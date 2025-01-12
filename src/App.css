@@ -1,0 +1,237 @@
+/* Alapértelmezett világos mód */
+html {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5; /* Világos háttér alapértelmezetten */
+    transition: background-color 0.3s ease; /* Simább váltás */
+  }
+  
+  .container {
+    display: grid;
+    grid-template-areas:
+      "header header"
+      "navbar navbar"
+      "content sidebar";
+    grid-template-columns: 5fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    min-height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Éjszakai mód (csak háttérszín) */
+  .dark-mode {
+    background-color: #121212 !important; /* Sötét háttér */
+  }
+  
+  .dark-mode .header {
+    background-color: #333; /* Sötét háttér a header számára */
+    color: #fff; /* Fehér szöveg */
+    border-bottom: 2px solid #ddd;;
+  }
+
+  .header {
+    grid-area: header;
+    background-color: #fff;
+    padding: 10px;
+    text-align: center;
+    border-bottom: 2px solid #ddd;;
+    position: relative;
+  }
+  
+  .theme-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+  
+  .theme-toggle:hover {
+    transform: scale(1.2);
+  }
+  
+  
+  /* Éjszakai mód csak a háttérre */
+  .dark-mode {
+    background-color: #121212; /* Sötét háttér */
+  }
+  
+  /* Egyéb stílusok */
+  .navbar {
+    grid-area: navbar;
+    background-color: #333; /* Navigációs sáv színe */
+    color: white;
+    width: 100%; /* Teljes szélesség */
+    margin: 0; /* Ne legyen margó */
+    padding: 0; /* Ne legyen extra padding */
+    box-sizing: border-box; /* Határok és margók figyelembevétele */
+  }
+  
+  .menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center; /* Középre igazított menüpontok */
+  }
+  
+  .menu li {
+    position: relative;
+  }
+  
+  .menu a {
+    text-decoration: none;
+    color: white;
+    padding: 10px 20px;
+    display: block;
+  }
+  
+  .menu a:hover,
+  .menu .dropdown:hover > a {
+    background-color: #0364cc;
+  }
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #007bff;
+    display: none;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    z-index: 1000;
+  }
+  
+  .dropdown:hover .dropdown-menu {
+    display: block;
+  }
+  
+  .dropdown-menu li a {
+    padding: 10px 20px;
+  }
+  
+  .content {
+    grid-area: content;
+    padding: 20px;
+    background-color: #fff;
+  }
+
+ 
+
+  .dark-mode .content {
+    background-color: #1e1e1e; /* Sötét háttér a content számára */
+    color: #fff; /* Fehér szöveg */
+  }
+  
+  .sidebar {
+    grid-area: sidebar;
+    padding: 20px;
+    background-color: #fff;
+    border-left: 5px solid #ddd;
+    
+  }
+
+
+    .dark-mode .sidebar {
+    background-color: #2c2c2c; /* Sötét háttér a sidebar számára */
+    border-left: 5px solid #444; /* Sötét szegély */
+    color: #fff; /* Fehér szöveg */
+    }
+
+  
+  .search-container {
+    display: flex;
+    justify-content: flex-end; /* A kereső jobb oldalra igazítása */
+    margin-bottom: 20px; /* Térköz a kereső és a bejegyzések között */
+  }
+  
+  .sidebar input {
+    width: 70%; /* A kereső mező szélessége */
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  
+  .sidebar h3 {
+    margin-top: 0;
+  }
+  
+  /* Mobilbarát reszponzív stílus */
+  @media (max-width: 768px) {
+    .container {
+      grid-template-areas:
+        "header"
+        "navbar"
+        "content"
+        "sidebar";
+      grid-template-columns: 1fr; /* Egy oszlopos elrendezés mobilon */
+    }
+  
+    .menu {
+      flex-direction: column; /* A menü mobilon függőlegessé válik */
+    }
+  }
+  
+  /* Box-sizing minden elemre */
+  * {
+    box-sizing: border-box;
+  }
+
+
+  .bionika-link {
+    color: #007bff; /* Állítsd be a kívánt színt */
+  }
+  
+  .bionika-link:hover {
+    color: #0056b3; /* Állítsd be a kívánt színt, amikor az egér fölé viszed */
+  }
+  
+
+  button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: #0056b3;
+  }
+
+
+
+
+
+
+
+  .folder-button {
+    display: flex;
+    align-items: center;
+    border: none;
+    cursor: pointer;
+    color: rgb(255, 255, 255);
+    font-size: 16px; /* Igazítsd a szövegméretet */
+    margin-bottom: 10px; /* Dinamikus hely a gombok között */
+  }
+  
+  .file-icon {
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    margin-bottom: 10px; /* Dinamikus hely a fájlok között */
+  }
