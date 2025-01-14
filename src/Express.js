@@ -43,33 +43,30 @@ app.get('/favicon.ico', (req, res) => {
 
 
 app.get('/api/files', (req, res) => {
-  const decodedPath = decodeURIComponent(req.query.path || ''); // Path dekódolása
-  const requestedPath = path.join(ROOT_DIR, decodedPath); // Teljes útvonal felépítése
+  const decodedPath = decodeURIComponent(req.query.path || '');
+  const requestedPath = path.join(ROOT_DIR, decodedPath);
 
   console.log('Kapott path:', req.query.path);
   console.log('Decoded path:', decodedPath);
   console.log('Requested path:', requestedPath);
 
-  // Ellenőrzés: létezik-e az útvonal
   if (!fs.existsSync(requestedPath)) {
-    console.error('Path not found:', requestedPath);
-    return res.status(404).json({ error: 'Path not found' });
+      console.error('Path not found:', requestedPath);
+      return res.status(404).json({ error: 'Path not found' });
   }
 
-  // Ellenőrzés: mappa-e az útvonal
   const isDirectory = fs.statSync(requestedPath).isDirectory();
   if (!isDirectory) {
-    console.error('Path is not a directory:', requestedPath);
-    return res.status(400).json({ error: 'Path is not a directory' });
+      console.error('Path is not a directory:', requestedPath);
+      return res.status(400).json({ error: 'Path is not a directory' });
   }
 
-  // Fájlok és mappák listázása
   const files = fs.readdirSync(requestedPath).map((name) => {
-    const filePath = path.join(requestedPath, name);
-    return {
-      name,
-      isDirectory: fs.statSync(filePath).isDirectory(),
-    };
+      const filePath = path.join(requestedPath, name);
+      return {
+          name,
+          isDirectory: fs.statSync(filePath).isDirectory(),
+      };
   });
 
   res.json({ files });
