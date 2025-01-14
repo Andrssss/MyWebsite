@@ -38,7 +38,14 @@ const Home = ({ folders, currentPath, handleMenuClick, setCurrentPath }) => {
             ) : (
               <>
                 <span className="file-icon">
-                  {folder.name.endsWith('.mp4') ? '▶️' : '📄'} {folder.name}
+                  {folder.name.endsWith('.mp4') 
+                    ? '▶️' 
+                    : folder.name.endsWith('.ppt') 
+                      ? '📙' 
+                      : folder.name.endsWith('.jpg') || folder.name.endsWith('.png') || folder.name.endsWith('.PNG') || folder.name.endsWith('.JPG')
+                        ? '🌇' 
+                        : '📄'} 
+                  {folder.name}
                 </span>
                 <button
                   onClick={() =>

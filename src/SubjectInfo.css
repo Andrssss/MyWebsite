@@ -1,0 +1,118 @@
+.subject-info-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    justify-content: flex-start;
+    padding: 20px;
+  }
+  
+  .search-bar input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .subject-card {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    background: var(--card-background-color, #ffffff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+  
+  .subject-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--header-background-color, #0044cc);
+    color: var(--header-text-color, #ffffff);
+  }
+  
+  .subject-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+  
+  .difficulty {
+    font-size: 0.9rem;
+    font-weight: bold;
+  }
+  
+  .subject-details {
+    padding: 15px;
+  }
+  
+  .section {
+    margin-bottom: 10px;
+  }
+  
+  .section h4 {
+    font-size: 1rem;
+    color: var(--section-header-color, #333);
+    margin-bottom: 5px;
+  }
+  
+  .section p {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--text-color, #555);
+  }
+  
+  .no-results {
+    text-align: center;
+    color: var(--text-color, #999);
+    font-size: 1rem;
+    margin-top: 20px;
+  }
+
+  .subject-semester {
+    padding: 0 15px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--semester-color, #555);
+  }
+
+
+  .search-filter-container {
+    display: flex;
+    justify-content: center;
+    align-items: center; /* Ensures both elements are vertically aligned */
+    gap: 15px; /* Adds spacing between the search bar and the dropdown */
+    margin-bottom: 20px;
+  }
+  
+  .search-bar {
+    width: 100%;
+    max-width: 300px;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 42px; /* Ensure the height matches the dropdown */
+    box-sizing: border-box; /* Ensures padding is included in the height */
+  }
+  
+  .semester-filter {
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 5px;
+    background-color: var(--filter-background, #fff);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 42px; /* Matches the search bar height */
+    line-height: 1.2; /* Ensures text is vertically centered */
+    box-sizing: border-box; /* Ensures padding is included in the height */
+    vertical-align: middle; /* Ensures the dropdown aligns vertically */
+  }
+  
+  
+  
