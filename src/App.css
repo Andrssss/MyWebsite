@@ -84,9 +84,11 @@ html {
   display: none; /* Rejtsd el a gombot nagyobb képernyőkön */
   background: none;
   color: white;
-  font-size: 24px;
+  font-size: 30px;
   border: none;
   cursor: pointer;
+  padding: 15px 20px; /* Nagyobb belső margó */
+  border-radius: 4px;
 }
 
 .menu li {
