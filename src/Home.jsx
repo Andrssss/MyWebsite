@@ -15,7 +15,7 @@ const Home = ({ folders, currentPath, handleMenuClick, setCurrentPath }) => {
       <iframe
         src={embedLink}
         style={{
-          width: '105%', // Teljes szélesség
+          width: '100%', // Teljes szélesség
           height: '100%', // Teljes magasság
           border: 'none',
           overflow: 'hidden',
