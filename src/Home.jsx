@@ -5,19 +5,21 @@ const Home = ({ folders, currentPath, handleMenuClick, setCurrentPath }) => {
   const embedLink = `https://drive.google.com/embeddedfolderview?id=${folderId}#grid`;
 
   return (
-    <div>
-      {/* Iframe a mappa tartalmának megjelenítéséhez */}
-      <div >
-        
-        <iframe
-          src={embedLink}
-          style={{
-            width: '100%',
-            height: '500px',
-            border: 'none',
-          }}
-        ></iframe>
-      </div>
+    <div
+      style={{
+        width: '100%',
+        height: '100vh', // Ensures full viewport height for iframe
+        overflow: 'hidden', // Prevent scrollbars on the container
+      }}
+    >
+      <iframe
+        src={embedLink}
+        style={{
+          width: '105%',
+          height: '100%',
+          border: 'none',
+        }}
+      ></iframe>
     </div>
   );
 };
