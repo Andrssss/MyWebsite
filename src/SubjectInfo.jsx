@@ -19,7 +19,7 @@ const subjects = [
   {
     name: 'Matematikai analízis I. - 2022',
     difficulty: 10,
-    general: 'Másnevén "Anál", a köznépi megnevezés jól tükrözi az érzést amit érezni fogsz a tárgy elvégzése közben. A nehézségek ott kezdődnek, hogy be kell járni előadásra és gyakorlatra. Ennek elhanyagolása legtöbb esetben bukáshoz vezet. A tárgy kulcsfontosságú, mivel majdnem minden tárgy erre a tudásra épít, az itt felszedet hiányosságok a későbbiekben is hátráltatni fognak.',
+    general: 'Másnevén "Anál", a köznépi megnevezés jól tükrözi az érzést amit érezni fogsz a tárgy elvégzése közben. A nehézségek ott kezdődnek, hogy be kell járni előadásra és gyakorlatra. Ennek elhanyagolása legtöbb esetben bukáshoz vezet. A tárgy kulcsfontosságú, mivel rengeteg tárgy erre a tudásra épít, az itt felszedet hiányosságok a későbbiekben is hátráltatni fognak.',
     duringSemester: 'Folyamatos figyelemre és gyakorlásra van szükség a tárgy elvégzéséhez. Nem lehet ZH-ra felkészűlni 1 nap alatt. Gyakorolni kell rá amennyit csak lehet.',
     exam: 'Szóbeli, tételeket tudni kell és arra is rákérdez, hogy érted-e. Van akinek elég 3 nap felkészűlni, de az átlag embernek MINIMUM 1 hét, ha már ki vannak dolgozva a tételek.  ',
     semester: 1,
@@ -27,7 +27,7 @@ const subjects = [
   {
     name: 'Lineáris algebra és diszkrét matematika I. -2022',
     difficulty: 6,
-    general: 'Ez a tárgy lényegesen kellemesebb, mint az Analízis, mivel lényegesen kisebb az anyag. A DM része könnyű, még az LA része némi otthoni utánajárást igényel. Minél több mindenről tudod, hogyan néz ki vizuálisan, annál könnyebb lesz ez a tárgy. Rengeteg jó anyag van vele kapcsolatban a neten, melegen javasolt, ha más nem a vizsga miatt',
+    general: 'Ez a tárgy lényegesen kellemesebb, mint az Analízis, mivel szignifikánsan kisebb az anyag. A DM része könnyű, még az LA része némi otthoni utánajárást igényel. Minél több mindenről tudod, hogyan néz ki vizuálisan, annál könnyebb lesz ez a tárgy. Rengeteg jó anyag van vele kapcsolatban a neten, melegen javasolt, ha más nem a vizsga miatt',
     duringSemester: 'Némi gyakorlást igényel. Érdemes bejárni órákra.',
     exam: 'Ha van megajánlott jegy, akkor az ajándék. Érdemes vele élni, ha nincs akkor pedig olyan, mint Analízis.',
     semester: 1,
@@ -50,7 +50,7 @@ const subjects = [
   {
     name: 'Valószínűségszámítás, matematikai statisztika - 2023',
     difficulty: 6,
-    general: 'Ha középsuliban se volt a kedvenc tárgyad, akkor majd itt megszereted, mert itt érdekesen adják elő. Neve jól leírja mire számíthatsz. De a fogalmak nem triviálisak. Nem feltétlen nehéz tárgy, de könnyű rajta megcsúszni, ha nem veszed komolyan. A tárgy olyasmi struktúrájában, mint LA. ',
+    general: 'Ha középsuliban nem volt a kedvenc tárgyad, akkor majd itt megszereted, mert itt érdekesen adják elő. Neve jól leírja amire számíthatsz. De a fogalmak nem triviálisak. Nem feltétlen nehéz tárgy, de könnyű rajta megcsúszni, ha nem veszed komolyan. A tárgy olyasmi struktúrájában, mint LA. ',
     duringSemester: 'Javasolt az órákra bejárni és figyelni. Mert le fogsz maradni.',
     exam: 'Ha van megajánlott jegy, akkor rá kell repűlni, mert a vizsga az nem annyira barátságos. Egyrészt tudni kell a tételeket, másrészt mély értést is feltételeznek és bele is kérdeznek, akár részletesen 1-1 fogalomba. Főleg azért fontos a megajánlott jegy, mert rettentően sok és nehéz vizsga van ebben a félévben.',
     semester:3 ,
@@ -58,7 +58,7 @@ const subjects = [
   {
     name: 'A digitális számítás elmélete - 2023',
     difficulty: 3,
-    general: 'Teljesen barátságos tárgy. Egyszerű és könnyű anyag. Itt-ott kicsit épűlnek rá tárgyak, de nem szuper fontosak az itt megtanult fogalmak. Év végén volt 1db, ami ZH nem volt nehéz.',
+    general: 'Teljesen barátságos tárgy. Egyszerű és könnyű anyag. Itt-ott kicsit épűlnek rá tárgyak, de nem szuper fontosak az itt megtanult fogalmak. Év végén volt 1db ZH, ami nem volt nehéz.',
     duringSemester:   'Érdemes lehet bejárni, mert elég sok lesz a kérdőjel, mire eljön a zh időszak.' ,
     exam: 'Nálunk annó lehetett puskázni vizsgán. De én nem éltem a lehetőséggel és így se volt nehéz. Nagyon kedven a Tanár úr és kedvesen osztályoz.',
     semester: 4,
@@ -66,7 +66,7 @@ const subjects = [
   {
     name: 'Sztochasztikus folyamatok - 2023',
     difficulty: 6,
-    general: 'A híres Valszám 2. Abban különbözik, hogy itt extrán érdekes dolgokat fogtok tanulni, ha érdekes a statisztika és a jóslás. Az itt megszerzett tudás természetesen másik tárgyakon is kelleni fog, széleskörben lehet használni. Hasonlóan nehéz, mint a Valszám. Csak ezt a tudást már tudod használni adott munkakörökben. Bionikásoknak is hasznos lehet. ',
+    general: 'A híres Valszám 2. Abban különbözik, hogy itt érdekesebb dolgokat fogtok tanulni, már ha érdekes a statisztika és a jóslás. Az itt megszerzett tudás természetesen másik tárgyakon is kelleni fog, széleskörben lehet használni. Hasonlóan nehéz, mint a Valszám. Bionikásoknak is hasznos lehet. ',
     duringSemester: 'Melegen javasolt bejárni.',
     exam: 'Itt is a megajánlott jegy nem kevés szenvedéstől tud megóvni, ha van. Vizsga olyan, mint valszámon, ha mégse lenne meg a megajánlott jegy.',
     semester: 4,
@@ -74,26 +74,27 @@ const subjects = [
   {
     name: 'A közgazdaságtan alapjai - 2022',
     difficulty: 2,
-    general: 'Nekünk ez online volt, szóval nem igényelt sok munkát. Kidolgoztunk rá egy excel táblázatot az összes kérdéssel és válasszal. De aki szereti, annak érdekes lehet, mert jó a tanár. De halottam, hogy később ez a tárgy nehézzé vált. Erről nem tudok nyilatkozni. ',
+    general: 'Nekünk ez online volt, szóval nem igényelt sok munkát. Kidolgoztunk rá egy excel táblázatot az összes kérdéssel és válasszal. Aki szereti, annak érdekes lehet, mert jó a tanár. De halottam, hogy később ez a tárgy nehézzé vált. Erről nem tudok nyilatkozni. ',
     semester: 1,
   },
   {
     name: 'Bevezetés a kereszténységbe - 2023',
     difficulty: 1,
-    general: 'Ez is olyan, mint a Biblia világa. Ha az se érdekelt, akkor ez se fog. Csak legalább jól fel is bosszant, hogy minek tanultok ilyenekről megint. Év végén volt egy ZH, ahol folyamatosan körbe járt a Tanár úr. Az volt a szerencsénk, hogy elfogadta, hogy nem papoknak tanulunk és ezért gyakorlatilag mindegy mi volt a ZH-n, a kettest megadta.',
-    semester: 3,
+    general: 'Kötelező volt bejárni. Jó volt mindig hallgatni, ahogy 30-an beszélnek mögöttem. Olyan érdekes dolgokat tudhatsz meg, hogy a kutyák miért nem kerűlnek a mennybe vagy miért alsóbrendű aki nem keresztény. Szuper. ZH nekünk abból állt, hogy be kellett küldeni egy pdf-et amiben ki lehetett választani a helyes választ. Ez megegyezett az elöző évivel. ',
+    semester: 1,
   },
   {
     name: 'A Biblia világa - 2023',
     difficulty: 1,
-    general: 'Kötelező volt bejárni. Jó volt mindig hallgatni, ahogy 30-an beszélnek mögöttem. ZH nekünk abból állt, hogy be kellett küldeni egy pdf-et amiben ki lehetett választani a helyes választ. Ez megegyezett az elöző évivel.',
+    general: 'Ez is olyan, mint a Biblia világa. Ha az se érdekelt, akkor ez se fog. Csak legalább jól fel is bosszant, hogy minek tanultok ilyenekről megint. Év végén volt egy ZH, ahol folyamatosan körbe járt a Tanár úr. Az volt a szerencsénk, hogy elfogadta, hogy nem papoknak tanulunk és ezért gyakorlatilag mindegy mi volt a ZH-n, a kettest megadta.',
     semester: 2,
   },
   {
     name: 'A Katolikus Egyház társadalmi tanítása - 2024',
     difficulty: 2,
-    general: 'Egyébként ezzel a tárgyal még tudtam is rezonálni, mert ha rárakunk egy kereszténység szürőt, akkor egész jónak hangzik az ott elhangzottak. Zh és Vizsga is van, amikre azt mondták, hogy megcsinálható. Nekünk úgy alakult, hogy teljes fedésben volt 2 másik kötelező tárgyal így Tanár nő, csak azt kérte, hogy olvassuk el a könyvét és beszélgessünk vele róla. Tanár nő kedves és megértő. Amikor meséltem másoknak erről a tárgyról mindig kinevettek. Szóval ha más nem egy jó beszélgetés indító marad az élmény.',
+    general: 'Egyébként ezzel a tárgyal még tudtam is rezonálni, mert ha rárakunk egy kereszténység szürőt, akkor egész jónak hangzik az ott elhangzottak. Röviden arról szól, hogy milyen lenne egy olyan gazdaság ahol mindenki jól jár. Zh és Vizsga is van, amikre azt mondták, hogy megcsinálható. Nekünk úgy alakult, hogy teljes fedésben volt 2 másik kötelező tárgyal így Tanár nő, csak azt kérte, hogy olvassuk el a könyvét és beszélgessünk vele róla. Tanár nő kedves és megértő. Amikor meséltem másoknak erről a tárgyról mindig kinevettek. Szóval ha más nem egy jó beszélgetés indító marad az élmény.',
     duringSemester: 'Kötelező bejárni...',
+    exam: 'Azt mesélték, hogy "tip-mix"-el egy 2-est meglehet szerezni vizsgán.',
     semester: 5,
   },
   
@@ -152,7 +153,7 @@ const subjects = [
   {
     name: 'Adatbázis rendszerek - 2024',
     difficulty: 8,
-    general: 'Nem mindenki szereti ezt a tárgyat egyenlő lelkesedéssel. Szerintem mind az oktató, mind a gyakvezem nagyon jó volt és így 10/10 ez a tárgy. De ne tévesszen meg az első pár alkalom, ez egy nehéz tárgy. A nehézség oka nem más, mint hogy sokat kell gyakorolni és sok fogalmat meg kell érteni. De ez megint egy olyan tárgy amivel munkát lehet szerezni. A röpZH-k nekünk nehezek voltak remélem azóta könnyítettek rajta. Amiatt sokan majdnem megbuktak. A Szuper-RZH meg egyenesen halál. (3 rzh egyben ?!). És így cserébe nem volt ZH.',
+    general: 'Nem mindenki szereti ezt a tárgyat egyenlő lelkesedéssel. Szerintem mind az oktató, mind a gyakvezem nagyon jó volt és így 10/10 ez a tárgy. De ne tévesszen meg az első pár alkalom, ez egy nehéz tárgy. A nehézség oka nem más, mint hogy sokat kell gyakorolni és sok fogalmat meg kell érteni. De ez megint egy olyan tárgy amivel munkát lehet szerezni. A röpZH-k nekünk nehezek voltak remélem azóta könnyítettek rajta. Amiatt sokan majdnem megbuktak. A Szuper-RZH meg egyenesen halál. (3 rzh egyben ?!). De így cserébe nem volt ZH.',
     duringSemester: 'A beugrókra kell figyelni. Csinálni kell heti rendszerességgel a házikat. ',
     exam: 'Szóbeli vizsga, hogy érted-e a fogalmakat. Szuper kedvesek és segítőkészek.',
     semester: 4,
@@ -160,7 +161,7 @@ const subjects = [
   {
     name: 'Digitális jelfeldolgozás - 2024',
     difficulty: 9,
-    general: 'Ez se volt egy egyszerű tárgy. De nagyon hasznos. A nehézséget a fogalmak okozzák, hogy kevés anyag van hozzá. A számolós feladatok nem egyszerűek, sok gyakorlást igényelnek. Az elmélet meg bár az Előadás jó, mégsincs elég anyag a megértéshez. Emiatt vizsgán a leggyakoribb jegy a 2-es volt. Nekünk 4 db KZH volt, ennek átlaga + a nagy ZH átlaga adta az alap osztályzatot. Majd utána egy írásbeli vizsga.',
+    general: 'Ez se volt egy egyszerű tárgy. De nagyon hasznos. A nehézséget a fogalmak okozzák, hogy kevés anyag van hozzá. A számolós feladatok nem egyszerűek, sok gyakorlást igényelnek. Az elmélet meg bár az Előadás jó, mégsincs elég anyag a megértéshez. Emiatt vizsgán a leggyakoribb jegy a 2-es volt. Nekünk 4db KZH volt és 1 ZH. Útóbbin olyan 70% bukott meg elsőre. De Pótzh-n átment az emberek nagyrésze. Ezt csak mint egy figyelmeztetést írom ide, hogy nem kell kétségbe esni, de komolyan kell venni. Majd utána egy írásbeli vizsga.',
     duringSemester: 'Melegen javasolt bejárni, nem szabad félválról venni. Arról nem is beszélve, hogy a fogalmakra épűlnek másik tárgyak.',
     exam: 'Gyakorlati vizsga, jobb jegyért lehet előadóval beszélgetni. Olyan nehézségű, mint egy sima ZH.',
     semester: 4,
@@ -186,7 +187,7 @@ const subjects = [
     general: 'Az anyag nem nehéz, de felvétel nem tartozik hozzá így ha nem jársz előadásra és nem figyelsz, akkor a HF nehéz tud lenni, meg a ZH is, mert a diákban direkt nincs szájbarágósan leírva és nem fogod érteni, hogy mi történik. Alapvetően ez egy barátságos tárgy. Mármint HF, az könnyű, ZH nekünk online volt. Szóval gyakorlatilag ingyen kredit.',
     duringSemester: 'Nem szükséges bejárni, de egyrészt kötelező, másrészt nem fogsz vizsgán bután nézni a tanárnőre, vagy a házi bemutatás során.',
     exam: 'Megajánlott jegyet lehet kapni bármire. Vizsgán lehet javítani. Kedves és segítőkész tanárnő.',
-    semester: 5,
+    semester: 4,
   },
   {
     name: 'Basics of Mobile Application Development - 2024',
@@ -228,7 +229,7 @@ const subjects = [
   {
     name: 'Computer Controlled Systems - 2024',
     difficulty: 4,
-    general: 'Meglepően könnyű tárgy. A rendszerek szabályozásáról, megfigyeléséről szól és stabilizálásáról. Mindkettő ZH 2 részből áll, elméleti és gyakorlati rész, azonos pontot érnek. Az elméleti rész-nél nem hivatalosan lehet használni segítséget. Gyakorlatoti rész korrekt. Órák jól felkészítenek. ',
+    general: 'Meglepően könnyű tárgy. A rendszerek szabályozásáról, megfigyeléséről szól és stabilizálásáról. Mindkettő ZH 2 részből áll, elméleti és gyakorlati rész, azonos pontot érnek. Az elméleti rész-nél nem hivatalosan lehet használni segítséget. Gyakorlatoti rész korrekt. Órák jól felkészítenek. Házik, projekt eddig 3 éve változatlan. ZH-kon minimálisakat válzotatnak.',
     duringSemester: 'Erősen javasolt bejárni.',
     exam: 'Nálunk mindenki megajánlott jegyet kapott, aki megcsinálta a ZH-t. (kivéve akinek mennie kellett PÓTZH-ra.) Hiába volt arról szó, hogy csak az 5-ös kap. Utána egy projektet kellett megcsinálni, ami max 1 nap, az egész éves tudás alapján. ',
     semester: 5,
@@ -250,7 +251,7 @@ const subjects = [
   {
     name: 'Játékelmélet és hálózati alkalmazásai - 2024',
     difficulty: 4,
-    general: '1. órán megy a beetetés, hogy wow ez tök érdekes tárgy lesz. Egy csomó izgalmas dolgot fogunk tanulni, majd amikor már nem lehet leadni ezt a tárgyat, akkor derűl ki, hogy 30% érdekez dolog, 70% butaságok számolása amiket 100 éves könyvből vannak. Ez a tárgy összességében relatív könnyű, mert év végén van egy ZH ami abból áll, hogy ezekből a számolós feladatokból van pár, meg néhány elméleti kérdés és ennyi. Ha figyeltél órán, akkor kis idő alatt begyakorolhatóak, minden évben hasonlóak a feladatok. Fent van youtube-on videó velük kapcsolatban.  ',
+    general: '1. órán megy a beetetés, hogy wow ez tök érdekes tárgy lesz. Egy csomó izgalmas dolgot fogunk tanulni, majd amikor már nem lehet leadni ezt a tárgyat, akkor derűl ki, hogy 30% érdekez dolog, 70% butaságok számolása amiknek semmi köze az elképzelésedhez. Jó azért vannak egész érdekes dolgok, de akkor sem erről volt szó. Ez a tárgy összességében relatív könnyű, mert év végén van egy ZH ami abból áll, hogy ezekből a számolós feladatokból van pár, meg néhány elméleti kérdés és ennyi. Ha figyeltél órán, akkor kis idő alatt begyakorolhatóak, minden évben hasonlóak a feladatok. Fent van youtube-on videó velük kapcsolatban.  ',
     duringSemester: 'Érdemes bejárni, mert év végén nem nagyon lesz idő átnézni ezt a sok butaságot. De van aki nem járt be és megcsinálta egész jóra a ZH-T. Személy függő. Szerintem ez egy butaság tárgy, lehetne muilliószor jobb. ',
     exam: '2-esnél jobb ZH megajánlott jegyet kap. ',
     semester: 4,
