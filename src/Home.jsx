@@ -7,15 +7,14 @@ const Home = ({ folders, currentPath, handleMenuClick, setCurrentPath }) => {
   return (
     <div
       style={{
-        width: '100%',
-        height: '100vh', // Ensures full viewport height for iframe
-        overflow: 'hidden', // Prevent scrollbars on the container
+        width: '110%',
+        height: '90vh', // Ensures full viewport height for iframe
       }}
     >
       <iframe
         src={embedLink}
         style={{
-          width: '100%', // Teljes szélesség
+          width: '110%', // Teljes szélesség
           height: '100%', // Teljes magasság
           border: 'none',
           overflow: 'hidden',
