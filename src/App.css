@@ -39,7 +39,7 @@ html {
   color: white;
   text-align: center;
   z-index: 15;
-  
+
   position: relative;
 }
 
@@ -54,7 +54,12 @@ html {
   border: none;
 }
 
-
+.center-text {
+  flex: 1;
+  font-weight: normal;
+  color: white;
+  margin-top: 0; /* Eltávolítja az esetleges felső margót */
+}
 
 .navbar {
   grid-area: navbar;
