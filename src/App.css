@@ -4,18 +4,16 @@ html {
   overflow-x: hidden;
 }
 
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #f5f5f5; /* Világos háttér alapértelmezetten */
-  transition: background-color 0.3s ease, color 0.3s ease; /* Simább váltás */
+
+.small-heading {
+  font-size: 20px; /* Állítsd be a kívánt méretet */
+  font-weight: normal; /* Állítsd be a kívánt betűvastagságot */
+  text-align: left; /* Balra igazítja a szöveget */
+  margin-left: 20px; /* Eltávolítja az esetleges bal oldali margót */
 }
 
-/* Közös transition osztály */
-.transition {
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
+
+
 
 .container {
   display: grid;
@@ -30,71 +28,60 @@ body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-/* Éjszakai mód (csak háttérszín) */
-.dark-mode {
-  background-color: #121212 !important;
 }
 
 
-.dark-mode .content {
-  background-color: #333;
-  color: #fff;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-.dark-mode .header,
-.dark-mode .navbar{
-  background-color: black;
-}
-.dark-mode .navbar{
-border-top: 2px solid white; 
-}
 
 .header {
+  position: sticky;
   grid-area: header;
-  background-color: black;
+  background-color: rgba(0, 0, 0, 1); /* Átlátszó navbar */
   color: white;
   text-align: center;
+  z-index: 15;
+  
   position: relative;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
+
 
 .theme-toggle {
   position: absolute;
   top: 10px;
   right: 10px;
+  width: 30px; /* Szélesség beállítása */
+  height: 30px; /* Magasság beállítása */
   background: none;
   border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.theme-toggle:hover {
-  transform: scale(1.2);
-  background: none; /* Eltávolítja a kék hátteret hover állapotban */
-}
+
 
 .navbar {
   grid-area: navbar;
-  background-color: black;
+  background-color: rgba(0, 0, 0, 1); /* Fekete 50% átlátszósággal */
   width: 100%;
   margin: 0;
   padding: 0;
-  border-top: 2px solid white; 
+  border-top: 2px solid white;
   display: flex;
   justify-content: center;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .menu {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
-  justify-content: center;
+  flex-direction: row; /* Alapértelmezett, nagyobb képernyőkre */
+  list-style: none;
+  transition: all 0.3s ease-in-out;
+
+}
+
+.menu-toggle {
+  display: none; /* Rejtsd el a gombot nagyobb képernyőkön */
+  background: none;
+  color: white;
+  font-size: 24px;
+  border: none;
+  cursor: pointer;
 }
 
 .menu li {
@@ -113,45 +100,33 @@ border-top: 2px solid white;
 
 }
 
-.dark-mode .menu li a {
-  color: white; /* Szín sötét módban */
-}
 
 
 
-.menu a:hover,
-.menu .dropdown:hover > a {
-  background-color: #007bff;
+
+.menu a:hover{
   transform: scale(1.01);
-  background: #007bff;
+  background: #646060;
 }
 
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  background-color: #007bff;
-  display: none;
-  list-style: none;
+
+body {
   margin: 0;
-  padding: 0;
-  z-index: 1000;
+  overflow: hidden; /* Fontos, hogy ne legyen görgetés */
+  background: black;
 }
 
-.dropdown:hover .dropdown-menu {
-  display: block;
-}
-
-.dropdown-menu li a {
-  padding: 10px 20px;
-}
-
-.content { 
+.content {
   grid-area: content;
   padding: 20px;
-  background-color: #fff;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  color: white;
+  z-index: 1;
+  position: relative;
 }
+
+
+
+
 
 .search-container {
   display: flex;
@@ -159,79 +134,68 @@ border-top: 2px solid white;
   margin-bottom: 20px;
 }
 
-/* Mobilbarát reszponzív stílus */
-@media (max-width: 768px) {
-  .container {
-    grid-template-areas:
-      "header"
-      "navbar"
-      "content"
-      "sidebar";
-    grid-template-columns: 1fr;
-  }
-
+@media (max-width: 650px) {
   .menu {
-    flex-direction: column;
+    display: none; /* Rejtett menü mobilon */
+    flex-direction: column; /* Függőleges irány */
+    background-color: rgba(0, 0, 0, 0.8); /* Átlátszó háttér */
+    position: absolute;
+    top: 60px; /* Az ikon alá helyezve */
+    right: 0;
+    width: 100%; /* Teljes szélesség */
+    padding: 10px 0;
+    z-index: 10;
+  }
+
+  .menu.open {
+    display: flex; /* Megjelenik, ha nyitva van */
+  }
+
+  .menu-toggle {
+    display: block; /* Csak mobilon jelenjen meg */
+  }
+
+  .menu a {
+    padding: 10px 20px;
+    text-align: center;
+    border-bottom: 1px solid white;
+  }
+
+  .menu a:last-child {
+    border-bottom: none; /* Az utolsó elemhez ne legyen alsó szegély */
   }
 }
 
-/* Box-sizing minden elemre */
-* {
-  box-sizing: border-box;
-}
 
-/* Linkek */
-.bionika-link {
-  color: #007bff;
-}
-
-.bionika-link:hover {
-  color: #0056b3;
-}
-
-button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
 
 .university-link-button,
 .others-link-button,
 .folder-button {
+  background-color: white;
+  color: black;
+  width: 300px;
   padding: 10px 40px;
   font-size: 16px;
+  text-align: center;
   border-radius: 4px;
   cursor: pointer;
   transition: transform 0.2s ease, background-color 0.3s ease;
   margin: 2px 0; /* Függőleges távolság növelése */
-
-}
-
-.university-link-button {
-  background-color: #007bff;
-  color: white;
-  text-align: left;
   text-decoration: none;
 }
 
+
+.folder-button:hover,
+.others-link-button:hover,
 .university-link-button:hover {
-  background-color: #0056b3;
+  background-color: #b9b9b9;
   transform: scale(1.1);
 }
 
-.university-links-list {
-  list-style-type: none; /* Eltávolítja a pontokat */
-}
 
 
 
+.university-links-list ,
 .others-links-list {
   list-style-type: none;
   padding: 0;
@@ -242,28 +206,4 @@ button:hover {
 }
 
 
-.others-link-button {
-  background-color: #28a745;
-  color: white;
-  text-align: center;
-  text-decoration: none;
-  display: block;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
 
-.others-link-button:hover {
-  background-color: #218838;
-  transform: scale(1.05);
-}
-
-.folder-button {
-  background-color: #6c757d;
-  color: white;
-  text-align: left;
-  text-decoration: none;
-}
-
-.folder-button:hover {
-  background-color: #5a6268;
-  transform: scale(1.05);
-}
