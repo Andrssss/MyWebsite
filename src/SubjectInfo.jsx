@@ -207,7 +207,7 @@ const subjects = [
   {
     name: 'Áramkörök elmélete és számítása - 2023',
     difficulty: 11,
-    general: 'Ez a tárgy. Fu. A legnagyobb probléma vele, a segédanyagok hiánya. Komolyan kell venni. 2023-ban ennek a tárgynak nagyon el volt engedve a keze. Ebben az évben a jegyek átlaga : 1.95  és medián :  2 ..... Jegyek :      29db 1-es, 66db 2-es, 21db 3-a és 1db 4-es. Én nem vagyok egy okos gyerek, de itt jól láthatóan az okatás minőségével van a baj. Nem tudsz mit csinálni, gyakorolni kell sokat. 2024-ben hallottam, hogy visszahoztak a  "létrát", az elvileg még egy mód, hogy megbuktassanak. Kitartást gyerekek.',
+    general: 'Ez a tárgy. Fu. A legnagyobb probléma vele, a segédanyagok hiánya. Komolyan kell venni. 2023-ban ennek a tárgynak nagyon el volt engedve a keze. Ebben az évben az év végi jegyek átlaga : 1.95  és medián :  2 ..... Jegyek :      29db 1-es, 66db 2-es, 21db 3-a és 1db 4-es. Én nem vagyok egy okos gyerek, de itt jól láthatóan az okatás minőségével van a baj. Nem tudsz mit csinálni, gyakorolni kell sokat. 2024-ben hallottam, hogy visszahoztak a  "létrát", az elvileg még egy mód, hogy megbuktassanak. Kitartást gyerekek.',
     duringSemester: 'Be KELL járni, és amikor van kis időd gyakorolni kell, mert magas a bukás arány.',
     exam: 'Ha a ZH megvan, akkor a Vizsga szinte könnyű, hasonló a ZH-hoz. ',
     semester: 3,
