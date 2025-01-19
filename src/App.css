@@ -39,17 +39,18 @@ html {
   color: white;
   text-align: center;
   z-index: 15;
-
   position: relative;
+  align-items: center; /* Függőleges középre igazítás */
+
 }
 
 
 .theme-toggle {
   position: absolute;
-  top: 10px;
+  top: 7px;
   right: 10px;
-  width: 30px; /* Szélesség beállítása */
-  height: 30px; /* Magasság beállítása */
+  width: 35px; /* Szélesség beállítása */
+  height: 35px; /* Magasság beállítása */
   background: none;
   border: none;
 }
@@ -75,40 +76,26 @@ html {
 .menu {
   display: flex;
   flex-direction: row; /* Alapértelmezett, nagyobb képernyőkre */
-  list-style: none;
-  transition: all 0.3s ease-in-out;
-
 }
 
 .menu-toggle {
   display: none; /* Rejtsd el a gombot nagyobb képernyőkön */
   background: none;
   color: white;
-  font-size: 30px;
+  font-size: 25px;
   border: none;
   cursor: pointer;
-  padding: 15px 20px; /* Nagyobb belső margó */
-  border-radius: 4px;
 }
 
-.menu li {
-  position: relative;
-}
+
 
 .menu a {
   text-decoration: none;
   color: white;
   padding: 10px 20px;
   display: block;
-  border-radius: 3px;
   opacity: 1; /*Áttetszőbb lesz a háttérhez képest*/
-
-
-
 }
-
-
-
 
 
 .menu a:hover{
@@ -131,15 +118,14 @@ body {
   position: relative;
 }
 
-
-
-
-
 .search-container {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 20px;
 }
+
+
+
 
 @media (max-width: 650px) {
   .menu {
@@ -147,11 +133,10 @@ body {
     flex-direction: column; /* Függőleges irány */
     background-color: rgba(0, 0, 0, 0.8); /* Átlátszó háttér */
     position: absolute;
-    top: 60px; /* Az ikon alá helyezve */
     right: 0;
     width: 100%; /* Teljes szélesség */
-    padding: 10px 0;
-    z-index: 10;
+    padding: 0;
+    z-index: 10; /* A menü előrébb kerül a rétegek között, hogy ne takarja el más elem. */
   }
 
   .menu.open {
@@ -163,13 +148,12 @@ body {
   }
 
   .menu a {
-    padding: 10px 20px;
-    text-align: center;
-    border-bottom: 1px solid white;
+    padding: 10px 20px; /*Minden menüelem kap egy belső margót, hogy kattintható területük kényelmesebb legyen */
+    text-align: center; /*A menüszöveg középre igazított.*/
   }
 
-  .menu a:last-child {
-    border-bottom: none; /* Az utolsó elemhez ne legyen alsó szegély */
+  .theme-toggle {
+    transform: translateY(+20%); /* Finomhangolás telefon módban */
   }
 }
 

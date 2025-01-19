@@ -16,6 +16,7 @@ const othersLinks = [
   { name: 'retge1', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'balma14', url: 'https://balazsmatyas429.wixsite.com/bm-s-home/file-share/cc237340-835b-4d31-bce0-a5ca48ddc9ea' },
   { name: 'bolle', url: 'https://users.itk.ppke.hu/~bolle/Minden%20-by%20Bal%c3%a1zs%20M%c3%a1ty%c3%a1s/' },
+  { name: 'PPKE WIKI', url: 'https://users.itk.ppke.hu/~marri1/?fbclid=IwZXh0bgNhZW0CMTAAAR184vSVMEMSqLJEWe3fgnc-JEl0U_gAYiXGuvkbRyy6R4VeGMj02NevaKA_aem_BG5QKzrq0RPmdpiqjOzWMw' },
 
 ];
 const OthersLinks = () => {

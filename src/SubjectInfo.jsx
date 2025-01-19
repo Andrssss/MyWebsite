@@ -207,14 +207,14 @@ const subjects = [
   {
     name: 'Áramkörök elmélete és számítása - 2023',
     difficulty: 11,
-    general: 'Ez a tárgy. Fu. A legnagyobb probléma vele, a segédanyagok hiánya. Komolyan kell venni. 2023-ban ennek a tárgynak nagyon el volt engedve a keze. Ebben az évben az év végi jegyek átlaga : 1.95  és medián :  2 ..... Jegyek :      29db 1-es, 66db 2-es, 21db 3-a és 1db 4-es. Én nem vagyok egy okos gyerek, de itt jól láthatóan az okatás minőségével van a baj. Nem tudsz mit csinálni, gyakorolni kell sokat. 2024-ben hallottam, hogy visszahoztak a  "létrát", az elvileg még egy mód, hogy megbuktassanak. Kitartást gyerekek.',
+    general: 'Ez a tárgy. Fu. A legnagyobb probléma vele, a segédanyagok hiánya. 2023-ban ennek a tárgynak nagyon el volt engedve a keze. Ebben az évben az év végi jegyek átlaga : 1.95  és medián :  2 ..... Jegyek :      29db 1-es, 66db 2-es, 21db 3-a és 1db 4-es. Én nem vagyok egy okos gyerek, de itt jól láthatóan az okatás minőségével van a baj. Nem tudsz mit csinálni, gyakorolni kell sokat. 2024-ben hallottam, hogy visszahoztak a  "létrát", az elvileg még egy mód, hogy megbuktassanak. Kitartást gyerekek.',
     duringSemester: 'Be KELL járni, és amikor van kis időd gyakorolni kell, mert magas a bukás arány.',
     exam: 'Ha a ZH megvan, akkor a Vizsga szinte könnyű, hasonló a ZH-hoz. ',
     semester: 3,
   },
   {
     name: 'Számítógépes hálózatok - 2023',
-    difficulty: 6,
+    difficulty: 4,
     general: 'Ez a tárgy fantasztikus. Sok fontos és érdekes fogalom. Neve jól leírja az itt tanultakat. A gyakorlatokon vicces dolgokat fogsz megismerni. A tárgy könnyű, csak beugró van és vizsga.',
     exam: 'Könnyű, csak egy laza beszélgetés, hogy az általad húzott tételben szereplő fogalmakat érted-e. De nálunk volt megajánlott jegy, arra javasolt rárepülni.',
     semester: 3,
@@ -228,7 +228,7 @@ const subjects = [
   },
   {
     name: 'Computer Controlled Systems - 2024',
-    difficulty: 4,
+    difficulty: 6,
     general: 'Meglepően könnyű tárgy. A rendszerek szabályozásáról, megfigyeléséről szól és stabilizálásáról. Mindkettő ZH 2 részből áll, elméleti és gyakorlati rész, azonos pontot érnek. Az elméleti rész-nél nem hivatalosan lehet használni segítséget. Gyakorlatoti rész korrekt. Órák jól felkészítenek. Házik, projekt eddig 3 éve változatlan. ZH-kon minimálisakat válzotatnak.',
     duringSemester: 'Erősen javasolt bejárni.',
     exam: 'Nálunk mindenki megajánlott jegyet kapott, aki megcsinálta a ZH-t. (kivéve akinek mennie kellett PÓTZH-ra.) Hiába volt arról szó, hogy csak az 5-ös kap. Utána egy projektet kellett megcsinálni, ami max 1 nap, az egész éves tudás alapján. ',
@@ -258,7 +258,7 @@ const subjects = [
   },
   {
     name: 'A nyelvtechnológia alapjai - 2024',
-    difficulty: 6,
+    difficulty: 7,
     general: 'Ez megint egy olyan tárgy, hogy miért is tanulunk ilyeneket. Az elmélet még úgy elmegy. Kis nyelvtan, kis mondat elemzés, kis digitális szótárak. De a gyakorlat, az kemény. Olyan randomnak érződik a tananyag, kicsit mintha nem lenne struktúra. ZH-n az még rosszabb, mint a gyakorlat. Fájdalmas. 2db ZH van, ezek évről-évre picit változhatnak. Alapvetőleg elméleti részből áll az első része, a többi a gyaorlaton elhangzottakból lehet bármi. Nem igazán lehet itt okosat mondani, ez a tárgy idén borzalmas volt.',
     duringSemester: 'Én azt mondanám, hogy érdemes bejárni, főleg gyakorlatra és figyelni. Mert akkor sokkal könnyebb dolgod lesz a ZH-n. ',
     exam: 'A vizsgán a gyakorlati jegyedről indulsz. Választasz egy tételt és ha az előadó úgy ítéli meg, hogy érted, akkor javíthatsz a jegyeden. Ha nem akkor meg kirugdos. :D  (persze megadva azt a jegyet, mint amit kaptál gyakorlatra.)',
@@ -268,6 +268,7 @@ const subjects = [
 
   {
     name: 'Introduction to Artificial Intelligence',
+    difficulty: 10,
     general: 'Azt monják nehéz. A követelmény rendszer meg káosz. Mármint a pontszámítás katyvasz és van amit meg se osztanak vizsgáig. Meg nem is az AI-ról szól.',
     semester: 5,
   },
@@ -283,7 +284,7 @@ const subjects = [
   },
   {
     name: 'Információ- és kódelmélet',
-
+    general: 'Digjel 2. Alig várom.',
     semester: 6,
   },
   
@@ -304,7 +305,7 @@ const subjects = [
   },
   {
     name: 'Önlab',
-
+  
     semester: 6,
   },
   {
