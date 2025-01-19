@@ -7,20 +7,17 @@ const Home = ({ folders, currentPath, handleMenuClick, setCurrentPath }) => {
   return (
     <div
       style={{
-        width: '90%', // Csökkentett szélesség
-        height: '80vh', // Csökkentett magasság
-        margin: '0 auto', // Központosítás
-        padding: '70px', // Csökkentett térköz a tartalom körül
-        paddingTop: '0px'
+        width: '110%',
+        height: '90vh', // Ensures full viewport height for iframe
+        marginLeft: '-10%', // Balra tolás, pl. -10% -kal
 
-        // Ha még közelebb szeretnéd a fejléchez, csökkentheted a padding-top-ot is
       }}
     >
       <iframe
         src={embedLink}
         style={{
-          width: '120%', // Teljes szélesség a div-en belül
-          height: '120%', // Teljes magasság a div-en belül
+          width: '110%', // Teljes szélesség
+          height: '100%', // Teljes magasság
           border: 'none',
           overflow: 'hidden',
         }}
