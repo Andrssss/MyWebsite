@@ -43,18 +43,8 @@ html {
   z-index: 15;
 }
 
-.menu-toggle {
-  display: block;
-  background: none;
-  color: white;
-  font-size: 25px;
-  border: none;
-  cursor: pointer;
-  position: absolute; /* Abszolút pozícionálás */
-  left: 10px; /* Bal oldali pozíció finomhangolása */
-  z-index: 20; /* Biztosítsuk, hogy az ikon mindig látható legyen */
-  margin: 0; /* Minden margót eltávolítunk */
-}
+
+
 
 .theme-toggle {
   position: absolute;
@@ -156,6 +146,13 @@ body {
     padding: 10px 0;
 
   }
+
+  .theme-toggle {
+    display: block;
+    right: 12px; /* Jobb oldali pozíció */
+
+  }
+
 
   .menu-toggle {
     display: block;
