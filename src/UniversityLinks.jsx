@@ -20,17 +20,21 @@ const UniversityLinks = () => {
       <ul className="university-links-list">
         {universityLinks.map((link, index) => (
           <li key={index}>
-            <button
-              className="university-link-button"
-              onClick={() => window.open(link.url, '_blank')}
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="university-link-button-wrapper"
             >
-              {link.name}
-            </button>
+              <button className="university-link-button">
+                {link.name}
+              </button>
+            </a>
           </li>
         ))}
       </ul>
     </div>
   );
-};
+}
 
 export default UniversityLinks;

@@ -25,17 +25,22 @@ const OthersLinks = () => {
       <ul className="others-links-list">
         {othersLinks.map((link, index) => (
           <li key={index}>
-            <button
-              className="others-link-button"
-              onClick={() => window.open(link.url, '_blank')}
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="others-link-button-wrapper"
             >
-              {link.name}
-            </button>
+              <button className="others-link-button">
+                {link.name}
+              </button>
+            </a>
           </li>
         ))}
       </ul>
     </div>
   );
 };
+
 
 export default OthersLinks;
