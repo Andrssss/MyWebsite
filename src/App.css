@@ -33,27 +33,44 @@ html {
 
 
 .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Különválasztja az ikonokat */
   position: sticky;
-  grid-area: header;
-  background-color: rgba(0, 0, 0, 1); /* Átlátszó navbar */
+  background-color: rgba(0, 0, 0, 1);
   color: white;
-  text-align: center;
+  padding: 10px 0;
+  margin-bottom: 10px; /* Távolságot biztosít a navbar-tól */
   z-index: 15;
-  position: relative;
-  align-items: center; /* Függőleges középre igazítás */
-
 }
 
+.menu-toggle {
+  display: block;
+  background: none;
+  color: white;
+  font-size: 25px;
+  border: none;
+  cursor: pointer;
+  position: absolute; /* Abszolút pozícionálás */
+  left: 10px; /* Bal oldali pozíció finomhangolása */
+  top: 10px; /* Felső pozíció, hogy ne lógjon ki */
+  z-index: 20; /* Biztosítsuk, hogy az ikon mindig látható legyen */
+  margin: 0; /* Minden margót eltávolítunk */
+}
 
 .theme-toggle {
   position: absolute;
-  top: 7px;
-  right: 10px;
-  width: 35px; /* Szélesség beállítása */
-  height: 35px; /* Magasság beállítása */
+  top: 10px; /* Távolítsuk el a `navbar`-tól */
+  right: 10px; /* Igazítsuk a jobb oldalhoz */
   background: none;
   border: none;
+  width: 30px;
+  height: 30px;
 }
+
+
+
+
 
 .center-text {
   flex: 1;
@@ -64,11 +81,10 @@ html {
 
 .navbar {
   grid-area: navbar;
-  background-color: rgba(0, 0, 0, 1); /* Fekete 50% átlátszósággal */
+  background-color: rgba(0, 0, 0, 1); /* Fekete háttér */
   width: 100%;
-  margin: 0;
-  padding: 0;
-  border-top: 2px solid white;
+  padding: 15px 0 0; /* Adjunk egy 15px felső paddingot */
+  border-top: 2px solid white; /* Fehér vonal a tetején */
   display: flex;
   justify-content: center;
 }
@@ -78,18 +94,7 @@ html {
   flex-direction: row; /* Alapértelmezett, nagyobb képernyőkre */
 }
 
-.menu-toggle {
-  display: none; /* Rejtsd el a gombot nagyobb képernyőkön */
-  background: none;
-  color: white;
-  font-size: 25px;
-  border: none;
-  cursor: pointer;
-  align-self: flex-start; /* Balra igazítás flex szülőn belül */
-  text-align: left; /* Szöveg balra igazítása */
-  margin-left: 0; /* Bal oldali margó legyen nulla */
-  left: 0; /* Balra igazítás */
-}
+
 
 
 
@@ -142,14 +147,23 @@ body {
     padding: 0;
     z-index: 10; /* A menü előrébb kerül a rétegek között, hogy ne takarja el más elem. */
   }
-
+  
   .menu.open {
     display: flex; /* Megjelenik, ha nyitva van */
   }
 
   .menu-toggle {
-    display: block; /* Csak mobilon jelenjen meg */
-    left: 0;
+    display: block;
+    background: none;
+    color: white;
+    font-size: 25px;
+    border: none;
+    cursor: pointer;
+    position: absolute;
+    left: 10px; /* Bal oldali pozíció */
+    top: 10px; /* Távolítsuk el a `navbar`-tól */
+    z-index: 20;
+    margin: 0;
   }
 
   .menu a {
@@ -157,10 +171,8 @@ body {
     text-align: center; /*A menüszöveg középre igazított.*/
   }
 
-  .theme-toggle {
-    transform: translateY(+20%); /* Finomhangolás telefon módban */
-    
-  }
+
+
 }
 
 
