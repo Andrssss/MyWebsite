@@ -85,6 +85,10 @@ html {
   font-size: 25px;
   border: none;
   cursor: pointer;
+  align-self: flex-start; /* Balra igazítás flex szülőn belül */
+  text-align: left; /* Szöveg balra igazítása */
+  margin-left: 0; /* Bal oldali margó legyen nulla */
+  left: 0; /* Balra igazítás */
 }
 
 
@@ -145,6 +149,7 @@ body {
 
   .menu-toggle {
     display: block; /* Csak mobilon jelenjen meg */
+    left: 0;
   }
 
   .menu a {
@@ -154,6 +159,7 @@ body {
 
   .theme-toggle {
     transform: translateY(+20%); /* Finomhangolás telefon módban */
+    
   }
 }
 
