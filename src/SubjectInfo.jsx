@@ -199,7 +199,7 @@ const subjects = [
   {
     name: 'Digitális rendszerek és számítógép architektúrák - 2024',
     difficulty: 10,
-    general: 'Tesség itt van 40 oldal architectúra magold be ZH-ra.. Oké minden évben kb. ugyanaz, mint az elöző évben. Oké be lehet magolni. De ezt a tárgyat senki se szereti és sokan meg is csúsznak miatta. Be kell magolni és kész. Persze, ha érted, akkor az sokat segít. De nem lesz egyszerű. Komolyan kell venni. Csalás eszedbe se jusson, mert nem is lesz rá lehetőséged. Megajánlott jegy lehet a 4 és 5 -ös ZH-kkal. Melegen javasolt. Méltó a tanfolyamokon átívelő nevére "Digszar".',
+    general: 'Tesség itt van 40 oldal architectúra magold be ZH-ra.. Oké minden évben kb. ugyanaz, mint az elöző évben. Oké be lehet magolni. De nem egyetemhez méltó ez az oktatási szint. Nem lesz egyszerű ez a tárgy elvégzése. Csalás eszedbe se jusson, mert nem is lesz rá lehetőséged. Megajánlott jegy lehet a 4 és 5 -ös ZH-kkal. Melegen javasolt. Ez a tárgy förtelmesen rossz . Méltó a tanfolyamokon átívelő nevére "Digszar".',
     duringSemester: 'Érdemes előre kidolgozni a ZH előtt sokkal az előfordúlható kérdéseket. Mert akkor már lehet hogy késő lesz amikor jön a ZH időszak.',
     exam: 'Nem adják ingyen. Függ attól is, hogy ki vizsgáztat, de elvileg nem értékelik, ha semmit sem tudsz mondani.',
     semester: 4,
@@ -331,32 +331,36 @@ const subjects = [
 ];
 
 
-
 const SubjectInfo = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('all'); // Default to "all semesters"
+
+  // Ékezetek eltávolítása a szövegből
+  const removeAccents = (str) =>
+    str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   const handleSemesterChange = (e) => {
     setSelectedSemester(e.target.value);
     setSearchTerm(''); // Töröljük a keresési mezőt
   };
-  
 
   const filteredSubjects = subjects.filter((subject) => {
-    const matchesSearch = subject.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSemester = selectedSemester === 'all' || subject.semester === parseInt(selectedSemester, 10);
-  
+    // Ékezetmentesítjük mind a keresett szöveget, mind a tárgy nevét
+    const normalizedSearchTerm = removeAccents(searchTerm.toLowerCase());
+    const normalizedSubjectName = removeAccents(subject.name.toLowerCase());
+
+    const matchesSearch = normalizedSubjectName.includes(normalizedSearchTerm);
+    const matchesSemester =
+      selectedSemester === 'all' || subject.semester === parseInt(selectedSemester, 10);
+
     // Ha van keresési kifejezés, csak a keresési találatok jelenjenek meg.
     if (searchTerm) {
       return matchesSearch;
     }
-  
+
     // Ha nincs keresési kifejezés, alkalmazzuk a félév szűrőt.
     return matchesSemester;
   });
-  
-
-
 
   return (
     <div className="subject-info-container">

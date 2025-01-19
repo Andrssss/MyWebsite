@@ -28,6 +28,7 @@ const Home = ({ folders, currentPath, handleMenuClick, setCurrentPath }) => {
         width: '110%',
         height: '90vh', // Ensures full viewport height for iframe
         marginLeft: isMobile ? '-10%' : '0', // Ha mobil, akkor -10% margó, különben nincs margó
+        marginTop: isMobile ? '-4%' : '0',
       }}
     >
       <iframe
