@@ -39,8 +39,7 @@ html {
   position: sticky;
   background-color: rgba(0, 0, 0, 1);
   color: white;
-  padding: 10px 0;
-  margin-bottom: 10px; /* Távolságot biztosít a navbar-tól */
+  padding: 0;
   z-index: 15;
 }
 
@@ -53,19 +52,20 @@ html {
   cursor: pointer;
   position: absolute; /* Abszolút pozícionálás */
   left: 10px; /* Bal oldali pozíció finomhangolása */
-  top: 10px; /* Felső pozíció, hogy ne lógjon ki */
   z-index: 20; /* Biztosítsuk, hogy az ikon mindig látható legyen */
   margin: 0; /* Minden margót eltávolítunk */
 }
 
 .theme-toggle {
   position: absolute;
-  top: 10px; /* Távolítsuk el a `navbar`-tól */
   right: 10px; /* Igazítsuk a jobb oldalhoz */
-  background: none;
   border: none;
-  width: 30px;
-  height: 30px;
+  width: 35px;
+  height: 35px;
+  right: 10px; /* Jobb oldali pozíció */
+  top: 10px; /* Távolság a tetejétől */
+  z-index: 20; /* Biztosítsuk, hogy mindig látható */
+  margin: 0; /* Margók eltávolítása */
 }
 
 
@@ -83,7 +83,6 @@ html {
   grid-area: navbar;
   background-color: rgba(0, 0, 0, 1); /* Fekete háttér */
   width: 100%;
-  padding: 15px 0 0; /* Adjunk egy 15px felső paddingot */
   border-top: 2px solid white; /* Fehér vonal a tetején */
   display: flex;
   justify-content: center;
@@ -150,6 +149,12 @@ body {
   
   .menu.open {
     display: flex; /* Megjelenik, ha nyitva van */
+  }
+
+  .header {
+    margin-bottom: 10px;
+    padding: 10px 0;
+
   }
 
   .menu-toggle {
