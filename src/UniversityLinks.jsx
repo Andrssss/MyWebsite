@@ -9,6 +9,7 @@ const universityLinks = [
   { name: 'Átlag Számoló', url: 'https://users.itk.ppke.hu/~nemse/atlag/' },
   { name: 'Távoktatás Felvételek (Megtekint gomb)', url: 'https://tavoktatas.ppke.hu/lister' },
   { name: 'PPKE Youtube', url: 'https://www.youtube.com/@ppkeitkvizmu/playlists' },
+  { name: 'ITK-s tárgytapasztalatok', url: 'https://docs.google.com/spreadsheets/d/1Bi4nMQZ5S6c8bXx3Xl73snqcYVgtKye8mOMc2MsA1fY/edit?gid=0#gid=0' },
 ];
 
 
