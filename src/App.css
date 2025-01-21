@@ -10,9 +10,8 @@ html {
   font-weight: normal; /* Állítsd be a kívánt betűvastagságot */
   text-align: left; /* Balra igazítja a szöveget */
   margin-left: 20px; /* Eltávolítja az esetleges bal oldali margót */
+
 }
-
-
 
 
 .container {
@@ -28,6 +27,7 @@ html {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  
 }
 
 
@@ -40,7 +40,7 @@ html {
   background-color: rgba(0, 0, 0, 1);
   color: white;
   padding: 0;
-  z-index: 15;
+  z-index: 0;
 }
 
 
@@ -66,6 +66,7 @@ html {
   flex: 1;
   font-weight: normal;
   color: white;
+  
   margin-top: 0; /* Eltávolítja az esetleges felső margót */
 }
 
@@ -79,6 +80,7 @@ html {
 }
 
 .menu {
+  
   display: flex;
   flex-direction: row; /* Alapértelmezett, nagyobb képernyőkre */
 }
@@ -88,6 +90,7 @@ html {
 
 
 .menu a {
+  
   text-decoration: none;
   color: white;
   padding: 10px 20px;
@@ -99,13 +102,15 @@ html {
 .menu a:hover{
   transform: scale(1.01);
   background: #646060;
+  
 }
 
 
 body {
   margin: 0;
   overflow: hidden; /* Fontos, hogy ne legyen görgetés */
-  background: black;
+  background: rgb(0, 0, 0);
+  
 }
 
 .content {
@@ -114,12 +119,14 @@ body {
   color: white;
   z-index: 1;
   position: relative;
+  
 }
 
 .search-container {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 20px;
+  
 }
 
 
@@ -135,21 +142,25 @@ body {
     width: 100%; /* Teljes szélesség */
     padding: 0;
     z-index: 10; /* A menü előrébb kerül a rétegek között, hogy ne takarja el más elem. */
+    
   }
   
   .menu.open {
     display: flex; /* Megjelenik, ha nyitva van */
+    
   }
 
   .header {
     margin-bottom: 10px;
     padding: 10px 0;
+    
 
   }
 
   .theme-toggle {
     display: block;
     right: 20px; /* Jobb oldali pozíció */
+    
 
   }
 
@@ -166,11 +177,13 @@ body {
     top: 10px; /* Távolítsuk el a `navbar`-tól */
     z-index: 20;
     margin: 0;
+    
   }
 
   .menu a {
     padding: 10px 20px; /*Minden menüelem kap egy belső margót, hogy kattintható területük kényelmesebb legyen */
     text-align: center; /*A menüszöveg középre igazított.*/
+    
   }
 
 
@@ -231,24 +244,27 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 500;
 }
 
 .popup-content {
   width: 400px; /* Explicit szélesség */
   max-width: none;
   width: 20%;
-  margin: 20px auto;
-  padding: 20px;
+  margin: 10px auto;
+  padding: 40px;
   background-color: #f9f9f9;
-  z-index: 9999; /* Nagyobb z-index, hogy előrébb jelenjen meg a header-nél */
+  z-index: 500; /* Nagyobb z-index, hogy előrébb jelenjen meg a header-nél */
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   position: relative;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
   text-align: center; /* Szöveg középre igazítása */
 }
+
+
+
 @media (max-width: 1200px) {
   .popup-content {
     width: 40%; /* Szélesség kisebb eszközökön */
@@ -257,7 +273,7 @@ body {
 }
 
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   .popup-content {
     width: 80%; /* Szélesség kisebb eszközökön */
     padding: 15px; /* Kisebb padding telefonokon */
@@ -290,7 +306,7 @@ body {
 
 .popup-content h4 {
   margin-top: 20px;
-  margin-bottom: 10px;
+  margin-bottom: 0px;
   color: #333;
 }
 
