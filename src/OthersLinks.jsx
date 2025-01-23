@@ -8,7 +8,6 @@ const othersLinks = [
   { name: 'heihe', url: 'https://users.itk.ppke.hu/~heihe/' },
   { name: 'ekacs', url: 'https://users.itk.ppke.hu/~ekacs' },
   { name: 'szege7', url: 'https://users.itk.ppke.hu/~szege7/' },
-
   { name: 'retge1', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'szama36', url: 'https://users.itk.ppke.hu/~szama36/Hasznos%20dolgok/index.html' },
   { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },
@@ -25,18 +24,26 @@ const othersLinks = [
 
 
 const additionalLinks = {
-  "Kevesebb anyag :": [
+  "Kevesebb anyag - 2025.01": [
     { name: 'papbe5', url: 'https://users.itk.ppke.hu/~papbe5/' },
     { name: 'nemda3', url: 'https://users.itk.ppke.hu/~nemda3/' },
     { name: 'nemda2', url: 'https://users.itk.ppke.hu/~nemda2/' },
     { name: 'nadak', url: 'https://users.itk.ppke.hu/~nadak/#/f' },
+    { name: 'fedad', url: 'https://users.itk.ppke.hu/~fedad/' },
     { name: 'szaba30', url: 'https://users.itk.ppke.hu/~szaba30/' },
     { name: 'kisbe32', url: 'https://users.itk.ppke.hu/~kisbe32/' },
     { name: 'misma', url: 'https://users.itk.ppke.hu/~misma/public_html_2/vsz_2020_vids.php' },
+    { name: 'pocta', url: 'https://users.itk.ppke.hu/~pocta/' },
+
   ],
   "Folyamatban - 2025.01": [
     { name: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { name: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
+    { name: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },
+    { name: 'herpe3', url: 'https://users.itk.ppke.hu/~herpe3/' },
+    { name: 'skulo', url: 'https://users.itk.ppke.hu/~skulo/web/index.html' },
+
+    
   ],
   "GAME :": [
     { name: 'gelge1', url: 'https://users.itk.ppke.hu/~gelge1/' },
@@ -50,6 +57,10 @@ const additionalLinks = {
     { name: 'kolcs', url: 'https://users.itk.ppke.hu/~kolcs' },
     { name: 'totbe31', url: 'https://users.itk.ppke.hu/~totbe31' },
     { name: 'tolma1', url: 'https://users.itk.ppke.hu/~tolma1/' },
+    { name: 'fabal3', url: 'https://users.itk.ppke.hu/~fabal3/' },
+    
+    
+    
   ],
 };
 
