@@ -17,7 +17,8 @@ const othersLinks = [
   { name: 'hudes', url: ' https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO' },
   { name: 'petma12', url: 'https://markomy.hu/' },
   { name: 'csobo3', url: 'https://users.itk.ppke.hu/~csobo3/' },
-  { name: 'szumi3', url: 'https://users.itk.ppke.hu/~szumi3/' },
+  
+  
   { name: 'radzi1', url: 'https://users.itk.ppke.hu/~radzi1/' },
   { name: 'PPKE WIKI', url: 'https://users.itk.ppke.hu/~marri1/?fbclid=IwZXh0bgNhZW0CMTAAAR184vSVMEMSqLJEWe3fgnc-JEl0U_gAYiXGuvkbRyy6R4VeGMj02NevaKA_aem_BG5QKzrq0RPmdpiqjOzWMw' },
 ];
@@ -25,12 +26,11 @@ const othersLinks = [
 
 const additionalLinks = {
   "Kevesebb anyag - 2025.01": [
-    { name: 'papbe5', url: 'https://users.itk.ppke.hu/~papbe5/' },
+    { name: 'szumi3', url: 'https://users.itk.ppke.hu/~szumi3/' },
     { name: 'nemda3', url: 'https://users.itk.ppke.hu/~nemda3/' },
     { name: 'nemda2', url: 'https://users.itk.ppke.hu/~nemda2/' },
     { name: 'nadak', url: 'https://users.itk.ppke.hu/~nadak/#/f' },
     { name: 'fedad', url: 'https://users.itk.ppke.hu/~fedad/' },
-    { name: 'szaba30', url: 'https://users.itk.ppke.hu/~szaba30/' },
     { name: 'kisbe32', url: 'https://users.itk.ppke.hu/~kisbe32/' },
     { name: 'misma', url: 'https://users.itk.ppke.hu/~misma/public_html_2/vsz_2020_vids.php' },
     { name: 'pocta', url: 'https://users.itk.ppke.hu/~pocta/' },
@@ -58,8 +58,8 @@ const additionalLinks = {
     { name: 'totbe31', url: 'https://users.itk.ppke.hu/~totbe31' },
     { name: 'tolma1', url: 'https://users.itk.ppke.hu/~tolma1/' },
     { name: 'fabal3', url: 'https://users.itk.ppke.hu/~fabal3/' },
-    
-    
+    { name: 'hugal', url: 'https://users.itk.ppke.hu/~hugal/' },
+    { name: 'mulkr', url: 'https://users.itk.ppke.hu/~mulkr/' },
     
   ],
 };
