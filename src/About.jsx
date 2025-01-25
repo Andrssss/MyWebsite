@@ -6,8 +6,9 @@ const About = () => {
   <div className="about-main">
       <div className="about-container">
         <h2>Kapcsolat</h2>
-        <p>Ha szeretnél elérni, írj emailt: <a href="mailto:bak.andrs@gmail.com">bak.andrs@gmail.com </a></p>
-        <p>Az oldal fejlesztés alatt van, még itt-ott változni fog. Anyagok kerűlni fognak még fel, szép lassan.</p>
+        <p>Ha szeretnél elérni, írj emailt: <a href="mailto:bak.andrs@gmail.com">bak.andrs@gmail.com </a>  <br /> <br />  </p>
+        <p>Az oldal fejlesztés alatt van. Anyagok kerűlni fognak fel, mivel majd csak 2026-ban végzek. <br /> <br />  </p>
+        <p> Ami a legszekszibb az oldalamban, hogy az anyagok között vannak videók is. Sajnos nem mindenhez. Ha valakinek vannak tárgyakhoz kapscsolatos videoi azokat szívesen fogadom. :) <br /><br />  </p>
       </div>
     </div>
   );
