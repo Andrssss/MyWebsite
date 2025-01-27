@@ -17,9 +17,8 @@ const othersLinks = [
   { name: 'hudes', url: ' https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO' },
   { name: 'petma12', url: 'https://markomy.hu/' },
   { name: 'csobo3', url: 'https://users.itk.ppke.hu/~csobo3/' },
-  
-  
   { name: 'radzi1', url: 'https://users.itk.ppke.hu/~radzi1/' },
+  { name: 'Csillag Vivien', url: 'https://sites.google.com/view/csillagjegyzetek?usp=sharing&fbclid=IwY2xjawIEl9JleHRuA2FlbQIxMAABHaXpxKjyatzEFF79--_No6FUtyGhLgz6TIlL8zdePgvHd7KXIN3JrRcZ1A_aem_zP1-jXOTurCs5HIjsuzmoA' },
   { name: 'PPKE WIKI', url: 'https://users.itk.ppke.hu/~marri1/?fbclid=IwZXh0bgNhZW0CMTAAAR184vSVMEMSqLJEWe3fgnc-JEl0U_gAYiXGuvkbRyy6R4VeGMj02NevaKA_aem_BG5QKzrq0RPmdpiqjOzWMw' },
 ];
 
@@ -52,6 +51,7 @@ const additionalLinks = {
     { name: 'wagzi', url: 'https://users.itk.ppke.hu/~wagzi/G7V/' },
   ],
   "Random WTF :": [
+    { name: 'prabo', url: 'https://users.itk.ppke.hu/~prabo/' },
     { name: 'kovzo14', url: 'https://users.itk.ppke.hu/~kovzo14' },
     { name: 'juhbe8', url: 'https://users.itk.ppke.hu/~juhbe8/' },
     { name: 'szeem4', url: 'https://users.itk.ppke.hu/~szeem4' },
@@ -62,7 +62,7 @@ const additionalLinks = {
     { name: 'fabal3', url: 'https://users.itk.ppke.hu/~fabal3/' },
     { name: 'hugal', url: 'https://users.itk.ppke.hu/~hugal/' },
     { name: 'mulkr', url: 'https://users.itk.ppke.hu/~mulkr/' },
-    
+    { name: 'sikbo', url: 'https://users.itk.ppke.hu/~sikbo/' },
   ],
 };
 
