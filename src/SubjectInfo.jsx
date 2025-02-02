@@ -198,7 +198,7 @@ const subjects = [
   {
     name: 'Digitális rendszerek és számítógép architektúrák - 2024',
     difficulty: 10,
-    general: 'Tesség itt van 40 oldal architectúra magold be ZH-ra.. Oké minden évben kb. ugyanaz, mint az elöző évben. Oké be lehet magolni. De nem egyetemhez méltó ez az oktatási szint. Nem lesz egyszerű ez a tárgy elvégzése. Csalás eszedbe se jusson, mert nem is lesz rá lehetőséged. Megajánlott jegy lehet a 4 és 5 -ös ZH-kkal. Melegen javasolt. Ez a tárgy förtelmesen rossz . Méltó a tanfolyamokon átívelő nevére "Digszar".',
+    general: 'Ezt a gusztustalan tárgyat... Tesség itt van 40 oldal architectúra magold be ZH-ra.. Oké minden évben kb. ugyanaz, mint az elöző évben. Oké be lehet magolni. De nem egyetemhez méltó ez az oktatási szint. Nem lesz egyszerű ez a tárgy elvégzése. Csalás eszedbe se jusson, mert nem is lesz rá lehetőséged. Megajánlott jegy lehet a 4 és 5 -ös ZH-kkal. Melegen javasolt. Ez a tárgy förtelmesen rossz . Méltó a tanfolyamokon átívelő nevére "Digszar".',
     duringSemester: 'Érdemes előre kidolgozni a ZH előtt sokkal az előfordúlható kérdéseket. Mert akkor már lehet hogy késő lesz amikor jön a ZH időszak.',
     exam: 'Nem adják ingyen. Függ attól is, hogy ki vizsgáztat, de elvileg nem értékelik, ha semmit sem tudsz mondani.',
     semester: 4,

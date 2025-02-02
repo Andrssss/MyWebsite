@@ -33,6 +33,9 @@ const additionalLinks = {
     { name: 'kisbe32', url: 'https://users.itk.ppke.hu/~kisbe32/' },
     { name: 'misma', url: 'https://users.itk.ppke.hu/~misma/public_html_2/vsz_2020_vids.php' },
     { name: 'pocta', url: 'https://users.itk.ppke.hu/~pocta/' },
+    { name: 'cseda6', url: 'https://users.itk.ppke.hu/~cseda6/public_html/files/' },
+    { name: 'tarcs', url: 'https://users.itk.ppke.hu/~tarcs/' },
+
 
   ],
   "Folyamatban - 2025.01": [
@@ -41,7 +44,6 @@ const additionalLinks = {
     { name: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },
     { name: 'herpe3', url: 'https://users.itk.ppke.hu/~herpe3/' },
     { name: 'skulo', url: 'https://users.itk.ppke.hu/~skulo/web/index.html' },
-    
     { name: 'kadso', url: ' https://users.itk.ppke.hu/~kadso/' },
    
     

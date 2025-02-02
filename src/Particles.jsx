@@ -54,7 +54,7 @@ const FireParticlesCanvas = () => {
     };
 
     const loop = () => {
-      for (let i = 0; i < 2; i++) { // Több részecske generálása egy loopban
+      for (let i = 0; i < 3; i++) { // Több részecske generálása egy loopban
         createParticle();
       }      
       updateParticles();
