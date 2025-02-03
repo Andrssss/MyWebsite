@@ -12,16 +12,18 @@ const FireParticlesCanvas = () => {
     const createParticle = () => {
       if (particles.length < maxParticles) {
         const isSmallScreen = window.innerWidth < 768;
-        const size = isSmallScreen ? Math.random() * 20 + 3 : Math.random() * 5 + 3;
-    
+        const size = isSmallScreen ? Math.random() * 20 + 3 : Math.random() * 6 + 3;
+        const life = isSmallScreen ? Math.random() * 60 + 150 : Math.random() * 60 + 110;
+        const y = isSmallScreen ? canvas.height + 20 : canvas.height + 7;
+        
         particles.push({
           x: Math.random() * canvas.width,
-          y: canvas.height + 10,
+          y: y,
           size: size,
           opacity: Math.random() * 0.5 + 0.5,
           speedY: Math.random() * 1.5 + 0,
           speedX: (Math.random() - 0.5) * 0.5,
-          life: Math.random() * 60 + 110,
+          life: life,
           age: 0,
           color: [255, Math.random() * 150 + 50, 0],
         });
@@ -57,7 +59,7 @@ const FireParticlesCanvas = () => {
     };
 
     const loop = () => {
-      for (let i = 0; i < 10; i++) { // Több részecske generálása egy loopban
+      for (let i = 0; i < 15; i++) { // Több részecske generálása egy loopban
         createParticle();
       }      
       updateParticles();
