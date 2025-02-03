@@ -7,18 +7,18 @@ const FireParticlesCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const particles = [];
-    const maxParticles = 2500;
+    const maxParticles = 25000;
 
     const createParticle = () => {
       if (particles.length < maxParticles) {
         particles.push({
           x: Math.random() * canvas.width, // Random vízszintes pozíció
           y: canvas.height+10 , // Az aljáról indul
-          size: Math.random() * 3 + 3, // Részecske mérete
+          size: Math.random() * 5.5 + 3, // Részecske mérete
           opacity: Math.random() * 0.5 + 0.5, // Átlátszóság
           speedY: Math.random() * 1.5 + 0, // Függőleges sebesség
           speedX: (Math.random() - 0.5) * 0.5, // Oldalirányú mozgás
-          life: Math.random() * 60 + 200, // Élettartam
+          life: Math.random() * 60 + 110, // Élettartam
           age: 0, // Aktuális kor
           color: [255, Math.random() * 150 + 50, 0], // Lángszín (narancssárga-vörös skála)
         });
@@ -54,7 +54,7 @@ const FireParticlesCanvas = () => {
     };
 
     const loop = () => {
-      for (let i = 0; i < 3; i++) { // Több részecske generálása egy loopban
+      for (let i = 0; i < 8; i++) { // Több részecske generálása egy loopban
         createParticle();
       }      
       updateParticles();
