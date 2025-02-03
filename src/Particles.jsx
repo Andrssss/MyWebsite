@@ -1,22 +1,25 @@
 import React, { useEffect, useRef } from 'react';
 
-const FireParticlesCanvas = () => {
+const FireParticlesCanvas = ({ active }) => {
   const canvasRef = useRef(null);
+  const animationRef = useRef(null);
+  const particles = useRef([]); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const particles = [];
     const maxParticles = 250000;
 
     const createParticle = () => {
-      if (particles.length < maxParticles) {
+      if (!active) return; // Ha inaktív, ne hozzon létre új részecskéket
+
+      if (particles.current.length < maxParticles) {
         const isSmallScreen = window.innerWidth < 768;
         const size = isSmallScreen ? Math.random() * 10 + 3 : Math.random() * 6 + 3;
         const life = isSmallScreen ? Math.random() * 60 + 130 : Math.random() * 60 + 120;
         const y = isSmallScreen ? canvas.height + 13 : canvas.height + 5;
-        
-        particles.push({
+
+        particles.current.push({
           x: Math.random() * canvas.width,
           y: y,
           size: size,
@@ -33,23 +36,21 @@ const FireParticlesCanvas = () => {
     const updateParticles = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      particles.forEach((particle, index) => {
-        particle.y -= particle.speedY*2; // Mozgás felfelé
-        particle.x += particle.speedX; // Oldalirányú sodródás
-        particle.age++;
+      particles.current.forEach((particle, index) => {
+        if (active) {
+          particle.y -= particle.speedY * 2; 
+          particle.x += particle.speedX;
+          particle.age++;
 
-        // Lassan csökken a méret és az átlátszóság
-        particle.size *= 0.994;
-        particle.opacity *= 0.99;
+          particle.size *= 0.994;
+          particle.opacity *= 0.99;
 
-        // Színváltozás sárgából vörös felé
-        particle.color[1] -= 4; // Zöld komponens csökken
+          particle.color[1] -= 4; 
+        }
 
-        // Részecske törlése, ha az élettartama véget ér
         if (particle.age >= particle.life || particle.opacity <= 0) {
-          particles.splice(index, 1);
+          particles.current.splice(index, 1);
         } else {
-          // Részecske kirajzolása
           ctx.beginPath();
           ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(${Math.floor(particle.color[0])}, ${Math.floor(particle.color[1])}, ${Math.floor(particle.color[2])}, ${particle.opacity})`;
@@ -59,21 +60,22 @@ const FireParticlesCanvas = () => {
     };
 
     const loop = () => {
-      for (let i = 0; i < 10; i++) { // Több részecske generálása egy loopban
-        createParticle();
-      }      
+      if (active) {
+        for (let i = 0; i < 10; i++) {
+          createParticle();
+        }
+      }
+      
       updateParticles();
-      requestAnimationFrame(loop);
+      animationRef.current = requestAnimationFrame(loop);
     };
 
-    // Méret beállítása
+    // Canvas méretének beállítása
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // Loop indítása
     loop();
 
-    // Canvas méretének frissítése, ha az ablak mérete változik
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -82,8 +84,18 @@ const FireParticlesCanvas = () => {
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(animationRef.current);
     };
-  }, []);
+  }, [active]); 
+
+  // 👉 **Ha `active` false lesz, azonnal töröljük a részecskéket és a canvas tartalmát**
+  useEffect(() => {
+    if (!active) {
+      particles.current = []; // Az összes részecske törlése
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); // Canvas törlése
+    }
+  }, [active]);
 
   return (
     <canvas

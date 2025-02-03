@@ -11,6 +11,7 @@ const App = () => {
   const [content, setContent] = useState('home');
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [particlesActive, setParticlesActive] = useState(true);
 
   useEffect(() => {
     const handleResize = () => {
@@ -23,9 +24,13 @@ const App = () => {
     return () => window.removeEventListener('resize', handleResize); // Takarítás
   }, []);
 
+  useEffect(() => {
+    setParticlesActive(content !== 'subjects'); // Ha a "Tárgy info" van kiválasztva, álljon le
+  }, [content]);
+
   return (
     <div className="container">
-      <Particles />
+      <Particles active={particlesActive} /> {/* Particles mindig jelen van, csak megállítható */}
 
       <header className="header">
         <h1 className="small-heading">

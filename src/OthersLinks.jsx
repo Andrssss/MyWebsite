@@ -45,7 +45,7 @@ const additionalLinks = {
     { name: 'herpe3', url: 'https://users.itk.ppke.hu/~herpe3/' },
     { name: 'skulo', url: 'https://users.itk.ppke.hu/~skulo/web/index.html' },
     { name: 'kadso', url: ' https://users.itk.ppke.hu/~kadso/' },
-   
+    { name: 'orbsa2', url: ' https://users.itk.ppke.hu/~orbsa2/' },
     
   ],
   "GAME :": [
