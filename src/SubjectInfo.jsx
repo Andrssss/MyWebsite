@@ -263,55 +263,60 @@ const subjects = [
     exam: 'A vizsgán a gyakorlati jegyedről indulsz. Választasz egy tételt és ha az előadó úgy ítéli meg, hogy érted, akkor javíthatsz a jegyeden. Ha nem akkor meg kirugdos. :D  (persze megadva azt a jegyet, mint amit kaptál gyakorlatra.)',
     semester: 3,
   },
-
-
   {
     name: 'Introduction to Artificial Intelligence',
     difficulty: 10,
     general: 'Azt monják nehéz. A követelmény rendszer meg káosz. Mármint a pontszámítás katyvasz és van amit meg se osztanak vizsgáig. Meg nem is az AI-ról szól.',
     semester: 5,
   },
+
+
+
   {
     name: 'Web programozás',
-
+    general: 'Azt mondják könnyű és szuper érdekes. 2025-ben nincs.',
     semester: 6,
   },
   {
     name: 'A szoftvertechnológia alapjai',
-
+    general: 'Azt mondják, hogy "1db ZH (4,5 -> Megajánlottért van a zh, lehet 1-es is ), csak végén vizsga. Kicsit több az anyag"',
     semester: 6,
   },
   {
     name: 'Információ- és kódelmélet',
-    general: 'Digjel 2. Alig várom.',
+    general: 'Digjel 2. Alig várom. "Digjel féle ZH + KZH, vizsga" ',
     semester: 6,
   },
-  
   {
     name: 'Programozási nyelvek és módszerek',
-
+    general: 'Azt mondják, hogy "Év közben nem nagyon, nincs zh csak szóbeli vizsga, vagy írásbeli az ilyen huh"',
     semester: 6,
   },
   {
     name: 'Adatbiztonság és kriptográfia',
-
+    general: 'Azt mondják, hogy "könnyű, évközben duma. Előadás + basic python labor. VIZSGA -> beszélgettek a tanultakról"',
+    semester: 6,
+  },  
+  {
+    name: 'Celluláris hullámszámítógépek',
+    general: 'Azt mondják, hogy "könnyű"',
     semester: 6,
   },
   {
-    name: 'Celluláris hullámszámítógépek',
-
+    name: 'A nyelvtechnológia eszközei',
+    general: 'Azt mondják, hogy "Könnyű. Év közben mindig más előadó. Írni kell egy fogalmazást, hogy melyik volt a best és előadást kell tartani valamiből év végén. Ennyi. Nincs vizsga, se zh."',
     semester: 6,
   },
   {
     name: 'Önlab',
-  
+    general: 'Azt mondják, hogy "Szopás, Szakdoga előszobája."',
     semester: 6,
   },
-  {
-    name: 'Szoftvertechnológia és nyelvtechnológia ZV',
   
-    semester: 7,
-  },
+
+
+
+
   {
     name: 'Haladó C++ programozás',
  
@@ -319,12 +324,10 @@ const subjects = [
   },
   {
     name: 'Jogi alapismeretek és szellemi tulajdon',
-  
     semester: 7,
   },
   {
     name: 'Szoftvertechnológia és nyelvtechnológia ZV',
-  
     semester: 7,
   },
 ];
