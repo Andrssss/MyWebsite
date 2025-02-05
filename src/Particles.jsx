@@ -3,7 +3,7 @@ import React, { useEffect, useRef } from 'react';
 const FireParticlesCanvas = ({ active }) => {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
-  const particles = useRef([]); 
+  const particles = useRef([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -36,26 +36,26 @@ const FireParticlesCanvas = ({ active }) => {
     const updateParticles = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      particles.current.forEach((particle, index) => {
-        if (active) {
-          particle.y -= particle.speedY * 2; 
-          particle.x += particle.speedX;
-          particle.age++;
+      particles.current = particles.current.filter((particle) => {
+        particle.y -= particle.speedY * 2;
+        particle.x += particle.speedX;
+        particle.age++;
 
-          particle.size *= 0.994;
-          particle.opacity *= 0.99;
+        particle.size *= 0.994;
+        particle.opacity *= 0.99;
 
-          particle.color[1] -= 4; 
-        }
+        particle.color[1] -= 4;
 
         if (particle.age >= particle.life || particle.opacity <= 0) {
-          particles.current.splice(index, 1);
-        } else {
-          ctx.beginPath();
-          ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(${Math.floor(particle.color[0])}, ${Math.floor(particle.color[1])}, ${Math.floor(particle.color[2])}, ${particle.opacity})`;
-          ctx.fill();
+          return false; // Részecske eltávolítása
         }
+
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${Math.floor(particle.color[0])}, ${Math.floor(particle.color[1])}, ${Math.floor(particle.color[2])}, ${particle.opacity})`;
+        ctx.fill();
+
+        return true; // Maradjon a tömbben
       });
     };
 
@@ -65,12 +65,11 @@ const FireParticlesCanvas = ({ active }) => {
           createParticle();
         }
       }
-      
+
       updateParticles();
       animationRef.current = requestAnimationFrame(loop);
     };
 
-    // Canvas méretének beállítása
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
@@ -86,15 +85,6 @@ const FireParticlesCanvas = ({ active }) => {
       window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(animationRef.current);
     };
-  }, [active]); 
-
-  // 👉 **Ha `active` false lesz, azonnal töröljük a részecskéket és a canvas tartalmát**
-  useEffect(() => {
-    if (!active) {
-      particles.current = []; // Az összes részecske törlése
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); // Canvas törlése
-    }
   }, [active]);
 
   return (
