@@ -15,9 +15,9 @@ const FireParticlesCanvas = ({ active }) => {
 
       if (particles.current.length < maxParticles) {
         const isSmallScreen = window.innerWidth < 768;
-        const size = isSmallScreen ? Math.random() * 10 + 3 : Math.random() * 6 + 3;
-        const life = isSmallScreen ? Math.random() * 60 + 130 : Math.random() * 60 + 120;
-        const y = isSmallScreen ? canvas.height + 13 : canvas.height + 5;
+        const size = isSmallScreen ? Math.random() * 6 + 3 : Math.random() * 6 + 3;
+        const life = isSmallScreen ? Math.random() * 60 + 120 : Math.random() * 60 + 120;
+        const y = isSmallScreen ? canvas.height + 5 : canvas.height + 5;
 
         particles.current.push({
           x: Math.random() * canvas.width,
