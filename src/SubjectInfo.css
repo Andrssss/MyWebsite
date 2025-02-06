@@ -278,3 +278,31 @@ button[type="button"].close-modal-button:hover {
   }
 }
 
+/* A parent .form-group legyen position: relative; hogy a doboz az input alatt legyen */
+.form-group {
+  position: relative;
+}
+
+.autocomplete-container {
+  position: absolute;
+  top: 60px; 
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  z-index: 2000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.autocomplete-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #000;        /* Szöveg színe: fekete */
+  text-align: left;   /* Szöveg balra igazítása */
+}
+
+.autocomplete-item:hover {
+  background-color: #f0f0f0;
+}
+

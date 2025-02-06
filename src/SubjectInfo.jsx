@@ -1,33 +1,35 @@
 import "./SubjectInfo.css";
 import React, { useState, useEffect } from "react";
 
-const removeAccents = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Ékezetmentesítés
+const removeAccents = (str) =>
+  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const SubjectInfo = () => {
-  const [subjects, setSubjects] = useState([]); // Tárolja a feldolgozott tárgyakat
-  const [loading, setLoading] = useState(true); // Betöltési állapot
-  const [error, setError] = useState(null); // Hiba állapot
-  const [searchTerm, setSearchTerm] = useState(""); // Keresési mező
-  const [selectedSemester, setSelectedSemester] = useState("all"); // Félév szűrő
-  const [isModalOpen, setIsModalOpen] = useState(false); // Pop-up ablak állapota
+  const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Kereső és félév
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("all");
+
+  // Új vélemény modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEntry, setNewEntry] = useState({
     name: "",
-    user: "anonim", // Alapértelmezetten anonim
+    user: "anonim",
     difficulty: "",
     general: "",
     duringSemester: "",
     exam: "",
-    year: new Date().getFullYear(), // Alapértelmezett év: idei
+    year: new Date().getFullYear(),
     semester: "",
   });
 
-  // Esemény a modal bezárásához
-  const handleModalClose = (e) => {
-    // Ha a háttérre kattintottak, akkor zárjuk be a modalt
-    if (e.target.className === "modal-overlay") {
-      setIsModalOpen(false);
-    }
-  };
+  // Autocomplete javaslatok
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
     const fetchTable = async () => {
@@ -37,8 +39,7 @@ const SubjectInfo = () => {
           throw new Error("Nem sikerült betölteni az adatokat");
         }
         const html = await response.text();
-        const parsedSubjects = parseHTMLTable(html); // HTML átalakítása JSON-re
-        setSubjects(parsedSubjects);
+        setSubjects(parseHTMLTable(html));
       } catch (err) {
         setError(err.message);
       } finally {
@@ -46,7 +47,7 @@ const SubjectInfo = () => {
       }
     };
 
-    // Betöltjük a mentett nevet, ha van
+    // Ha van mentett user
     const savedUserName = localStorage.getItem("savedUserName");
     if (savedUserName) {
       setNewEntry((prev) => ({ ...prev, user: savedUserName }));
@@ -60,12 +61,11 @@ const SubjectInfo = () => {
     const doc = parser.parseFromString(html, "text/html");
     const rows = doc.querySelectorAll("table tr");
 
-    const subjectsArray = [];
+    const arr = [];
     rows.forEach((row, index) => {
-      if (index === 0) return; // Fejléc kihagyása
+      if (index === 0) return; // fejléc
       const cells = row.querySelectorAll("td");
-
-      subjectsArray.push({
+      arr.push({
         user: cells[0]?.textContent.trim() || "N/A",
         name: cells[1]?.textContent.trim() || "N/A",
         difficulty: cells[2]?.textContent.trim() || "N/A",
@@ -76,52 +76,169 @@ const SubjectInfo = () => {
         semester: parseInt(cells[7]?.textContent.trim(), 10) || "N/A",
       });
     });
-    return subjectsArray;
+    return arr;
   };
 
+  // --- Keresés + félév szűrés
   const handleSemesterChange = (e) => {
     setSelectedSemester(e.target.value);
-    setSearchTerm(""); // Töröljük a keresési kifejezést
+    setSearchTerm("");
   };
 
+  // Ha a felhasználó ír valamit a keresőmezőbe,
+  // és NEM üres a kifejezés, automatikusan all-ra állítjuk a félévet:
+  const handleSearchTermChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+
+    // Ha van beírt szöveg, levesszük a félévszűrést
+    if (val.trim().length > 0) {
+      setSelectedSemester("all");
+    }
+  };
+
+  // =========== AUTOCOMPLETE LOGIKA ===========
+  // 1) onFocus => mindig mutassa az összes tárgyat
+  const handleNameFocus = () => {
+    // Összes tárgynév, egyedivé téve
+    const allNames = [...new Set(subjects.map((subj) => subj.name))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+    setSuggestions(allNames);
+    setShowSuggestions(true);
+  };
+
+  // 2) OnChange => ha üres, mutasson mindent, ha van szöveg, szűrjön
+  const handleNameChange = (e) => {
+    const { value } = e.target;
+    setNewEntry((prev) => ({ ...prev, name: value }));
+  
+    if (value.trim().length === 0) {
+      const allNames = [...new Set(subjects.map((subj) => subj.name))].sort((a, b) =>
+        a.localeCompare(b)
+      );
+      setSuggestions(allNames);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(true);
+      const search = removeAccents(value.toLowerCase());
+      const filtered = [
+        ...new Set(
+          subjects
+            .map((subj) => subj.name)
+            .filter((name) => {
+              const n = removeAccents(name.toLowerCase());
+              return n.includes(search);
+            })
+        ),
+      ].sort((a, b) => a.localeCompare(b));
+      setSuggestions(filtered);
+    }
+  
+    // === IDE írd a beillesztendő kódot, a logika végére: ===
+  
+    // Ha a beírt value (szóközöket levéve) pontosan egyezik egy subject.name mezővel,
+    // akkor automatikusan állítsuk be a semester mezőt is.
+    const exactMatch = subjects.find((s) => s.name === value.trim());
+    if (exactMatch) {
+      setNewEntry((prev) => ({
+        ...prev,
+        semester: exactMatch.semester,
+      }));
+    }
+  };
+  
+
+
+
+
+
+  // Kattintás egy javaslatra
+  const handleSuggestionClick = (suggestedName) => {
+    // Keresd meg a subjects tömbben
+    const foundSubject = subjects.find((s) => s.name === suggestedName);
+  
+    if (foundSubject) {
+      // Ha megtaláltad, beállítod a name és a semester mezőt is
+      setNewEntry((prev) => ({
+        ...prev,
+        name: suggestedName,
+        semester: foundSubject.semester,
+      }));
+    } else {
+      // Ha véletlen nem találtad (pl. duplán van?), egyszerű fallback
+      setNewEntry((prev) => ({ ...prev, name: suggestedName, semester: "" }));
+    }
+  
+    setShowSuggestions(false);
+  };
+
+  // --- Új vélemény egyéb mezők
   const handleInputChange = (e) => {
-      const { name, value } = e.target;
-    
-      setNewEntry((prev) => {
-        if (name === "name") {
-          const selectedSubject = subjects.find((subject) => subject.name === value);
-          return {
-            ...prev,
-            [name]: value,
-            semester: selectedSubject ? selectedSubject.semester : "", // Beállítjuk a félévet
-          };
-        }
-        return { ...prev, [name]: value };
-      });
-    
-      if (name === "user") {
-        localStorage.setItem("savedUserName", value);
-      }
-    };
-  
-  
+    const { name, value } = e.target;
+    setNewEntry((prev) => ({ ...prev, [name]: value }));
+    if (name === "user") {
+      localStorage.setItem("savedUserName", value);
+    }
+  };
+
+  // Modal bezárás
+  const handleModalClose = (e) => {
+    if (e.target.className === "modal-overlay") {
+      setIsModalOpen(false);
+      setShowSuggestions(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
 
 
-    // Létrehozunk egy FormData objektumot, amivel elküldjük a form adatokat
-    const formData = new URLSearchParams();
-    Object.keys(newEntry).forEach((key) => formData.append(key, newEntry[key]));
+    if (newEntry.difficulty.trim() !== "") {
+      const d = parseInt(newEntry.difficulty, 10);
+      if (isNaN(d)) {
+        alert("A nehézség mezőnek számot kell tartalmaznia !");
+        return; // Megszakítjuk a submitot
+      }
+    }
 
+    // Megnézzük, létezik-e az adott tárgy:
+    const foundSubject = subjects.find((s) => s.name === newEntry.name.trim());
+    if (!foundSubject) {
+      alert("Nincs ilyen tárgy a meglévő listában!");
+      return; // Megszakítjuk a submitot
+    }
 
-
-
-    // Ha a felhasználó nem adott meg nevet, alapértelmezetten "anonim"
     if (!newEntry.user) {
       newEntry.user = "anonim";
     }
+
+
+    const isNameEmpty = !newEntry.name.trim(); // üres a tárgynév
+    const isUserAnon = !newEntry.user.trim() || newEntry.user.trim().toLowerCase() === "anonim";
+    const isDifficultyEmpty = !newEntry.difficulty.trim();
+    const isGeneralEmpty = !newEntry.general.trim();
+    const isDuringEmpty = !newEntry.duringSemester.trim();
+    const isExamEmpty = !newEntry.exam.trim();
+    if (
+      isDifficultyEmpty &&
+      isGeneralEmpty &&
+      isDuringEmpty &&
+      isExamEmpty
+    ) {
+      alert("Minden mezőt üresen hagytál, tölts ki legalább egyet!");
+      return; // Megszakítjuk a beküldést
+    }
+  
+  
+
+    const formData = new URLSearchParams();
+    Object.keys(newEntry).forEach((key) => formData.append(key, newEntry[key]));
+
+    formData.set("semester", foundSubject.semester);
+
+
 
     try {
       const response = await fetch("https://www.kacifant.hu/andris/submit.php", {
@@ -129,17 +246,14 @@ const SubjectInfo = () => {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         },
-        body: formData.toString(), // URL-encoded adatok
-
+        body: formData.toString(),
       });
 
       if (!response.ok) {
         throw new Error("Hiba történt az adatbeküldés során");
       }
-      const responseData = await response.text();
       alert("Adatok sikeresen beküldve!");
-
-      // Csak azokat a mezőket állítjuk vissza, amelyek nem a "user" mező
+      // Reset
       setNewEntry((prev) => ({
         ...prev,
         name: "",
@@ -150,39 +264,39 @@ const SubjectInfo = () => {
         year: new Date().getFullYear(),
         semester: "",
       }));
-      setIsModalOpen(false); // Pop-up bezárása
+      setIsModalOpen(false);
+      setShowSuggestions(false);
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
     }
   };
 
+  // --- A fő lista (keresés + félév)
   const filteredSubjects = subjects.filter((subject) => {
-    const normalizedSearchTerm = removeAccents(searchTerm.toLowerCase());
-    const normalizedSubjectName = removeAccents(subject.name.toLowerCase());
+    const normSearch = removeAccents(searchTerm.toLowerCase());
+    const normName = removeAccents(subject.name.toLowerCase());
+    const matchesSearch = normName.includes(normSearch);
 
-    const matchesSearch = normalizedSubjectName.includes(normalizedSearchTerm);
     const matchesSemester =
-      selectedSemester === "all" || subject.semester === parseInt(selectedSemester, 10);
+      selectedSemester === "all" ||
+      subject.semester === parseInt(selectedSemester, 10);
 
-    return searchTerm ? matchesSearch : matchesSemester;
+    return matchesSearch && matchesSemester;
   });
 
-  if (loading) {
-    return <p>Adatok betöltése...</p>;
-  }
-
-  if (error) {
-    return <p>Hiba történt: {error}</p>;
-  }
+  if (loading) return <p>Adatok betöltése...</p>;
+  if (error) return <p>Hiba történt: {error}</p>;
 
   return (
     <div className="subject-info-container">
+      {/* Keresés, félév */}
       <div className="search-filter-container">
+        {/* FONTOS: itt cseréltük le onChange-t a handleSearchTermChange-re */}
         <input
           type="text"
           placeholder="Keresés tárgy neve alapján..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchTermChange}
           className="search-bar"
         />
         <select
@@ -191,82 +305,89 @@ const SubjectInfo = () => {
           className="semester-filter"
         >
           <option value="all">Összes félév</option>
-          {[...new Set(subjects.map((s) => s.semester))].filter((semester) => semester !== "N/A").sort((a, b) => a - b).map((semester) => (
-            <option key={semester} value={semester}>
-              {semester}. FÉLÉV
-            </option>
-          ))}
+          {[...new Set(subjects.map((s) => s.semester))]
+            .filter((sem) => sem !== "N/A")
+            .sort((a, b) => a - b)
+            .map((sem) => (
+              <option key={sem} value={sem}>
+                {sem}. félév
+              </option>
+            ))}
         </select>
-        <button
-          className="open-modal-button"
-          onClick={() => setIsModalOpen(true)}
-        >
+        <button className="open-modal-button" onClick={() => setIsModalOpen(true)}>
           Feltöltés
         </button>
       </div>
 
+      {/* Megjelenített subjectek */}
       {filteredSubjects.length > 0 ? (
         filteredSubjects
-          .reduce((acc, subject) => {
-              const existingSubject = acc.find((item) => item.name === subject.name);
-              if (subject.user && subject.user.trim() !== "" && subject.user !== "N/A") { // Csak akkor adja hozzá, ha van user
-                if (existingSubject) {
-                  existingSubject.users.push({
-                    user: subject.user,
-                    year: subject.year,
-                    difficulty: subject.difficulty,
-                    general: subject.general,
-                    duringSemester: subject.duringSemester,
-                    exam: subject.exam,
-                  });
-                } else {
-                  acc.push({
-                    name: subject.name,
-                    semester: subject.semester,
-                    users: [
-                      {
-                        user: subject.user,
-                        year: subject.year,
-                        difficulty: subject.difficulty,
-                        general: subject.general,
-                        duringSemester: subject.duringSemester,
-                        exam: subject.exam,
-                      },
-                    ],
-                  });
-                }
+          .reduce((acc, s) => {
+            const existing = acc.find((item) => item.name === s.name);
+            if (s.user && s.user !== "N/A" && s.user.trim() !== "") {
+              if (existing) {
+                existing.users.push({
+                  user: s.user,
+                  year: s.year,
+                  difficulty: s.difficulty,
+                  general: s.general,
+                  duringSemester: s.duringSemester,
+                  exam: s.exam,
+                });
+              } else {
+                acc.push({
+                  name: s.name,
+                  semester: s.semester,
+                  users: [
+                    {
+                      user: s.user,
+                      year: s.year,
+                      difficulty: s.difficulty,
+                      general: s.general,
+                      duringSemester: s.duringSemester,
+                      exam: s.exam,
+                    },
+                  ],
+                });
+              }
             }
             return acc;
           }, [])
-          .map((subject, index) => (
-            <div key={index} className="subject-card">
+          .map((group, i) => (
+            <div key={i} className="subject-card">
               <div className="subject-header">
-                <h3 className="subject-title">{subject.name}</h3>
+                <h3 className="subject-title">{group.name}</h3>
               </div>
               <div className="subject-semester">
-                <p>Félév: {subject.semester}. FÉLÉV</p>
+                <p>Félév: {group.semester}. félév</p>
               </div>
               <div className="subject-details">
-                {subject.users.map((user, userIndex) => (
-                  <div key={userIndex} className="user-feedback">
-                      <h4>{user.user}</h4>
-                      <p><strong>Év:</strong> {user.year}</p>
-                      {user.difficulty !== "N/A" && (
-                        <p><strong>Nehézség:</strong> {user.difficulty}/10</p>
-                      )}
-                      {user.general && (
-                        <p><strong>Általános:</strong> {user.general}</p>
-                      )}
-                      {user.duringSemester !== "N/A" && (
-                        <p><strong>Évközben:</strong> {user.duringSemester}</p>
-                      )}
-                      {user.exam !== "N/A" && (
-                        <p><strong>Vizsga:</strong> {user.exam}</p>
-                      )}
-
-
-
-
+                {group.users.map((u, idx) => (
+                  <div key={idx} className="user-feedback">
+                    <h4>{u.user}</h4>
+                    <p>
+                      <strong>Év:</strong> {u.year}
+                    </p>
+                    {u.difficulty !== "N/A" && (
+                      <p>
+                        <strong>Nehézség:</strong> {u.difficulty}/10
+                      </p>
+                    )}
+                    {u.general && (
+                      <p>
+                        <strong>Általános:</strong> {u.general}
+                      </p>
+                    )}
+                    {u.duringSemester !== "N/A" && (
+                      <p>
+                        <strong>Évközben:</strong> {u.duringSemester}
+                      </p>
+                    )}
+                    {u.exam !== "N/A" && (
+                      <p>
+                        <strong>Vizsga:</strong> {u.exam}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -276,42 +397,52 @@ const SubjectInfo = () => {
         <p className="no-results">Nincs találat a keresett kifejezésre.</p>
       )}
 
-      {/* Pop-up modal */}
+      {/* Modal: Új vélemény */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={handleModalClose}>
           <div className="modal-content">
             <button
               className="close-button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                setShowSuggestions(false);
+              }}
             >
               x
             </button>
             <form onSubmit={handleSubmit} className="submission-form">
               <h2>Új vélemény hozzáadása</h2>
 
-              {/* Tárgynév */}
-              <div className="form-group">
+              <div className="form-group" style={{ position: "relative" }}>
                 <label htmlFor="name">Tárgynév:</label>
-                <select
+                <input
+                  type="text"
                   id="name"
                   name="name"
                   value={newEntry.name}
-                  onChange={handleInputChange}
+                  onChange={handleNameChange}
+                  onFocus={handleNameFocus}
+                  placeholder="Kattints ide vagy írj be valamit..."
+                  autoComplete="off"
                   required
-                >
-                  <option value="">Válassz egy tárgyat</option>
-                  {subjects
-                  .slice() // Másolatot készítünk a biztonság kedvéért
-                  .sort((a, b) => a.name.localeCompare(b.name)) // ABC sorrendbe rendezzük a nevek alapján
-                  .map((subject, index) => (
-                    <option key={index} value={subject.name}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
+                />
+
+                {/* Javaslatok doboza */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="autocomplete-container">
+                    {suggestions.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="autocomplete-item"
+                        onClick={() => handleSuggestionClick(item)}
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Felhasználó */}
               <div className="form-group">
                 <label htmlFor="user">Felhasználó:</label>
                 <input
@@ -320,11 +451,9 @@ const SubjectInfo = () => {
                   name="user"
                   value={newEntry.user}
                   onChange={handleInputChange}
-                  placeholder="Írd be a nevet vagy hagyd üresen"
                 />
               </div>
 
-              {/* Nehézség */}
               <div className="form-group">
                 <label htmlFor="difficulty">Nehézség: (1-10)</label>
                 <input
@@ -333,11 +462,9 @@ const SubjectInfo = () => {
                   name="difficulty"
                   value={newEntry.difficulty}
                   onChange={handleInputChange}
-                  placeholder="Írd be a nehézséget"
                 />
               </div>
 
-              {/* Általános */}
               <div className="form-group">
                 <label htmlFor="general">Általános:</label>
                 <textarea
@@ -348,9 +475,8 @@ const SubjectInfo = () => {
                 ></textarea>
               </div>
 
-              {/* Évközben */}
               <div className="form-group">
-                <label htmlFor="duringSemester">Évközben: (nem kötelező)</label>
+                <label htmlFor="duringSemester">Évközben:</label>
                 <textarea
                   id="duringSemester"
                   name="duringSemester"
@@ -359,9 +485,8 @@ const SubjectInfo = () => {
                 ></textarea>
               </div>
 
-              {/* Vizsga */}
               <div className="form-group">
-                <label htmlFor="exam">Vizsga: (nem kötelező)</label>
+                <label htmlFor="exam">Vizsga:</label>
                 <textarea
                   id="exam"
                   name="exam"
@@ -370,7 +495,6 @@ const SubjectInfo = () => {
                 ></textarea>
               </div>
 
-              {/* Év */}
               <div className="form-group">
                 <label htmlFor="year">Év:</label>
                 <input
