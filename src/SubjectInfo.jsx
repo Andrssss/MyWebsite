@@ -46,6 +46,12 @@ const SubjectInfo = () => {
       }
     };
 
+    // Betöltjük a mentett nevet, ha van
+    const savedUserName = localStorage.getItem("savedUserName");
+    if (savedUserName) {
+      setNewEntry((prev) => ({ ...prev, user: savedUserName }));
+    }
+
     fetchTable();
   }, []);
 
@@ -82,6 +88,10 @@ const SubjectInfo = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewEntry((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "user") {
+      localStorage.setItem("savedUserName", value);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -103,7 +113,7 @@ const SubjectInfo = () => {
       const response = await fetch("https://www.kacifant.hu/andris/submit.php", {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         },
         body: formData.toString(), // URL-encoded adatok
 
@@ -116,16 +126,17 @@ const SubjectInfo = () => {
       alert("Adatok sikeresen beküldve!");
       console.log(responseData); // Válasz kiírása a konzolra
 
-      setNewEntry({
+      // Csak azokat a mezőket állítjuk vissza, amelyek nem a "user" mező
+      setNewEntry((prev) => ({
+        ...prev,
         name: "",
-        user: "anonim",
         difficulty: "",
         general: "",
         duringSemester: "",
         exam: "",
         year: new Date().getFullYear(),
         semester: "",
-      });
+      }));
       setIsModalOpen(false); // Pop-up bezárása
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
