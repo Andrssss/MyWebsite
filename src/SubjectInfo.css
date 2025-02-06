@@ -115,6 +115,13 @@
   color: var(--semester-color, #555);
 }
 
+
+strong {
+  color: #ff0000; /* Válassz egy színt */
+  font-weight: bold; /* Ez opcionális, ha még hangsúlyosabbá akarod tenni */
+}
+
+
 /* Vélemények stílusa */
 .user-feedback {
   margin-bottom: 15px;
@@ -126,7 +133,7 @@
 
 .user-feedback h4 {
   font-size: 1rem;
-  color: #333;
+  color: #000000;
   margin-bottom: 5px;
 }
 
@@ -160,7 +167,7 @@
   background: #fff;
   padding: 25px; /* Növelt padding */
   border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 10px rgba(128, 7, 7, 0.15);
   width: 90%; /* Még szélesebb, mint 85% */
   max-width: 600px; /* Asztali nézetben nagyobb maximális szélesség */
   position: relative;

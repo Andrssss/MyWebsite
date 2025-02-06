@@ -249,20 +249,24 @@ const SubjectInfo = () => {
               <div className="subject-details">
                 {subject.users.map((user, userIndex) => (
                   <div key={userIndex} className="user-feedback">
-                    <h4>{user.user}</h4>
-                    <p><strong>Év:</strong> {user.year}</p>
-                    {user.difficulty !== "N/A" && (
-                      <p><strong>Nehézség: </strong> {user.difficulty}/10</p>
-                    )}
-                    {user.general && (
-                      <p><strong>Általános:</strong> {user.general}</p>
-                    )}
-                    {user.duringSemester !== "N/A" && (
-                      <p><strong>Évközben:</strong> {user.duringSemester}</p>
-                    )}
-                    {user.exam !== "N/A" && (
-                      <p><strong>Vizsga:</strong> {user.exam}</p>
-                    )}
+                      <h4>{user.user}</h4>
+                      <p><strong>Év:</strong> {user.year}</p>
+                      {user.difficulty !== "N/A" && (
+                        <p><strong>Nehézség:</strong> {user.difficulty}/10</p>
+                      )}
+                      {user.general && (
+                        <p><strong>Általános:</strong> {user.general}</p>
+                      )}
+                      {user.duringSemester !== "N/A" && (
+                        <p><strong>Évközben:</strong> {user.duringSemester}</p>
+                      )}
+                      {user.exam !== "N/A" && (
+                        <p><strong>Vizsga:</strong> {user.exam}</p>
+                      )}
+
+
+
+
                   </div>
                 ))}
               </div>
