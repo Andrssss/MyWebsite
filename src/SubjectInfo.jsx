@@ -76,7 +76,6 @@ const SubjectInfo = () => {
         semester: parseInt(cells[7]?.textContent.trim(), 10) || "N/A",
       });
     });
-
     return subjectsArray;
   };
 
@@ -86,16 +85,31 @@ const SubjectInfo = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewEntry((prev) => ({ ...prev, [name]: value }));
-
-    if (name === "user") {
-      localStorage.setItem("savedUserName", value);
-    }
-  };
+      const { name, value } = e.target;
+    
+      setNewEntry((prev) => {
+        if (name === "name") {
+          const selectedSubject = subjects.find((subject) => subject.name === value);
+          return {
+            ...prev,
+            [name]: value,
+            semester: selectedSubject ? selectedSubject.semester : "", // Beállítjuk a félévet
+          };
+        }
+        return { ...prev, [name]: value };
+      });
+    
+      if (name === "user") {
+        localStorage.setItem("savedUserName", value);
+      }
+    };
+  
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+
 
     // Létrehozunk egy FormData objektumot, amivel elküldjük a form adatokat
     const formData = new URLSearchParams();
@@ -124,7 +138,6 @@ const SubjectInfo = () => {
       }
       const responseData = await response.text();
       alert("Adatok sikeresen beküldve!");
-      console.log(responseData); // Válasz kiírása a konzolra
 
       // Csak azokat a mezőket állítjuk vissza, amelyek nem a "user" mező
       setNewEntry((prev) => ({
@@ -195,31 +208,33 @@ const SubjectInfo = () => {
       {filteredSubjects.length > 0 ? (
         filteredSubjects
           .reduce((acc, subject) => {
-            const existingSubject = acc.find((item) => item.name === subject.name);
-            if (existingSubject) {
-              existingSubject.users.push({
-                user: subject.user,
-                year: subject.year,
-                difficulty: subject.difficulty,
-                general: subject.general,
-                duringSemester: subject.duringSemester,
-                exam: subject.exam,
-              });
-            } else {
-              acc.push({
-                name: subject.name,
-                semester: subject.semester,
-                users: [
-                  {
+              const existingSubject = acc.find((item) => item.name === subject.name);
+              if (subject.user && subject.user.trim() !== "" && subject.user !== "N/A") { // Csak akkor adja hozzá, ha van user
+                if (existingSubject) {
+                  existingSubject.users.push({
                     user: subject.user,
                     year: subject.year,
                     difficulty: subject.difficulty,
                     general: subject.general,
                     duringSemester: subject.duringSemester,
                     exam: subject.exam,
-                  },
-                ],
-              });
+                  });
+                } else {
+                  acc.push({
+                    name: subject.name,
+                    semester: subject.semester,
+                    users: [
+                      {
+                        user: subject.user,
+                        year: subject.year,
+                        difficulty: subject.difficulty,
+                        general: subject.general,
+                        duringSemester: subject.duringSemester,
+                        exam: subject.exam,
+                      },
+                    ],
+                  });
+                }
             }
             return acc;
           }, [])
