@@ -1,118 +1,273 @@
-.subject-info-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    justify-content: flex-start;
-    padding: 20px;
-  }
-  
-  .search-bar input {
-    width: 100%;
-    max-width: 400px;
-    padding: 10px;
-    font-size: 1rem;
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .subject-card {
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    background: var(--card-background-color, #ffffff);
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 5px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-  }
-  
-  .subject-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px;
-    background: var(--header-background-color, #191919);
-    color: var(--header-text-color, #ffffff);
-  }
-  
-  .subject-title {
-    font-size: 1.2rem;
-    font-weight: bold;
-  }
-  
-  .difficulty {
-    font-size: 0.9rem;
-    font-weight: bold;
-  }
-  
-  .subject-details {
-    padding: 15px;
-  }
-  
-  .section {
-    margin-bottom: 10px;
-  }
-  
-  .section h4 {
-    font-size: 1rem;
-    color: var(--section-header-color, #333);
-    margin-bottom: 5px;
-  }
-  
-  .section p {
-    font-size: 0.9rem;
-    line-height: 1.4;
-    color: var(--text-color, #555);
-  }
-  
-  .no-results {
-    text-align: center;
-    color: var(--text-color, #999);
-    font-size: 1rem;
-    margin-top: 20px;
+/* Kereső és félév szűrő */
+.search-filter-container {
+  display: flex;
+  justify-content: center; /* A tartalom középre igazítása vízszintesen */
+  align-items: center; /* Az elemek középre igazítása függőlegesen */
+  gap: 15px; /* Távolság az elemek között */
+  margin-bottom: 20px;
+  position: relative; /* A gomb jobb oldalra igazítása miatt */
+}
+
+/* Keresősáv */
+.search-bar {
+  width: 100%;
+  max-width: 300px;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 42px;
+  box-sizing: border-box;
+}
+
+/* Félév szűrő */
+.semester-filter {
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 5px;
+  background-color: var(--filter-background, #fff);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 42px;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+/* Feltöltés gomb */
+.open-modal-button {
+  margin-left: 15px; /* 15px távolságra kerül a legördülő menütől */
+  padding: 10px 15px;
+  font-size: 1rem;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.open-modal-button:hover {
+  background-color: #0056b3;
+}
+
+/* Kártyák és vélemények */
+.subject-card {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--card-background-color, #ffffff);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.subject-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: var(--header-background-color, #191919);
+  color: var(--header-text-color, #ffffff);
+}
+
+.subject-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.difficulty {
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.subject-details {
+  padding: 15px;
+}
+
+.section {
+  margin-bottom: 10px;
+}
+
+.section h4 {
+  font-size: 1rem;
+  color: var(--section-header-color, #333);
+  margin-bottom: 5px;
+}
+
+.section p {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-color, #555);
+}
+
+.no-results {
+  text-align: center;
+  color: var(--text-color, #999);
+  font-size: 1rem;
+  margin-top: 20px;
+}
+
+.subject-semester {
+  padding: 0 15px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: var(--semester-color, #555);
+}
+
+/* Vélemények stílusa */
+.user-feedback {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.user-feedback h4 {
+  font-size: 1rem;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.user-feedback p {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 5px 0;
+}
+
+
+
+
+
+
+/* Pop-up Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Pop-up Modal Content */
+.modal-content {
+  background: #fff;
+  padding: 25px; /* Növelt padding */
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  width: 90%; /* Még szélesebb, mint 85% */
+  max-width: 600px; /* Asztali nézetben nagyobb maximális szélesség */
+  position: relative;
+  max-height: 80vh; /* 80% maximális magasság */
+  overflow-y: auto; /* Ha a tartalom hosszú, görgethetővé válik */
+  text-align: center;
+}
+
+/* Close Button */
+.close-button {
+  position: absolute;
+  top: 15px;
+  right: 15px; /* A gomb a jobb felső sarokban lesz */
+  background-color: transparent;
+  color: #333;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  font-weight: bold;
+  z-index: 1100; /* Biztosítjuk, hogy a gomb mindig felül legyen */
+}
+
+.close-button:hover {
+  color: #f44336;
+  scale: 1.1;
+}
+
+/* Form input mezők */
+.form-group {
+  margin-bottom: 20px; /* Marad a margó */
+}
+
+.form-group label {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  display: block;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 12px; /* Kicsit több padding, hogy kényelmesebb legyen */
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.form-group textarea {
+  height: 140px; /* Magasabb textarea */
+}
+
+button[type="submit"] {
+  padding: 12px 18px;
+  font-size: 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+button[type="button"].close-modal-button {
+  background-color: #dc3545;
+  color: white;
+  padding: 12px 18px;
+}
+
+button[type="button"].close-modal-button:hover {
+  background-color: #c82333;
+}
+
+/* Mobilbarát stílusok */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 90%; /* Az ablak szélessége mobilon kisebb */
+    max-width: 400px; /* Maximális szélesség mobilon */
+    padding: 20px; /* Kevesebb padding mobilon */
+    max-height: 80vh; /* A magasság is 80% */
   }
 
-  .subject-semester {
-    padding: 0 15px;
-    font-size: 0.9rem;
-    font-weight: bold;
-    color: var(--semester-color, #555);
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 10px; /* Kevesebb padding mobilon */
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 90%; /* Még kisebb eszközökön is */
+    max-width: 350px; /* Kisebb szélesség */
+    padding: 15px; /* Még kevesebb padding */
+    max-height: 80vh; /* Továbbra is mobilbarát magasság */
   }
 
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 8px; /* Kevesebb padding mobilon */
+  }
+}
 
-  .search-filter-container {
-    display: flex;
-    justify-content: center;
-    align-items: center; /* Ensures both elements are vertically aligned */
-    gap: 15px; /* Adds spacing between the search bar and the dropdown */
-    margin-bottom: 20px;
-  }
-  
-  .search-bar {
-    width: 100%;
-    max-width: 300px;
-    padding: 10px;
-    font-size: 1rem;
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    height: 42px; /* Ensure the height matches the dropdown */
-    box-sizing: border-box; /* Ensures padding is included in the height */
-  }
-  
-  .semester-filter {
-    padding: 10px;
-    font-size: 1rem;
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 5px;
-    background-color: var(--filter-background, #fff);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    height: 42px; /* Matches the search bar height */
-    line-height: 1.2; /* Ensures text is vertically centered */
-    box-sizing: border-box; /* Ensures padding is included in the height */
-    vertical-align: middle; /* Ensures the dropdown aligns vertically */
-  }
-  
-  
-  
