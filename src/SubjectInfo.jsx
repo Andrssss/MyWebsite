@@ -59,11 +59,12 @@ const SubjectInfo = () => {
       } finally {
         setLoading(false);
       }
-
-
-      fetchTable(); // Betöltéskor lekéri az adatokat
-
     };
+
+
+    // Hívás az adatok lekérésére
+    fetchTable();
+
 
     // Ha van mentett user
     const savedUserName = localStorage.getItem("savedUserName");
