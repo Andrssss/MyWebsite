@@ -306,3 +306,51 @@ button[type="button"].close-modal-button:hover {
   background-color: #f0f0f0;
 }
 
+
+.feedback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.feedback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.feedback-buttons {
+  display: flex;
+  flex-direction: column; /* Gombok egymás alá */
+  align-items: flex-end; /* Igazítás a jobb oldalra */
+  gap: 8px; /* Térköz a gombok között */
+}
+
+.edit-button {
+  background-color: #4d79ff; /* Kék szín a szerkesztéshez */
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.edit-button:hover {
+  background-color: #1a53ff; /* Sötétebb kék, amikor az egér fölé viszed */
+}
+
+.delete-button {
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.delete-button:hover {
+  background-color: #ff1a1a;
+}
+
+
