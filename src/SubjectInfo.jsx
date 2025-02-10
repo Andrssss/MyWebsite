@@ -188,7 +188,7 @@ const SubjectInfo = () => {
   
   const handleDelete = async (id) => {
     if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) {
-      return; // Ha a felhasználó nem erősíti meg, kilép
+      return;
     }
   
     try {
@@ -204,13 +204,14 @@ const SubjectInfo = () => {
   
       alert("Vélemény sikeresen törölve.");
   
-      // Adatok frissítése (fetchTable csak akkor hívódik meg, ha létezik)
+      // **1. Verzió: Manuális frissítés + Késleltetés**
+      setTimeout(() => {
+        setSubjects((prevSubjects) => prevSubjects.filter((subject) => subject.id !== id));
+      }, 200); // 200ms késleltetés, hogy az UI biztosan frissüljön
+  
+      // **2. Verzió: Ha van fetchTable, frissítsük az adatokat is**
       if (typeof fetchTable === "function") {
         await fetchTable();
-      } else {
-        console.warn("fetchTable is not defined, skipping data refresh.");
-        // Ha nincs fetchTable, akkor manuálisan frissítjük az állapotot
-        setSubjects((prevSubjects) => prevSubjects.filter((subject) => subject.id !== id));
       }
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
@@ -390,22 +391,20 @@ const SubjectInfo = () => {
       const d = parseInt(newEntry.difficulty, 10);
       if (isNaN(d)) {
         alert("A nehézség mezőnek számot kell tartalmaznia !");
-        return; // Megszakítjuk a submitot
+        return;
       }
     }
   
-    // Ellenőrizzük, hogy létezik-e az adott tárgy
     const foundSubject = subjects.find((s) => s.name === newEntry.name.trim());
     if (!foundSubject) {
       alert("Nincs ilyen tárgy a meglévő listában!");
-      return; // Megszakítjuk a submitot
+      return;
     }
   
     if (!newEntry.user) {
       newEntry.user = "anonim";
     }
   
-    // Ellenőrzés, hogy legalább egy mező ki van-e töltve
     const isDifficultyEmpty = !newEntry.difficulty.trim();
     const isGeneralEmpty = !newEntry.general.trim();
     const isDuringEmpty = !newEntry.duringSemester.trim();
@@ -413,10 +412,9 @@ const SubjectInfo = () => {
   
     if (isDifficultyEmpty && isGeneralEmpty && isDuringEmpty && isExamEmpty) {
       alert("Minden mezőt üresen hagytál, tölts ki legalább egyet!");
-      return; // Megszakítjuk a beküldést
+      return;
     }
   
-    // FormData létrehozása
     const formData = new URLSearchParams();
     Object.keys(newEntry).forEach((key) => formData.append(key, newEntry[key]));
     formData.set("user_id", userId);
@@ -431,23 +429,25 @@ const SubjectInfo = () => {
         body: formData.toString(),
       });
   
-      if (!response.ok) {
-        throw new Error("Hiba történt az adatbeküldés során");
+      const responseText = await response.text(); // 🔥 Most szöveget dolgozunk fel!
+  
+      if (!response.ok || !responseText.startsWith("SUCCESS:")) {
+        throw new Error(responseText || "Hiba történt az adatbeküldés során");
+      }
+  
+      // 🔹 Az új ID kinyerése a válaszból
+      const newId = parseInt(responseText.replace("SUCCESS:", "").trim(), 10);
+      if (isNaN(newId)) {
+        throw new Error("Hibás ID érték a szerver válaszában.");
       }
   
       alert("Adatok sikeresen beküldve!");
   
-      // Adatok frissítése (fetchTable csak akkor hívódik meg, ha létezik)
-      if (typeof fetchTable === "function") {
-        await fetchTable();
-      } else {
-        console.warn("fetchTable is not defined, skipping data refresh.");
-        // Ha nincs fetchTable, akkor manuálisan frissítjük az állapotot
-        const newSubject = { ...newEntry, id: Date.now(), user_id: userId };
-        setSubjects((prevSubjects) => [...prevSubjects, newSubject]);
-      }
+      // **🔹 Új ID beállítása a frontend állapotban**
+      const newSubject = { ...newEntry, id: newId, user_id: userId };
   
-      // Reset állapot
+      setSubjects((prevSubjects) => [...prevSubjects, newSubject]);
+  
       setNewEntry((prev) => ({
         ...prev,
         name: "",
@@ -458,12 +458,14 @@ const SubjectInfo = () => {
         year: new Date().getFullYear(),
         semester: "",
       }));
+  
       setIsModalOpen(false);
       setShowSuggestions(false);
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
     }
   };
+  
   
 
 
@@ -530,125 +532,129 @@ const SubjectInfo = () => {
         <button className="open-modal-button" onClick={() => setIsModalOpen(true)}>
           Feltöltés
         </button>
+
       </div>
   
+
+
       {/* Megjelenített subjectek */}
       {filteredSubjects.length > 0 ? (
         filteredSubjects
-        .reduce((acc, s) => {
-          const existing = acc.find((item) => item.name === s.name);
-        
-          if (s.user && s.user !== "N/A" && s.user.trim() !== "") {
+          .reduce((acc, s) => {
+            const existing = acc.find((item) => item.name === s.name);
+
             if (existing) {
-              existing.users.push({
-                user: s.user,
-                user_id: s.user_id,
-                year: s.year,
-                difficulty: s.difficulty,
-                general: s.general,
-                duringSemester: s.duringSemester,
-                exam: s.exam,
-                id: s.id, // ID hozzáadása
-              });
+              if (s.user && s.user !== "N/A" && s.user.trim() !== "") {
+                existing.users.push({
+                  user: s.user,
+                  user_id: s.user_id,
+                  year: s.year,
+                  difficulty: s.difficulty,
+                  general: s.general,
+                  duringSemester: s.duringSemester,
+                  exam: s.exam,
+                  id: s.id,
+                });
+              }
             } else {
               acc.push({
                 name: s.name,
                 semester: s.semester,
-                id: s.id, // ID beállítása új csoportnál
-                users: [
-                  {
-                    user: s.user,
-                    user_id: s.user_id,
-                    year: s.year,
-                    difficulty: s.difficulty,
-                    general: s.general,
-                    duringSemester: s.duringSemester,
-                    exam: s.exam,
-                    id: s.id, // ID hozzáadása
-                  },
-                ],
+                id: s.id,
+                users: s.user && s.user !== "N/A" && s.user.trim() !== ""
+                  ? [
+                      {
+                        user: s.user,
+                        user_id: s.user_id,
+                        year: s.year,
+                        difficulty: s.difficulty,
+                        general: s.general,
+                        duringSemester: s.duringSemester,
+                        exam: s.exam,
+                        id: s.id,
+                      },
+                    ]
+                  : [], // Üres tömb, hogy később hozzá lehessen adni ha szükséges
               });
             }
-          }
-        
-          return acc;
-        }, [])
-        
-        
-          .map((group, i) => (
-            <div key={i} className="subject-card">
-              <div className="subject-header">
-                <h3 className="subject-title">{group.name}</h3>
-              </div>
-              <div className="subject-semester">
-                <p>Félév: {group.semester}. félév</p>
-              </div>
-              <div className="subject-details">
-                {group.users.map((u, idx) => (
-                  <div key={idx} className="user-feedback">
-                    {/* FEJLÉC: Felhasználónév és szerkesztés gomb */}
-                    <div className="feedback-header">
-                      <h4>{u.user}</h4>
-                      {u.user_id === userId && (
-                        <div className="feedback-buttons">
-                          <button
-                            className="edit-button"
-                            onClick={() =>
-                              openEditModal({
-                                ...u,
-                                id: u.id,
-                                name: group.name,
-                                semester: group.semester,
-                              })
-                            }
-                          >
-                            Szerkesztés
-                          </button>
-                          <button
-                            className="delete-button"
-                            onClick={() => handleDelete(u.id)}
-                          >
-                            Törlés
-                          </button>
-                        </div>
+
+            return acc;
+          }, [])
+          .map((group, i) => {
+            // Ellenőrzés: van-e legalább egy érvényes vélemény?
+            const hasValidReviews = group.users.some((u) => u.user !== "N/A" && u.user.trim() !== "");
+
+            // Ha nincs érvényes vélemény, adjunk hozzá egy alapértelmezett üzenetet
+            if (!hasValidReviews) {
+              group.users.push({ user: "Kérlek írj véleményt róla.", id: null });
+            }
+
+            return (
+              <div key={i} className="subject-card">
+                <div className="subject-header">
+                  <h3 className="subject-title">{group.name}</h3>
+                </div>
+                <div className="subject-semester">
+                  <p>Félév: {group.semester}. félév</p>
+                </div>
+                <div className="subject-details">
+                  {group.users.map((u, idx) => (
+                    <div key={idx} className="user-feedback">
+                      {/* Ha nincs valódi vélemény, csak kiírjuk az üzenetet */}
+                      {u.id === null ? (
+                        <p className="no-feedback">{u.user}</p>
+                      ) : (
+                        <>
+                          <div className="feedback-header">
+                            <h4>{u.user}</h4>
+                            {u.user_id === userId && (
+                              <div className="feedback-buttons">
+                                <button
+                                  className="edit-button"
+                                  onClick={() =>
+                                    openEditModal({
+                                      ...u,
+                                      id: u.id,
+                                      name: group.name,
+                                      semester: group.semester,
+                                    })
+                                  }
+                                >
+                                  Szerkesztés
+                                </button>
+                                <button
+                                  className="delete-button"
+                                  onClick={() => handleDelete(u.id)}
+                                >
+                                  Törlés
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Vélemény részletek */}
+                          <p><strong>Év:</strong> {u.year}</p>
+                          {u.difficulty !== "N/A" && (
+                            <p><strong>Nehézség:</strong> {u.difficulty}/10</p>
+                          )}
+                          {u.general && <p><strong>Általános:</strong> {u.general}</p>}
+                          {u.duringSemester !== "N/A" && (
+                            <p><strong>Évközben:</strong> {u.duringSemester}</p>
+                          )}
+                          {u.exam !== "N/A" && <p><strong>Vizsga:</strong> {u.exam}</p>}
+                        </>
                       )}
-
-
-
                     </div>
-  
-                    {/* Vélemény részletek */}
-                    <p>
-                      <strong>Év:</strong> {u.year}
-                    </p>
-                    {u.difficulty !== "N/A" && (
-                      <p>
-                        <strong>Nehézség:</strong> {u.difficulty}/10
-                      </p>
-                    )}
-                    {u.general && (
-                      <p>
-                        <strong>Általános:</strong> {u.general}
-                      </p>
-                    )}
-                    {u.duringSemester !== "N/A" && (
-                      <p>
-                        <strong>Évközben:</strong> {u.duringSemester}
-                      </p>
-                    )}
-                    {u.exam !== "N/A" && (
-                      <p>
-                        <strong>Vizsga:</strong> {u.exam}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
       ) : (
         <p className="no-results">Nincs találat a keresett kifejezésre.</p>
       )}
+
+
 
       {/* Modal: Új vélemény */}
       {isModalOpen && (
