@@ -714,7 +714,7 @@ const SubjectInfo = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="user">Felhasználó:</label>
+                <label htmlFor="user">Becenév:</label>
                 <input
                   type="text"
                   id="user"
