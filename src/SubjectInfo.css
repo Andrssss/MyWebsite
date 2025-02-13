@@ -129,13 +129,13 @@ strong {
   margin-bottom: 15px;
   padding: 10px;
   background: #f9f9f9;
-  border: 1px solid #ddd;
+  border: 1px solid #191919;
   border-radius: 5px;
 }
 
 .user-feedback h4 {
   font-size: 1rem;
-  color: #000000;
+  color: #191919;
   margin-bottom: 5px;
 }
 
