@@ -215,7 +215,7 @@ strong {
 .form-group textarea {
   width: 100%;
   padding: 12px; /* Kicsit több padding, hogy kényelmesebb legyen */
-  border: 1px solid #ddd;
+  border: 1px solid #000000;
   border-radius: 5px;
   box-sizing: border-box;
 }

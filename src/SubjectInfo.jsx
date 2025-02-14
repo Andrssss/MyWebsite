@@ -719,19 +719,21 @@ const SubjectInfo = () => {
                   type="text"
                   id="user"
                   name="user"
-                  value={newEntry.user}
+                  value={newEntry.user === "anonim" ? "" : newEntry.user} // 🔹 Ha anonim, akkor üres legyen
                   onChange={handleInputChange}
+                  placeholder="anonim"
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="difficulty">Nehézség: (1-10)</label>
+                <label htmlFor="difficulty">Nehézség: </label>
                 <input
                   type="text"
                   id="difficulty"
                   name="difficulty"
                   value={newEntry.difficulty}
                   onChange={handleInputChange}
+                  placeholder="Szám (1-10) "
                 />
               </div>
 
@@ -752,6 +754,7 @@ const SubjectInfo = () => {
                   name="duringSemester"
                   value={newEntry.duringSemester}
                   onChange={handleInputChange}
+                   placeholder="( Nem kötelező )"
                 ></textarea>
               </div>
 
@@ -762,6 +765,7 @@ const SubjectInfo = () => {
                   name="exam"
                   value={newEntry.exam}
                   onChange={handleInputChange}
+                  placeholder="( Nem kötelező )"
                 ></textarea>
               </div>
 
