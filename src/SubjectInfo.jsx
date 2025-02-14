@@ -733,7 +733,7 @@ const SubjectInfo = () => {
                   name="difficulty"
                   value={newEntry.difficulty}
                   onChange={handleInputChange}
-                  placeholder="Szám (1-10) "
+                  placeholder="Szám (0-10) "
                 />
               </div>
 
