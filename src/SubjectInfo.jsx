@@ -13,7 +13,6 @@ const SubjectInfo = () => {
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
 
-
   // Kereső és félév
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("all");
@@ -36,15 +35,12 @@ const SubjectInfo = () => {
   const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
-    
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId) {
       storedUserId = "user-" + Math.random().toString(36).substr(2, 9);
       localStorage.setItem("userId", storedUserId);
     }
-    
-    setUserId(storedUserId); // Előbb beállítjuk az userId-t
-
+    setUserId(storedUserId);
 
     const fetchTable = async () => {
       try {
@@ -54,17 +50,15 @@ const SubjectInfo = () => {
         }
         const html = await response.text();
         setSubjects(parseHTMLTable(html));
-      }  catch (err) {
+      } catch (err) {
         console.error("Hiba történt az adatok lekérésekor:", err);
       } finally {
         setLoading(false);
       }
     };
 
-
     // Hívás az adatok lekérésére
     fetchTable();
-
 
     // Ha van mentett user
     const savedUserName = localStorage.getItem("savedUserName");
@@ -72,17 +66,15 @@ const SubjectInfo = () => {
       setNewEntry((prev) => ({ ...prev, user: savedUserName }));
     }
 
+    // (Esetleg ha kétszer szeretnéd hívni a fetchTable-t, itt maradhat a második hívás)
     fetchTable();
   }, [userId]);
-
-
-
 
   const parseHTMLTable = (html) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     const rows = doc.querySelectorAll("table tr");
-  
+
     const arr = [];
     rows.forEach((row, index) => {
       if (index === 0) return; // Fejléc kihagyása
@@ -102,10 +94,6 @@ const SubjectInfo = () => {
     });
     return arr;
   };
-  
-  
-
-
 
   // --- Keresés + félév szűrés
   const handleSemesterChange = (e) => {
@@ -113,22 +101,17 @@ const SubjectInfo = () => {
     setSearchTerm("");
   };
 
-  // Ha a felhasználó ír valamit a keresőmezőbe,
-  // és NEM üres a kifejezés, automatikusan all-ra állítjuk a félévet:
   const handleSearchTermChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
 
-    // Ha van beírt szöveg, levesszük a félévszűrést
     if (val.trim().length > 0) {
       setSelectedSemester("all");
     }
   };
 
   // =========== AUTOCOMPLETE LOGIKA ===========
-  // 1) onFocus => mindig mutassa az összes tárgyat
   const handleNameFocus = () => {
-    // Összes tárgynév, egyedivé téve
     const allNames = [...new Set(subjects.map((subj) => subj.name))].sort((a, b) =>
       a.localeCompare(b)
     );
@@ -136,15 +119,10 @@ const SubjectInfo = () => {
     setShowSuggestions(true);
   };
 
-
-
-
-
-  // 2) OnChange => ha üres, mutasson mindent, ha van szöveg, szűrjön
   const handleNameChange = (e) => {
     const { value } = e.target;
     setNewEntry((prev) => ({ ...prev, name: value }));
-  
+
     if (value.trim().length === 0) {
       const allNames = [...new Set(subjects.map((subj) => subj.name))].sort((a, b) =>
         a.localeCompare(b)
@@ -166,10 +144,8 @@ const SubjectInfo = () => {
       ].sort((a, b) => a.localeCompare(b));
       setSuggestions(filtered);
     }
-  
-    // === IDE írd a beillesztendő kódot, a logika végére: ===
-  
-    // Ha a beírt value (szóközöket levéve) pontosan egyezik egy subject.name mezővel,
+
+    // Ha a beírt value pontosan egyezik egy subject.name-nel,
     // akkor automatikusan állítsuk be a semester mezőt is.
     const exactMatch = subjects.find((s) => s.name === value.trim());
     if (exactMatch) {
@@ -179,13 +155,7 @@ const SubjectInfo = () => {
       }));
     }
   };
-  
 
-
-
-
-
-  
   const handleDelete = async (id) => {
     if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) {
       return;
@@ -204,12 +174,11 @@ const SubjectInfo = () => {
   
       alert("Vélemény sikeresen törölve.");
   
-      // **1. Verzió: Manuális frissítés + Késleltetés**
       setTimeout(() => {
         setSubjects((prevSubjects) => prevSubjects.filter((subject) => subject.id !== id));
-      }, 200); // 200ms késleltetés, hogy az UI biztosan frissüljön
+      }, 200);
   
-      // **2. Verzió: Ha van fetchTable, frissítsük az adatokat is**
+      // Ha létezik a fetchTable, frissítsük az adatokat is
       if (typeof fetchTable === "function") {
         await fetchTable();
       }
@@ -217,29 +186,17 @@ const SubjectInfo = () => {
       alert(`Hiba történt: ${err.message}`);
     }
   };
-  
-  
 
-
-
-
-
-
-
-  // Kattintás egy javaslatra
   const handleSuggestionClick = (suggestedName) => {
-    // Keresd meg a subjects tömbben
     const foundSubject = subjects.find((s) => s.name === suggestedName);
   
     if (foundSubject) {
-      // Ha megtaláltad, beállítod a name és a semester mezőt is
       setNewEntry((prev) => ({
         ...prev,
         name: suggestedName,
         semester: foundSubject.semester,
       }));
     } else {
-      // Ha véletlen nem találtad (pl. duplán van?), egyszerű fallback
       setNewEntry((prev) => ({ ...prev, name: suggestedName, semester: "" }));
     }
   
@@ -261,12 +218,8 @@ const SubjectInfo = () => {
       setIsModalOpen(false);
       setShowSuggestions(false);
     }
-
     if (e.target.className === "modal-overlay") {
-      // Modal bezárása
       setIsModalOpen(false);
-  
-      // Adatok resetelése
       setNewEntry((prev) => ({
         ...prev,
         name: "",
@@ -277,17 +230,12 @@ const SubjectInfo = () => {
         year: new Date().getFullYear(),
         semester: "",
       }));
-  
-      // Szerkesztési azonosító törlése
       setEditingReviewId(null);
     }
-
   };
 
-
-
   const openEditModal = (review) => {
-     setNewEntry({
+    setNewEntry({
       name: review.name !== "N/A" ? review.name : "",
       user: review.user !== "N/A" ? review.user : "anonim",
       difficulty: review.difficulty !== "N/A" ? review.difficulty : "",
@@ -295,18 +243,13 @@ const SubjectInfo = () => {
       duringSemester: review.duringSemester !== "N/A" ? review.duringSemester : "",
       exam: review.exam !== "N/A" ? review.exam : "",
       year: review.year !== "N/A" ? review.year : new Date().getFullYear(),
-      semester: review.semester !== "N/A" ? review.semester : "", // Győződj meg arról, hogy a semester helyes adatokat tartalmaz
+      semester: review.semester !== "N/A" ? review.semester : "",
     });
-  
-   
-
-    setEditingReviewId(review.id); // Azonosító beállítása
-    setIsModalOpen(true); // Megnyitjuk a modált
+    setEditingReviewId(review.id);
+    setIsModalOpen(true);
   };
-  
-  
-  
-  
+
+
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -323,8 +266,8 @@ const SubjectInfo = () => {
       }
     });
   
-    formData.set("user_id", userId); // Felhasználó azonosítója
-    formData.append("id", editingReviewId); // Vélemény azonosítója
+    formData.set("user_id", userId);
+    formData.append("id", editingReviewId);
   
     try {
       const response = await fetch("https://www.kacifant.hu/andris/edit.php", {
@@ -340,16 +283,14 @@ const SubjectInfo = () => {
   
       alert("Vélemény sikeresen módosítva.");
   
-      // Frissítsd a `subjects` állapotot
       setSubjects((prevSubjects) =>
         prevSubjects.map((subject) =>
           subject.id === editingReviewId
-            ? { ...subject, ...newEntry } // Ha az ID egyezik, frissítjük az adatokat
+            ? { ...subject, ...newEntry }
             : subject
         )
       );
   
-      // Reset állapot (egységesítve a handleSubmit reset logikájával)
       setNewEntry((prev) => ({
         ...prev,
         name: "",
@@ -360,30 +301,26 @@ const SubjectInfo = () => {
         year: new Date().getFullYear(),
         semester: "",
       }));
-      setIsModalOpen(false); // Modal bezárása
-      setEditingReviewId(null); // Azonosító törlése
+      setIsModalOpen(false);
+      setEditingReviewId(null);
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
     }
   };
-  
-  
-  
-
-  
-  
 
 
+  // ★★ Új segédfüggvény: Modal megnyitása a kiválasztott tárgy előzetes kitöltésével ★★
+  const openModalForSubject = (subjectName, semester) => {
+    setNewEntry((prev) => ({
+      ...prev,
+      name: subjectName,
+      semester: semester,
+      year: new Date().getFullYear(),
+    }));
+    setIsModalOpen(true);
+    setShowSuggestions(false);
+  };
 
-
-
-
-
-
-
-
-
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
   
@@ -429,13 +366,12 @@ const SubjectInfo = () => {
         body: formData.toString(),
       });
   
-      const responseText = await response.text(); // 🔥 Most szöveget dolgozunk fel!
+      const responseText = await response.text();
   
       if (!response.ok || !responseText.startsWith("SUCCESS:")) {
         throw new Error(responseText || "Hiba történt az adatbeküldés során");
       }
   
-      // 🔹 Az új ID kinyerése a válaszból
       const newId = parseInt(responseText.replace("SUCCESS:", "").trim(), 10);
       if (isNaN(newId)) {
         throw new Error("Hibás ID érték a szerver válaszában.");
@@ -443,7 +379,6 @@ const SubjectInfo = () => {
   
       alert("Adatok sikeresen beküldve!");
   
-      // **🔹 Új ID beállítása a frontend állapotban**
       const newSubject = { ...newEntry, id: newId, user_id: userId };
   
       setSubjects((prevSubjects) => [...prevSubjects, newSubject]);
@@ -465,17 +400,6 @@ const SubjectInfo = () => {
       alert(`Hiba történt: ${err.message}`);
     }
   };
-  
-  
-
-
-
-
-
-
-
-
-
 
   // --- A fő lista (keresés + félév)
   const filteredSubjects = subjects.filter((subject) => {
@@ -492,16 +416,6 @@ const SubjectInfo = () => {
 
   if (loading) return <p>Adatok betöltése...</p>;
   if (error) return <p>Hiba történt: {error}</p>;
-
-
-
-
-
-
-
-
-
-
 
   return (
     <div className="subject-info-container">
@@ -532,10 +446,7 @@ const SubjectInfo = () => {
         <button className="open-modal-button" onClick={() => setIsModalOpen(true)}>
           Feltöltés
         </button>
-
       </div>
-  
-
 
       {/* Megjelenített subjectek */}
       {filteredSubjects.length > 0 ? (
@@ -561,100 +472,108 @@ const SubjectInfo = () => {
                 name: s.name,
                 semester: s.semester,
                 id: s.id,
-                users: s.user && s.user !== "N/A" && s.user.trim() !== ""
-                  ? [
-                      {
-                        user: s.user,
-                        user_id: s.user_id,
-                        year: s.year,
-                        difficulty: s.difficulty,
-                        general: s.general,
-                        duringSemester: s.duringSemester,
-                        exam: s.exam,
-                        id: s.id,
-                      },
-                    ]
-                  : [], // Üres tömb, hogy később hozzá lehessen adni ha szükséges
+                users:
+                  s.user && s.user !== "N/A" && s.user.trim() !== ""
+                    ? [
+                        {
+                          user: s.user,
+                          user_id: s.user_id,
+                          year: s.year,
+                          difficulty: s.difficulty,
+                          general: s.general,
+                          duringSemester: s.duringSemester,
+                          exam: s.exam,
+                          id: s.id,
+                        },
+                      ]
+                    : [],
               });
             }
 
             return acc;
           }, [])
-          .map((group, i) => {
-            // Ellenőrzés: van-e legalább egy érvényes vélemény?
-            const hasValidReviews = group.users.some((u) => u.user !== "N/A" && u.user.trim() !== "");
-
-            // Ha nincs érvényes vélemény, adjunk hozzá egy alapértelmezett üzenetet
-            if (!hasValidReviews) {
-              group.users.push({ user: "Kérlek írj véleményt róla.", id: null });
-            }
-
-            return (
-              <div key={i} className="subject-card">
-                <div className="subject-header">
-                  <h3 className="subject-title">{group.name}</h3>
-                </div>
-                <div className="subject-semester">
-                  <p>Félév: {group.semester}. félév</p>
-                </div>
-                <div className="subject-details">
-                  {group.users.map((u, idx) => (
-                    <div key={idx} className="user-feedback">
-                      {/* Ha nincs valódi vélemény, csak kiírjuk az üzenetet */}
-                      {u.id === null ? (
-                        <p className="no-feedback">{u.user}</p>
-                      ) : (
-                        <>
-                          <div className="feedback-header">
-                            <h4>{u.user}</h4>
-                            {u.user_id === userId && (
-                              <div className="feedback-buttons">
-                                <button
-                                  className="edit-button"
-                                  onClick={() =>
-                                    openEditModal({
-                                      ...u,
-                                      id: u.id,
-                                      name: group.name,
-                                      semester: group.semester,
-                                    })
-                                  }
-                                >
-                                  Szerkesztés
-                                </button>
-                                <button
-                                  className="delete-button"
-                                  onClick={() => handleDelete(u.id)}
-                                >
-                                  Törlés
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Vélemény részletek */}
-                          <p><strong>Év:</strong> {u.year}</p>
-                          {u.difficulty !== "N/A" && (
-                            <p><strong>Nehézség:</strong> {u.difficulty}/10</p>
+          .map((group, i) => (
+            <div key={i} className="subject-card">
+              <div className="subject-header">
+                <h3 className="subject-title">{group.name}</h3>
+              </div>
+              <div className="subject-semester">
+                <p>Félév: {group.semester}. félév</p>
+              </div>
+              <div className="subject-details">
+                {group.users.map((u, idx) => (
+                  <div key={idx} className="user-feedback">
+                    {u.id === null ? (
+                      <p className="no-feedback">{u.user}</p>
+                    ) : (
+                      <>
+                        <div className="feedback-header">
+                          <h4>{u.user}</h4>
+                          {u.user_id === userId && (
+                            <div className="feedback-buttons">
+                              <button
+                                className="edit-button"
+                                onClick={() =>
+                                  openEditModal({
+                                    ...u,
+                                    id: u.id,
+                                    name: group.name,
+                                    semester: group.semester,
+                                  })
+                                }
+                              >
+                                Szerkesztés
+                              </button>
+                              <button
+                                className="delete-button"
+                                onClick={() => handleDelete(u.id)}
+                              >
+                                Törlés
+                              </button>
+                            </div>
                           )}
-                          {u.general && <p><strong>Általános:</strong> {u.general}</p>}
-                          {u.duringSemester !== "N/A" && (
-                            <p><strong>Évközben:</strong> {u.duringSemester}</p>
-                          )}
-                          {u.exam !== "N/A" && <p><strong>Vizsga:</strong> {u.exam}</p>}
-                        </>
-                      )}
-                    </div>
-                  ))}
+                        </div>
+                        <p>
+                          <strong>Év:</strong> {u.year}
+                        </p>
+                        {u.difficulty !== "N/A" && (
+                          <p>
+                            <strong>Nehézség:</strong> {u.difficulty}/10
+                          </p>
+                        )}
+                        {u.general && <p><strong>Általános:</strong> {u.general}</p>}
+                        {u.duringSemester !== "N/A" && (
+                          <p>
+                            <strong>Évközben:</strong> {u.duringSemester}
+                          </p>
+                        )}
+                        {u.exam !== "N/A" && (
+                          <p>
+                            <strong>Vizsga:</strong> {u.exam}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+                {/* Extra elem: "Írj véleményt itt" gomb */}
+                <div className="user-feedback write-review">
+                  <p>
+                    Írj véleményt{" "}
+                    <button
+                      className="write-review-button"
+                      onClick={() => openModalForSubject(group.name, group.semester)}
+                    >
+                      itt
+                    </button>
+                  </p>
                 </div>
               </div>
-            );
-          })
+            </div>
+          ))
       ) : (
         <p className="no-results">Nincs találat a keresett kifejezésre.</p>
       )}
-
-
 
       {/* Modal: Új vélemény */}
       {isModalOpen && (
@@ -680,9 +599,11 @@ const SubjectInfo = () => {
             >
               x
             </button>
-            <form onSubmit={editingReviewId ? handleUpdate : handleSubmit} className="submission-form">
+            <form
+              onSubmit={editingReviewId ? handleUpdate : handleSubmit}
+              className="submission-form"
+            >
               <h2>Új vélemény hozzáadása</h2>
-
               <div className="form-group" style={{ position: "relative" }}>
                 <label htmlFor="name">Tárgynév:</label>
                 <input
@@ -696,8 +617,6 @@ const SubjectInfo = () => {
                   autoComplete="off"
                   required
                 />
-
-                {/* Javaslatok doboza */}
                 {showSuggestions && suggestions.length > 0 && (
                   <div className="autocomplete-container">
                     {suggestions.map((item, idx) => (
@@ -712,19 +631,17 @@ const SubjectInfo = () => {
                   </div>
                 )}
               </div>
-
               <div className="form-group">
                 <label htmlFor="user">Becenév:</label>
                 <input
                   type="text"
                   id="user"
                   name="user"
-                  value={newEntry.user === "anonim" ? "" : newEntry.user} // 🔹 Ha anonim, akkor üres legyen
+                  value={newEntry.user === "anonim" ? "" : newEntry.user}
                   onChange={handleInputChange}
                   placeholder="anonim"
                 />
               </div>
-
               <div className="form-group">
                 <label htmlFor="difficulty">Nehézség: </label>
                 <input
@@ -736,7 +653,6 @@ const SubjectInfo = () => {
                   placeholder="Szám (0-10) "
                 />
               </div>
-
               <div className="form-group">
                 <label htmlFor="general">Általános:</label>
                 <textarea
@@ -746,7 +662,6 @@ const SubjectInfo = () => {
                   onChange={handleInputChange}
                 ></textarea>
               </div>
-
               <div className="form-group">
                 <label htmlFor="duringSemester">Évközben:</label>
                 <textarea
@@ -754,10 +669,9 @@ const SubjectInfo = () => {
                   name="duringSemester"
                   value={newEntry.duringSemester}
                   onChange={handleInputChange}
-                   placeholder="( Nem kötelező )"
+                  placeholder="( Nem kötelező )"
                 ></textarea>
               </div>
-
               <div className="form-group">
                 <label htmlFor="exam">Vizsga:</label>
                 <textarea
@@ -768,7 +682,6 @@ const SubjectInfo = () => {
                   placeholder="( Nem kötelező )"
                 ></textarea>
               </div>
-
               <div className="form-group">
                 <label htmlFor="year">Év:</label>
                 <input
@@ -779,7 +692,6 @@ const SubjectInfo = () => {
                   onChange={handleInputChange}
                 />
               </div>
-
               <button type="submit">Hozzáadás</button>
             </form>
           </div>
@@ -787,22 +699,6 @@ const SubjectInfo = () => {
       )}
     </div>
   );
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
 };
 
 export default SubjectInfo;
