@@ -556,18 +556,20 @@ const SubjectInfo = () => {
                     )}
                   </div>
                 ))}
-                {/* Extra elem: "Írj véleményt itt" gomb */}
-                <div className="user-feedback write-review">
-                  <p>
-                    Írj véleményt{" "}
-                    <button
-                      className="write-review-button"
-                      onClick={() => openModalForSubject(group.name, group.semester)}
-                    >
-                      itt
-                    </button>
-                  </p>
-                </div>
+                {/* Csak akkor jelenítjük meg az extra elemet, ha a tárgy neve nem "Általános info" */}
+                {group.name !== "Általános info" && (
+                  <div className="user-feedback write-review">
+                    <p>
+                      Írj véleményt{" "}
+                      <button
+                        className="write-review-button"
+                        onClick={() => openModalForSubject(group.name, group.semester)}
+                      >
+                        itt
+                      </button>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ))
