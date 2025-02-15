@@ -36,7 +36,10 @@ const SubjectInfo = () => {
 
   // Segédfüggvény a form visszaállításához
   const resetNewEntry = () => {
-    setNewEntry({ ...initialNewEntry });
+    setNewEntry((prev) => ({
+      ...initialNewEntry,
+      user: localStorage.getItem("savedUserName") || "anonim", // itt megőrizzük a korábbi felhasználó nevet
+    }));
     setEditingReviewId(null);
   };
 
