@@ -5,11 +5,20 @@ import React, { useState, useEffect } from "react";
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+const initialNewEntry = {
+  name: "",
+  user: "anonim",
+  difficulty: "",
+  general: "",
+  duringSemester: "",
+  exam: "",
+  year: new Date().getFullYear(),
+  semester: "",
+};
+
 const SubjectInfo = () => {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
 
@@ -19,22 +28,20 @@ const SubjectInfo = () => {
 
   // Új vélemény modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newEntry, setNewEntry] = useState({
-    name: "",
-    user: "anonim",
-    difficulty: "",
-    general: "",
-    duringSemester: "",
-    exam: "",
-    year: new Date().getFullYear(),
-    semester: "",
-  });
+  const [newEntry, setNewEntry] = useState(initialNewEntry);
 
   // Autocomplete javaslatok
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
 
+  // Segédfüggvény a form visszaállításához
+  const resetNewEntry = () => {
+    setNewEntry({ ...initialNewEntry });
+    setEditingReviewId(null);
+  };
+
   useEffect(() => {
+    // userId beállítása, ha még nincs
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId) {
       storedUserId = "user-" + Math.random().toString(36).substr(2, 9);
@@ -42,6 +49,7 @@ const SubjectInfo = () => {
     }
     setUserId(storedUserId);
 
+    // Adatok lekérése
     const fetchTable = async () => {
       try {
         const response = await fetch("https://www.kacifant.hu/andris/test.php");
@@ -57,27 +65,22 @@ const SubjectInfo = () => {
       }
     };
 
-    // Hívás az adatok lekérésére
-    fetchTable();
-
-    // Ha van mentett user
+    // Mentett felhasználónév betöltése, ha van
     const savedUserName = localStorage.getItem("savedUserName");
     if (savedUserName) {
       setNewEntry((prev) => ({ ...prev, user: savedUserName }));
     }
 
-    // (Esetleg ha kétszer szeretnéd hívni a fetchTable-t, itt maradhat a második hívás)
     fetchTable();
-  }, [userId]);
+  }, []);
 
   const parseHTMLTable = (html) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     const rows = doc.querySelectorAll("table tr");
-
     const arr = [];
     rows.forEach((row, index) => {
-      if (index === 0) return; // Fejléc kihagyása
+      if (index === 0) return; // fejléc kihagyása
       const cells = row.querySelectorAll("td");
       arr.push({
         user: cells[0]?.textContent.trim() || "N/A",
@@ -89,13 +92,13 @@ const SubjectInfo = () => {
         year: parseInt(cells[6]?.textContent.trim(), 10) || "N/A",
         semester: parseInt(cells[7]?.textContent.trim(), 10) || "N/A",
         user_id: cells[8]?.textContent.trim() || "N/A",
-        id: parseInt(cells[9]?.textContent.trim(), 10) || null, // ID mező hozzáadása
+        id: parseInt(cells[9]?.textContent.trim(), 10) || null,
       });
     });
     return arr;
   };
 
-  // --- Keresés + félév szűrés
+  // Keresés és félév szűrés
   const handleSemesterChange = (e) => {
     setSelectedSemester(e.target.value);
     setSearchTerm("");
@@ -104,13 +107,12 @@ const SubjectInfo = () => {
   const handleSearchTermChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
-
     if (val.trim().length > 0) {
       setSelectedSemester("all");
     }
   };
 
-  // =========== AUTOCOMPLETE LOGIKA ===========
+  // Autocomplete logika
   const handleNameFocus = () => {
     const allNames = [...new Set(subjects.map((subj) => subj.name))].sort((a, b) =>
       a.localeCompare(b)
@@ -128,82 +130,32 @@ const SubjectInfo = () => {
         a.localeCompare(b)
       );
       setSuggestions(allNames);
-      setShowSuggestions(true);
     } else {
-      setShowSuggestions(true);
       const search = removeAccents(value.toLowerCase());
-      const filtered = [
-        ...new Set(
-          subjects
-            .map((subj) => subj.name)
-            .filter((name) => {
-              const n = removeAccents(name.toLowerCase());
-              return n.includes(search);
-            })
-        ),
-      ].sort((a, b) => a.localeCompare(b));
+      const filtered = [...new Set(subjects.map((subj) => subj.name)
+        .filter((name) => removeAccents(name.toLowerCase()).includes(search)))]
+        .sort((a, b) => a.localeCompare(b));
       setSuggestions(filtered);
     }
 
-    // Ha a beírt value pontosan egyezik egy subject.name-nel,
-    // akkor automatikusan állítsuk be a semester mezőt is.
+    // Pontos egyezés esetén automatikusan beállítjuk a félévet
     const exactMatch = subjects.find((s) => s.name === value.trim());
     if (exactMatch) {
-      setNewEntry((prev) => ({
-        ...prev,
-        semester: exactMatch.semester,
-      }));
+      setNewEntry((prev) => ({ ...prev, semester: exactMatch.semester }));
     }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) {
-      return;
-    }
-  
-    try {
-      const response = await fetch("https://www.kacifant.hu/andris/delete.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ id, user_id: userId }).toString(),
-      });
-  
-      if (!response.ok) {
-        throw new Error("Hiba történt a törlés során.");
-      }
-  
-      alert("Vélemény sikeresen törölve.");
-  
-      setTimeout(() => {
-        setSubjects((prevSubjects) => prevSubjects.filter((subject) => subject.id !== id));
-      }, 200);
-  
-      // Ha létezik a fetchTable, frissítsük az adatokat is
-      if (typeof fetchTable === "function") {
-        await fetchTable();
-      }
-    } catch (err) {
-      alert(`Hiba történt: ${err.message}`);
-    }
+    setShowSuggestions(true);
   };
 
   const handleSuggestionClick = (suggestedName) => {
     const foundSubject = subjects.find((s) => s.name === suggestedName);
-  
-    if (foundSubject) {
-      setNewEntry((prev) => ({
-        ...prev,
-        name: suggestedName,
-        semester: foundSubject.semester,
-      }));
-    } else {
-      setNewEntry((prev) => ({ ...prev, name: suggestedName, semester: "" }));
-    }
-  
+    setNewEntry((prev) => ({
+      ...prev,
+      name: suggestedName,
+      semester: foundSubject ? foundSubject.semester : "",
+    }));
     setShowSuggestions(false);
   };
 
-  // --- Új vélemény egyéb mezők
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewEntry((prev) => ({ ...prev, [name]: value }));
@@ -212,63 +164,59 @@ const SubjectInfo = () => {
     }
   };
 
-  // Modal bezárás
   const handleModalClose = (e) => {
     if (e.target.className === "modal-overlay") {
       setIsModalOpen(false);
       setShowSuggestions(false);
-    }
-    if (e.target.className === "modal-overlay") {
-      setIsModalOpen(false);
-      setNewEntry((prev) => ({
-        ...prev,
-        name: "",
-        difficulty: "",
-        general: "",
-        duringSemester: "",
-        exam: "",
-        year: new Date().getFullYear(),
-        semester: "",
-      }));
-      setEditingReviewId(null);
+      resetNewEntry();
     }
   };
 
-  const openEditModal = (review) => {
+  const openEditModal = (review, subjectName, subjectSemester) => {
     setNewEntry({
-      name: review.name !== "N/A" ? review.name : "",
+      name: subjectName,
       user: review.user !== "N/A" ? review.user : "anonim",
       difficulty: review.difficulty !== "N/A" ? review.difficulty : "",
       general: review.general !== "N/A" ? review.general : "",
       duringSemester: review.duringSemester !== "N/A" ? review.duringSemester : "",
       exam: review.exam !== "N/A" ? review.exam : "",
       year: review.year !== "N/A" ? review.year : new Date().getFullYear(),
-      semester: review.semester !== "N/A" ? review.semester : "",
+      semester: subjectSemester,
     });
     setEditingReviewId(review.id);
     setIsModalOpen(true);
   };
 
-
+  const handleDelete = async (id) => {
+    if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
+    try {
+      const response = await fetch("https://www.kacifant.hu/andris/delete.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ id, user_id: userId }).toString(),
+      });
+      if (!response.ok) throw new Error("Hiba történt a törlés során.");
+      alert("Vélemény sikeresen törölve.");
+      setSubjects((prev) => prev.filter((subject) => subject.id !== id));
+    } catch (err) {
+      alert(`Hiba történt: ${err.message}`);
+    }
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-  
     if (!editingReviewId) {
       alert("Hiba: Nem található a szerkesztendő vélemény azonosítója!");
       return;
     }
-  
     const formData = new URLSearchParams();
     Object.keys(newEntry).forEach((key) => {
       if (newEntry[key] !== "N/A" && newEntry[key] !== "") {
         formData.append(key, newEntry[key]);
       }
     });
-  
     formData.set("user_id", userId);
     formData.append("id", editingReviewId);
-  
     try {
       const response = await fetch("https://www.kacifant.hu/andris/edit.php", {
         method: "POST",
@@ -276,45 +224,25 @@ const SubjectInfo = () => {
         mode: "cors",
         body: formData.toString(),
       });
-  
-      if (!response.ok) {
-        throw new Error("Hiba történt a módosítás során.");
-      }
-  
+      if (!response.ok) throw new Error("Hiba történt a módosítás során.");
       alert("Vélemény sikeresen módosítva.");
-  
-      setSubjects((prevSubjects) =>
-        prevSubjects.map((subject) =>
-          subject.id === editingReviewId
-            ? { ...subject, ...newEntry }
-            : subject
+      setSubjects((prev) =>
+        prev.map((subject) =>
+          subject.id === editingReviewId ? { ...subject, ...newEntry } : subject
         )
       );
-  
-      setNewEntry((prev) => ({
-        ...prev,
-        name: "",
-        difficulty: "",
-        general: "",
-        duringSemester: "",
-        exam: "",
-        year: new Date().getFullYear(),
-        semester: "",
-      }));
+      resetNewEntry();
       setIsModalOpen(false);
-      setEditingReviewId(null);
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
     }
   };
 
-
-  // ★★ Új segédfüggvény: Modal megnyitása a kiválasztott tárgy előzetes kitöltésével ★★
   const openModalForSubject = (subjectName, semester) => {
     setNewEntry((prev) => ({
       ...prev,
       name: subjectName,
-      semester: semester,
+      semester,
       year: new Date().getFullYear(),
     }));
     setIsModalOpen(true);
@@ -323,77 +251,56 @@ const SubjectInfo = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+
     if (newEntry.difficulty.trim() !== "") {
       const d = parseInt(newEntry.difficulty, 10);
       if (isNaN(d)) {
-        alert("A nehézség mezőnek számot kell tartalmaznia !");
+        alert("A nehézség mezőnek számot kell tartalmaznia!");
         return;
       }
     }
-  
+
     const foundSubject = subjects.find((s) => s.name === newEntry.name.trim());
     if (!foundSubject) {
       alert("Nincs ilyen tárgy a meglévő listában!");
       return;
     }
-  
-    if (!newEntry.user) {
-      newEntry.user = "anonim";
-    }
-  
-    const isDifficultyEmpty = !newEntry.difficulty.trim();
-    const isGeneralEmpty = !newEntry.general.trim();
-    const isDuringEmpty = !newEntry.duringSemester.trim();
-    const isExamEmpty = !newEntry.exam.trim();
-  
-    if (isDifficultyEmpty && isGeneralEmpty && isDuringEmpty && isExamEmpty) {
+
+    if (!newEntry.user) newEntry.user = "anonim";
+
+    if (
+      !newEntry.difficulty.trim() &&
+      !newEntry.general.trim() &&
+      !newEntry.duringSemester.trim() &&
+      !newEntry.exam.trim()
+    ) {
       alert("Minden mezőt üresen hagytál, tölts ki legalább egyet!");
       return;
     }
-  
+
     const formData = new URLSearchParams();
     Object.keys(newEntry).forEach((key) => formData.append(key, newEntry[key]));
     formData.set("user_id", userId);
     formData.set("semester", foundSubject.semester);
-  
+
     try {
       const response = await fetch("https://www.kacifant.hu/andris/submit.php", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
         body: formData.toString(),
       });
-  
       const responseText = await response.text();
-  
       if (!response.ok || !responseText.startsWith("SUCCESS:")) {
         throw new Error(responseText || "Hiba történt az adatbeküldés során");
       }
-  
       const newId = parseInt(responseText.replace("SUCCESS:", "").trim(), 10);
       if (isNaN(newId)) {
         throw new Error("Hibás ID érték a szerver válaszában.");
       }
-  
       alert("Adatok sikeresen beküldve!");
-  
       const newSubject = { ...newEntry, id: newId, user_id: userId };
-  
-      setSubjects((prevSubjects) => [...prevSubjects, newSubject]);
-  
-      setNewEntry((prev) => ({
-        ...prev,
-        name: "",
-        difficulty: "",
-        general: "",
-        duringSemester: "",
-        exam: "",
-        year: new Date().getFullYear(),
-        semester: "",
-      }));
-  
+      setSubjects((prev) => [...prev, newSubject]);
+      resetNewEntry();
       setIsModalOpen(false);
       setShowSuggestions(false);
     } catch (err) {
@@ -401,25 +308,20 @@ const SubjectInfo = () => {
     }
   };
 
-  // --- A fő lista (keresés + félév)
   const filteredSubjects = subjects.filter((subject) => {
     const normSearch = removeAccents(searchTerm.toLowerCase());
     const normName = removeAccents(subject.name.toLowerCase());
     const matchesSearch = normName.includes(normSearch);
-
     const matchesSemester =
-      selectedSemester === "all" ||
-      subject.semester === parseInt(selectedSemester, 10);
-
+      selectedSemester === "all" || subject.semester === parseInt(selectedSemester, 10);
     return matchesSearch && matchesSemester;
   });
 
   if (loading) return <p>Adatok betöltése...</p>;
-  if (error) return <p>Hiba történt: {error}</p>;
 
   return (
     <div className="subject-info-container">
-      {/* Keresés, félév */}
+      {/* Keresés és szűrő */}
       <div className="search-filter-container">
         <input
           type="text"
@@ -428,11 +330,7 @@ const SubjectInfo = () => {
           onChange={handleSearchTermChange}
           className="search-bar"
         />
-        <select
-          value={selectedSemester}
-          onChange={handleSemesterChange}
-          className="semester-filter"
-        >
+        <select value={selectedSemester} onChange={handleSemesterChange} className="semester-filter">
           <option value="all">Összes félév</option>
           {[...new Set(subjects.map((s) => s.semester))]
             .filter((sem) => sem !== "N/A")
@@ -448,24 +346,24 @@ const SubjectInfo = () => {
         </button>
       </div>
 
-      {/* Megjelenített subjectek */}
+      {/* Tárgyak listája */}
       {filteredSubjects.length > 0 ? (
         filteredSubjects
           .reduce((acc, s) => {
             const existing = acc.find((item) => item.name === s.name);
-
+            const feedback = {
+              user: s.user,
+              user_id: s.user_id,
+              year: s.year,
+              difficulty: s.difficulty,
+              general: s.general,
+              duringSemester: s.duringSemester,
+              exam: s.exam,
+              id: s.id,
+            };
             if (existing) {
               if (s.user && s.user !== "N/A" && s.user.trim() !== "") {
-                existing.users.push({
-                  user: s.user,
-                  user_id: s.user_id,
-                  year: s.year,
-                  difficulty: s.difficulty,
-                  general: s.general,
-                  duringSemester: s.duringSemester,
-                  exam: s.exam,
-                  id: s.id,
-                });
+                existing.users.push(feedback);
               }
             } else {
               acc.push({
@@ -474,22 +372,10 @@ const SubjectInfo = () => {
                 id: s.id,
                 users:
                   s.user && s.user !== "N/A" && s.user.trim() !== ""
-                    ? [
-                        {
-                          user: s.user,
-                          user_id: s.user_id,
-                          year: s.year,
-                          difficulty: s.difficulty,
-                          general: s.general,
-                          duringSemester: s.duringSemester,
-                          exam: s.exam,
-                          id: s.id,
-                        },
-                      ]
+                    ? [feedback]
                     : [],
               });
             }
-
             return acc;
           }, [])
           .map((group, i) => (
@@ -514,12 +400,7 @@ const SubjectInfo = () => {
                               <button
                                 className="edit-button"
                                 onClick={() =>
-                                  openEditModal({
-                                    ...u,
-                                    id: u.id,
-                                    name: group.name,
-                                    semester: group.semester,
-                                  })
+                                  openEditModal(u, group.name, group.semester)
                                 }
                               >
                                 Szerkesztés
@@ -556,7 +437,6 @@ const SubjectInfo = () => {
                     )}
                   </div>
                 ))}
-                {/* Csak akkor jelenítjük meg az extra elemet, ha a tárgy neve nem "Általános info" */}
                 {group.name !== "Általános info" && (
                   <div className="user-feedback write-review">
                     <p>
@@ -577,7 +457,7 @@ const SubjectInfo = () => {
         <p className="no-results">Nincs találat a keresett kifejezésre.</p>
       )}
 
-      {/* Modal: Új vélemény */}
+      {/* Új vélemény modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={handleModalClose}>
           <div className="modal-content">
@@ -585,18 +465,8 @@ const SubjectInfo = () => {
               className="close-button"
               onClick={() => {
                 setIsModalOpen(false);
-                setNewEntry((prev) => ({
-                  ...prev,
-                  name: "",
-                  difficulty: "",
-                  general: "",
-                  duringSemester: "",
-                  exam: "",
-                  year: new Date().getFullYear(),
-                  semester: "",
-                }));
-                setEditingReviewId(null);
                 setShowSuggestions(false);
+                resetNewEntry();
               }}
             >
               x
@@ -652,7 +522,7 @@ const SubjectInfo = () => {
                   name="difficulty"
                   value={newEntry.difficulty}
                   onChange={handleInputChange}
-                  placeholder="Szám (0-10) "
+                  placeholder="Szám (0-10)"
                 />
               </div>
               <div className="form-group">
