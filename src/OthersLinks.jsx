@@ -10,7 +10,7 @@ const othersLinks = [
   { name: 'szege7', url: 'https://users.itk.ppke.hu/~szege7/' },
   { name: 'retge1', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'szama36', url: 'https://users.itk.ppke.hu/~szama36/Hasznos%20dolgok/index.html' },
-  { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },
+  { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },  
   { name: 'balma14', url: 'https://users.itk.ppke.hu/~balma14/' },
   { name: 'bolle', url: 'https://users.itk.ppke.hu/~bolle/Minden%20-by%20Bal%c3%a1zs%20M%c3%a1ty%c3%a1s/' },
   { name: 'vagle', url: 'https://users.itk.ppke.hu/~vagle/main/' },
@@ -18,6 +18,7 @@ const othersLinks = [
   { name: 'petma12', url: 'https://markomy.hu/' },
   { name: 'csobo3', url: 'https://users.itk.ppke.hu/~csobo3/' },
   { name: 'radzi1', url: 'https://users.itk.ppke.hu/~radzi1/' },
+  { name: 'juhki1', url: 'https://users.itk.ppke.hu/~juhki1/jegyzetek/' },
   { name: 'Csillag Vivien', url: 'https://sites.google.com/view/csillagjegyzetek?usp=sharing&fbclid=IwY2xjawIEl9JleHRuA2FlbQIxMAABHaXpxKjyatzEFF79--_No6FUtyGhLgz6TIlL8zdePgvHd7KXIN3JrRcZ1A_aem_zP1-jXOTurCs5HIjsuzmoA' },
   { name: 'PPKE WIKI', url: 'https://users.itk.ppke.hu/~marri1/?fbclid=IwZXh0bgNhZW0CMTAAAR184vSVMEMSqLJEWe3fgnc-JEl0U_gAYiXGuvkbRyy6R4VeGMj02NevaKA_aem_BG5QKzrq0RPmdpiqjOzWMw' },
 ];
