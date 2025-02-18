@@ -443,7 +443,7 @@ const SubjectInfo = () => {
                 {group.name !== "Általános info" && (
                   <div className="user-feedback write-review">
                     <p>
-                      Írj véleményt{" "}
+                      Írj te is véleményt{" "}
                       <button
                         className="write-review-button"
                         onClick={() => openModalForSubject(group.name, group.semester)}
