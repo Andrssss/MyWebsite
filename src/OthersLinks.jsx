@@ -10,6 +10,7 @@ const othersLinks = [
   { name: 'szege7', url: 'https://users.itk.ppke.hu/~szege7/' },
   { name: 'retge1', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'szama36', url: 'https://users.itk.ppke.hu/~szama36/Hasznos%20dolgok/index.html' },
+  { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },
   { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },  
   { name: 'balma14', url: 'https://users.itk.ppke.hu/~balma14/' },
   { name: 'bolle', url: 'https://users.itk.ppke.hu/~bolle/Minden%20-by%20Bal%c3%a1zs%20M%c3%a1ty%c3%a1s/' },
@@ -47,7 +48,7 @@ const additionalLinks = {
     { name: 'skulo', url: 'https://users.itk.ppke.hu/~skulo/web/index.html' },
     { name: 'kadso', url: ' https://users.itk.ppke.hu/~kadso/' },
     { name: 'orbsa2', url: ' https://users.itk.ppke.hu/~orbsa2/' },
-    
+
   ],
   "GAME :": [
     { name: 'gelge1', url: 'https://users.itk.ppke.hu/~gelge1/' },
