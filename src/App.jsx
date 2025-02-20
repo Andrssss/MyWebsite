@@ -70,7 +70,7 @@ const App = () => {
       </nav>
 
       <div className="content">
-        {content === 'home' && <Home />}
+        {content === 'home' && <Home setContent={setContent} setMenuOpen={setMenuOpen} />}
         {content === 'subjects' && <SubjectInfo />}
         {content === 'info' && <UniversityLinks />}
         {content === 'othersLink' && <OthersLinks />}

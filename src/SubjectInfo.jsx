@@ -320,7 +320,24 @@ const SubjectInfo = () => {
     return matchesSearch && matchesSemester;
   });
 
-  if (loading) return <p>Adatok betöltése...</p>;
+  if (loading) return (
+    <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.5rem',
+        }}
+      >
+        Betöltés...
+      </div>
+  );
 
   return (
     <div className="subject-info-container">
