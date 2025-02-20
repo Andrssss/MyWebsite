@@ -24,9 +24,24 @@ const Home = ({ setContent, setMenuOpen }) => {
 
   return (
     <div>
-      <div className="about-container" style={{ padding: '20px', textAlign: 'center', backgroundColor: '#f8f8f8', marginBottom: '0px',zIndex: 500 }}>
-        <h2>Gyere te is írj vagy olvass véleményt a <a href="#" className="button" onClick={() => { setContent('subjects'); setMenuOpen(false); }}>Tárgy info-n</a>!</h2>
-      </div>
+          <div className="about-container" 
+        style={{ 
+          padding: '20px', 
+          textAlign: 'center', 
+          backgroundColor: '#f8f8f8', 
+          marginBottom: '0px', 
+          zIndex: 500,
+          position: 'relative' // szükséges, hogy a z-index működjön
+        }}>
+      <h2>
+        Gyere te is írj vagy olvass véleményt a 
+        <a href="#" className="button" onClick={() => { setContent('subjects'); setMenuOpen(false); }}>
+          Tárgy info-n
+        </a>
+        !
+      </h2>
+    </div>
+
 
       <div
         style={{
