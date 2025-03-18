@@ -4,6 +4,7 @@ import './App.css'; // Ha szükséges stílus hozzá
 const universityLinks = [
   
   { name: 'PPKE Oktatók Elérhetőségei', url: 'https://ppke.hu/oktatok/?search=&sort_by=asc' },
+  { name: 'TVSz kivonat', url: 'https://ppkeitk2021.notion.site/Kivonat-a-TVSz-b-l-eea98819b0b146dfad09f7596601726e' },
   { name: 'TO oldala', url: 'https://ppke.sharepoint.com/sites/itk-to' },
   { name: 'zimbra', url: 'https://hallgato.ppke.hu/zimbra/mail#1' },
   { name: 'Átlag Számoló', url: 'https://users.itk.ppke.hu/~nemse/atlag/' },
