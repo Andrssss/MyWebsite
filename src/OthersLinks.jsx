@@ -8,6 +8,7 @@ const othersLinks = [
   { name: 'heihe', url: 'https://users.itk.ppke.hu/~heihe/' },
   { name: 'ekacs', url: 'https://users.itk.ppke.hu/~ekacs' },
   { name: 'szege7', url: 'https://users.itk.ppke.hu/~szege7/' },
+  { name: 'gyoad5', url: 'https://users.itk.ppke.hu/~gyoad5/' },
   { name: 'retge1', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'szama36', url: 'https://users.itk.ppke.hu/~szama36/Hasznos%20dolgok/index.html' },
   { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },
