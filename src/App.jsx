@@ -15,33 +15,39 @@ const App = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 650);
+      setIsMobile(window.innerWidth <= 844);
     };
 
-    handleResize(); // Ellenőrzi az első rendereléskor
+    handleResize();
     window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize); // Takarítás
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
-    setParticlesActive(content !== 'subjects'); // Ha a "Tárgy info" van kiválasztva, álljon le
+    setParticlesActive(content !== 'subjects');
   }, [content]);
+
+  const handleNavClick = (target) => {
+    setContent(target);
+    setMenuOpen(false);
+  };
 
   return (
     <div className="container">
-      <Particles active={particlesActive} /> {/* Particles mindig jelen van, csak megállítható */}
+      <Particles active={particlesActive} />
 
       <header className="header">
         <h1 className="small-heading">
           {isMobile ? (
-            <button
-              className="menu-toggle"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Toggle menu"
-            >
-              ☰
-            </button>
+            <>
+              <button
+                className="menu-toggle"
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label="Toggle menu"
+              >
+                ☰
+              </button>
+            </>
           ) : (
             'bakan7'
           )}
@@ -50,21 +56,21 @@ const App = () => {
       </header>
 
       <nav className="navbar">
-        <ul className={`menu ${menuOpen ? 'open' : ''}`}>
+        <ul className={`menu ${menuOpen ? 'open' : ''} ${isMobile ? 'mobile' : ''}`}>
           <li>
-            <a href="#" className="button" onClick={() => { setContent('home'); setMenuOpen(false); }}>Főoldal</a>
+            <a href="#" onClick={() => handleNavClick('home')}>Főoldal</a>
           </li>
           <li>
-            <a href="#" className="button" onClick={() => { setContent('subjects'); setMenuOpen(false); }}>Tárgy info</a>
+            <a href="#" onClick={() => handleNavClick('subjects')}>Tárgy info</a>
           </li>
           <li>
-            <a href="#" className="button" onClick={() => { setContent('info'); setMenuOpen(false); }}>Egyetemi Linkek</a>
+            <a href="#" onClick={() => handleNavClick('info')}>Egyetemi Linkek</a>
           </li>
           <li>
-            <a href="#" className="button" onClick={() => { setContent('othersLink'); setMenuOpen(false); }}>Mások oldalai</a>
+            <a href="#" onClick={() => handleNavClick('othersLink')}>Mások oldalai</a>
           </li>
           <li>
-            <a href="#" className="button" onClick={() => { setContent('about'); setMenuOpen(false); }}>Kapcsolat</a>
+            <a href="#" onClick={() => handleNavClick('about')}>Kapcsolat</a>
           </li>
         </ul>
       </nav>

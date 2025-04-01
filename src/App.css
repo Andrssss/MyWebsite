@@ -79,31 +79,41 @@ html {
   justify-content: center;
 }
 
+
+
+
+
 .menu {
-  
   display: flex;
-  flex-direction: row; /* Alapértelmezett, nagyobb képernyőkre */
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px 28px; /* korábbi: 10px 18px */
+  gap: 16px; /* Ezt használd spacingre */
 }
-
-
-
-
 
 .menu a {
-  
+  color: rgb(0, 0, 0);
+  background-color: rgb(255, 255, 255);
+  padding: 10px 18px;
   text-decoration: none;
-  color: white;
-  padding: 10px 20px;
-  display: block;
-  opacity: 1; /*Áttetszőbb lesz a háttérhez képest*/
+  border-radius: 3px;
+  font-weight: 500;
+  font-size: 22px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.menu a:hover {
+  background-color: rgba(240, 240, 240, 0.618);
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
 
 
-.menu a:hover{
-  transform: scale(1.01);
-  background: #646060;
-  
-}
+
 
 
 body {
@@ -130,65 +140,79 @@ body {
 }
 
 
-
-
-@media (max-width: 650px) {
+@media (max-width: 844px) {
   .menu {
-    display: none; /* Rejtett menü mobilon */
-    flex-direction: column; /* Függőleges irány */
-    background-color: rgba(0, 0, 0, 0.8); /* Átlátszó háttér */
+    gap: 0px; /* Ezt használd spacingre */
+
+    display: none;
+    flex-direction: column;
     position: absolute;
+    left: 0;
     right: 0;
-    width: 100%; /* Teljes szélesség */
+    width: 100vw; /* teljes képernyő szélesség */
     padding: 0;
-    z-index: 10; /* A menü előrébb kerül a rétegek között, hogy ne takarja el más elem. */
-    
+    margin: 0;
+    background-color: rgba(0, 0, 0, 0.15);
+    z-index: 100;
   }
-  
+
   .menu.open {
-    display: flex; /* Megjelenik, ha nyitva van */
-    
+    display: flex;
   }
 
-  .header {
-    margin-bottom: 10px;
-    padding: 10px 0;
-    
-
+  .menu li {
+    width: 100%;
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
-  .theme-toggle {
+  .menu a {
     display: block;
-    right: 20px; /* Jobb oldali pozíció */
-    
-
+    width: 100%;
+    padding: 12px 0;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 500;
+    color: white;
+    background-color: rgba(30, 30, 30, 0.85);
+    text-decoration: none;
+    border-bottom: 0px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s ease, transform 0.2s ease;
   }
 
+  .menu a:hover {
+    background-color: rgba(50, 50, 50, 1);
+    transform: scale(1.0);
+  }
 
   .menu-toggle {
     display: block;
     background: none;
     color: white;
-    font-size: 25px;
+    font-size: 26px;
     border: none;
     cursor: pointer;
     position: absolute;
-    left: 10px; /* Bal oldali pozíció */
-    top: 10px; /* Távolítsuk el a `navbar`-tól */
-    z-index: 20;
-    margin: 0;
-    
+    left: 10px;
+    top: 10px;
+    z-index: 101;
   }
 
-  .menu a {
-    padding: 10px 20px; /*Minden menüelem kap egy belső margót, hogy kattintható területük kényelmesebb legyen */
-    text-align: center; /*A menüszöveg középre igazított.*/
-    
+  .header {
+    position: relative;
+    padding: 10px 0;
+    margin-bottom: 0;
   }
 
-
-
+  .theme-toggle {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+  }
 }
+
+
 
 
 

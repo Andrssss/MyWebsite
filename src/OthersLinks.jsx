@@ -21,6 +21,7 @@ const othersLinks = [
   { name: 'csobo3', url: 'https://users.itk.ppke.hu/~csobo3/' },
   { name: 'radzi1', url: 'https://users.itk.ppke.hu/~radzi1/' },
   { name: 'juhki1', url: 'https://users.itk.ppke.hu/~juhki1/jegyzetek/' },
+  { name: 'szale8', url: 'https://users.itk.ppke.hu/~szale8' },
   { name: 'Csillag Vivien', url: 'https://sites.google.com/view/csillagjegyzetek?usp=sharing&fbclid=IwY2xjawIEl9JleHRuA2FlbQIxMAABHaXpxKjyatzEFF79--_No6FUtyGhLgz6TIlL8zdePgvHd7KXIN3JrRcZ1A_aem_zP1-jXOTurCs5HIjsuzmoA' },
   { name: 'PPKE WIKI', url: 'https://users.itk.ppke.hu/~marri1/?fbclid=IwZXh0bgNhZW0CMTAAAR184vSVMEMSqLJEWe3fgnc-JEl0U_gAYiXGuvkbRyy6R4VeGMj02NevaKA_aem_BG5QKzrq0RPmdpiqjOzWMw' },
 ];
