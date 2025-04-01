@@ -24,6 +24,10 @@ const Home = ({ setContent, setMenuOpen }) => {
 
   return (
     <div>
+      <div className="about-container" style={{ padding: '20px', textAlign: 'center', backgroundColor: '#f8f8f8', marginBottom: '0px' }}>
+        <h2>Írj vagy olvass véleményt a <a href="#" className="button" onClick={() => { setContent('subjects'); setMenuOpen(false); }}>Tárgy info-n</a>!</h2>
+      </div>
+
       <div
         style={{
           width: '110%',
