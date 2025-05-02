@@ -12,7 +12,6 @@ const othersLinks = [
   { name: 'retge1', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'szama36', url: 'https://users.itk.ppke.hu/~szama36/Hasznos%20dolgok/index.html' },
   { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },
-  { name: 'morak', url: 'https://users.itk.ppke.hu/~morak/' },  
   { name: 'balma14', url: 'https://users.itk.ppke.hu/~balma14/' },
   { name: 'bolle', url: 'https://users.itk.ppke.hu/~bolle/Minden%20-by%20Bal%c3%a1zs%20M%c3%a1ty%c3%a1s/' },
   { name: 'vagle', url: 'https://users.itk.ppke.hu/~vagle/main/' },
