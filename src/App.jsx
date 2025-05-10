@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+// Ez azt jelenti, hogy a böngésző címsorában lévő útvonal (pl. /targy_info) számít, és a frontend (React) fogja kezelni, nem a szerver. Ezért is kellett a _redirects.
+
+
+
 import './App.css';
 import Home from './Home';
 import UniversityLinks from './UniversityLinks.jsx';
