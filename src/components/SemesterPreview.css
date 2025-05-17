@@ -1,0 +1,100 @@
+.folder-preview {
+  position: relative;
+  display: inline-block;
+  text-align: center;
+  margin: 1rem;
+  cursor: pointer;
+  color: white;
+  text-decoration: none;
+}
+
+.folder-icon {
+  width: 60px;
+  height: 60px;
+  transition: transform 0.2s ease;
+}
+
+.folder-preview:hover .folder-icon {
+  transform: scale(1.1);
+}
+
+.folder-title {
+  display: block;
+  margin-top: 0.5rem;
+  color: #ccc;
+}
+.preview-tooltip::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #222;
+}
+
+@media (max-width: 768px) {
+  .preview-tooltip {
+    position: static;
+    transform: none;
+    display: block;
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin-top: 0.5rem;
+  }
+
+  .subject-item {
+    color: #ddd;
+  }
+}
+
+
+.preview-tooltip {
+  display: none;
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #222;
+  color: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  z-index: 10;
+  min-width: 180px;
+  text-align: left;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+}
+
+.folder-preview:hover .preview-tooltip {
+  display: block;
+}
+
+.subject-item {
+  display: block;
+  padding: 4px 0;
+  color: white;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.subject-item:hover {
+  color: #ffcc66; /* vagy valami jól látható világos árnyalat */
+  text-decoration: underline;
+}
+
+.folder-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.emoji-icon {
+  font-size: 60px;
+  transition: transform 0.2s ease;
+}
+
+.folder-preview:hover .emoji-icon {
+  transform: scale(1.1);
+}

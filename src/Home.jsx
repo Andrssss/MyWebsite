@@ -1,69 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import SemesterPreview from './components/SemesterPreview';
+import { semesterData } from './components/semesterData_pretty';
 
 const Home = ({ setContent, setMenuOpen }) => {
-  const folderId = '1V4ryxSmLNoQZ14UQry1DbfjUlVWN6DTx'; 
-  const embedLink = `https://drive.google.com/embeddedfolderview?id=${folderId}#grid`;
-
   const [isMobile, setIsMobile] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
     handleResize();
     window.addEventListener('resize', handleResize);
-
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleIframeLoad = () => {
-    setLoading(false);
-  };
-
   return (
-    <div>
-      
-
-      <div
-        style={{
-          width: '110%',
-          height: '90vh',
-          marginLeft: isMobile ? '-10%' : '0',
-          marginTop: isMobile ? '-4%' : '0',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        {loading && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.5rem',
-            }}
-          >
-            Betöltés...
-          </div>
-        )}
-        <iframe
-          src={embedLink}
-          onLoad={handleIframeLoad}
-          style={{
-            width: '110%',
-            height: '100%',
-            border: 'none',
-            overflow: 'hidden',
-          }}
-        ></iframe>
+    <div className="home-container">
+      <h2 style={{ color: '#fff', marginBottom: '1rem' }}>Jegyzeteim:</h2>
+      <div className="folder-grid">
+        {Object.entries(semesterData).map(([semester, { link, subjects }]) => (
+          <SemesterPreview
+            key={semester}
+            title={semester}
+            subjects={subjects}
+            link={link}
+          />
+        ))}
       </div>
     </div>
   );
