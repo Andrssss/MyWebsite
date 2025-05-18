@@ -14,7 +14,8 @@ const Home = ({ setContent, setMenuOpen }) => {
 
   return (
     <div className="home-container">
-      <h2 style={{ color: '#fff', marginBottom: '1rem' }}>Jegyzeteim:</h2>
+      <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Anyagaim :</h2>
+
       <div className="folder-grid">
         {Object.entries(semesterData).map(([semester, { link, subjects }]) => (
           <SemesterPreview
