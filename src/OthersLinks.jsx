@@ -5,7 +5,7 @@ const othersLinks = [
 
   { name: 'pauad1 📚', url: 'https://users.itk.ppke.hu/~pauad1/' },
   { name: 'hakkeltamas 🖤', url: 'https://itk.hakkeltamas.hu/' },
-  { name: 'heihe 😎', url: 'https://users.itk.ppke.hu/~heihe/' },
+  { name: 'heihe 🌲', url: 'https://users.itk.ppke.hu/~heihe/' },
   { name: 'ekacs 🦔', url: 'https://users.itk.ppke.hu/~ekacs' },
   { name: 'szege7 🧩', url: 'https://users.itk.ppke.hu/~szege7/' },
   { name: 'gyoad5 🕊️', url: 'https://users.itk.ppke.hu/~gyoad5/' },
@@ -14,7 +14,7 @@ const othersLinks = [
   { name: 'morak 🛰️', url: 'https://users.itk.ppke.hu/~morak/' },
   { name: 'balma14 📚', url: 'https://users.itk.ppke.hu/~balma14/' },
   { name: 'bolle 📚', url: 'https://users.itk.ppke.hu/~bolle/Minden%20-by%20Bal%c3%a1zs%20M%c3%a1ty%c3%a1s/' },
-  { name: 'vagle 📘', url: 'https://users.itk.ppke.hu/~vagle/main/' },
+  { name: 'vagle 🌀', url: 'https://users.itk.ppke.hu/~vagle/main/' },
   { name: 'hudes ☁️', url: ' https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO' },
   { name: 'petma12 📂', url: 'https://markomy.hu/' },
   { name: 'csobo3 📚', url: 'https://users.itk.ppke.hu/~csobo3/' },
