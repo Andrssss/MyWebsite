@@ -8,16 +8,16 @@ const FireParticlesCanvas = ({ active }) => {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const maxParticles = 250000;
+    const maxParticles = 20000;
 
     const createParticle = () => {
       if (!active) return; // Ha inaktív, ne hozzon létre új részecskéket
 
       if (particles.current.length < maxParticles) {
         const isSmallScreen = window.innerWidth < 768;
-        const size = isSmallScreen ? Math.random() * 6 + 3 : Math.random() * 6 + 3;
-        const life = isSmallScreen ? Math.random() * 60 + 120 : Math.random() * 60 + 120;
-        const y = isSmallScreen ? canvas.height + 5 : canvas.height + 5;
+        const size = isSmallScreen ? Math.random() * 6 + 10 : Math.random() * 6 + 25;
+        const life = isSmallScreen ? Math.random() * 60 + 150 : Math.random() * 60 + 300;
+        const y = isSmallScreen ? canvas.height + 5 : canvas.height + 19;
 
         particles.current.push({
           x: Math.random() * canvas.width,
@@ -38,13 +38,17 @@ const FireParticlesCanvas = ({ active }) => {
 
       particles.current = particles.current.filter((particle) => {
         particle.y -= particle.speedY * 2;
-        particle.x += particle.speedX;
+        particle.x += particle.speedX* 1.5;
         particle.age++;
-
-        particle.size *= 0.994;
-        particle.opacity *= 0.99;
-
-        particle.color[1] -= 4;
+        
+        if (particles.current.length < maxParticles) {
+          const isSmallScreen = window.innerWidth < 768;
+          particle.size *= isSmallScreen ? 0.995 : 0.99;
+          particle.opacity *= isSmallScreen ? 0.99 : 0.994;
+          // particle.size *= 0.994;
+          // particle.opacity *= 0.99;
+        }
+        particle.color[1] -= 3;
 
         if (particle.age >= particle.life || particle.opacity <= 0) {
           return false; // Részecske eltávolítása
@@ -61,7 +65,7 @@ const FireParticlesCanvas = ({ active }) => {
 
     const loop = () => {
       if (active) {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 3; i++) {
           createParticle();
         }
       }
