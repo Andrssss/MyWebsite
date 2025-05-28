@@ -21,6 +21,9 @@ const AppContent = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [particlesActive, setParticlesActive] = useState(true);
   const location = useLocation();
+  const [initialPath, setInitialPath] = useState(null);
+  const [hasNavigatedAway, setHasNavigatedAway] = useState(false);
+
 
   useEffect(() => {
     setParticlesActive(location.pathname !== '/targy_info');
@@ -33,11 +36,17 @@ const AppContent = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  useEffect(() => {
-    // Ha nem a főoldalon vagyunk, zárjuk össze a sidebart
-    setSidebarCollapsed(location.pathname !== '/');
-  }, [location]);
+
+
+useEffect(() => {
+  if (initialPath === null) {
+    setInitialPath(location.pathname);
+  } else if (location.pathname !== initialPath && !hasNavigatedAway) {
+    setHasNavigatedAway(true);
+  }
+}, [location, initialPath, hasNavigatedAway]);
+
+
   
 
   return (
@@ -77,7 +86,7 @@ const AppContent = () => {
           </nav>
         </>
       ) : (
-        <aside className={`sidebar ${!isMobile && location.pathname !== '/' ? 'collapsed' : ''}`}>
+        <aside className={`sidebar ${!isMobile && hasNavigatedAway  ? 'collapsed' : ''}`}>
           <div className="logo">bakan7</div>
           <nav>
             <ul>
