@@ -94,9 +94,9 @@ useEffect(() => {
           <nav>
             <ul>
               <li><Link to="/">📂 Főoldal</Link></li>
-              <li><Link to="/targy_info">📘 Tárgy info</Link></li>
+              <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
               <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
-              <li><Link to="/masok_oldalai">🌐 Más oldalak</Link></li>
+              <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
               <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
             </ul>
           </nav>
