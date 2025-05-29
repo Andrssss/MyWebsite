@@ -43,8 +43,14 @@ const FireParticlesCanvas = ({ active }) => {
         
         if (particles.current.length < maxParticles) {
           const isSmallScreen = window.innerWidth < 768;
-          particle.size *= isSmallScreen ? 0.995 : 0.99;
-          particle.opacity *= isSmallScreen ? 0.99 : 0.994;
+          if (particle.size < 8) {
+            particle.size *= isSmallScreen ? 0.96 : 0.94;  // gyorsabb zsugorodás
+            particle.opacity *= isSmallScreen ? 0.95 : 0.96; // gyorsabb elhalványulás
+          } else {
+            particle.size *= isSmallScreen ? 0.995 : 0.99;
+            particle.opacity *= isSmallScreen ? 0.99 : 0.994;
+          }
+
           // particle.size *= 0.994;
           // particle.opacity *= 0.99;
         }
