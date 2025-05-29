@@ -16,6 +16,7 @@ import About from './About.jsx';
 import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
 
+
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -23,6 +24,8 @@ const AppContent = () => {
   const location = useLocation();
   const [initialPath, setInitialPath] = useState(null);
   const [hasNavigatedAway, setHasNavigatedAway] = useState(false);
+  const [subjectInfoLoading, setSubjectInfoLoading] = useState(false);
+
 
 
   useEffect(() => {
@@ -86,7 +89,7 @@ useEffect(() => {
           </nav>
         </>
       ) : (
-        <aside className={`sidebar ${!isMobile && hasNavigatedAway  ? 'collapsed' : ''}`}>
+        <aside className={`sidebar ${!isMobile && hasNavigatedAway  && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
           <div className="logo">bakan7</div>
           <nav>
             <ul>
@@ -101,10 +104,10 @@ useEffect(() => {
 
       )}
 
-      <main className={`${isMobile ? 'content' : 'main-content'} ${!isMobile && location.pathname !== '/' ? 'collapsed' : ''}`}>
+      <main className={`${isMobile ? 'content' : 'main-content'} ${!isMobile && hasNavigatedAway  && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
         <Routes>
           <Route path="/" element={<Home setContent={() => {}} setMenuOpen={setMenuOpen} />} />
-          <Route path="/targy_info" element={<SubjectInfo />} />
+          <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
           <Route path="/masok_oldalai" element={<OthersLinks />} />
           <Route path="/kapcsolat" element={<About />} />

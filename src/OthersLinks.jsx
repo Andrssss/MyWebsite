@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import './App.css';
 
 const othersLinks = [
-
+  { name: 'radzi1 📚', url: 'https://users.itk.ppke.hu/~radzi1/' },
   { name: 'pauad1 📚', url: 'https://users.itk.ppke.hu/~pauad1/' },
   { name: 'hakkeltamas 🖤', url: 'https://itk.hakkeltamas.hu/' },
-  { name: 'radzi1 📚', url: 'https://users.itk.ppke.hu/~radzi1/' },
   { name: 'heihe 🌲', url: 'https://users.itk.ppke.hu/~heihe/' },
   { name: 'ekacs 🦔', url: 'https://users.itk.ppke.hu/~ekacs' },
   { name: 'szege7 🧩', url: 'https://users.itk.ppke.hu/~szege7/' },

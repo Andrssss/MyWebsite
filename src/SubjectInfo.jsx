@@ -1,5 +1,6 @@
 import "./SubjectInfo.css";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, createContext } from "react";
+export const SubjectInfoLoadingContext = createContext(false);
 
 // Ékezetmentesítés
 const removeAccents = (str) =>
@@ -16,9 +17,9 @@ const initialNewEntry = {
   semester: "",
 };
 
-const SubjectInfo = () => {
+const SubjectInfo = ({ setLoading }) => {
   const [subjects, setSubjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLocalLoading] = useState(true);
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
 
@@ -43,6 +44,11 @@ const SubjectInfo = () => {
     setEditingReviewId(null);
   };
 
+
+  useEffect(() => {
+    if (setLoading) setLoading(loading);
+  }, [loading, setLoading]);
+
   useEffect(() => {
     // userId beállítása, ha még nincs
     let storedUserId = localStorage.getItem("userId");
@@ -64,12 +70,12 @@ const SubjectInfo = () => {
       } catch (err) {
         console.error("Hiba történt az adatok lekérésekor:", err);
       } finally {
-        setLoading(false);
+        setLocalLoading(false);
       }
     };
 
     // Mentett felhasználónév betöltése, ha van
-    const savedUserName = localStorage.getItem("savedUserName");
+    const savedUserName = localStorage.getItem("savedUserNam  e");
     if (savedUserName) {
       setNewEntry((prev) => ({ ...prev, user: savedUserName }));
     }
