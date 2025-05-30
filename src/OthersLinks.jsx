@@ -26,7 +26,7 @@ const othersLinks = [
 
 
 const additionalLinks = {
-  "Kevesebb anyag - 2025.02": [
+  "Kevesebb anyag - 2025.07": [
     { name: 'szumi3', url: 'https://users.itk.ppke.hu/~szumi3/' },
     { name: 'nemda3', url: 'https://users.itk.ppke.hu/~nemda3/' },
     { name: 'nemda2', url: 'https://users.itk.ppke.hu/~nemda2/' },
