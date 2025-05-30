@@ -8,7 +8,7 @@ const othersLinks = [
   { name: 'heihe 🌲', url: 'https://users.itk.ppke.hu/~heihe/' },
   { name: 'ekacs 🦔', url: 'https://users.itk.ppke.hu/~ekacs/anyagok/' },
   { name: 'szege7 🧩', url: 'https://users.itk.ppke.hu/~szege7/' },
-  { name: 'gyoad5 🕊️', url: 'https://users.itk.ppke.hu/~gyoad5/' },
+  { name: 'gyoad5 🕊️', url: 'https://users.itk.ppke.hu/~gyoad5/i_sem/index.html' },
   { name: 'retge1 🍞', url: 'https://users.itk.ppke.hu/~retge1/' },
   { name: 'szama36 📘', url: 'https://users.itk.ppke.hu/~szama36/Hasznos%20dolgok/index.html' },
   { name: 'morak 🛰️', url: 'https://users.itk.ppke.hu/~morak/' },
@@ -40,7 +40,7 @@ const additionalLinks = {
 
 
   ],
-  "Folyamatban - 2025.02": [
+  "Folyamatban - 2025.07": [
     { name: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { name: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
     { name: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },

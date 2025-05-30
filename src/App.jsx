@@ -55,8 +55,10 @@ useEffect(() => {
   return (
     <div className={isMobile ? 'container' : 'layout'}>
       <div className="particles-wrapper">
+        <div className="background-image"></div> {/* Háttérkép */}
         <Particles active={particlesActive} />
       </div>
+
 
 
       {isMobile ? (
