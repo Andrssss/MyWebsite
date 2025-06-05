@@ -3,7 +3,7 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/15GaVm9O4usLBA7oBE9q0LHp0VyBdzTNZ?usp=drive_link",
     "subjects": [
       {
-        "name": "LA-DM",
+        "name": "LA-DM_1",
         "url": "https://drive.google.com/drive/folders/1LzxiBhI6bWwrt78esudVSjQgzJlHLOtY?usp=drive_link"
       },
       {
@@ -15,15 +15,15 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/1IMa9G8Mq_MpwB3vODHXNBKoLgCE0s1Rp?usp=drive_link"
       },
       {
-        "name": "DM",
+        "name": "DM_1",
         "url": "https://drive.google.com/drive/folders/1x-cDjm8IekLT10qiS5SdruEEUFvR1gw6?usp=drive_link"
       },
       {
-        "name": "Bev. Ker.",
+        "name": "BEV_KER",
         "url": "https://drive.google.com/drive/folders/1gzAihLA_H6bA2bw0hxAr7lG--BWMGlop?usp=drive_link"
       },
       {
-        "name": "BEV_PROG",
+        "name": "BEV_PROG_1",
         "url": "https://drive.google.com/drive/folders/178GbVnOQXBnClZMECE0IYB49bwXTn4rp?usp=drive_link"
       },
       {
@@ -35,7 +35,7 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/10r3YViZIa1A513ujAKb7ooCpdu7jcJmE?usp=drive_link"
       },
       {
-        "name": "ANÁL",
+        "name": "ANALÍZIS_1",
         "url": "https://drive.google.com/drive/folders/1vOHHGc2kjuaAqjM8LEmSGMwx_pZqvpc2?usp=drive_link"
       }
     ]
@@ -44,35 +44,35 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/17ZNNYjsdRlWOMY1Sib0ckboxlWtPGAOT?usp=drive_link",
     "subjects": [
       {
-        "name": "MAT_lab",
+        "name": "MATLAB",
         "url": "https://drive.google.com/drive/folders/1AM-TQ89cRplu1FLKJ02rC2TKpiGcqZjB?usp=drive_link"
       },
       {
-        "name": "LA2",
+        "name": "LA_2",
         "url": "https://drive.google.com/drive/folders/1TSDfWHHbdGCEmsgxt7oF6v9O1ekfevzp?usp=drive_link"
       },
       {
-        "name": "Klass-fizika",
+        "name": "KLASZ-FIZ",
         "url": "https://drive.google.com/drive/folders/1CpzimFHAWaEDlXGbFslHWS80QWGz9mfl?usp=drive_link"
       },
       {
-        "name": "DM2",
+        "name": "DM_2",
         "url": "https://drive.google.com/drive/folders/1x9qjw9GeJtEcxgRAg934Rr3Woetm3O2c?usp=drive_link"
       },
       {
-        "name": "BIBLIA_VILAGA_MEGOLDASOK",
+        "name": "BIBLIA_VILAGA",
         "url": "https://drive.google.com/drive/folders/1Gx2VvzPP7k03CJd2xbW6bSBrfu80txpG?usp=drive_link"
       },
       {
-        "name": "BEV. MÉRÉSTECH.",
+        "name": "BEV_MÉRÉSTECH",
         "url": "https://drive.google.com/drive/folders/1SrpBLDX7N3WPzlVG_606Oc7-XZqa-BW9?usp=drive_link"
       },
       {
-        "name": "BEV PROG 2",
+        "name": "BEV _PROG_2",
         "url": "https://drive.google.com/drive/folders/1VIY1XvYwvul1NzLF30TPdGK5J6zmT5sa?usp=drive_link"
       },
       {
-        "name": "ANÁL2",
+        "name": "ANALÍZIS_2",
         "url": "https://drive.google.com/drive/folders/1fUGZhRj8AJnSlimwrdUnfbBPM8quETNP?usp=drive_link"
       }
     ]
@@ -81,31 +81,31 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/1qADHXKHCW4VbCu2paVo_FyV_FYkvH-Ta?usp=drive_link",
     "subjects": [
       {
-        "name": "VALSZAM",
+        "name": "VALSZÁM",
         "url": "https://drive.google.com/drive/folders/1wl9LrrT82hyRuUNatYyMGwJLoxvRYf39?usp=drive_link"
       },
       {
-        "name": "Szamitogepes_halok",
+        "name": "SZÁMHÁLÓ",
         "url": "https://drive.google.com/drive/folders/1HBngwsZNQg_JBQHEx5-iDjNgi3uU4hNf?usp=drive_link"
       },
       {
-        "name": "Nyelvtech",
+        "name": "NYELVTECH_1",
         "url": "https://drive.google.com/drive/folders/1EzZFi2wn5BRgZlsHiJ9g7x4LsWCNh1ZS?usp=drive_link"
       },
       {
-        "name": "Multi",
+        "name": "MULTI_1",
         "url": "https://drive.google.com/drive/folders/1851pcNfoxp2n-lJLYQ6OwgeWCws9c7DX?usp=drive_link"
       },
       {
-        "name": "Bev Kereszténység",
+        "name": "BEV_KER",
         "url": "https://drive.google.com/drive/folders/1-JZO6Xv9iC9eg76wRHUfk8_EjCSiifTI?usp=drive_link"
       },
       {
-        "name": "Áramkörök",
+        "name": "ÁRAMKÖRÖK",
         "url": "https://drive.google.com/drive/folders/155LV_O-b04m8nahUZyz9yDLwePDPHnqY?usp=drive_link"
       },
       {
-        "name": "Agykut",
+        "name": "AGYKUT",
         "url": "https://drive.google.com/drive/folders/1zrCTxIVdKiMhwGITcvm7sBd8nMjhu1w6?usp=drive_link"
       },
       {
@@ -126,27 +126,27 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/1QmQ5UxwKEEDLAzbBS4BYr_TUF_XXjDXG?usp=drive_link"
       },
       {
-        "name": "JATEKELMELET",
+        "name": "JÁTÉKELMÉLET",
         "url": "https://drive.google.com/drive/folders/1wIJhY7V_0EB0H_3SnppDG-RjS1o2-NZN?usp=drive_link"
       },
       {
-        "name": "DIG SZAR",
+        "name": "DIGSZAR",
         "url": "https://drive.google.com/drive/folders/1Q-5XRlaWXgMrDe8ZFnxs7RbwakPuHiBt?usp=drive_link"
       },
       {
-        "name": "Dig Szam",
+        "name": "DIG_SZÁM",
         "url": "https://drive.google.com/drive/folders/1hWdBHEe2hiz44lGQl-vh18xh_llv0NlI?usp=drive_link"
       },
       {
-        "name": "Dig jel",
+        "name": "DIG_JEL",
         "url": "https://drive.google.com/drive/folders/1UUYoBFRX4kqiRAur3SyXWHFZxHJsrgOM?usp=drive_link"
       },
       {
-        "name": "Nyelvtech_2",
+        "name": "NYELVTECH_2",
         "url": "https://drive.google.com/drive/folders/10FjVQWlDU9CuC5C_yWzsDr677q5LzWPF?usp=drive_link"
       },
       {
-        "name": "Adatbazis",
+        "name": "ADATBÁZIS",
         "url": "https://drive.google.com/drive/folders/1Z-p2z-nubigOS9W0rccSTrVCQetxvAwR?usp=drive_link"
       }
     ]
@@ -155,27 +155,27 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/1EQWAV93Cg_9XAOGS8M2R7A-2QAGqXu8x?usp=sharing",
     "subjects": [
       {
-        "name": "NEUR",
+        "name": "NEURHÁLÓ",
         "url": "https://drive.google.com/drive/folders/154L-2n4yS5OPIy-hP0sIBuAr_6Eo_Qrg?usp=drive_link"
       },
       {
-        "name": "Meres_tech",
+        "name": "MÉRÉS_TECH",
         "url": "https://drive.google.com/drive/folders/1gJdEeFGvQMa_cGXyySQNp3RUUlxVJVci?usp=drive_link"
       },
       {
-        "name": "Kattan",
+        "name": "KATTAN",
         "url": "https://drive.google.com/drive/folders/1j7B5-UdMb3JJMxShQuBNE6GgOvo6Ksp8?usp=drive_link"
       },
       {
-        "name": "Info_Vissza",
+        "name": "INFO_VISSZA",
         "url": "https://drive.google.com/drive/folders/1Y9qm3JnmbBexDTEAy42HTiPrAC5bBGzt?usp=drive_link"
       },
       {
-        "name": "Info_Con",
+        "name": "INFO_COM",
         "url": "https://drive.google.com/drive/folders/1VKszI_NoMYVMvacE-DQtm4Sx1g9na57h?usp=drive_link"
       },
       {
-        "name": "Előírt lab",
+        "name": "ELŐÍRT_LAB",
         "url": "https://drive.google.com/drive/folders/1HMJXiKnDH6Jm2iPzq2rlx2Do8PoGIGM6?usp=drive_link"
       },
       {
@@ -187,7 +187,7 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/13HPCpb9cqvf1_x0CbkRxqZ2w7cJiQ3YW?usp=drive_link"
       },
       {
-        "name": "Basic_of_mobile",
+        "name": "BASIC_OF_MOBILE",
         "url": "https://drive.google.com/drive/folders/1gv6ku326f6j73WyJm3EIWNmzh1XySVOd?usp=drive_link"
       },
       {
@@ -200,15 +200,15 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/1qYv5d6DLZqpZumIqRo776POMoxXXRRuS?usp=drive_link",
     "subjects": [
       {
-        "name": "WEB. PROG.",
+        "name": "WEB_PROG",
         "url": "https://drive.google.com/drive/folders/1fPK7C6nUyP_Q4LeB8Rij_7nntbEYZzlT?usp=drive_link"
       },
       {
-        "name": "SZOFTVER TECH",
+        "name": "SZOFTVER_TECH",
         "url": "https://drive.google.com/drive/folders/1Z3QlyrEy0SYJazx3ySYMPvA7yyZnNvpT?usp=drive_link"
       },
       {
-        "name": "PROG NYELVEK",
+        "name": "PROG_NYELVEK",
         "url": "https://drive.google.com/drive/folders/1aZ31xo70SF8ZOVRK4HV2HwXHl6SkK8Gd?usp=drive_link"
       },
       {
@@ -220,7 +220,7 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/188Q4Kk657WBOjiDgeSdPk4AC1bfurjQ5?usp=drive_link"
       },
       {
-        "name": "Informacio és kodelm.",
+        "name": "INFORMÁCIÓ_ÉS_KÓD",
         "url": "https://drive.google.com/drive/folders/1_xBJ6_GoIkN7XD_6EU8_-fUUhzmuoBWG?usp=drive_link"
       },
       {
