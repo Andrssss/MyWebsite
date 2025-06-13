@@ -220,6 +220,13 @@ body {
     margin-left: 0;
     margin-top: 80px; /* ha kell hely a headernek */
   }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+  }
 }
 
 
@@ -283,7 +290,6 @@ body {
 
 .popup-content {
   width: 400px; /* Explicit szélesség */
-  max-width: none;
   width: 20%;
   margin: 10px auto;
   padding: 40px;
@@ -301,6 +307,8 @@ body {
 
 @media (max-width: 1200px) {
   .popup-content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
     width: 40%; /* Szélesség kisebb eszközökön */
     padding: 15px; /* Kisebb padding telefonokon */
   }
@@ -309,6 +317,8 @@ body {
 
 @media (max-width: 600px) {
   .popup-content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
     width: 80%; /* Szélesség kisebb eszközökön */
     padding: 15px; /* Kisebb padding telefonokon */
   }
@@ -316,6 +326,8 @@ body {
 
 @media (max-width: 480px) {
   .popup-content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
     width: 80%; /* Még kisebb eszközökön */
     padding: 10px;
   }
@@ -430,7 +442,6 @@ body {
   font-weight: 500;
   font-size: 1rem;
   display: block;
-  transition: all 0.3s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
@@ -514,5 +525,11 @@ body {
       background: url('/background.png');
     background-position: center center; /* <<< középre vízszintesen és függőlegesen */
     background-size: auto 100vh; /* kicsit kisebb is lehet telefonon */
+  }
+  .content {
+    margin-left: 0 !important;
+    padding: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box;
   }
 }

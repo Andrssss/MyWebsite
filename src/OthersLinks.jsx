@@ -41,8 +41,10 @@ const additionalLinks = {
     { name: 'pocta', url: 'https://users.itk.ppke.hu/~pocta/' },
     { name: 'cseda6', url: 'https://users.itk.ppke.hu/~cseda6/public_html/files/' },
     { name: 'tarcs', url: 'https://users.itk.ppke.hu/~tarcs/' },
+    
   ],
   "Folyamatban - 2025.07": [
+    { name: 'odobo', url: 'https://users.itk.ppke.hu/~odobo/' },
     { name: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { name: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
     { name: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },

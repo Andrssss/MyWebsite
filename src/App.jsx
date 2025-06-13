@@ -90,20 +90,22 @@ useEffect(() => {
             </ul>
           </nav>
         </>
-      ) : (
-        <aside className={`sidebar ${!isMobile && hasNavigatedAway  && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
-          <div className="logo">bakan7</div>
-          <nav>
-            <ul>
-              <li><Link to="/">📂 Főoldal</Link></li>
-              <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
-              <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
-              <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
-              <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
-            </ul>
-          </nav>
-        </aside>
-
+      ) :  (
+        //!isMobile => desktop nézet - itt jön az új aside blokk
+        !isMobile && (
+          <aside className={`sidebar ${hasNavigatedAway && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
+            <div className="logo">bakan7</div>
+            <nav>
+              <ul>
+                <li><Link to="/">📂 Főoldal</Link></li>
+                <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
+                <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
+                <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
+                <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
+              </ul>
+            </nav>
+          </aside>
+        )
       )}
 
       <main className={`${isMobile ? 'content' : 'main-content'} ${!isMobile && hasNavigatedAway  && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
