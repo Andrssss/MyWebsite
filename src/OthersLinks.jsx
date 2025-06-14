@@ -28,12 +28,16 @@ const othersLinks = [
 
 
 const additionalLinks = {
-  "Kevesebb anyag - 2025.07": [
+  "Kevesebb anyag - 2025.06": [
     { name: 'araba4', url: 'https://users.itk.ppke.hu/~araba4/' },
     { name: 'perpa4', url: 'https://users.itk.ppke.hu/~perpa4' },
     { name: 'szumi3', url: 'https://users.itk.ppke.hu/~szumi3/' },
     { name: 'nemda3', url: 'https://users.itk.ppke.hu/~nemda3/' },
+    { name: 'erdar2', url: 'https://users.itk.ppke.hu/~erdar2' },
     { name: 'nemda2', url: 'https://users.itk.ppke.hu/~nemda2/' },
+    { name: 'szaba30', url: 'https://users.itk.ppke.hu/~szaba30/' },
+    { name: 'bocka2', url: 'https://users.itk.ppke.hu/~bocka2/' },
+    { name: 'szama50', url: 'https://users.itk.ppke.hu/~szama50/' },
     { name: 'nadak', url: 'https://users.itk.ppke.hu/~nadak/#/f' },
     { name: 'fedad', url: 'https://users.itk.ppke.hu/~fedad/' },
     { name: 'kisbe32', url: 'https://users.itk.ppke.hu/~kisbe32/' },
@@ -41,10 +45,11 @@ const additionalLinks = {
     { name: 'pocta', url: 'https://users.itk.ppke.hu/~pocta/' },
     { name: 'cseda6', url: 'https://users.itk.ppke.hu/~cseda6/public_html/files/' },
     { name: 'tarcs', url: 'https://users.itk.ppke.hu/~tarcs/' },
+    { name: 'odobo', url: 'https://users.itk.ppke.hu/~odobo/' },
+
     
   ],
-  "Folyamatban - 2025.07": [
-    { name: 'odobo', url: 'https://users.itk.ppke.hu/~odobo/' },
+  "Folyamatban - 2025.06": [
     { name: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { name: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
     { name: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },
