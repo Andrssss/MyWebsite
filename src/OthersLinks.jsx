@@ -23,6 +23,7 @@ const othersLinks = [
   { name: 'heihe 🌲', url: 'https://users.itk.ppke.hu/~heihe/' },
   { name: 'morak 🛰️', url: 'https://users.itk.ppke.hu/~morak/' },
   { name: 'vecha ☁️', url: 'https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ' },
+  { name: 'mozbo 🐈', url: 'https://users.itk.ppke.hu/~mozbo/' },
   { name: 'PPKE WIKI 🅦', url: 'https://users.itk.ppke.hu/~marri1/?fbclid=IwZXh0bgNhZW0CMTAAAR184vSVMEMSqLJEWe3fgnc-JEl0U_gAYiXGuvkbRyy6R4VeGMj02NevaKA_aem_BG5QKzrq0RPmdpiqjOzWMw' },
 ];
 
