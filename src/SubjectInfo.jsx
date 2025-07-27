@@ -5,6 +5,12 @@ import './SubjectInfo.css';
 
 const subjects = [
   {
+    name: 'Általános információ',
+    difficulty: 0,
+    general: 'Sajnos a backend elpusztult és vele együtt a vélemények is. Így csak a saját véleményemel tudok szolgálni...',
+    semester: 0,
+  },
+  {
     name: 'Matematikai alapismeretek',
     difficulty: 6,
     general: 'Nem feltétlen könnyű...',
