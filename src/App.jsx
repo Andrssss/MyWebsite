@@ -15,6 +15,7 @@ import OthersLinks from './OthersLinks.jsx';
 import About from './About.jsx';
 import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
+import LinksLauncher from './LinksLauncher.jsx';
 
 
 const AppContent = () => {
@@ -53,7 +54,11 @@ useEffect(() => {
   
 
   return (
-    <div className={isMobile ? 'container' : 'layout'}>
+    <div className={`${isMobile ? 'container' : 'layout'} ${
+      !isMobile && hasNavigatedAway && !(location.pathname === '/targy_info' && subjectInfoLoading)
+        ? 'sb-collapsed'
+        : ''
+     }`}>
       <div className="particles-wrapper">
         <div className="background-image"></div> {/* Háttérkép */}
         <Particles active={particlesActive} />
@@ -81,13 +86,15 @@ useEffect(() => {
           </header>
 
           <nav className="navbar">
-            <ul className={`menu ${menuOpen ? 'open' : ''} mobile`}>
+             <ul className={`menu ${menuOpen ? 'open' : ''} mobile`}>
               <li><Link to="/" onClick={() => setMenuOpen(false)}>Főoldal</Link></li>
               <li><Link to="/targy_info" onClick={() => setMenuOpen(false)}>Tárgy info</Link></li>
               <li><Link to="/egyetemi_linkek" onClick={() => setMenuOpen(false)}>Egyetemi Linkek</Link></li>
               <li><Link to="/masok_oldalai" onClick={() => setMenuOpen(false)}>Mások oldalai</Link></li>
+              <li><Link to="/gyakornoki_poziciok" onClick={() => setMenuOpen(false)}>Gyakornoki linkek</Link></li>
               <li><Link to="/kapcsolat" onClick={() => setMenuOpen(false)}>Kapcsolat</Link></li>
             </ul>
+
           </nav>
         </>
       ) :  (
@@ -101,7 +108,9 @@ useEffect(() => {
                 <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
                 <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
                 <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
+                <li><Link to="/gyakornoki_poziciok">🧭 Gyakornoki pozi</Link></li>
                 <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
+                
               </ul>
             </nav>
           </aside>
@@ -115,6 +124,14 @@ useEffect(() => {
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
           <Route path="/masok_oldalai" element={<OthersLinks />} />
           <Route path="/kapcsolat" element={<About />} />
+          <Route
+            path="/gyakornoki_poziciok"
+            element={<div className="main-content re-page"><LinksLauncher /></div>}
+          />
+          <Route
+            path="/gyakornoki_poziciok/auto"
+            element={<div className="main-content re-page"><LinksLauncher autoOpen /></div>}
+          />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
