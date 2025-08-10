@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 
 const LINKS = [
   { label: 'Melódiák – gyakornoki/szakmai', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak' },
+  { label: 'Jobbkezek', url: 'http://jobbkezek.hu/work/list' },
   { label: 'Minddiák (page=2)', url: 'https://minddiak.hu/position?page=2' },
   { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3' },
   { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
@@ -18,31 +19,28 @@ function getDomain(u) {
 }
 
 export default function LinksLauncher({ autoOpen = false }) {
-  const [status, setStatus] = useState('');
+  const [warnModal, setWarnModal] = useState(false);
 
   const openAll = useCallback(() => {
-    let opened = 0;
     LINKS.forEach(({ url }) => {
-      const w = window.open(url, '_blank', 'noopener,noreferrer');
-      if (w) opened++;
+      window.open(url, '_blank', 'noopener,noreferrer');
     });
-
-    if (opened === LINKS.length) {
-      setStatus('Minden link megnyitva új lapokon.');
-    } else if (opened === 0) {
-      setStatus('A böngésző popup-blokkolója letiltotta.');
-    } else {
-      setStatus(`Csak ${opened}/${LINKS.length} nyílt meg (popup-blokkoló?).`);
-    }
   }, []);
 
-  // AUTO mód: betöltéskor egyből nyissa
+  const handleOpenAllClick = useCallback(() => {
+    setWarnModal(true); // mindig figyelmeztetés előbb
+  }, []);
+
+  const confirmAndOpen = useCallback(() => {
+    setWarnModal(false);
+    setTimeout(openAll, 50); // kis késleltetés a modal bezárása után
+  }, [openAll]);
+
   useEffect(() => {
     if (autoOpen) {
-      const t = setTimeout(openAll, 100);
-      return () => clearTimeout(t);
+      setWarnModal(true); // auto módban is először csak figyelmeztetés
     }
-  }, [autoOpen, openAll]);
+  }, [autoOpen]);
 
   return (
     <section className="links-launcher" aria-labelledby="re-title">
@@ -51,15 +49,12 @@ export default function LinksLauncher({ autoOpen = false }) {
           <h2 id="re-title">Gyakornoki / IT linkek</h2>
           <p className="ll-sub">Összegyűjtött releváns állás/gyakornoki oldalak.</p>
         </div>
-
         <div className="ll-actions">
-          <button className="btn btn-primary btn-red" onClick={openAll}>
+          <button className="btn btn-primary btn-red" onClick={handleOpenAllClick}>
             Összes megnyitása
           </button>
         </div>
       </header>
-
-      {status && <div className="ll-status" role="status">{status}</div>}
 
       <ul className="link-grid">
         {LINKS.map(({ label, url }) => (
@@ -75,6 +70,27 @@ export default function LinksLauncher({ autoOpen = false }) {
           </li>
         ))}
       </ul>
+
+      {/* Figyelmeztető modal minden esetben */}
+      {warnModal && (
+        <div className="popup-blocker-overlay" role="dialog" aria-modal="true" aria-labelledby="warn-title">
+          <div className="popup-blocker-box">
+            <h3 id="warn-title">Felugró ablakok – tipp</h3>
+            <p>
+              Több lap fog megnyílni. Ha a böngésződ tiltja a felugrókat,
+              engedélyezd őket ehhez az oldalhoz, majd folytasd.
+            </p>
+            <p className="popup-guide">
+              <strong>Chrome / Edge:</strong> címsor jobb oldalán a blokkolt ikon → „Felugró ablakok és átirányítások” → Engedélyezés az oldalnál.<br />
+              <strong>Firefox:</strong> sáv felül/alul → Engedélyezés.
+            </p>
+            <div className="popup-actions">
+              <button className="btn btn-primary btn-red" onClick={confirmAndOpen}>Folytatás</button>
+              <button className="btn btn-ghost" onClick={() => setWarnModal(false)}>Mégse</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
