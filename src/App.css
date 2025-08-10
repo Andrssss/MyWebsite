@@ -27,7 +27,7 @@ html {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  
+
 }
 
 
@@ -66,7 +66,7 @@ html {
   flex: 1;
   font-weight: normal;
   color: white;
-  
+
   margin-top: 0; /* Eltávolítja az esetleges felső margót */
 }
 
@@ -130,14 +130,14 @@ body {
   color: white;
   z-index: 1;
   position: relative;
-  
+
 }
 
 .search-container {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 20px;
-  
+
 }
 
 
@@ -535,27 +535,122 @@ body {
 }
 
 
+:root{
+  --ll-bg: rgba(20,20,20,0.65);
+  --ll-card: rgba(255,255,255,0.06);
+  --ll-card-hover: rgba(255,255,255,0.12);
+  --ll-border: rgba(255,255,255,0.12);
+  --ll-text: #f4f4f5;
+  --ll-muted: #c9c9ce;
+  --ll-shadow: 0 10px 30px rgba(0,0,0,.35);
+  --ll-radius: 16px;
+  --ll-blur: saturate(140%) blur(6px);
+}
+
+/* Felső doboz */
+.links-launcher{
+  color: var(--ll-text);
+  background: var(--ll-bg);
+  backdrop-filter: var(--ll-blur);
+  border: 1px solid var(--ll-border);
+  border-radius: var(--ll-radius);
+  padding: 18px 18px 22px;
+  box-shadow: var(--ll-shadow);
+}
+
+.ll-head{
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--ll-border);
+  padding-bottom: 12px;
+}
+.ll-head h2{
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 28px);
+  letter-spacing: .2px;
+}
+.ll-sub{ margin: 4px 0 0; opacity: .8; font-size: .95rem; }
+
+.ll-actions{ display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Gombok – nincs transition/transform */
+.btn{
+  border-radius: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ll-border);
+  background: var(--ll-card);
+  color: var(--ll-text);
+  cursor: pointer;
+  text-decoration: none;
+  display:inline-flex; align-items:center; gap:8px;
+}
+.btn:hover{ background: var(--ll-card-hover); }
+.btn:active{ background: var(--ll-card-hover); }
+.btn-primary{ border-color: transparent; }
+.btn-ghost{ background: transparent; }
+
+.ll-status{
+  margin: 10px 0 6px;
+  font-size: .95rem;
+  color: var(--ll-muted);
+}
+
+/* Linkrács */
+.link-grid{
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+/* Kártyák – nincs transition/transform */
+.link-card{
+  border-radius: var(--ll-radius);
+  overflow: clip;
+  border: 1px solid var(--ll-border);
+  background: linear-gradient(180deg, var(--ll-card), rgba(255,255,255,0.03));
+  box-shadow: var(--ll-shadow);
+}
+.link-card:hover{ border-color: rgba(255,255,255,.22); }
+
+.card-link{
+  display:block; padding: 14px 14px 12px; text-decoration:none; color:inherit;
+}
+.card-title{
+  font-weight: 600; line-height: 1.2; margin-bottom: 8px;
+}
+.card-meta{
+  display:flex; align-items:center; gap:8px; font-size:.9rem; color: var(--ll-muted);
+}
+.card-meta .dot{
+  width: 6px; height: 6px; border-radius: 999px; background: var(--ll-muted); opacity:.6;
+}
+.card-meta .ext{ margin-left:auto; opacity:.7; }
+
+.ll-hint{ margin-top: 14px; font-size: .9rem; opacity: .8; }
+
 /* kisebb képernyőn kicsi padding */
 @media (max-width: 520px){
   .links-launcher{ padding: 5px; border-radius: 14px; }
 }
 @media (max-width: 844px) {
-  .main-content.re-page {
-    margin-left: 0 !important;
-  }
+  .main-content.re-page { margin-left: 0 !important; }
 }
 
 .main-content.re-page {
-  margin-left: 120px; /* finomhangolás: 238–244px között próbáld ki */
+  margin-left: 120px;
 }
 
 .sidebar.collapsed ~ .main-content.re-page {
-  margin-left: 5px; /* összehúzott állapot */
+  margin-left: 5px;
 }
 
-
-
-/* Popup-blokkoló figyelmeztetés */
+/* Popup-blokkoló figyelmeztetés – változatlan */
 .popup-blocker-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -604,149 +699,4 @@ body {
 .btn-red:hover {
   background-color: #c62828 !important;
   border-color: #c62828 !important;
-}
-
-
-
-:root{
-  --ll-bg: rgba(20,20,20,0.65);
-  --ll-card: rgba(255,255,255,0.06);
-  --ll-card-hover: rgba(255,255,255,0.12);
-  --ll-border: rgba(255,255,255,0.12);
-  --ll-text: #f4f4f5;
-  --ll-muted: #c9c9ce;
-  --ll-shadow: 0 10px 30px rgba(0,0,0,.35);
-  --ll-radius: 16px;
-  --ll-blur: saturate(140%) blur(6px);
-  --cardWidth: 240px;
-}
-
-/* Konténer optimalizált blur-rel */
-.links-launcher{
-  position: relative;
-  color: var(--ll-text);
-  border: 1px solid var(--ll-border);
-  border-radius: var(--ll-radius);
-  padding: 18px 18px 22px;
-  box-shadow: var(--ll-shadow);
-}
-.links-launcher::before{
-  content:"";
-  position:absolute; inset:0;
-  border-radius: var(--ll-radius);
-  background: var(--ll-bg);
-  backdrop-filter: var(--ll-blur);
-  -webkit-backdrop-filter: var(--ll-blur);
-  pointer-events:none;
-  z-index:0;
-}
-.links-launcher > *{ position:relative; z-index:1; }
-
-.ll-head{
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--ll-border);
-  padding-bottom: 12px;
-}
-.ll-head h2{
-  margin: 0;
-  font-size: clamp(20px, 2.4vw, 28px);
-  letter-spacing: .2px;
-}
-.ll-sub{
-  margin: 4px 0 0;
-  opacity: .8;
-  font-size: .95rem;
-}
-
-.ll-actions{ display: flex; gap: 10px; flex-wrap: wrap; }
-.btn{
-  border-radius: 12px;
-  padding: 10px 14px;
-  border: 1px solid var(--ll-border);
-  background: var(--ll-card);
-  color: var(--ll-text);
-  cursor: pointer;
-  text-decoration: none;
-  display:inline-flex; align-items:center; gap:8px;
-  transition: transform .15s ease, background-color .15s ease, opacity .15s ease;
-  will-change: transform;
-}
-.btn:hover{
-  background: var(--ll-card-hover);
-  transform: translateY(-1px);
-}
-.btn:active{ transform: translateY(0); }
-.btn-primary{ border-color: transparent; }
-.btn-ghost{ background: transparent; }
-
-.ll-status{
-  margin: 10px 0 6px;
-  font-size: .95rem;
-  color: var(--ll-muted);
-}
-
-.link-grid{
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--cardWidth), 1fr));
-  gap: 12px;
-}
-.link-card{
-  border-radius: var(--ll-radius);
-  overflow: clip;
-  border: 1px solid var(--ll-border);
-  background: linear-gradient(180deg, var(--ll-card), rgba(255,255,255,0.03));
-  box-shadow: var(--ll-shadow);
-  transition: transform .15s ease, border-color .15s ease;
-  will-change: transform;
-}
-.link-card:hover{
-  transform: translateY(-1px);
-  border-color: rgba(255,255,255,.22);
-}
-
-.card-link{
-  display:block;
-  padding: 14px 14px 12px;
-  text-decoration:none;
-  color:inherit;
-}
-.card-title{
-  font-weight: 600;
-  line-height: 1.2;
-  margin-bottom: 8px;
-}
-.card-meta{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:.9rem;
-  color: var(--ll-muted);
-}
-.card-meta .dot{
-  width: 6px; height: 6px;
-  border-radius: 999px;
-  background: var(--ll-muted);
-  opacity:.6;
-}
-.card-meta .ext{
-  margin-left:auto;
-  opacity:.7;
-}
-
-.ll-hint{
-  margin-top: 14px;
-  font-size: .9rem;
-  opacity: .8;
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .link-card, .btn { transition: none; }
 }
