@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 
 const LINKS = [
   { label: 'Melódiák – gyakornoki/szakmai', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak' },
-  { label: 'Minddiák (page=2)', url: 'https://minddiak.hu/position?page=2' },
+  { label: 'Minddiák ', url: 'https://minddiak.hu/position?page=2' },
   { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3' },
   { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
   { label: 'Zyntern – IT/fejlesztés', url: 'https://zyntern.com/jobs?fields=16' },
@@ -43,10 +43,21 @@ export default function LinksLauncher({ autoOpen = false }) {
 
   return (
     <section className="links-launcher" aria-labelledby="re-title">
+      <style>{`
+        .links-launcher .link-card .card-meta .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          display: inline-block;
+          background-color: #22c55e !important; /* zöld */
+          opacity: 1;
+          filter: none;
+        }
+      `}</style>
       <header className="ll-head">
         <div>
           <h2 id="re-title">Gyakornoki / IT linkek</h2>
-          <p className="ll-sub">Összegyűjtött releváns állás/gyakornoki oldalak.</p>
+          <p className="ll-sub">Összegyűjtött releváns állás/gyakornoki oldalak. Ezek a linkeket érdemes heti párszor megnézegetni.</p>
         </div>
         <div className="ll-actions">
           <button className="btn btn-primary btn-red" onClick={handleOpenAllClick}>
@@ -93,3 +104,5 @@ export default function LinksLauncher({ autoOpen = false }) {
     </section>
   );
 }
+
+
