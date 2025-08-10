@@ -2,14 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 
 const LINKS = [
   { label: 'Melódiák – gyakornoki/szakmai', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak' },
-  { label: 'Jobbkezek', url: 'http://jobbkezek.hu/work/list' },
   { label: 'Minddiák (page=2)', url: 'https://minddiak.hu/position?page=2' },
   { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3' },
   { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
   { label: 'Zyntern – IT/fejlesztés', url: 'https://zyntern.com/jobs?fields=16' },
   { label: 'OTP Karrier – GYAKORNOK keresés', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
   { label: 'Profession – IT fejlesztés (intern)', url: 'https://www.profession.hu/allasok/it-programozas-fejlesztes/1,10,0,intern' },
-  { label: 'Profession – Somogy (gyakornok)', url: 'https://www.profession.hu/allasok/somogy/1,0,38,gyakornok%401%401?keywordsearch' },
+  { label: 'Profession – (gyakornok)', url: 'https://www.profession.hu/allasok/1,0,0,gyakornok%401%401?keywordsearch' },
   { label: 'Fürge Diák – gyakornok', url: 'https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7' },
   { label: 'Schönherz – Budapest fejlesztő/tesztelő', url: 'https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo' },
 ];
