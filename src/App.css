@@ -606,6 +606,8 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 12px;
+    align-items: stretch; /* minden kártya egyforma magasságú lesz soronként */
+
 }
 
 /* Kártyák – nincs transition/transform */
@@ -615,6 +617,8 @@ body {
   border: 1px solid var(--ll-border);
   background: linear-gradient(180deg, var(--ll-card), rgba(255,255,255,0.03));
   box-shadow: var(--ll-shadow);
+    min-height: 90px; /* vagy amennyi kell */
+
 }
 .link-card:hover{ border-color: rgba(255,255,255,.22); }
 
@@ -700,3 +704,6 @@ body {
   background-color: #c62828 !important;
   border-color: #c62828 !important;
 }
+
+.main-content.re-page { padding-top: 0; } 
+

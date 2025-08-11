@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
 const LINKS = [
-  { label: 'Melódiák – gyakornoki/szakmai', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak' },
+  { label: 'Melódiák – gyakornoki', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak' },
   { label: 'Minddiák ', url: 'https://minddiak.hu/position?page=2' },
   { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3' },
   { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
   { label: 'Zyntern – IT/fejlesztés', url: 'https://zyntern.com/jobs?fields=16' },
-  { label: 'OTP Karrier – GYAKORNOK keresés', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
+  { label: 'OTP Karrier – GYAKORNOK', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
   { label: 'Profession – IT fejlesztés (intern)', url: 'https://www.profession.hu/allasok/it-programozas-fejlesztes/1,10,0,intern' },
   { label: 'Profession – (gyakornok)', url: 'https://www.profession.hu/allasok/1,0,0,gyakornok%401%401?keywordsearch' },
   { label: 'Fürge Diák – gyakornok', url: 'https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7' },
@@ -57,7 +57,7 @@ export default function LinksLauncher({ autoOpen = false }) {
       <header className="ll-head">
         <div>
           <h2 id="re-title">Gyakornoki / IT linkek</h2>
-          <p className="ll-sub">Összegyűjtött releváns állás/gyakornoki oldalak. Ezek a linkeket érdemes heti párszor megnézegetni.</p>
+          <p className="ll-sub">Összegyűjtött releváns gyakornoki oldalak. Ezeket a linkeket érdemes heti párszor megnézegetni.</p>
         </div>
         <div className="ll-actions">
           <button className="btn btn-primary btn-red" onClick={handleOpenAllClick}>

@@ -29,7 +29,7 @@ const othersLinks = [
 
 
 const additionalLinks = {
-  "Kevesebb anyag - 2025.06": [
+  "Kevesebb anyag - 2025.08": [
     { name: 'araba4', url: 'https://users.itk.ppke.hu/~araba4/' },
     { name: 'perpa4', url: 'https://users.itk.ppke.hu/~perpa4' },
     { name: 'szumi3', url: 'https://users.itk.ppke.hu/~szumi3/' },
@@ -50,7 +50,7 @@ const additionalLinks = {
 
     
   ],
-  "Folyamatban - 2025.06": [
+  "Folyamatban - 2025.08": [
     { name: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { name: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
     { name: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },
