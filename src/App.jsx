@@ -108,7 +108,7 @@ useEffect(() => {
                 <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
                 <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
                 <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
-                <li><Link to="/gyakornoki_poziciok">💼 Gyakornoki pozi</Link></li>
+                {/*<li><Link to="/gyakornoki_poziciok">💼 Gyakornoki pozi</Link></li>*/}
                 <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
                 
               </ul>
