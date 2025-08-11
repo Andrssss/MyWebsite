@@ -558,6 +558,11 @@ body {
   box-shadow: var(--ll-shadow);
 }
 
+.links-launcher:not(:last-of-type) {
+  margin-bottom: 1.5rem;
+}
+
+
 .ll-head{
   display: flex;
   align-items: flex-end;
