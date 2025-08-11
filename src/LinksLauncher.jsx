@@ -1,16 +1,24 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
-const LINKS = [
+const JOB_PORTALS = [
   { label: 'Melódiák – gyakornoki', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak' },
   { label: 'Minddiák ', url: 'https://minddiak.hu/position?page=2' },
   { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3' },
   { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
   { label: 'Zyntern – IT/fejlesztés', url: 'https://zyntern.com/jobs?fields=16' },
-  { label: 'OTP Karrier – GYAKORNOK', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
   { label: 'Profession – IT fejlesztés (intern)', url: 'https://www.profession.hu/allasok/it-programozas-fejlesztes/1,10,0,intern' },
   { label: 'Profession – (gyakornok)', url: 'https://www.profession.hu/allasok/1,0,0,gyakornok%401%401?keywordsearch' },
   { label: 'Fürge Diák – gyakornok', url: 'https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7' },
   { label: 'Schönherz – Budapest fejlesztő/tesztelő', url: 'https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo' },
+];
+
+const COMPANIES = [
+  { label: 'OTP Karrier – GYAKORNOK', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
+  { label: 'TCS Hungary – állások', url: 'https://hungarycareer.tcsapps.com/?s=' },
+  { label: 'AVL – állások', url: 'https://jobs.avl.com/search/?createNewAlert=false&q=&locationsearch=hu' },
+  { label: 'MOL – gyakornokok', url: 'https://karrier.mol.hu/hu/gyakornokok' },
+  { label: 'Taboola – állások', url: 'https://www.taboola.com/careers/jobs#team=&location=31734' },
+  { label: 'Siemens – állások', url: 'https://jobs.siemens.com/careers/search?query=%2A&location=Budapest%2C%20Hungary&pid=563156121706158&level=student%20%28not%20yet%20graduated%29&level=early%20professional&level=recent%20college%20graduate&level=not%20defined&domain=siemens.com&sort_by=relevance&location_distance_km=25&triggerGoButton=false' }
 ];
 
 function getDomain(u) {
@@ -20,54 +28,45 @@ function getDomain(u) {
 export default function LinksLauncher({ autoOpen = false }) {
   const [warnModal, setWarnModal] = useState(false);
 
-  const openAll = useCallback(() => {
-    LINKS.forEach(({ url }) => {
+  const openAll = useCallback((links) => {
+    links.forEach(({ url }) => {
       window.open(url, '_blank', 'noopener,noreferrer');
     });
   }, []);
 
-  const handleOpenAllClick = useCallback(() => {
-    setWarnModal(true); // mindig figyelmeztetés előbb
+  const handleOpenAllClick = useCallback((links) => {
+    setWarnModal({ open: true, links }); // tároljuk, melyik listát nyitjuk
   }, []);
 
   const confirmAndOpen = useCallback(() => {
-    setWarnModal(false);
-    setTimeout(openAll, 50); // kis késleltetés a modal bezárása után
-  }, [openAll]);
+    setWarnModal({ open: false, links: [] });
+    setTimeout(() => openAll(warnModal.links), 50);
+  }, [openAll, warnModal]);
 
   useEffect(() => {
     if (autoOpen) {
-      setWarnModal(true); // auto módban is először csak figyelmeztetés
+      setWarnModal({ open: true, links: [...JOB_PORTALS, ...COMPANIES] });
     }
   }, [autoOpen]);
 
-  return (
-    <section className="links-launcher" aria-labelledby="re-title">
-      <style>{`
-        .links-launcher .link-card .card-meta .dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          display: inline-block;
-          background-color: #22c55e !important; /* zöld */
-          opacity: 1;
-          filter: none;
-        }
-      `}</style>
+  const renderLinks = (title, links) => (
+    <section className="links-launcher" aria-labelledby={`${title}-title`}>
       <header className="ll-head">
         <div>
-          <h2 id="re-title">Gyakornoki / IT linkek</h2>
-          <p className="ll-sub">Összegyűjtött releváns gyakornoki oldalak. Ezeket a linkeket érdemes heti párszor megnézegetni.</p>
+          <h2 id={`${title}-title`}>{title}</h2>
         </div>
         <div className="ll-actions">
-          <button className="btn btn-primary btn-red" onClick={handleOpenAllClick}>
+          <button
+            className="btn btn-primary btn-red"
+            onClick={() => handleOpenAllClick(links)}
+          >
             Összes megnyitása
           </button>
         </div>
       </header>
 
       <ul className="link-grid">
-        {LINKS.map(({ label, url }) => (
+        {links.map(({ label, url }) => (
           <li key={url} className="link-card">
             <a href={url} target="_blank" rel="noopener noreferrer" className="card-link">
               <div className="card-title">{label}</div>
@@ -80,9 +79,27 @@ export default function LinksLauncher({ autoOpen = false }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
 
-      {/* Figyelmeztető modal minden esetben */}
-      {warnModal && (
+  return (
+    <>
+      <style>{`
+        .links-launcher .link-card .card-meta .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          display: inline-block;
+          background-color: #22c55e !important;
+          opacity: 1;
+          filter: none;
+        }
+      `}</style>
+
+      {renderLinks('Munka portálok', JOB_PORTALS)}
+      {renderLinks('Cégek', COMPANIES)}
+
+      {warnModal.open && (
         <div className="popup-blocker-overlay" role="dialog" aria-modal="true" aria-labelledby="warn-title">
           <div className="popup-blocker-box">
             <h3 id="warn-title">Felugró ablakok – tipp</h3>
@@ -96,13 +113,11 @@ export default function LinksLauncher({ autoOpen = false }) {
             </p>
             <div className="popup-actions">
               <button className="btn btn-primary btn-red" onClick={confirmAndOpen}>Folytatás</button>
-              <button className="btn btn-ghost" onClick={() => setWarnModal(false)}>Mégse</button>
+              <button className="btn btn-ghost" onClick={() => setWarnModal({ open: false, links: [] })}>Mégse</button>
             </div>
           </div>
         </div>
       )}
-    </section>
+    </>
   );
 }
-
-
