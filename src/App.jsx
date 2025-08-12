@@ -43,6 +43,7 @@ const AppContent = () => {
 
 
 useEffect(() => {
+  /*setHasNavigatedAway(false);*/
   if (initialPath === null) {
     setInitialPath(location.pathname);
   } else if (location.pathname !== initialPath && !hasNavigatedAway) {
