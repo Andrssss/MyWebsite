@@ -11,6 +11,7 @@ const JOB_PORTALS = [
   { label: 'Profession – (gyakornok)', url: 'https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/1,25,0,gyakornok' },
   { label: 'Fürge Diák – gyakornok', url: 'https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7' },
   { label: 'Schönherz – Budapest fejlesztő/tesztelő', url: 'https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo' },
+  { label: 'Frissdiplomás – állások', url: 'https://www.frissdiplomas.hu/allasok' }
 ];
 
 const COMPANIES = [
