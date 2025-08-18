@@ -35,9 +35,14 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/10r3YViZIa1A513ujAKb7ooCpdu7jcJmE?usp=drive_link"
       },
       {
+        "name": "BEV_SZÁMTECH",
+        "url": "https://drive.google.com/drive/folders/1RVM-GKScjgkrgKMC8VwWjYwZxLBZz31E?usp=sharing"
+      },
+      {
         "name": "ANALÍZIS_1",
         "url": "https://drive.google.com/drive/folders/1vOHHGc2kjuaAqjM8LEmSGMwx_pZqvpc2?usp=drive_link"
       }
+      
     ]
   },
   "2. FÉLÉV": {

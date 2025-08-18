@@ -304,8 +304,10 @@ const subjects = [
     semester: 6,
   },  
   {
-    name: 'Celluláris hullámszámítógépek',
-    general: 'Azt mondják, hogy "könnyű"',
+    name: 'Celluláris hullámszámítógépek - 2025',
+    general: 'Nenm volt',
+    duringSemester: 'Első 3 órára jártam be, aztán úgy alakult, hogy nincs rá időm. Amúgy az előadások szörnyen érdekesek, csak a legtöbb ember annyira leterhelt, hogy nem jut rá idő. Gyakorlat segíthet a megértésben, ZH-hoz, de többnyire haszontalan a programozós rész. ',
+    exam: 'Volt 1 ZH év közben, kb. olyan volt, mint elöző évben. Pár nap tanulás elég. ',
     semester: 6,
   },
   {
