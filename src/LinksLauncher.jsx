@@ -16,6 +16,7 @@ const JOB_PORTALS = [
 ];
 
 const COMPANIES = [
+  { label: 'GOV.HU – állások', url: 'https://karrier.ih.gov.hu/index.php/nyitott-poziciok/' },
   { label: 'OTP Karrier – GYAKORNOK', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
   { label: 'TCS Hungary – állások', url: 'https://hungarycareer.tcsapps.com/?s=' },
   { label: 'AVL – állások', url: 'https://jobs.avl.com/search/?createNewAlert=false&q=&locationsearch=hu' },
