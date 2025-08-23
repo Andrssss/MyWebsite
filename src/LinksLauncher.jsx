@@ -7,12 +7,13 @@ const JOB_PORTALS = [
   { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
   { label: 'CV Centrum – intern IT', url: 'https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job' },
   { label: 'Zyntern – IT/fejlesztés', url: 'https://zyntern.com/jobs?fields=16' },
-  { label: 'Profession – IT fejlesztés (intern)', url: 'https://www.profession.hu/allasok/it-programozas-fejlesztes/1,10,0,intern' },
-  { label: 'Profession – (gyakornok)', url: 'https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/1,25,0,gyakornok' },
+  { label: 'Profession – Intern', url: 'https://www.profession.hu/allasok/it-programozas-fejlesztes/1,10,0,intern' },
+  { label: 'Profession – Gyakornok', url: 'https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/1,25,0,gyakornok' },
   { label: 'Fürge Diák – gyakornok', url: 'https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7' },
   { label: 'Schönherz – Budapest fejlesztő/tesztelő', url: 'https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo' },
   { label: 'Frissdiplomás – állások', url: 'https://www.frissdiplomas.hu/allasok' },
-  { label: 'Prodiák – IT állások', url: 'https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/osszes/kulfold' }
+  { label: 'Prodiák – IT állások', url: 'https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/osszes/kulfold' },
+  { label: 'LinkedIn – PAST 24H', url: 'https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R' }
 ];
 
 const COMPANIES = [
