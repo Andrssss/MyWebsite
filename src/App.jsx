@@ -123,14 +123,14 @@ useEffect(() => {
           <Route path="/" element={<Home setContent={() => {}} setMenuOpen={setMenuOpen} />} />
           <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
-          <Route path="/masok_oldalai" element={<OthersLinks />} />
+          <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
           <Route path="/kapcsolat" element={<About />} />
           <Route
             path="/gyakornoki_poziciok"
             element={<div className="main-content re-page"><LinksLauncher /></div>}
           />
           <Route
-            path="/gyakornoki_poziciok/auto"
+            path="/gyakornoki_poziciok/auto" 
             element={<div className="main-content re-page"><LinksLauncher autoOpen /></div>}
           />
           <Route path="*" element={<Navigate to="/" />} />

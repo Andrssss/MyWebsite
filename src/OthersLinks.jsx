@@ -81,7 +81,7 @@ function getDomain(u) {
   try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; }
 }
 
-export default function OthersLinksStyled({ autoOpen = false }) {
+export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = () => {} }) {
   const [warn, setWarn] = useState({ open: false, links: [] });
   const [moreOpen, setMoreOpen] = useState(false); // fallback modal, ha a popup-ot blokkolja a böngésző
 
@@ -214,7 +214,7 @@ export default function OthersLinksStyled({ autoOpen = false }) {
         <Section
           title="Alap linkek"
           links={OTHERS_LINKS}
-          extra={<button className="others-ll__btn others-ll__btn--ghost" onClick={() => setMoreOpen(true)}>További linkek</button>}        />
+          extra={<button className="others-ll__btn others-ll__btn--ghost" onClick={() => { onNavigateAway(); setMoreOpen(true); }}>További linkek</button>}        />
       </div>
 
       {/* Fallback: További linkek MODAL (ha a popup blokkolva van) */}
