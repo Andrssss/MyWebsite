@@ -165,12 +165,38 @@ export default function OthersLinksStyled({ autoOpen = false }) {
         .btn-red:hover{ background-color:#c62828 !important; border-color:#c62828 !important; }
         .others-ll__grid{ list-style:none; margin:12px 0 0; padding:0; display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; align-items: stretch; }
         .others-ll__card{ border-radius: var(--ll-radius); overflow: clip; border: 1px solid var(--ll-border); background: linear-gradient(180deg, var(--ll-card), rgba(255,255,255,0.03)); box-shadow: var(--ll-shadow); }
-        .others-ll__card:hover{ border-color: rgba(255,255,255,.22); }
+        .others-ll__card:hover{ border-color: rgba(170, 59, 59, 0.71); }
         .others-ll__cardLink{ display:block; padding:14px 14px 12px; text-decoration:none; color:inherit; min-height: 96px; }
         .others-ll__title{ font-weight:600; line-height:1.2; margin-bottom:8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .others-ll__meta{ display:flex; align-items:center; gap:8px; font-size:.9rem; color: var(--ll-muted); }
         .others-ll__dot{ width:6px; height:6px; border-radius:999px; background: var(--ll-muted); opacity:.6; }
         .others-ll__ext{ margin-left:auto; opacity:.7; }
+        
+/* Fullscreen overlay that centers the modal */
+.others-ll__overlay {
+  position: fixed;
+  inset: 0;                  /* top:0 right:0 bottom:0 left:0 */
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;       /* vertical centering */
+  justify-content: center;   /* horizontal centering */
+  padding: 24px;             /* breathing room on small screens */
+  z-index: 1000;
+}
+
+/* The modal itself */
+.others-ll__modal {
+  width: min(1240px, 100%);  /* cap at 1240px but allow to shrink */
+  max-width: 1240px;
+  height: 100%;              /* now works because overlay defines the context */
+  max-height: calc(100vh - 48px);  /* respect padding */
+  overflow: auto;            /* scroll content if too tall */
+  background: var(--ll-bg);
+  border-radius: var(--ll-radius);
+  padding: 20px;
+  box-shadow: var(--ll-shadow);
+}
+
         @media (max-width: 520px){ .others-ll__section{ padding:5px; border-radius:14px; } }
         @media (max-width: 844px){ .others-ll__container{ padding-left:0 !important; } }
         @media (max-width: 768px) {
