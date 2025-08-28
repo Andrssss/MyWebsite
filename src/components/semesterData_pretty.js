@@ -237,5 +237,18 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/1bAnJcMzovYUOtpLysQqe-J8Vef_wiU9q?usp=drive_link"
       }
     ]
+  },
+  "7. FÉLÉV": {
+    "link": "https://drive.google.com/drive/folders/1-7a_4RjziDbxvGiG-_hRd665YcvAWjtB?usp=sharing",
+    "subjects": [
+      {
+        "name": "Jog",
+        "url": "https://drive.google.com/drive/folders/1YnmkA-Icqa4pxCnsudFoJzyPpm_pK0PG?usp=sharing"
+      },
+      {
+        "name": "Op_rendszer",
+        "url": "https://drive.google.com/drive/folders/1mKfZilCJwCVkQiMxAKtJvuE03RAe_Xhr?usp=drive_link"
+      },
+    ]
   }
 };
