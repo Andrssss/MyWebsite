@@ -202,12 +202,12 @@ const subjects = [
     semester: 5,
   },
   {
-    name: 'Digitális rendszerek és számítógép architektúrák - 2025',
-    difficulty: 69,
-    general: 'Be kell vallanom, nekem 2x kellett megcsinálnom ezt a tárgyat. Ami nem meglepő az 50% bukási aránynál. A nehézség a heti szintű rendszeres készülés és hogy eddig semmi értelmes anyag nem volt a neten. De ne aggód, mi kb. 50 kérdést tettünk fel tanár úraknak és így megszületett a 3 csodás Whiteboard (anyagaim között). Szinte az összes létező ZH kérdést kidolgoztuk és validáltuk. Úgyhogy mostmár könnyebb lesz. De tényleg járj be és figyelj, mert az életed legrosszabb hete helyet életed egy rossz hetét csinál. ',
-    duringSemester: 'Érdemes előre kidolgozni a ZH előtt sokkal az előfordúlható kérdéseket. Mert akkor már lehet hogy késő lesz amikor jön a ZH időszak. A másik, hogy tényleg figyelj órán és akkor barátságos lesz.',
-    exam: 'Nem adják ingyen. Függ attól is, hogy ki vizsgáztat, de elvileg nem értékelik, ha semmit sem tudsz mondani.',
-    semester: 4,
+    "name": "Digitális rendszerek és számítógép-architektúrák - 2025",
+    "difficulty": 69,
+    "general": "Be kell vallanom, nekem kétszer kellett megcsinálnom ezt a tárgyat. Ami nem meglepő az 50%-os bukási aránynál. A nehézség a heti szintű rendszeres készülés, és hogy eddig semmi értelmes anyag nem volt a neten. De ne aggódj, mi kb. 50 kérdést tettünk fel tanár úrnak, és így megszületett a 3 db csodás Whiteboard (anyagaim között). Feltöltöttem statisztikákat is az előző évekről. Izgi.",
+    "duringSemester": "Érdemes előre kidolgozni a ZH előtt jóval az előforduló kérdéseket, mert akkor már lehet, hogy késő lesz, amikor jön a ZH-időszak. A másik, hogy tényleg figyelj órán, és akkor barátságos lesz.",
+    "exam": "Nem adják ingyen. Függ attól is, hogy ki vizsgáztat, de elvileg nem értékelik, ha semmit sem tudsz mondani.",
+    "semester": 4
   },
   {
     name: 'Áramkörök elmélete és számítása - 2023',
@@ -283,61 +283,58 @@ const subjects = [
     general: 'Azt mondják könnyű és szuper érdekes. 2025-ben nincs.',
     semester: 6,
   },
-
-  {
-    name: 'A szoftvertechnológia alapjai - 2025',
-    general: 'Igazából ilyen töltelék tárgy. Találj ki egy csapattal egy weblap ötletet és annak a menedzselésén fogtok végigmenni. Év végén egy nyiltlapos ZH. Ha az nem sikerűl, akkor pedig egy barátságos vizsga, ahol nekünk 2-es csapatokba kellett valamit kiokoskodni. Ami jó volt benne, hogy nem kellett magolni, csak érteni a dolgokat és átolvasni. Ingyen 5-ös.',
-    duringSemester: 'Kedvencem az volt, amikor Zh időszakban több tanár volt bent órán, mint diák. (3-2) Ezt meglepő módon nem értékelték, utána kötelezővé tették a bejárást.',
-    difficulty: 2,
-    semester: 6,
-  },
-  {
-    name: 'Információ- és kódelmélet - 2025',
-    general: 'Digjel 2. Fasza volt. Kicsit azért már könnyebb és több anyag van hozzá.',
-    exam: 'Vizsga is 1-1 ugyanolyan. Szeret szóban a megértésre rákérdezni. Mivel ez nekem nem volt meg ezért a 3-as egy 2-esre sikerűlt lerontani.',
-    difficulty: 8,
-    semester: 6,
-  },
-  {
-    name: 'Programozási nyelvek és módszerek - 2025',
-    general: 'Ez kemény volt. Évközben érdemes figyelgetni és igazából csak vizsga van a végén.',
-    exam: 'Nekem azért volt fájdalmas, mert 1 hét magolást igényelt. A lényeg, hogy olyan volt, mint Adatszerk vizsga. Kis írásbeli rész, aztán szünet. Ahol utána lehet nézni a kérdéseknek és utána lehet javítani az írásbelin és még jön rá egy szóbeli rész. A probléma, hogy lehet, hogy 10 percet leszel kint, lehet, hogy 1,5 órát. Ami azt jelenti, hogy szerencsén múlik az, hogy mennyit kell rá készülnöd előzetesen. Minél később adod be, annál valószínűbb, hogy sok időt leszel kint.',
-    difficulty: 10,
-    semester: 6,
-  },
-  {
-    name: 'Adatbiztonság és kriptográfia - 2025',
-    general: 'Baromi érdekes, baromi könnyű. Nyilván figyelni kell. A gyakorlatokra be kell járni és érdemes ott megérteni mindent jól. Mert vizsgán azt kérdi.',
-    difficulty: 7,
-    exam: 'Vizsga számomra barátságos volt, mert igazából csak megértést kéri számon és kb. olyan volt, mint elöző évben. Kis irásbeli rész, majd szóbeli. Ha látja, hogy jó vagy akkor mehetsz.',
-    duringSemester: 'Ami nálunk nagy szenvedés volt az a KisZH, mert elég szigorú annak az osztályozása. Alig lett meg az évfolyam nagy részének. A legtöbbeket a pápa halála mentett meg, mivel a gyász miatt aznap nem írtuk meg a beugrót és mindenki max pontott kapott együtérzésűl.',
-    semester: 6,
-  },  
-  {
-    name: 'Celluláris hullámszámítógépek - 2025',
-    general: 'Egyik legkönnyebb tárgy.',
-    duringSemester: 'Első 3 órára jártam be, aztán úgy alakult, hogy nincs rá időm. Amúgy az előadások szörnyen érdekesek, csak a legtöbb ember annyira leterhelt, hogy nem jut rá idő. Gyakorlat segíthet a megértésben, ZH-hoz, de többnyire haszontalan a programozós rész. ',
-    difficulty: 3,
-    exam: 'Volt 1 ZH év közben, kb. olyan volt, mint elöző évben. Pár nap tanulás elég. Vizsga nem javasolt, viszont a projekt munka szörnyen könnyű és 4-5 -öst lehet vele szeretni.',
-    semester: 6,
-  },
-  {
-    name: 'A nyelvtechnológia eszközei - 2025',
-    general: 'Év közben mindig más előadó. A gyakorlat viszont fájdalom volt. Igazából ugyanaz, mint az első."',
-    exam: 'Év végén volt vizsga, ahol elő kellett adni egy általad elovasott cikket. Hogy miről szólt és mik voltak benne.',
-    difficulty: 2,
-    semester: 6,
-  },
-  {
-    name: 'Önlab - 2025',
-    general: 'Igazából a lényege, hogy kiválasztas az itk.space -en egy színpatkus témát, és arról kell dolgozni. Ami lényeges, hogy nagy valószínűséggel a témát viszed majd tovább és lesz belőle szakdolgozat. Ha olyan tanárt választasz aki nagyon elfoglalt, akkor esélyes, hogy nem fog segíteni eleget és neked nagyon fájdalmas lesz.',
-    duringSemester: 'Érdemes heti szinten haladni vele, hogy ne maradj le. Anyagokat, linkeket kezd el gyűjteni egy mappába, mert minden forrást meg kell jelölni az írásban.',
-    difficulty: 6,
-    exam: 'Év végére kell írni egy szakdolgozat szerű írást. És vizsgaidőszakban be kell mutatni ki közönség előtt, hogy mit csináltál egész félévben. Olyan kb. 20 ember előtt, abból csak 3 a bizottság, többi meg a szaktársak.', 
-    semester: 6,
-  },
-  
-
+{
+  "name": "A szoftvertechnológia alapjai - 2025",
+  "general": "Igazából ilyen töltelék tárgy. Találj ki egy csapattal egy weblapötletet, és annak a menedzselésén fogtok végigmenni. Év végén egy nyíltlapos ZH. Ha az nem sikerül, akkor pedig egy barátságos vizsga, ahol nekünk 2-es csapatokban kellett valamit kiokoskodni. Ami jó volt benne, hogy nem kellett magolni, csak érteni a dolgokat és átolvasni. Ingyen 5-ös.",
+  "duringSemester": "Kedvencem az volt, amikor ZH-időszakban több tanár volt bent órán, mint diák (3–2). Ezt meglepő módon nem értékelték, utána kötelezővé tették a bejárást.",
+  "difficulty": 2,
+  "semester": 6
+},
+{
+  "name": "Információ- és kódelmélet - 2025",
+  "general": "Digjel 2. Fasza volt. Kicsit azért már könnyebb, és több anyag van hozzá.",
+  "exam": "Vizsga is 1-1 ugyanolyan. Szeret szóban a megértésre rákérdezni. Mivel ez nekem nem volt meg, ezért a 3-as egy 2-esre sikerült lerontani.",
+  "difficulty": 8,
+  "semester": 6
+},
+{
+  "name": "Programozási nyelvek és módszerek - 2025",
+  "general": "Ez kemény volt. Évközben érdemes figyelgetni, és igazából csak vizsga van a végén.",
+  "exam": "Nekem azért volt fájdalmas, mert 1 hét magolást igényelt. A lényeg, hogy olyan volt, mint az Adatszerk vizsga. Kis írásbeli rész, aztán szünet. Ahol utána lehet nézni a kérdéseknek, és lehet javítani az írásbelin, majd jön rá egy szóbeli rész. A probléma, hogy lehet, hogy 10 percet leszel kint, lehet, hogy 1,5 órát. Ami azt jelenti, hogy szerencsén múlik az, mennyit kell rá készülnöd előzetesen. Minél később adod be, annál valószínűbb, hogy sok időt leszel kint.",
+  "difficulty": 10,
+  "semester": 6
+},
+{
+  "name": "Adatbiztonság és kriptográfia - 2025",
+  "general": "Baromi érdekes, baromi könnyű. Nyilván figyelni kell. A gyakorlatokra be kell járni, és érdemes ott megérteni mindent jól. Mert vizsgán azt kérdi.",
+  "difficulty": 7,
+  "exam": "A vizsga számomra barátságos volt, mert igazából csak a megértést kéri számon, és kb. olyan volt, mint előző évben. Kis írásbeli rész, majd szóbeli. Ha látja, hogy jó vagy, akkor mehetsz.",
+  "duringSemester": "Ami nálunk nagy szenvedés volt, az a kis ZH, mert elég szigorú annak az osztályozása. Alig lett meg az évfolyam nagy részének. A legtöbbeket a pápa halála mentett meg, mivel a gyász miatt aznap nem írtuk meg a beugrót, hisz bizonyára nem tudtunk rá tanulni a gyász miatt.",
+  "semester": 6
+},
+{
+  "name": "Celluláris hullámszámítógépek - 2025",
+  "general": "Egyik legkönnyebb tárgy.",
+  "duringSemester": "Első 3 órára jártam be, aztán úgy alakult, hogy nincs rá időm. Amúgy az előadások szörnyen érdekesek, csak a legtöbb ember annyira leterhelt, hogy nem jut rá idő. A gyakorlat segíthet a megértésben, ZH-hoz, de többnyire haszontalan a programozós rész.",
+  "difficulty": 3,
+  "exam": "Volt 1 ZH év közben, kb. olyan volt, mint előző évben. Pár nap tanulás elég. Vizsga nem javasolt, viszont a projektmunka szörnyen könnyű, és 4–5-öst lehet vele szerezni.",
+  "semester": 6
+},
+{
+  "name": "A nyelvtechnológia eszközei - 2025",
+  "general": "Év közben mindig más előadó. A gyakorlat viszont fájdalom volt. Igazából ugyanaz, mint az első.",
+  "exam": "Év végén volt vizsga, ahol elő kellett adni egy általad elolvasott cikket: hogy miről szólt és mik voltak benne.",
+  "difficulty": 2,
+  "semester": 6
+},
+{
+  "name": "Önlab - 2025",
+  "general": "Igazából a lényege, hogy kiválasztasz az itk.space-en egy szimpatikus témát, és arról kell dolgozni. Ami lényeges, hogy nagy valószínűséggel a témát viszed majd tovább, és lesz belőle szakdolgozat. Ha olyan tanárt választasz, aki nagyon elfoglalt, akkor esélyes, hogy nem fog segíteni eleget, és neked nagyon fájdalmas lesz.",
+  "duringSemester": "Érdemes heti szinten haladni vele, hogy ne maradj le. Anyagokat, linkeket kezdj el gyűjteni egy mappába, mert minden forrást meg kell jelölni az írásban.",
+  "difficulty": 6,
+  "exam": "Év végére kell írni egy szakdolgozatszerű írást, és vizsgaidőszakban be kell mutatni közönség előtt, hogy mit csináltál egész félévben. Olyan kb. 20 ember előtt, abból csak 3 a bizottság, a többi a szaktársak.",
+  "semester": 6
+},
 
 
 
