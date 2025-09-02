@@ -27,7 +27,7 @@ const Home = ({ setContent, setMenuOpen }) => {
           />
         ))}
       </div>
-      <aside className="side-col">
+      {/*<aside className="side-col">
           <h3 className="side-title">Extra</h3>
 
           <a
@@ -41,7 +41,7 @@ const Home = ({ setContent, setMenuOpen }) => {
             <div className="portfolio-title">Portfólióm</div>
             <div className="portfolio-sub">külső oldal · új lapon nyílik</div>
           </a>
-        </aside>
+        </aside>*/}
     </div>
   );
 };
