@@ -242,7 +242,7 @@ const subjects = [
   {
     name: 'Előírt labor - 2024',
     difficulty: 6,
-    general: 'Bev. méréstec, csak már durvább matekosabb feladatok. Érdekes itt látni, hogy mire vagyunk képesek az eddig megszerzett tudásunkkal. (Ha van :D). A beugróknál ugyanúgy elvoltunk veszbe, mint bev. méréstech.-nél.',  
+    general: 'Itt fogod utoljára látni a Tihanyit, és minden órával közelebb leszel ahhoz, hogy örülj ennek az állításomnak. De a tárgy lényegében egy Bev. Méréstech. A beugróknál ugyanúgy elvoltunk veszbe, mint bev. méréstech.-nél.',  
     semester: 5,
   },
   {
