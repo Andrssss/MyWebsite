@@ -36,6 +36,8 @@ const ADDITIONAL_LINKS = {
     { label: 'szaba30', url: 'https://users.itk.ppke.hu/~szaba30/' },
     { label: 'bocka2', url: 'https://users.itk.ppke.hu/~bocka2/' },
     { label: 'szama50', url: 'https://users.itk.ppke.hu/~szama50/' },
+    { label: 'panis1 🍆', url: 'https://users.itk.ppke.hu/~panis1/' },
+    { label: 'iller3', url: 'https://users.itk.ppke.hu/~iller3/' },
     { label: 'nadak', url: 'https://users.itk.ppke.hu/~nadak/#/f' },
     { label: 'fedad', url: 'https://users.itk.ppke.hu/~fedad/' },
     { label: 'kisbe32', url: 'https://users.itk.ppke.hu/~kisbe32/' },
@@ -44,8 +46,12 @@ const ADDITIONAL_LINKS = {
     { label: 'cseda6', url: 'https://users.itk.ppke.hu/~cseda6/public_html/files/' },
     { label: 'tarcs', url: 'https://users.itk.ppke.hu/~tarcs/' },
     { label: 'odobo', url: 'https://users.itk.ppke.hu/~odobo/' },
+    { label: 'karbe8', url: 'https://users.itk.ppke.hu/~karbe8/' },
+    { label: 'szama50', url: 'https://users.itk.ppke.hu/~szama50/' },
+
   ],
   'Folyamatban - 2025.08': [
+    { label: 'varbe35', url: 'https://users.itk.ppke.hu/~varbe35/' },
     { label: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { label: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
     { label: 'lazta3', url: 'https://users.itk.ppke.hu/~lazta3/' },
