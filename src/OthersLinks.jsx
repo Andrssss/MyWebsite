@@ -26,7 +26,9 @@ const OTHERS_LINKS = [
 ];
 
 const ADDITIONAL_LINKS = {
-  'Kevesebb anyag - 2025.08': [
+  'Kevesebb anyag - 2025.09': [
+    { label: 'panis1 🍆', url: 'https://users.itk.ppke.hu/~panis1/' },
+    { label: 'iller3', url: 'https://users.itk.ppke.hu/~iller3/' },
     { label: 'araba4', url: 'https://users.itk.ppke.hu/~araba4/' },
     { label: 'perpa4', url: 'https://users.itk.ppke.hu/~perpa4' },
     { label: 'szumi3', url: 'https://users.itk.ppke.hu/~szumi3/' },
@@ -36,8 +38,6 @@ const ADDITIONAL_LINKS = {
     { label: 'szaba30', url: 'https://users.itk.ppke.hu/~szaba30/' },
     { label: 'bocka2', url: 'https://users.itk.ppke.hu/~bocka2/' },
     { label: 'szama50', url: 'https://users.itk.ppke.hu/~szama50/' },
-    { label: 'panis1 🍆', url: 'https://users.itk.ppke.hu/~panis1/' },
-    { label: 'iller3', url: 'https://users.itk.ppke.hu/~iller3/' },
     { label: 'nadak', url: 'https://users.itk.ppke.hu/~nadak/#/f' },
     { label: 'fedad', url: 'https://users.itk.ppke.hu/~fedad/' },
     { label: 'kisbe32', url: 'https://users.itk.ppke.hu/~kisbe32/' },
@@ -50,7 +50,7 @@ const ADDITIONAL_LINKS = {
     { label: 'szama50', url: 'https://users.itk.ppke.hu/~szama50/' },
 
   ],
-  'Folyamatban - 2025.08': [
+  'Folyamatban - 2025.09': [
     { label: 'varbe35', url: 'https://users.itk.ppke.hu/~varbe35/' },
     { label: 'vasbo2', url: 'https://users.itk.ppke.hu/~vasbo2' },
     { label: 'tabcs', url: 'https://users.itk.ppke.hu/~tabcs/' },
