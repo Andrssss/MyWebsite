@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import  { useEffect, useState, useCallback } from 'react';
 
 const JOB_PORTALS = [
   { label: 'Melódiák – gyakornoki', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki' },
@@ -29,7 +29,8 @@ const COMPANIES = [
   { label: 'Mediso – állások', url: 'https://mediso.com/global/hu/career?search=&location=&category=9' },
   { label: 'Thyssenkrupp – állások', url: 'https://jobs.thyssenkrupp.com/hu?filter=jobField%3AIT&location=Hungary%2C+Magyarorsz%C3%A1g&lat=47.1817585&lng=19.5060937&placeId=512e36525b8f8133405990a2cedc43974740f00101f9015753000000000000c0020b92030748756e67617279&radius=0' },
   { label: 'Continental – állások', url: 'https://jobs.continental.com/hu/#/?fieldOfWork_stringS=3a2330f4-2793-4895-b7c7-aee9c965ae22,b99ff13c-96c8-4a72-b427-dec7effd7338&location=%7B%22title%22:%22Magyarorsz%C3%A1g%22,%22type%22:%22country%22,%22countryCode%22:%22hu%22%7D&searchTerm=intern' },
-  { label: 'K&H – állások', url: 'https://karrier.kh.hu/allasok/2' }
+  { label: 'K&H – állások', url: 'https://karrier.kh.hu/allasok/2' },
+  { label: 'Piller – állások', url: 'https://piller.karrierportal.hu/allasok?q=Y2l0aWVzJTVCJTVEJTNEQnVkYXBlc3QlMjYuuzzuuzz#!'}
 ];
 
 function getDomain(u) {
