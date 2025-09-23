@@ -21,7 +21,9 @@ const OTHERS_LINKS = [
   { label: 'heihe 🌲', url: 'https://users.itk.ppke.hu/~heihe/' },
   { label: 'morak 🛰️', url: 'https://users.itk.ppke.hu/~morak/' },
   { label: 'vecha ☁️', url: 'https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ' },
-  { label: 'mozbo 🐈', url: 'https://users.itk.ppke.hu/~mozbo/' },
+    { label: 'mozbo 🐈', url: 'https://users.itk.ppke.hu/~mozbo/' },
+    { label: 'mozbo 🐹', url: 'https://users.itk.ppke.hu/~szivi10/' },
+    
   { label: 'PPKE WIKI 🅦', url: 'https://users.itk.ppke.hu/~marri1/' },
 ];
 
@@ -230,7 +232,6 @@ export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = (
             <div className="others-ll__modalHead">
               <h3 id="more-title" style={{ margin: 0 }}>További linkek</h3>
               <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <button className="others-ll__btn btn-red" onClick={() => askAndOpenAll(allAdditional)}>Összes megnyitása</button>
                 <button className="others-ll__btn others-ll__btn--ghost" onClick={() => setMoreOpen(false)} aria-label="Bezárás">&times;</button>
               </div>
             </div>
