@@ -356,3 +356,15 @@ button[type="button"].close-modal-button:hover {
 }
 
 
+.subject-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.subject-stats {
+    display: flex;
+    flex-direction: column; /* stack vertically */
+    gap: 4px; /* space between rows */
+    text-align: right; /* optional */
+}
