@@ -7,7 +7,7 @@ const subjects = [
   {
     name: 'Általános információ',
     difficulty: 0,
-    general: 'Sajnos a backend elpusztult és vele együtt a vélemények is. Így csak a saját véleményemel tudok szolgálni...',
+        general: 'Sajnos a backend elpusztult, és vele együtt a vélemények is. Így csak a sajátommal tudok szolgálni... Ha két tanácsot adhatok nektek, akkor az egyik, hogy ha munkát szeretnétek találni ezzel a diplomával, akkor ne higgyétek el, hogy az egyetem által adott tudás elég lesz... Foglalkozni kell vele azon kívül is. Lehetőleg projekteken kell dolgozni, vagy elméleti tudást szívni magadba. A másik, hogy folyékony angol beszéd nélkül reménytelen munkát találni.',
     semester: 0,
   },
   {
@@ -79,7 +79,7 @@ const subjects = [
   {
     name: 'Sztochasztikus folyamatok - 2023',
       difficulty: 6,
-      usefulness: 6,
+      usefulness: 2,
     general: 'A híres Valszám 2. Abban különbözik, hogy itt komplexebb dolgokat fogtok tanulni. Olyasmiket, mint a statisztika és a jóslás. Az itt megszerzett tudás természetesen másik tárgyakon is kelleni fog. Hasonlóan nehéz, mint a Valszám. Bionikásoknak is hasznos lehet. ',
     duringSemester: 'Melegen javasolt bejárni.',
     exam: 'Itt is a megajánlott jegy nem kevés szenvedéstől tud megóvni, ha van. Vizsga olyan, mint valszámon, ha mégse lenne meg a megajánlott jegy.',
@@ -153,7 +153,7 @@ const subjects = [
   {
     name: 'Bevezetés a Matlab programozásba - 2023',
       difficulty: 8,
-      usefulness: 1,
+      usefulness: 0,
     general: 'Ez a tárgy ilyen kis aranyos távolról, de ha odamész hozzá akkor harap. Matlab egy könnyű nyelv, az teszi nehézzé a tárgyat, hogy be kell magolni egy csomo függvényt. Gyakorolni kell sokat és nem lesz baj.',
     duringSemester: 'Erősen javasolt bejárni.',
     exam: 'Nálunk a társaság 80%-a megbukott az első vizsgán így biztosan változtattak rajta. Nem tudok nyilatkozni. (Közös géptermi.)',
@@ -196,7 +196,7 @@ const subjects = [
   {
     name: 'Neural Networks - 2024',
       difficulty: 9,
-      usefulness: 5,
+      usefulness: 4,
     general: 'Szemet gyönyörködtető. Baromi jófejek a tanárok és jó is az anyag. De cserébe nehéz is. Nekünk három ZH volt évközben : Python, Papiros, Géptermi. Ebből az első 2 könnyű volt. Viszont a harmadikról nem hallottam szépeket, mert ugye ott nem lehet használni segítséget és egy neurális hálót kell építeni a 0-ról. Ezt az utolsót és a vizsgát lehet "skip"-pelni a projekttel, ha benne vagy a top valamennyi százalékban. Ezért melegen javasolt elkezdeni foglalkozni, mert akkor simán kaphatsz megajánlott jegyet. Sok hétbe telik mire megérted mi a fene is történik, hiába van mögöttem az elméleti tudás. A projektet egy erős gépen érdemes futtatni, aminek jó a videókártyája, mert különben a többiekhez képest hátrányba fogsz kerülni.',
     duringSemester: 'Fogalalkozni kell vele sokat. Projektet meg kell nyomni. Előadásra erősen javasolt bejárni.',
     exam: 'Nem mondják könnyűnek. Mi projekttel benne voltunk hálisten a top 3-ban.',
@@ -222,7 +222,7 @@ const subjects = [
   {
     name: 'Basics of Mobile Application Development - 2024',
       difficulty: 4,
-      usefulness: 7,
+      usefulness: 5,
     general: 'Borzalmasan könnyen elvégezhető tárgy. Aki bejár órarára és KZH-kon, meg HF-ken elér sok pontot, annak a ZH szinte instant megvan. Mivel azok hozzáadódnak az össz pontszámhoz. De ZH se nehéz, lehet használni az előadás diáit. És ha figyeltél órán, akkor még könnyűek is lesznek a kifejtős feladatok.',
     duringSemester: 'Érdemes bejárni.',
     semester: 5,
