@@ -8,12 +8,33 @@ const User_pages = () => {
         // ✅ Full-page white background + readable text color
         <div className="others-ll">
 
+
+            {/* NOTE #0 */}
+            <div className="others-ll__noteWrap" aria-live="polite">
+                <section className="others-ll__note" aria-labelledby="quota-note-title-2">
+                    <h3 id="quota-note-title-2">Előzetes információ</h3>
+                    <hr />
+                    <p>
+                        Mindenki készíthet magának felhasználói oldalt a szerveren, ahol elhelyezheti az anyagait.
+                        Ezek addig maradnak elérhetők, amíg aktív tanuló vagy. Emiatt sokan közös helyekre szervezik az anyagaikat.
+                        Ehhez a következő néhány kód segíthet, hogy könnyen meg lehessen találni és lementeni őket.
+                    </p>
+
+
+                    
+                </section>
+            </div>
+
+
+
             {/* NOTE #1 */}
             <div className="others-ll__noteWrap" aria-live="polite">
 
                 <section className="others-ll__note" aria-labelledby="quota-note-title">
                     <h3 id="quota-note-title">User oldalak felfedezése</h3>
                     <hr />
+                    <p>Előzetesen annyit a kódról, hogy nemcsak megnézi, melyik aktív, hanem le is szűri az üreseket és azokat, amelyeken nincs releváns tartalom. Ezeket a szűrőket te is tudod állítani. </p>
+
                     <h4 style={{ margin: '6px 0' }}>SSH a szerverre</h4>
                     <ol className="steps">
                         <li>CMD-t megnyitod vagy a neki megfelelő macOS alkalmazást</li>
