@@ -11,11 +11,12 @@ import {
 import './App.css';
 import Home from './Home';
 import UniversityLinks from './UniversityLinks.jsx';
-import OthersLinks from './OthersLinks.jsx';
+import OthersLinks from './OthersLinks.tsx';
 import About from './About.jsx';
 import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
 import LinksLauncher from './LinksLauncher.jsx';
+import User_pages from './User_pages.tsx';
 
 
 const AppContent = () => {
@@ -92,6 +93,7 @@ useEffect(() => {
               <li><Link to="/targy_info" onClick={() => setMenuOpen(false)}>Tárgy info</Link></li>
               <li><Link to="/egyetemi_linkek" onClick={() => setMenuOpen(false)}>Egyetemi Linkek</Link></li>
               <li><Link to="/masok_oldalai" onClick={() => setMenuOpen(false)}>Mások oldalai</Link></li>
+              <li><Link to="/User_oldalak" onClick={() => setMenuOpen(false)}>User oldalak</Link></li>
               <li><Link to="/gyakornoki_poziciok" onClick={() => setMenuOpen(false)}>Gyakornoki linkek</Link></li>
               <li><Link to="/kapcsolat" onClick={() => setMenuOpen(false)}>Kapcsolat</Link></li>
             </ul>
@@ -109,6 +111,7 @@ useEffect(() => {
                 <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
                 <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
                 <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
+                <li><Link to="/User_oldalak">🧭 User oldalak</Link></li>
                 {/*<li><Link to="/gyakornoki_poziciok">💼 Gyakornoki pozi</Link></li>*/}
                 <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
                 
@@ -124,6 +127,7 @@ useEffect(() => {
           <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
           <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
+                  <Route path="/User_oldalak" element={<User_pages />} />
           <Route path="/kapcsolat" element={<About />} />
           <Route
             path="/gyakornoki_poziciok"
