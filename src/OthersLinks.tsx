@@ -474,8 +474,172 @@ foreach ($name in $usernames) {
 
 Write-Host "Kész."`}</code>
                     </pre>
+
+                    <p>
+                        Ezután az eredményeket ezzel a kóddal lehet megnyitni :
+                    </p>
+
+                    <pre aria-label="PowerShell script">
+
+                        <code>{String.raw`
+# Fájl teljes elérési útja
+$filePath = "C:\Users\Public\result.txt"
+
+# Ellenőrizzük, hogy létezik-e a fájl
+if (Test-Path -Path $filePath) {
+    # Olvassuk be a fájl tartalmát
+    $links = Get-Content -Path $filePath
+
+    # Minden linket megnyitunk az alapértelmezett böngészőben
+    foreach ($link in $links) {
+        if ($link -match '^https?://') {
+            Start-Process $link
+        } else {
+            Write-Host "Érvénytelen link kihagyva: $link"
+        }
+    }
+} else {
+    Write-Host "A megadott fájl nem található: $filePath"
+}
+
+                        `}</code>
+                    </pre>
+
+
+
                 </section>
             </div>
+
+
+
+            <div className="others-ll__noteWrap" aria-live="polite">
+                <section className="others-ll__note" aria-labelledby="quota-note-title">
+                    <h3 id="quota-note-title">User oldalak felfedezése</h3>
+
+                    <hr />
+
+                  
+                    <p>
+                        Ha "LETÖLTÉS_1" nem működik, akkor a speckós "LETÖLTÉS_2"-vel lehet lehúzni az oldal tartalmát.
+                        Csak ahoz le kell tölteni a sütiket.
+
+                        Mindkettőben át kell állítani, h melyik weboldalról ($root) mentse el a tartalmat.
+                    </p>
+                    <p>LETÖLTÉS_1.txt :  </p>
+
+                    <pre aria-label="PowerShell script">
+                        <code>{String.raw`
+# --- Beállítások ---
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# A LEGFELSŐ mappa (VÉGÉN perjel!)
+$root = 'https://users.itk.ppke.hu/~cseda6/public_html/files/7.felev/oprendszerek/'
+if (-not $root.EndsWith('/')) { $root += '/' }
+
+# Helyi cél
+$dest = "$env:USERPROFILE\Downloads\csedaOP"
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
+$rootUri   = [Uri]$root
+$destFull  = [IO.Path]::GetFullPath($dest)
+$visited   = New-Object 'System.Collections.Generic.HashSet[string]'
+
+function Get-Hrefs($html) {
+  return [regex]::Matches($html, '<a\s+[^>]*href\s*=\s*"(.*?)"', 'IgnoreCase') |
+         ForEach-Object { $_.Groups[1].Value }
+}
+
+function Normalize-RelPath([string]$relUrl) {
+  # URL-dekód + tiltott karakterek cseréje szegmensenként
+  $segs = $relUrl.Split('/') | Where-Object { $_ -ne '' } | ForEach-Object {
+    $s = [System.Net.WebUtility]::UrlDecode($_)
+    $s = $s -replace '[<>:"/\\|?*]', '_'     # Windows-illegális karakterek
+    $s.Trim().TrimEnd('.')                   # végéről pont/space le
+  }
+  if ($segs.Count -eq 0) { return $null }
+  return ($segs -join [IO.Path]::DirectorySeparatorChar)
+}
+
+function Ensure-Under-Dest([string]$relPath) {
+  $candidate = [IO.Path]::GetFullPath((Join-Path $dest $relPath))
+  # Biztonsági ellenőrzés: ne lépjen ki a célból
+  if ($candidate.ToLower().StartsWith($destFull.ToLower())) { return $candidate }
+  return $null
+}
+
+function Mirror-Web([Uri]$url) {
+  if (-not $visited.Add($url.AbsoluteUri)) { return }
+
+  try {
+    $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -Headers @{ 'User-Agent'='Mozilla/5.0' }
+  } catch {
+    Write-Warning "Nem olvasható: $($url.AbsoluteUri) -> $($_.Exception.Message)"
+    return
+  }
+
+  $hrefs = Get-Hrefs $resp.Content
+  foreach ($href in $hrefs) {
+    if (-not $href) { continue }
+    if ($href -eq '../') { continue }                                   # parent
+    if ($href.StartsWith('?') -or $href.StartsWith('#')) { continue }    # rendező/anchor
+    if ($href -match '^/?icons/') { continue }                           # Apache ikonok
+
+    $target = [Uri]::new($resp.BaseResponse.ResponseUri, $href)
+
+    # Csak a ROOT alatti URL-ek jöhetnek szóba
+    if (-not $rootUri.IsBaseOf($target)) { continue }
+    if ($target.Query) { continue }
+
+    $isDir = ($href.EndsWith('/') -or $target.AbsolutePath.EndsWith('/'))
+
+    $relUrl  = $rootUri.MakeRelativeUri($target).OriginalString
+    $relPath = Normalize-RelPath $relUrl
+    if (-not $relPath) { continue }
+
+    if ($isDir) {
+      $localDir = Ensure-Under-Dest $relPath
+      if ($localDir) { if (!(Test-Path $localDir)) { New-Item -ItemType Directory -Force -Path $localDir | Out-Null } }
+      Mirror-Web $target
+      continue
+    }
+
+    $outFile = Ensure-Under-Dest $relPath
+    if (-not $outFile) { continue }
+    $outDir = Split-Path $outFile -Parent
+    if (!(Test-Path $outDir)) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
+
+    try {
+      Invoke-WebRequest -Uri $target.AbsoluteUri -UseBasicParsing -OutFile $outFile -ErrorAction Stop
+      Write-Host "Letöltve: $relPath"
+    } catch {
+      Write-Warning "HIBA: $relPath -> $($_.Exception.Message)"
+    }
+  }
+}
+
+Mirror-Web $rootUri
+Write-Host "KÉSZ: $dest"
+                        `}</code>
+                    </pre>
+
+
+
+                    <p>
+                         LETÖLTÉS_2.txt :
+                    </p>
+
+                    <pre aria-label="PowerShell script">
+                        <code>{String.raw`
+wget.exe -r -np -nH --cut-dirs=2 -R "index.html*" --reject-regex "[?](C|O)=" -e robots=off -U "Mozilla/5.0" --load-cookies 
+"$env:USERPROFILE\Downloads\cookies.txt" -P "$env:USERPROFILE\Downloads\retge1_ai" "https://users.itk.ppke.hu/~retge1/6.felev.html/ai/"
+                        `}</code>
+                    </pre>
+
+                </section>
+            </div>
+
+
 
             {/* Fallback: További linkek MODAL (ha a popup blokkolva van) */}
             {moreOpen && (
