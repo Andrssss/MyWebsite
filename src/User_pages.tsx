@@ -31,7 +31,7 @@ const User_pages = () => {
             <div className="others-ll__noteWrap" aria-live="polite">
 
                 <section className="others-ll__note" aria-labelledby="quota-note-title">
-                    <h3 id="quota-note-title">User oldalak felfedezése</h3>
+                    <h3 id="quota-note-title">User oldalak felfedezése ( POWERSHELL )</h3>
                     <hr />
                     <p>Előzetesen annyit a kódról, hogy nemcsak megnézi, melyik aktív, hanem le is szűri az üreseket és azokat, amelyeken nincs releváns tartalom. Ezeket a szűrőket te is tudod állítani. </p>
 
@@ -220,7 +220,7 @@ if (Test-Path -Path $filePath) {
             {/* NOTE #2 */}
             <div className="others-ll__noteWrap" aria-live="polite">
                 <section className="others-ll__note" aria-labelledby="quota-note-title-2">
-                    <h3 id="quota-note-title-2">User oldalak tartalmának Letöltése</h3>
+                    <h3 id="quota-note-title-2">User oldalak tartalmának Letöltése  ( POWERSHELL )</h3>
                     <hr />
                     <p>
                         Ha "LETÖLTÉS_1" nem működik, akkor a speckós "LETÖLTÉS_2"-vel lehet lehúzni az oldal tartalmát.
