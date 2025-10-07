@@ -16,8 +16,8 @@ const User_pages = () => {
                     <hr />
                     <p>
                         Mindenki készíthet magának felhasználói oldalt a szerveren, ahol elhelyezheti az anyagait.
-                        Ezek addig maradnak elérhetők, amíg aktív tanuló vagy. Emiatt sokan közös helyekre szervezik az anyagaikat.
-                        Ehhez a következő néhány kód segíthet, hogy könnyen meg lehessen találni és lementeni őket.
+                        Ezek addig maradnak elérhetők, amíg aktív tanuló vagy. Emiatt sokan külső helyekre szervezik az anyagaikat.
+                        A következő néhány kód segíthet, hogy könnyen meg lehessen találni és lementeni őket.
                     </p>
 
 
