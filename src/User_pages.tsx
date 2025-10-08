@@ -15,7 +15,7 @@ const User_pages = () => {
                     <h3 id="quota-note-title-2">Előzetes információ</h3>
                     <hr />
                     <p>
-                        Mindenki készíthet magának felhasználói oldalt a szerveren, ahol elhelyezheti az anyagait.
+                        Mindenki készíthet magának user oldalt a szerveren, ahol elhelyezheti az anyagait.
                         Ezek addig maradnak elérhetők, amíg aktív tanuló vagy. Emiatt sokan külső helyekre szervezik az anyagaikat.
                         A következő néhány kód segíthet, hogy könnyen meg lehessen találni és lementeni őket.
                     </p>
@@ -33,7 +33,7 @@ const User_pages = () => {
                 <section className="others-ll__note" aria-labelledby="quota-note-title">
                     <h3 id="quota-note-title">User oldalak felfedezése ( POWERSHELL )</h3>
                     <hr />
-                    <p>Előzetesen annyit a kódról, hogy nemcsak megnézi, melyik aktív, hanem le is szűri az üreseket és azokat, amelyeken nincs releváns tartalom. Ezeket a szűrőket te is tudod állítani. </p>
+                    <p>Ez a kód nemcsak megnézi, melyik aktív, hanem le is szűri az üreseket és azokat, amelyeken nincs releváns tartalom. Ezeket a szűrőket te is tudod állítani a "$excludedPatterns" változóban. </p>
 
                     <h4 style={{ margin: '6px 0' }}>SSH a szerverre</h4>
                     <ol className="steps">
@@ -191,7 +191,7 @@ foreach ($name in $usernames) {
 Write-Host "Kész."`}
                     </pre>
 
-                    <p>Ezután az eredményeket ezzel a kóddal lehet megnyitni :</p>
+                    <p>Ezután az összes eredményt ezzel a kóddal tudod megnyitni :</p>
 
                     <pre aria-label="PowerShell script">
                         {String.raw`# Fájl teljes elérési útja
@@ -223,7 +223,7 @@ if (Test-Path -Path $filePath) {
                     <h3 id="quota-note-title-2">User oldalak tartalmának Letöltése  ( POWERSHELL )</h3>
                     <hr />
                     <p>
-                        Ha "LETÖLTÉS_1" nem működik, akkor a speckós "LETÖLTÉS_2"-vel lehet lehúzni az oldal tartalmát.
+                        Ha "LETÖLTÉS_1" nem működik, akkor a speckós "LETÖLTÉS_2"-vel lehet lehúzni az oldal tartalmát. (Általában, ha valahova be kell jelentkezni, oda csak a sütis fog működni.)
                         Csak ahhoz le kell tölteni a sütiket. Mindkettőben át kell állítani, hogy melyik weboldalról
                         (<code>$root</code>) mentse el a tartalmat.
                     </p>
