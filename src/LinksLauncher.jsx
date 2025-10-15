@@ -31,6 +31,8 @@ const COMPANIES = [
   { label: 'Continental – állások', url: 'https://jobs.continental.com/hu/#/?fieldOfWork_stringS=3a2330f4-2793-4895-b7c7-aee9c965ae22,b99ff13c-96c8-4a72-b427-dec7effd7338&location=%7B%22title%22:%22Magyarorsz%C3%A1g%22,%22type%22:%22country%22,%22countryCode%22:%22hu%22%7D&searchTerm=intern' },
   { label: 'K&H – állások', url: 'https://karrier.kh.hu/allasok/2' },
   { label: 'Piller – állások', url: 'https://piller.karrierportal.hu/allasok?q=Y2l0aWVzJTVCJTVEJTNEQnVkYXBlc3QlMjYuuzzuuzz#!'}
+    { label: 'prohardver – állások', url: 'https://prohardver.hu/allasok/index.html' },
+
 ];
 
 function getDomain(u) {
