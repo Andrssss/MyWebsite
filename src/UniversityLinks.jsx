@@ -5,7 +5,7 @@ const universityLinks = [
   
   { name: 'PPKE Oktatók Elérhetőségei ☎️', url: 'https://ppke.hu/oktatok/?search=&sort_by=asc' },
   { name: 'zimbra 📮', url: 'https://hallgato.ppke.hu/zimbra/mail#1' },
-  { name: 'Neptun 📘', url: 'https://neptun2.ppke.hu/hallgato3_uj/login' },
+  { name: 'Neptun 📘', url: 'https://neptun2.ppke.hu/hallgato3_uj/' },
   { name: 'TO oldala 💝', url: 'https://ppke.sharepoint.com/sites/itk-to' },
   { name: 'Szakmai gyakorlat 💼', url: 'https://ppke.sharepoint.com/sites/itk-to/SitePages/Szakmai-gyakorlat.aspx' },
   { name: 'Önlab / FÖT 🧪', url: 'https://space.itk.ppke.hu/onlab/lista' },
