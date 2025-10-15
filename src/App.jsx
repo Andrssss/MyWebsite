@@ -18,7 +18,6 @@ import Particles from './Particles.jsx';
 import LinksLauncher from './LinksLauncher.jsx';
 import User_pages from './User_pages.tsx';
 
-
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -127,7 +126,7 @@ useEffect(() => {
           <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
           <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
-                  <Route path="/User_oldalak" element={<User_pages />} />
+          <Route path="/User_oldalak" element={<User_pages />} />
           <Route path="/kapcsolat" element={<About />} />
           <Route
             path="/gyakornoki_poziciok"

@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Digitális Számítás Elmélete - Szigorlati Témák</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e22ce 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .tema {
+            margin-bottom: 45px;
+            padding: 30px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border-left: 5px solid #2a5298;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .tema:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.12);
+        }
+        
+        .tema-szam {
+            display: inline-block;
+            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        
+        .tema h2 {
+            color: #1e3c72;
+            margin-bottom: 20px;
+            font-size: 1.6em;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        
+        .tema h3 {
+            color: #2a5298;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+        
+        .tema h4 {
+            color: #475569;
+            margin-top: 18px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .tema p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        .tema ul {
+            margin-left: 25px;
+            margin-bottom: 15px;
+        }
+        
+        .tema li {
+            margin-bottom: 10px;
+        }
+        
+        .definicio {
+            background: #dbeafe;
+            padding: 18px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .tetel {
+            background: #fef3c7;
+            padding: 18px;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .pelda {
+            background: #d1fae5;
+            padding: 18px;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+            margin: 15px 0;
+        }
+        
+        .figyelem {
+            background: #fee2e2;
+            padding: 18px;
+            border-radius: 8px;
+            border-left: 4px solid #ef4444;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .formula {
+            font-family: 'Courier New', monospace;
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: inline-block;
+            font-size: 0.95em;
+        }
+        
+        code {
+            font-family: 'Courier New', monospace;
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        
+        footer {
+            background: #1e293b;
+            color: white;
+            text-align: center;
+            padding: 25px;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .tema {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>A Digitális Számítás Elmélete</h1>
+            <p class="subtitle">Szigorlati Témák Kidolgozása</p>
+        </header>
+        
+        <div class="content">
+            <div class="tema">
+                <span class="tema-szam">1. TÉMA</span>
+                <h2>Formális nyelvek, generatív grammatika, Chomsky-féle nyelvosztályok</h2>
+                
+                <h3>Formális nyelv fogalma</h3>
+                <div class="definicio">
+                    <strong>Ábécé (Σ):</strong> Véges, nemüres szimbólumhalmaz.<br>
+                    <strong>Szó:</strong> Az ábécé elemeinek véges sorozata. Az üres szót ε-nal jelöljük.<br>
+                    <strong>Σ*:</strong> Az ábécé feletti összes szó halmaza.<br>
+                    <strong>Formális nyelv:</strong> L ⊆ Σ*, azaz az ábécé feletti szavak egy részhalmaza.
+                </div>
+                
+                <h3>Formális nyelvek megadási módjai</h3>
+                <ul>
+                    <li><strong>Felsorolás:</strong> A nyelv szavainak explicit felsorolása (csak véges nyelvekre)</li>
+                    <li><strong>Tulajdonság megadása:</strong> L = {w ∈ Σ* | w rendelkezik P tulajdonsággal}</li>
+                    <li><strong>Generatív grammatika:</strong> Szabályrendszer, amely generálja a nyelv szavait</li>
+                    <li><strong>Felismerő automata:</strong> Olyan gép, amely eldönti, hogy egy szó benne van-e a nyelvben</li>
+                    <li><strong>Reguláris kifejezés:</strong> Speciális jelölésrendszer (reguláris nyelvekre)</li>
+                </ul>
+                
+                <h3>Generatív grammatika</h3>
+                <div class="definicio">
+                    <strong>Grammatika (G):</strong> G = (N, Σ, P, S) rendezett négyes, ahol:<br>
+                    • <strong>N:</strong> nemterminális szimbólumok véges halmaza<br>
+                    • <strong>Σ:</strong> terminális szimbólumok véges halmaza (N ∩ Σ = ∅)<br>
+                    • <strong>P:</strong> helyettesítési szabályok véges halmaza (α → β formában)<br>
+                    • <strong>S ∈ N:</strong> kezdőszimbólum
+                </div>
+                
+                <h4>Levezetés (deriváció)</h4>
+                <p>Egy szóforma közvetlenül levezethető egy másikból (jelölés: ⇒), ha egyetlen szabály alkalmazásával megkapható. A levezetés tranzitív lezártját ⇒* jelöli.</p>
+                
+                <div class="pelda">
+                    <strong>Példa:</strong> G = ({S}, {a,b}, {S → aSb, S → ε}, S)<br>
+                    Levezetés: S ⇒ aSb ⇒ aaSbb ⇒ aabb<br>
+                    Ez a grammatika az L = {aⁿbⁿ | n ≥ 0} nyelvet generálja.
+                </div>
+                
+                <h4>Generált nyelv</h4>
+                <div class="definicio">
+                    <strong>L(G):</strong> Azon terminális szavak halmaza, amelyek levezethetők a kezdőszimbólumból:<br>
+                    L(G) = {w ∈ Σ* | S ⇒* w}
+                </div>
+                
+                <h3>Grammatikák ekvivalenciája</h3>
+                <p>Két grammatika (G₁ és G₂) ekvivalens, ha ugyanazt a nyelvet generálják: L(G₁) = L(G₂)</p>
+                
+                <h3>Chomsky-féle nyelvosztályok</h3>
+                <p>Noam Chomsky 1956-ban négyszintű hierarchiát állított fel a szabályok alakja alapján:</p>
+                
+                <h4>0. típus (Rekurzíve felsorolható nyelvek)</h4>
+                <p><strong>Szabály alakja:</strong> α → β, ahol α ∈ (N ∪ Σ)⁺, β ∈ (N ∪ Σ)*</p>
+                <p>Nincs megszorítás. Felismerő: Turing-gép</p>
+                
+                <h4>1. típus (Környezetfüggő vagy kontextusfüggő nyelvek)</h4>
+                <p><strong>Szabály alakja:</strong> αAβ → αγβ, ahol A ∈ N, α,β ∈ (N ∪ Σ)*, γ ∈ (N ∪ Σ)⁺</p>
+                <p>Nem csökkenthető a szóhossz (kivéve: S → ε megengedett, ha S nem fordul elő jobb oldalon).</p>
+                <p>Felismerő: Lineárisan korlátozott automata (LBA)</p>
+                
+                <h4>2. típus (Környezetfüggetlen vagy kontextusmentes nyelvek, CF)</h4>
+                <p><strong>Szabály alakja:</strong> A → γ, ahol A ∈ N, γ ∈ (N ∪ Σ)*</p>
+                <p>A bal oldal egyetlen nemterminális. Felismerő: Veremautomata (PDA)</p>
+                
+                <div class="pelda">
+                    <strong>Példa CF nyelvre:</strong> Helyes zárójelezések, programozási nyelvek szintaxisa
+                </div>
+                
+                <h4>3. típus (Reguláris nyelvek)</h4>
+                <p><strong>Szabály alakja (jobblineáris):</strong> A → wB vagy A → w, ahol A,B ∈ N, w ∈ Σ*</p>
+                <p><strong>Szabály alakja (ballineáris):</strong> A → Bw vagy A → w</p>
+                <p>Felismerő: Véges automata (DFA, NFA)</p>
+                
+                <div class="tetel">
+                    <strong>Chomsky-hierarchia:</strong><br>
+                    3. típus ⊂ 2. típus ⊂ 1. típus ⊂ 0. típus<br>
+                    (Reguláris ⊂ CF ⊂ Kontextusfüggő ⊂ Rekurzíve felsorolható)
+                </div>
+                
+                <p>Minden tartalmazás valódi, azaz vannak olyan nyelvek, amelyek az egyik osztályba tartoznak, de a másikba nem.</p>
+                
+                <div class="pelda">
+                    <strong>Példák az elhatárolásra:</strong><br>
+                    • L = {aⁿbⁿ | n ≥ 0} CF, de nem reguláris<br>
+                    • L = {aⁿbⁿcⁿ | n ≥ 0} kontextusfüggő, de nem CF<br>
+                    • Turing-gép megállási problémája rekurzíve felsorolható, de nem rekurzív
+                </div>
+            </div>
+
+            <div class="tema">
+                <span class="tema-szam">2. TÉMA</span>
+                <h2>Reguláris kifejezések, véges automaták, minimalizálás</h2>
+                
+                <h3>Reguláris kifejezések</h3>
+                <div class="definicio">
+                    <strong>Reguláris kifejezés (regex):</strong> Egy Σ ábécé feletti reguláris kifejezések rekurzív definíciója:<br>
+                    • ∅ reguláris kifejezés (üres nyelv)<br>
+                    • ε reguláris kifejezés (üres szót tartalmazó nyelv)<br>
+                    • ∀a ∈ Σ: a reguláris kifejezés<br>
+                    • Ha r₁ és r₂ reguláris kifejezések, akkor:<br>
+                    &nbsp;&nbsp;- (r₁ + r₂) - unió (alternatíva)<br>
+                    &nbsp;&nbsp;- (r₁ · r₂) - konkatenáció<br>
+                    &nbsp;&nbsp;- (r₁)* - Kleene-csillag (0 vagy több ismétlés)
+                </div>
+                
+                <div class="pelda">
+                    <strong>Példák:</strong><br>
+                    • (a + b)* : minden a-kból és b-kből álló szó<br>
+                    • a*b* : először a-k, aztán b-k<br>
+                    • (a + b)*abb : abb-re végződő szavak<br>
+                    • (0 + 1)*1 : páratlan bináris számok
+                </div>
+                
+                <h3>Reguláris nyelvek</h3>
+                <p>Egy nyelv reguláris, ha előállítható reguláris kifejezéssel, vagy generálható 3. típusú grammatikával, vagy felismerhető véges automatával.</p>
+                
+                <div class="tetel">
+                    <strong>Kleene tétele:</strong> Egy nyelv pontosan akkor reguláris, ha van olyan véges automata, amely felismeri.
+                </div>
+                
+                <h3>Determinisztikus véges automata (DFA)</h3>
+                <div class="definicio">
+                    <strong>DFA:</strong> M = (Q, Σ, δ, q₀, F) rendezett ötös, ahol:<br>
+                    • <strong>Q:</strong> állapotok véges halmaza<br>
+                    • <strong>Σ:</strong> bemeneti ábécé<br>
+                    • <strong>δ: Q × Σ → Q:</strong> átmeneti függvény (determinisztikus!)<br>
+                    • <strong>q₀ ∈ Q:</strong> kezdőállapot<br>
+                    • <strong>F ⊆ Q:</strong> elfogadó állapotok halmaza
+                </div>
+                
+                <p>Egy DFA elfogad egy w szót, ha a kezdőállapotból indulva w beolvasása után egy elfogadó állapotba jut.</p>
+                
+                <h3>Nemdeterminisztikus véges automata (NFA)</h3>
+                <div class="definicio">
+                    <strong>NFA:</strong> M = (Q, Σ, δ, q₀, F), ahol minden ugyanaz, mint DFA-nál, kivéve:<br>
+                    • <strong>δ: Q × (Σ ∪ {ε}) → 2^Q:</strong> átmeneti függvény (nemdeterminisztikus)<br>
+                    • Lehetnek ε-átmenetek (spontán átmenetek bemenet nélkül)<br>
+                    • Egy állapotból ugyanarra a bemenetre több átmenet is mehet
+                </div>
+                
+                <p>Az NFA elfogad egy szót, ha <em>létezik</em> legalább egy olyan számítási út, amely elfogadó állapotba vezet.</p>
+                
+                <h3>DFA és NFA ekvivalenciája</h3>
+                <div class="tetel">
+                    <strong>Rabin-Scott tétel:</strong> Minden NFA-hoz konstruálható ekvivalens DFA.<br>
+                    Következmény: A DFA-val és NFA-val felismerhető nyelvek osztálya megegyezik.
+                </div>
+                
+                <p><strong>Konstrukció alapgondolata:</strong> A DFA állapotai az NFA állapotainak halmazai lesznek (hatványhalmaz-konstrukció). Ha az NFA-nak n állapota van, a DFA-nak legfeljebb 2ⁿ állapota lehet.</p>
+                
+                <div class="pelda">
+                    <strong>Példa:</strong> NFA 3 állapottal → DFA legfeljebb 8 állapottal<br>
+                    Gyakorlatban gyakran kevesebb elérthető állapot van.
+                </div>
+                
+                <h3>Reguláris nyelvek felismerése automatával</h3>
+                <p>Egy nyelv felismerése DFA-val:</p>
+                <ol>
+                    <li>Indulás a kezdőállapotból (q₀)</li>
+                    <li>Bemeneti szó karaktereinek beolvasása egyesével</li>
+                    <li>Minden karakterre az átmeneti függvény szerint állapotváltás</li>
+                    <li>Ha a szó végén elfogadó állapotban vagyunk, a szó elfogadva</li>
+                </ol>
+                
+                <h3>Minimális DFA konstrukciója</h3>
+                <p>Egy reguláris nyelvet felismerő minimális (legkevesebb állapotú) DFA egyértelmű (izomorfiától eltekintve).</p>
+                
+                <div class="tetel">
+                    <strong>Myhill-Nerode tétel:</strong> Egy L nyelvhez tartozó minimális DFA állapotainak száma megegyezik az L jobbkongruenciája szerinti ekvivalenciaosztályok számával.
+                </div>
+                
+                <h4>Minimalizálási algoritmus (Hopcroft)</h4>
+                <p><strong>Alapgondolat:</strong> Megkülönböztethetetlen állapotok azonosítása és összevonása.</p>
+                
+                <ol>
+                    <li><strong>Elérhetetlen állapotok eltávolítása:</strong> Azon állapotok törlése, amelyek nem érhetők el q₀-ból</li>
+                    <li><strong>Állapotok partícionálása:</strong>
+                        <ul>
+                            <li>Kezdetben két osztály: elfogadó (F) és nem elfogadó (Q\F) állapotok</li>
+                            <li>Iteratív finomítás: két állapot külön osztályba kerül, ha van olyan bemenet, amelyre különböző osztályokba jutnak</li>
+                            <li>Folytatás, amíg nem változik a partíció</li>
+                        </ul>
+                    </li>
+                    <li><strong>Új automata felépítése:</strong> Minden ekvivalenciaosztály egy állapot lesz</li>
+                </ol>
+                
+                <div class="pelda">
+                    <strong>Gyakorlati jelentőség:</strong><br>
+                    • Hatékonyabb végrehajtás (kevesebb állapot)<br>
+                    • Memóriahatékonyság<br>
+                    • Egyszerűbb struktúra<br>
+                    • Reguláris kifejezések implementációja (lexikális elemzők)
+                </div>
+                
+                <h3>Műveletek reguláris nyelveken</h3>
+                <p>A reguláris nyelvek osztálya zárt a következő műveletekre:</p>
+                <ul>
+                    <li><strong>Unió:</strong> L₁ ∪ L₂</li>
+                    <li><strong>Konkatenáció:</strong> L₁ · L₂ = {uv | u ∈ L₁, v ∈ L₂}</li>
+                    <li><strong>Kleene-csillag:</strong> L* = {w₁w₂...wₙ | n ≥ 0, wᵢ ∈ L}</li>
+                    <li><strong>Komplemens:</strong> L̄ = Σ* \ L</li>
+                    <li><strong>Metszet:</strong> L₁ ∩ L₂</li>
+                </ul>
+            </div>
+
+            <div class="tema">
+                <span class="tema-szam">3. TÉMA</span>
+                <h2>Pumpáló lemmák reguláris és CF nyelvekre</h2>
+                
+                <h3>Reguláris nyelvek pumpáló lemmája</h3>
+                <div class="tetel">
+                    <strong>Pumpáló lemma reguláris nyelvekre:</strong><br>
+                    Ha L reguláris nyelv, akkor ∃p ≥ 1 konstans (pumpálási hossz), hogy<br>
+                    ∀w ∈ L szóra, ahol |w| ≥ p, ∃ felbontás w = xyz, amelyre:<br>
+                    1. |xy| ≤ p<br>
+                    2. |y| ≥ 1<br>
+                    3. ∀i ≥ 0: xyⁱz ∈ L
+                </div>
+                
+                <p><strong>Alapgondolat:</strong> Ha egy szó elég hosszú egy reguláris nyelvben, akkor az automata feldolgozás során ismétlődnie kell egy állapotnak (skatulya-elv). Ez a ciklus tetszőleges sokszor ismételhető vagy kihagyható.</p>
+                
+                <h4>Használat nem-reguláris nyelvek bizonyítására</h4>
+                <p>A lemma ellentmondásos: bizonyítjuk, hogy ha L reguláris lenne, akkor teljesülnie kellene a lemmának, de találunk olyan szót, amelyre nem teljesül.</p>
+                
+                <div class="pelda">
+                    <strong>Példa:</strong> Bizonyítsuk, hogy L = {aⁿbⁿ | n ≥ 0} nem reguláris!<br><br>
+                    
+                    <strong>Bizonyítás (indirekt):</strong><br>
+                    Tegyük fel, hogy L reguláris. Legyen p a pumpálási hossz.<br>
+                    Válasszuk w = aᵖbᵖ szót, |w| = 2p ≥ p.<br>
+                    A lemma szerint ∃ w = xyz felbontás:<br>
+                    • |xy| ≤ p → xy csak a-kat tartalmaz<br>
+                    • |y| ≥ 1 → y legalább egy a-t tartalmaz<br>
+                    • Pumáljuk: i=2 esetén xy²z = aᵖ⁺ᵏbᵖ, ahol k = |y| ≥ 1<br>
+                    • Ez a szó nem eleme L-nek (több a van, mint b)<br>
+                    <strong>Ellentmondás!</strong> → L nem reguláris.
+                </div>
+                
+                <div class="pelda">
+                    <strong>További példák nem-reguláris nyelvekre:</strong><br>
+                    • L = {aⁿ² | n ≥ 0} (a-k száma négyzetszám)<br>
+                    • L = {ww | w ∈ {a,b}*} (szó önmagának megismétlése)<br>
+                    • L = {aⁿbⁿcⁿ | n ≥ 0}
+                </div>
+                
+                <h3>Környezetfüggetlen nyelvek pumpáló lemmája</h3>
+                <div class="tetel">
+                    <strong>Pumpáló lemma CF nyelvekre (Uvwxy lemma):</strong><br>
+                    Ha L környezetfüggetlen nyelv, akkor ∃p ≥ 1 konstans, hogy<br>
+                    ∀z ∈ L szóra, ahol |z| ≥ p, ∃ felbontás z = uvwxy, amelyre:<br>
+                    1. |vwx| ≤ p<br>
+                    2. |vx| ≥ 1 (legalább v vagy x nem üres)<br>
+                    3. ∀i ≥ 0: uvⁱwxⁱy ∈ L
+                </div>
+                
+                <p><strong>Alapgondolat:</strong> A CF nyelvek levezetési fáiban, ha elég mély a fa, akkor egy nemterminálisnak ismétlődnie kell egy ágon (skatulya-elv). Ez a részfa tetszőleges sokszor ismételhető.</p>
+                
+                <h4>Különbség a reguláris pumpáló lemmától</h4>
+                <ul>
+                    <li>Két darab pumpálható rész van (v és x), nem csak egy (y)</li>
+                    <li>Ezeket szinkronban kell pumpálni (ugyanannyiszor)</li>
+                    <li>A pumpálható részek nem feltétlenül a szó elején vannak</li>
+                </ul>
+                
+                <div class="pelda">
+                    <strong>Példa:</strong> Bizonyítsuk, hogy L = {aⁿbⁿcⁿ | n ≥ 0} nem CF!<br><br>
+                    
+                    <strong>Bizonyítás (indirekt):</strong><br>
+                    Tegyük fel, hogy L CF. Legyen p a pumpálási hossz.<br>
+                    Válasszuk z = aᵖbᵖcᵖ szót, |z| = 3p ≥ p.<br>
+                    A lemma szerint ∃ z = uvwxy felbontás, ahol |vwx| ≤ p.<br><br>
+                    
+                    <strong>Esetszétválasztás:</strong><br>
+                    • vwx nem tartalmazhatja mind a három szimbólumot (a, b, c), mert |vwx| ≤ p<br>
+                    • Ha vwx csak a-kat és b-ket tartalmaz: uv²wx²y-ban több lesz a+b, de c nem változik<br>
+                    • Ha vwx csak b-ket és c-ket tartalmaz: uv²wx²y-ban több lesz b+c, de a nem változik<br>
+                    • Hasonlóan más esetekben is<br>
+                    <strong>Minden esetben:</strong> uv²wx²y ∉ L<br>
+                    <strong>Ellentmondás!</strong> → L nem CF.
+                </div>
+                
+                <div class="pelda">
+                    <strong>CF, de nem reguláris nyelvek:</strong><br>
+                    • L = {aⁿbⁿ | n ≥ 0} : CF (veremautomatával felismerhető)<br>
+                    • L = {ww^R | w ∈ {a,b}*} : palindrómok (w^R = w megfordítása)<br>
+                    • Helyes zárójelezések nyelve
+                </div>
+                
+                <h3>A pumpáló lemmák használata</h3>
+                <div class="figyelem">
+                    <strong>Fontos:</strong><br>
+                    • A pumpáló lemma <strong>szükséges</strong>, de <strong>nem elégséges</strong> feltétel!<br>
+                    • Ha egy nyelv teljesíti a lemmát, még nem biztos, hogy reguláris/CF<br>
+                    • A lemmát csak arra használjuk, hogy bebizonyítsuk: egy nyelv <strong>NEM</strong> reguláris/CF
+</div>
+
+            <div class="tema">
+                <span class="tema-szam">4. TÉMA</span>
+                <h2>Környezetfüggetlen grammatikák, Chomsky-féle normálalak, Veremautomata</h2>
+
+                <h3>Környezetfüggetlen Grammatika (CFG)</h3>
+                <p>A CFG-k (2. típusú grammatikák) szabályai $A \to \gamma$ alakúak. A leggyakrabban használt grammatika típus a programozási nyelvek szintaxisának leírására.</p>
+
+                <h4>Egyértelműség és Többértelműség</h4>
+                <ul>
+                    <li><strong>Egyértelmű CFG:</strong> A nyelv minden szavához **pontosan egy** levezetési fa tartozik.</li>
+                    <li><strong>Többértelmű CFG:</strong> Legalább egy szóhoz **több különböző** levezetési fa tartozik. (Pl. $E \to E + E \mid id$ aritmetikai kifejezések).</li>
+                    <li>Egyes nyelvek (inherensen többértelmű nyelvek) csak többértelmű grammatikával írhatók le.</li>
+                </ul>
+
+                <h4>Chomsky-féle Normálalak (CNF) és BNF</h4>
+                <div class="definicio">
+                    <strong>Chomsky-féle Normálalak (CNF):</strong> Bármely $\varepsilon$-mentes CFG átalakítható CNF-re, ahol a szabályok csak a következő alakúak lehetnek:
+                    <div class="formula">A &rarr; BC&nbsp;&nbsp;&nbsp;&nbsp; vagy&nbsp;&nbsp;&nbsp;&nbsp; A &rarr; a</div>
+                    Ahol A, B, C nemterminálisok, és a terminális szimbólum.
+                </div>
+                <p><strong>BNF (Backus-Naur Forma):</strong> A CFG-k jelölésére szolgáló szabványos forma, melyet a programozási nyelvek szintaxisának leírására használnak.</p>
+
+                <h3>Műveletek CF Nyelveken</h3>
+                <p>A CF nyelvek osztálya **zárt** a következő műveletekre:</p>
+                <ul>
+                    <li><strong>Unió:</strong> $L_1 \cup L_2$</li>
+                    <li><strong>Konkatenáció:</strong> $L_1 L_2$</li>
+                    <li><strong>Kleene-csillag:</strong> $L^*$</li>
+                </ul>
+                <p>A CF nyelvek osztálya **nem zárt** a <strong>Metszetre</strong> és a <strong>Komplementer képzésre</strong>.</p>
+
+                <h3>Veremautomata (PDA)</h3>
+                <div class="definicio">
+                    <strong>Veremautomata:</strong> A Veremautomata a CF nyelvek felismerője. Egy Véges Automata, amely egy külső, <strong>korlátlan</strong> kapacitású <strong>veremmemóriával</strong> rendelkezik. Működése függ az állapottól, a bemeneti szimbólumtól és a verem tetején lévő szimbólumtól.
+                </div>
+                <div class="tetel">
+                    <strong>NVA és CF Nyelvek Kapcsolata:</strong> Egy $L$ nyelv akkor és csakis akkor <strong>környezetfüggetlen</strong>, ha felismerhető egy **Nemdeterminisztikus Verem Automatával (NVA)**.
+                </div>
+                <p>A determinisztikus Veremautomata (DVA) szigorúan gyengébb, mint az NVA; a DVA csak a determinisztikus CF nyelveket ismeri fel.</p>
+            </div>
+
+            <div class="tema">
+                <span class="tema-szam">5. TÉMA</span>
+                <h2>Turing gép, ekvivalens fajtái. Rekurzív és rekurzíve felsorolható nyelvek, számosságuk.</h2>
+
+                <h3>Turing-gép (TG)</h3>
+                <div class="definicio">
+                    <strong>Turing-gép (TG):</strong> A számítás absztrakt matematikai modellje, amely egy véges automata és egy külső, két irányban **végtelen (korlátlan)** szalag (memória) kombinációja. Ez a modell definiálja azt, amit ma algoritmikusan megoldható feladatnak nevezünk.
+                </div>
+
+                <h4>Ekvivalens Fajták</h4>
+                <p>Bár a TG-nek léteznek variációi, mindegyik **ekvivalens** az alap (egy szalagos, determinisztikus) TG-vel a felismerési képesség szempontjából:</p>
+                <ul>
+                    <li><strong>Nemdeterminisztikus TG (NTG):</strong> Ugyanazt az osztályt ismeri fel, mint a DTG.</li>
+                    <li><strong>Több szalagos TG:</strong> Szimulálható egy szalagos TG-vel.</li>
+                    <li><strong>Több fejű TG:</strong> Szimulálható egy szalagos TG-vel.</li>
+                </ul>
+
+                <h3>Rekurzív és Rekurzíve Felsorolható Nyelvek</h3>
+                <ul>
+                    <li><strong>Rekurzíve Felsorolható Nyelvek (RE, 0. típus):</strong> Azon nyelvek, amelyeket egy TG **felismer** (a $w \in L$ szavakra megáll és elfogad, de a $w \notin L$ szavakra **nem garantált, hogy megáll**, ciklusba kerülhet).</li>
+                    <li><strong>Rekurzív Nyelvek (R, Eldönthető):</strong> Azon nyelvek, amelyeket egy TG **eldönt** (minden bemenetre **garantáltan megáll** és elfogad vagy elutasít).</li>
+                </ul>
+                <div class="figyelem">
+                    <strong>Összefüggés:</strong> $\text{Rekurzív Nyelvek} \subset \text{Rekurzíve Felsorolható Nyelvek}$
+                </div>
+
+                <h3>Számosság és Példák</h3>
+                <ul>
+                    <li>A RE nyelvek száma **megszámlálhatóan végtelen** ($\aleph_0$), mivel a TG-k száma megszámlálható.</li>
+                    <li>Az összes formális nyelv száma **nem megszámlálhatóan végtelen** ($\aleph_1$).</li>
+                </ul>
+
+                <div class="table-container">
+                    <table>
+                        <tr><th>Nyelvosztály</th><th>Példa</th><th>Indoklás</th></tr>
+                        <tr><td><strong>RE, de nem Rekurzív</strong></td><td>A **Megállási Probléma Nyelve** ($L_H$)</td><td>Felismert (ha megáll, tudjuk), de nem eldönthető (ha nem áll meg, nem tudjuk, hogy végtelen ciklusban van-e).</td></tr>
+                        <tr><td><strong>Nem Rekurzíve Felsorolható</strong></td><td>A **Megállási Probléma Komplementere** ($\overline{L_H}$)</td><td>Ha $L_H$ és $\overline{L_H}$ is RE lenne, $L_H$ rekurzív lenne (ami nem igaz).</td></tr>
+                    </table>
+                </div>
+
+                <h3>Turing-gépek és Nyelvtanok Kapcsolata</h3>
+                <div class="tetel">
+                    <strong>Tétel:</strong> Egy nyelv akkor és csakis akkor **rekurzívan felsorolható**, ha egy **0. típusú (korlátlan)** grammatika generálja.
+                </div>
+            </div>
+
+            <div class="tema">
+                <span class="tema-szam">6. TÉMA</span>
+                <h2>Church-Turing tézis, algoritmikusan nem eldönthető problémák, Univerzális TG</h2>
+
+                <h3>Church-Turing Tézis (CTT)</h3>
+                <div class="definicio">
+                    <strong>CTT:</strong> Bármely <strong>intuitíve számítható</strong> (algoritmikusan megoldható) függvényt ki lehet számítani egy <strong>Turing-géppel</strong>.
+                </div>
+                <p>Ez egy informális tétel, amely a TG-t teszi meg a számíthatóság formális definíciójának. Mivel a $\lambda$-kalkulus és a rekurzív függvények is ekvivalensek a TG-vel, a CTT szerint mindegyik modell a számíthatóság fogalmának pontos leírása.</p>
+
+                <h3>Algoritmikusan Nem Eldönthető Probléma</h3>
+                <p>Egy probléma akkor nem eldönthető, ha nem létezik rá eldöntő TG (azaz TG, amely minden bemenetre megáll).</p>
+                <div class="figyelem">
+                    <strong>Példa: Megállási Probléma (Halting Problem):</strong> Eldönthető-e, hogy egy tetszőleges TG ($M$) egy tetszőleges bemeneten ($w$) **megáll-e** vagy sem?
+                    <p><strong>Tétel (Turing, 1936):</strong> A megállási probléma **algoritmikusan nem eldönthető**.</p>
+                </div>
+                <p>A bizonyítás **diagonalizációval** történik: feltételezünk egy $H$ eldöntő algoritmust, majd megkonstruálunk egy $D$ gépet, ami paradoxonhoz vezet ($D$ a saját kódján ellentétesen viselkedik azzal, amit $H$ jósol róla).</p>
+
+                <h3>Turing-gép Kódja és Univerzális TG</h3>
+                <p><strong>TG Kódja ($\langle M \rangle$):</strong> Minden TG véges leírása (állapotok, átmeneti függvény) egyértelműen leképezhető egy **bináris szóra**.</p>
+                <div class="definicio">
+                    <strong>Univerzális Turing-gép (UTG):</strong> Egy speciális TG ($U$), amely képes **bármely más TG ($M$) működését szimulálni**, ha a bemenete $M$ kódja és a bemeneti szó: $U(\langle M, w \rangle) = M(w)$.
+                </div>
+                <p><strong>Jelentősége:</strong> Az UTG adja a **tárolt program elvének** (a Neumann-elv) elméleti alapját, bizonyítva, hogy egyetlen gép képes tetszőleges algoritmus futtatására programozással.</p>
+            </div>
+
+            <div class="tema">
+                <span class="tema-szam">7. TÉMA</span>
+                <h2>Algoritmusok idő és tárigénye, P nyelvosztály, komplexitási hierarchia</h2>
+
+                <h3>TG-ek Idő és Tárigénye</h3>
+                <p>A komplexitáselmélet az erőforrás-szükségletet vizsgálja a bemenet hossza ($n$) függvényében.</p>
+                <ul>
+                    <li><strong>Időkomplexitás:</strong> $T(n)$ lépésszám a legrosszabb esetben. Jelölés: $\mathbf{TIME}(T(n))$.</li>
+                    <li><strong>Tárkomplexitás:</strong> $S(n)$ használt szalagcellák száma. Jelölés: $\mathbf{SPACE}(S(n))$.</li>
+                </ul>
+
+                <h3>A $\mathbf{P}$ Nyelvosztály Jellemzése</h3>
+                <div class="definicio">
+                    <strong>$\mathbf{P}$ (Polynomial Time):</strong> Azon **eldöntési problémák** osztálya, amelyeket egy **determinisztikus Turing-gép** polinom időben ($O(n^k)$) képes eldönteni.
+                </div>
+                <p>A $\mathbf{P}$-beli problémákat tekintjük **gyakorlatilag hatékonyan megoldhatóknak**.</p>
+
+                <h4>Zártság a $\mathbf{P}$ osztályra</h4>
+                <p>A $\mathbf{P}$ osztály **zárt** minden alapvető halmazelméleti műveletre:</p>
+                <ul>
+                    <li>Unió, Metszet, Konkatenáció, Kleene-csillag.</li>
+                    <li><strong>Komplementer:</strong> $\mathbf{P} = \mathbf{coP}$ (mivel a DTG minden esetben megáll, a komplementer is P-beli).</li>
+                </ul>
+                <p><strong>Nevezetes $\mathbf{P}$-beli Problémák:</strong> Prímtesztelés (PRIMES), Gráf elérhetőségi probléma, Lineáris programozás.</p>
+
+                <h3>Tár-Idő Tétel és Komplexitási Osztályok</h3>
+                <div class="tetel">
+                    <strong>Tár-Idő Tétel (Kompromisszum):</strong> Az idő drágább, mint a tárhely (a futási idő felső korlátja a használt tárhelynek).
+                    <div class="formula">$$\mathbf{TIME}(T(n)) \subseteq \mathbf{SPACE}(T(n))$$</div>
+                </div>
+
+                <h4>Komplexitási Hierarchia</h4>
+                <p>A legfontosabb osztályok tartalmazási viszonyai:</p>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Osztály</th><th>Automata</th><th>Erőforrás</th></tr>
+                        <tr><td>$\mathbf{P}$</td><td>DTG</td><td>Polinom idő</td></tr>
+                        <tr><td>$\mathbf{NP}$</td><td>NTG</td><td>Polinom idő</td></tr>
+                        <tr><td>$\mathbf{PSPACE}$</td><td>DTG/NTG</td><td>Polinom tár</td></tr>
+                        <tr><td>$\mathbf{EXPTIME}$</td><td>DTG</td><td>Exponenciális idő ($2^{n^k}$)</td></tr>
+                    </table>
+                </div>
+                <p><strong>Tartalmazási Viszonyok:</strong></p>
+                <div class="formula">$$\mathbf{P} \subseteq \mathbf{NP} \subseteq \mathbf{PSPACE} \subseteq \mathbf{EXPTIME}$$</div>
+                <p>A feltételezések szerint a tartalmazások szigorúak (pl. $\mathbf{P} \subset \mathbf{NP}$), de a **$\mathbf{P} \stackrel{?}{=} \mathbf{NP}$** probléma megoldatlan.</p>
+            </div>
+
+            <div class="tema">
+                <span class="tema-szam">8. TÉMA</span>
+                <h2>Az NP nyelvosztály, tanúk, NP-teljes nyelvek</h2>
+
+                <h3>Az $\mathbf{NP}$ Nyelvosztály Jellemzése</h3>
+                <div class="definicio">
+                    <strong>$\mathbf{NP}$ (Nondeterministic Polynomial Time):</strong> Azon eldöntési problémák osztálya, amelyekre a megoldás (az $IGEN$ válasz) **polinom időben ellenőrizhető** (verifikálható), ha rendelkezésre áll egy megfelelő **tanú (witness)**.
+                </div>
+                <p>A tanú hossza polinom hosszúságú a bemenet hosszában.</p>
+
+                <h4>Nevezetes $\mathbf{NP}$-beli Nyelvek és Tanúk</h4>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Probléma (Nyelv)</th><th>Eldöntési Kérdés</th><th>Tanú (Witness)</th></tr>
+                        <tr><td>**SAT** (Kielégíthetőség)</td><td>Kielégíthető-e a logikai formula?</td><td>A kielégítő igazságérték-kiosztás.</td></tr>
+                        <tr><td>**CLIQUE** (Klikk Probléma)</td><td>Tartalmaz-e a gráf $k$ méretű klikket?</td><td>A $k$ csúcsból álló halmaz.</td></tr>
+                        <tr><td>**Hamilton-kör**</td><td>Létezik-e Hamilton-kör a gráfban?</td><td>A kört alkotó csúcsok sorozata.</td></tr>
+                    </table>
+                </div>
+
+                <h3>$\mathbf{NP}$-teljes Nyelvek Jellemzése</h3>
+                <p>Az $\mathbf{NP}$-teljes nyelvek az $\mathbf{NP}$ osztály **legnehezebb** problémái. Ha az egyiket gyorsan (polinom időben) megoldjuk, akkor minden $\mathbf{NP}$-beli problémát gyorsan megoldunk.</p>
+
+                <p><strong>Polinom Idejű Redukció ($\subseteq_p$):</strong> $A \subseteq_p B$ jelenti, hogy $A$ polinom időben átalakítható $B$-re.</p>
+
+                <div class="definicio">
+                    <strong>$\mathbf{NP}$-teljes Nyelv:</strong> Egy $L$ nyelv akkor $\mathbf{NP}$-teljes, ha:
+                    <ol>
+                        <li>$L \in \mathbf{NP}$ (polinom időben ellenőrizhető).</li>
+                        <li>$L$ **$\mathbf{NP}$-nehéz** (minden $A \in \mathbf{NP}$ nyelvre $A \leq_p L$).</li>
+                    </ol>
+                </div>
+
+                <div class="tetel">
+                    <strong>Cook-Levin Tétel:</strong> A **kielégíthetőségi probléma (SAT)** az első bizonyítottan $\mathbf{NP}$-teljes probléma.
+                </div>
+
+                <h4>Nevezetes $\mathbf{NP}$-teljes Problémák</h4>
+                <p>Az $\mathbf{NP}$-teljes problémák listája redukciókkal bővül:</p>
+                <ul>
+                    <li>**3-SAT:** (Speciális SAT)</li>
+                    <li>**CLIQUE, Vertex Cover, Set Cover** (Gráfproblémák)</li>
+                    <li>**Hamilton-kör, Utazó Ügynök Probléma (TSP)** (Útvonal-optimalizálás)</li>
+                    <li>**Hátizsák Probléma** (Knapsack)</li>
+                </ul>
+            </div>
