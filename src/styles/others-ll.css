@@ -306,3 +306,48 @@
         min-height: 92px;
     }
 }
+
+
+/* Tabs container: full-width bar, centered content */
+.others-ll__tabs{
+  top: 0;                /* sticks to the very top */
+  z-index: 20;
+  display: flex;
+  justify-content: center;   /* center horizontally */
+  padding: .5rem .75rem;
+  margin: 0 0 1rem;
+  background: #ffffffcc;     /* slightly translucent so it blends */
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Base tab look */
+.others-ll__tab{
+  padding: .45rem .9rem;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #111827;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .08s ease, background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.others-ll__tab:hover{
+  transform: translateY(-1px);
+  background: #ffffff;
+}
+
+/* Selected tab: distinct color */
+.others-ll__tab.is-active{
+  background: #2563eb;     /* blue */
+  color: #fff;
+  border-color: #1d4ed8;
+  box-shadow: 0 1px 0 rgba(29,78,216,.35), 0 8px 16px -8px rgba(37,99,235,.45);
+}
+
+/* Ensure focus is obvious for keyboard users */
+.others-ll__tab:focus{
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}

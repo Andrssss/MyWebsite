@@ -1,0 +1,7 @@
+.codeblock { position: relative; border:1px solid #e5e7eb; border-radius: .5rem; overflow:hidden; background:#0b1020; color:#e5efff; margin: .75rem 0; }
+.codeblock__cap { display:flex; align-items:center; justify-content:space-between; padding:.4rem .6rem; background:#0f172a; color:#e2e8f0; font-size:.85rem; }
+.codeblock__copy { border:1px solid #334155; background:#111827; color:#e5e7eb; padding:.25rem .6rem; border-radius:.375rem; cursor:pointer; }
+.codeblock__copy:hover { filter:brightness(1.1); }
+.codeblock__copy.is-copied { background:#065f46; border-color:#047857; }
+.codeblock__pre { margin:0; padding:.8rem; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.9rem; line-height:1.5; white-space:pre; }
+.codeblock[data-language]::before { content: attr(data-language); position:absolute; top:.35rem; right:.5rem; font-size:.7rem; color:#93c5fd; opacity:.7; }

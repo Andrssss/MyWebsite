@@ -149,4 +149,9 @@ const App = () => (
   </Router>
 );
 
+
+
+// npm run dev -- --host
+
+
 export default App;
