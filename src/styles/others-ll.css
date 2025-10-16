@@ -351,3 +351,9 @@
   outline: 3px solid #93c5fd;
   outline-offset: 2px;
 }
+
+.others-ll__mac-joke {
+  text-align: center;
+  padding: 2rem;
+  font-family: monospace;
+}
