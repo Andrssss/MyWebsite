@@ -173,7 +173,7 @@ const User_pages_linux: React.FC = () => {
 
           <h4 style={{ margin: "6px 0" }}>SSH a szerverre</h4>
           <ol className="steps">
-            <li>Konzolt megnyitod (cntrl + alt + t)</li>
+            <li>Konzolt megnyitod (Ctrl + alt + t)</li>
             <li><code>ssh bakan7@users.itk.ppke.hu</code></li>
             <li>jelszó</li>
             <li>yes</li>

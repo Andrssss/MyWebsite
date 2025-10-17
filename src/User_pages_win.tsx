@@ -314,7 +314,7 @@ const User_pages_win: React.FC = () => {
         <section className="others-ll__note" aria-labelledby="quota-note-title-3">
           <h3 id="quota-note-title-3">User oldalak tartalmának Letöltése (POWERSHELL)</h3>
           <hr />
-          <p>Ha "LETÖLTÉS_1" nem működik, akkor a speckós "LETÖLTÉS_2"-vel lehet lehúzni az oldal tartalmát…</p>
+          <p>Ha "LETÖLTÉS_1" nem működik, akkor a speckós "LETÖLTÉS_2"-vel lehet lehúzni az oldal tartalmát… Ha valahova be kell jelentkezni, a tartalom megnézéséhez, akkor gyanús, hogy csak a speckóssal lehet lehúzni. Mivel ilyenkor szükség van a sütire, amit az oldal adott. Ezeket a sütiket előzetesen le kell töltened valami tool-lal.</p>
 
           <p>LETÖLTÉS_1.txt :</p>
           <CopyCode
