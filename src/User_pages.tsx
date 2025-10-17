@@ -71,10 +71,10 @@ const User_pages: React.FC = () => {
             Sorry, we can’t provide programs to Mac users.
           </p>
           <p>
-            Try again after you <code> install a real-os</code> 😎
+            Try again after you <code> install a real OS</code> 😎
           </p>
           <p style={{ fontStyle: "italic", color: "#888" }}>
-            (Just kidding. Kind of.)
+            (Just kidding. Kinda.)
           </p>
         </div>
       </div>
