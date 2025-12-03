@@ -191,32 +191,37 @@ const SubjectInfo = () => {
     setIsModalOpen(true);
   };
 
-    const handleDelete = async (id) => {
-      if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
+  
+const handleDelete = async (id) => {
+  console.log("handleDelete called with id =", id);
+  alert("Delete clicked, id = " + id);
 
-      try {
-        console.log("Frontend: törlés indítva, id =", id);
+  if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
-        const response = await fetch(
-          `${API_BASE_URL}/reviews/${id}`,
-          {
-            method: "DELETE",
-          }
-        );
-
-        const text = await response.text();
-        console.log("DELETE response status:", response.status, "body:", text);
-
-        if (!response.ok && response.status !== 204) {
-          throw new Error(text || "Hiba történt a törlés során.");
-        }
-
-        alert("Vélemény sikeresen törölve.");
-        setSubjects((prev) => prev.filter((subject) => subject.id !== id));
-      } catch (err) {
-        alert(`Hiba történt: ${err.message}`);
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/reviews/${id}`,
+      {
+        method: "DELETE",
       }
-    };
+    );
+
+    const txt = await response.text();
+    console.log("DELETE response status:", response.status, "body:", txt);
+
+    if (!response.ok && response.status !== 204) {
+      throw new Error(txt || "Hiba történt a törlés során.");
+    }
+
+    alert("Vélemény sikeresen törölve.");
+    setSubjects((prev) => prev.filter((subject) => subject.id !== id));
+  } catch (err) {
+    alert(`Hiba történt: ${err.message}`);
+  }
+};
+
+   
+  
   
 
 
