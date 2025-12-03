@@ -217,48 +217,37 @@ exports.handler = async (event, context) => {
       return jsonResponse(200, rows[0]);
     }
 
-    // ───────────────── DELETE ─────────────────
-    // DELETE /.netlify/functions/reviews/:id?user_id=...
-    // DELETE /.netlify/functions/reviews/:id
-    // ───────────────── DELETE ─────────────────
-    // DELETE /.netlify/functions/reviews?id=123
-    if (method === "DELETE") {
-    console.log("🔥 DELETE called, raw query params:", event.queryStringParameters);
-
-    const params = event.queryStringParameters || {};
-    const idParam = params.id;
-
-    if (!idParam) {
-        return jsonResponse(400, { error: "Hiányzik az id query param (?id=...)." });
+        // ───────────────── PUT ─────────────────
+    if (method === "PUT" && id) {
+      // ... (ez maradhat ahogy van)
     }
 
-    const id = parseInt(idParam, 10);
-    if (Number.isNaN(id)) {
-        return jsonResponse(400, { error: `Érvénytelen id: ${idParam}` });
-    }
+    // ───────────────── DELETE ─────────────────
+    if (method === "DELETE" && id) {
+      console.log("🔥 DELETE called, id from path =", id);
 
-    console.log("➡️ Deleting from DB, id =", id);
-
-    const { rowCount } = await client.query(
+      const { rowCount } = await client.query(
         `DELETE FROM subject_reviews WHERE id = $1`,
         [id]
-    );
+      );
 
-    if (rowCount === 0) {
+      if (rowCount === 0) {
+        console.log("❌ Nincs sor ezzel az id-vel:", id);
         return jsonResponse(404, {
-        error: "Nincs ilyen vélemény (id nem található).",
+          error: "Nincs ilyen vélemény (id nem található).",
         });
-    }
+      }
 
-    return {
+      console.log("✅ Sikeres törlés, id =", id);
+
+      return {
         statusCode: 204,
         headers: {
-        "Content-Type": "application/json; charset=utf-8",
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: "",
-    };
+      };
     }
-
 
     // Ha egyik sem
     return jsonResponse(405, { error: "Nem támogatott HTTP metódus." });
@@ -269,3 +258,5 @@ exports.handler = async (event, context) => {
     client.release();
   }
 };
+
+
