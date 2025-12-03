@@ -222,17 +222,9 @@ exports.handler = async (event, context) => {
     // DELETE /.netlify/functions/reviews/:id
     if (method === "DELETE") {
     // id path-ból
-    let deleteId = id;
 
     // vagy query-ből
     const params = event.queryStringParameters || {};
-    if (!deleteId && params.id) {
-        deleteId = parseInt(params.id, 10);
-    }
-
-    if (!deleteId || Number.isNaN(deleteId)) {
-        return jsonResponse(400, { error: "Érvényes 'id' szükséges a törléshez." });
-    }
 
     console.log("🔴 Deleting review id =", deleteId);
 

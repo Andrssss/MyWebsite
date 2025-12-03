@@ -195,37 +195,28 @@ const SubjectInfo = () => {
 
 
  const handleDelete = async (id) => {
-  console.log("🟠 Delete button clicked for id =", id, "userId =", userId);
-
-  if (!id) {
-    alert("Hiba: nincs ID, nem tudok törölni.");
-    return;
-  }
-
-  if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
+  console.log("🔴 handleDelete called with id =", id, "userId =", userId);
 
   try {
-    const response = await fetch(
-      `/.netlify/functions/reviews?id=${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-      }
-    );
+    const res = await fetch(`/.netlify/functions/reviews?id=${id}`, {
+      method: "DELETE",
+    });
 
-    const text = await response.text();
-    console.log("🔴 DELETE status:", response.status, "body:", text);
+    const text = await res.text();
+    console.log("🔴 DELETE RESULT:", res.status, text);
 
-    if (!response.ok && response.status !== 204) {
-      throw new Error(text || "Hiba történt a törlés során.");
+    if (!res.ok && res.status !== 204) {
+      throw new Error(text || "Delete failed");
     }
 
-    alert("Vélemény sikeresen törölve.");
-    setSubjects((prev) => prev.filter((subject) => subject.id !== id));
+    alert("Törölve.");
+    setSubjects((prev) => prev.filter((s) => s.id !== id));
   } catch (err) {
-    console.error("DELETE error:", err);
-    alert(`Hiba történt: ${err.message}`);
+    console.error("DELETE ERROR:", err);
+    alert("Hiba: " + err.message);
   }
 };
+
 
 
 
@@ -478,6 +469,7 @@ const SubjectInfo = () => {
                                 style={{ pointerEvents: "auto" }}
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  e.preventDefault();
                                   console.log("🟠 Delete button clicked for id =", u.id);
                                   handleDelete(u.id);
                                 }}
