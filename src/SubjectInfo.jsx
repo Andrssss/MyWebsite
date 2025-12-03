@@ -110,6 +110,7 @@ const SubjectInfo = () => {
   };
 
   // Autocomplete logika
+  // comment
   const handleNameFocus = () => {
     const allNames = [...new Set(subjects.map((subj) => subj.name))].sort(
       (a, b) => a.localeCompare(b)
@@ -190,28 +191,34 @@ const SubjectInfo = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-  if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
+    const handleDelete = async (id) => {
+      if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/reviews/${id}`,
-      {
-        method: "DELETE",
+      try {
+        console.log("Frontend: törlés indítva, id =", id);
+
+        const response = await fetch(
+          `${API_BASE_URL}/reviews/${id}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        const text = await response.text();
+        console.log("DELETE response status:", response.status, "body:", text);
+
+        if (!response.ok && response.status !== 204) {
+          throw new Error(text || "Hiba történt a törlés során.");
+        }
+
+        alert("Vélemény sikeresen törölve.");
+        setSubjects((prev) => prev.filter((subject) => subject.id !== id));
+      } catch (err) {
+        alert(`Hiba történt: ${err.message}`);
       }
-    );
+    };
+  
 
-    if (!response.ok && response.status !== 204) {
-      const txt = await response.text();
-      throw new Error(txt || "Hiba történt a törlés során.");
-    }
-
-    alert("Vélemény sikeresen törölve.");
-    setSubjects((prev) => prev.filter((subject) => subject.id !== id));
-  } catch (err) {
-    alert(`Hiba történt: ${err.message}`);
-  }
-};
 
   
 

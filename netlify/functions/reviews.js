@@ -220,28 +220,44 @@ exports.handler = async (event, context) => {
     // ───────────────── DELETE ─────────────────
     // DELETE /.netlify/functions/reviews/:id?user_id=...
     // DELETE /.netlify/functions/reviews/:id
-if (method === "DELETE" && id) {
-  console.log("DELETE request for id:", id);
+    // ───────────────── DELETE ─────────────────
+    if (method === "DELETE" && id) {
+        console.log("DELETE request:", {
+            path,
+            id,
+        });
 
-  const { rowCount } = await client.query(
-    `DELETE FROM subject_reviews WHERE id = $1`,
-    [id]
-  );
+        try {
+            const { rowCount } = await client.query(
+            `DELETE FROM subject_reviews WHERE id = $1`,
+            [id]
+            );
 
-  if (rowCount === 0) {
-    return jsonResponse(404, {
-      error: "Nincs ilyen vélemény (id nem található).",
-    });
-  }
+            console.log("DELETE rowCount:", rowCount);
 
-  return {
-    statusCode: 204,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: "",
-  };
-}
+            if (rowCount === 0) {
+            return jsonResponse(404, {
+                error: "Nincs ilyen vélemény (id nem található).",
+            });
+            }
+
+            // Sikeres törlés
+            return {
+            statusCode: 204,
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+            },
+            body: "",
+            };
+        } catch (err) {
+            console.error("DELETE hiba:", err);
+            return jsonResponse(500, {
+            error: "Szerver hiba törlés közben",
+            details: err.message,
+            });
+        }
+    }
+
 
 
     // Ha egyik sem
