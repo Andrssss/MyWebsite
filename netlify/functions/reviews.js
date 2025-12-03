@@ -220,30 +220,42 @@ exports.handler = async (event, context) => {
     // ───────────────── DELETE ─────────────────
     // DELETE /.netlify/functions/reviews/:id?user_id=...
     // DELETE /.netlify/functions/reviews/:id
-    // ───────────────── DELETE ─────────────────
-// DELETE /.netlify/functions/reviews/:id
-if (method === "DELETE" && id) {
-  console.log("DELETE request for id:", id);
+    if (method === "DELETE") {
+    // id path-ból
+    let deleteId = id;
 
-  const { rowCount } = await client.query(
-    `DELETE FROM subject_reviews WHERE id = $1`,
-    [id]
-  );
+    // vagy query-ből
+    const params = event.queryStringParameters || {};
+    if (!deleteId && params.id) {
+        deleteId = parseInt(params.id, 10);
+    }
 
-  if (rowCount === 0) {
-    return jsonResponse(404, {
-      error: "Nincs ilyen vélemény (id nem található).",
-    });
-  }
+    if (!deleteId || Number.isNaN(deleteId)) {
+        return jsonResponse(400, { error: "Érvényes 'id' szükséges a törléshez." });
+    }
 
-  return {
-    statusCode: 204,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: "",
-  };
-}
+    console.log("🔴 Deleting review id =", deleteId);
+
+    const { rowCount } = await client.query(
+        "DELETE FROM subject_reviews WHERE id = $1",
+        [deleteId]
+    );
+
+    if (rowCount === 0) {
+        return jsonResponse(404, {
+        error: "Nincs ilyen vélemény (id nem található).",
+        });
+    }
+
+    return {
+        statusCode: 204,
+        headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        },
+        body: "",
+    };
+    }
+
 
 
 

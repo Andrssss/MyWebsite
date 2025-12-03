@@ -194,9 +194,8 @@ const SubjectInfo = () => {
 
 
 
-   
-  const handleDelete = async (id) => {
-  console.log("🔴 handleDelete called with id =", id, "userId =", userId);
+ const handleDelete = async (id) => {
+  console.log("🟠 Delete button clicked for id =", id, "userId =", userId);
 
   if (!id) {
     alert("Hiba: nincs ID, nem tudok törölni.");
@@ -206,15 +205,18 @@ const SubjectInfo = () => {
   if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
   try {
-    const response = await fetch(`/.netlify/functions/reviews/${id}`, {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `/.netlify/functions/reviews?id=${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      }
+    );
 
-    console.log("DELETE response status:", response.status);
+    const text = await response.text();
+    console.log("🔴 DELETE status:", response.status, "body:", text);
 
     if (!response.ok && response.status !== 204) {
-      const txt = await response.text();
-      throw new Error(txt || "Hiba történt a törlés során.");
+      throw new Error(text || "Hiba történt a törlés során.");
     }
 
     alert("Vélemény sikeresen törölve.");
@@ -224,11 +226,6 @@ const SubjectInfo = () => {
     alert(`Hiba történt: ${err.message}`);
   }
 };
-
-  
-
-
-  
 
 
 
