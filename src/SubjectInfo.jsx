@@ -5,8 +5,8 @@ import React, { useState, useEffect } from "react";
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// Ha ugyanazon a domainen megy (Netlify redirect), maradhat üres string.
-const API_BASE_URL = "";
+// Közvetlenül a Netlify functiont hívjuk
+const API_BASE_URL = "/.netlify/functions";
 
 // A backend JSON-ben:
 // id, name, user, difficulty, usefulness, general, duringSemester, exam, year, semester, user_id
@@ -65,7 +65,7 @@ const SubjectInfo = () => {
 
     const fetchTable = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/reviews`);
+        const response = await fetch(`${API_BASE_URL}/reviews`);
         if (!response.ok) {
           throw new Error("Nem sikerült betölteni az adatokat");
         }
@@ -194,9 +194,7 @@ const SubjectInfo = () => {
     if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/reviews/${id}?user_id=${encodeURIComponent(
-          userId
-        )}`,
+        `${API_BASE_URL}/reviews/${id}?user_id=${encodeURIComponent(userId)}`,
         {
           method: "DELETE",
         }
@@ -227,7 +225,7 @@ const SubjectInfo = () => {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/reviews/${editingReviewId}`,
+        `${API_BASE_URL}/reviews/${editingReviewId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -297,7 +295,7 @@ const SubjectInfo = () => {
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/reviews`, {
+      const response = await fetch(`${API_BASE_URL}/reviews`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json; charset=UTF-8",

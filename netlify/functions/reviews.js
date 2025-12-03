@@ -1,8 +1,15 @@
 // netlify/functions/reviews.js
 const { Pool } = require("pg");
 
+const connectionString = process.env.NETLIFY_DATABASE_URL;
+
+if (!connectionString) {
+  console.error("❌ NETLIFY_DATABASE_URL nincs beállítva.");
+  throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
+}
+
 const pool = new Pool({
-  connectionString:  process.env.NETLIFY_DATABASE_URL || null,
+  connectionString,
   ssl: { rejectUnauthorized: false },
 });
 
