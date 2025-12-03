@@ -389,6 +389,7 @@ const SubjectInfo = () => {
         filteredSubjects
           .reduce((acc, s) => {
             const existing = acc.find((item) => item.name === s.name);
+
             const feedback = {
               user: s.user,
               user_id: s.user_id,
@@ -399,28 +400,28 @@ const SubjectInfo = () => {
               exam: s.exam,
               id: s.id,
             };
-            if (
+
+            const isRealUser =
               s.user &&
               s.user !== "N/A" &&
               s.user.trim() !== "" &&
-              s.user !== "placeholder"
-            ) {
-              existing.users.push(feedback);
+              s.user !== "placeholder";
+
+            if (existing) {
+              // már van ilyen nevű tárgy a listában
+              if (isRealUser) {
+                existing.users.push(feedback);
+              }
             } else {
+              // új tárgy blokk
               acc.push({
                 name: s.name,
                 semester: s.semester,
                 id: s.id,
-                users:
-                  s.user &&
-                  s.user !== "N/A" &&
-                  s.user.trim() !== "" &&
-                  s.user !== "placeholder"
-                    ? [feedback]
-                    : [],
-
+                users: isRealUser ? [feedback] : [],
               });
             }
+
             return acc;
           }, [])
           .map((group, i) => (
