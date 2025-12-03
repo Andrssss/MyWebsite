@@ -339,11 +339,21 @@ const handleDelete = async (id) => {
     const normSearch = removeAccents(searchTerm.toLowerCase());
     const normName = removeAccents(subject.name.toLowerCase());
     const matchesSearch = normName.includes(normSearch);
+
+    // Ha "Saját vélemények" van kiválasztva → csak a saját user_id-s sorok
+    if (selectedSemester === "mine") {
+      const isMine = subject.user_id === userId;
+      return matchesSearch && isMine;
+    }
+
+    // Egyébként marad a régi logika
     const matchesSemester =
       selectedSemester === "all" ||
       subject.semester === parseInt(selectedSemester, 10);
+
     return matchesSearch && matchesSemester;
   });
+
 
   if (loading)
     return (
@@ -376,12 +386,14 @@ const handleDelete = async (id) => {
           onChange={handleSearchTermChange}
           className="search-bar"
         />
+        
         <select
           value={selectedSemester}
           onChange={handleSemesterChange}
           className="semester-filter"
         >
           <option value="all">Összes félév</option>
+          <option value="mine">Saját vélemények</option>
           {[...new Set(subjects.map((s) => s.semester))]
             .filter((sem) => sem !== "N/A")
             .sort((a, b) => a - b)
@@ -391,6 +403,8 @@ const handleDelete = async (id) => {
               </option>
             ))}
         </select>
+
+
         <button
           className="open-modal-button"
           onClick={() => setIsModalOpen(true)}
