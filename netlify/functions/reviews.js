@@ -217,10 +217,6 @@ exports.handler = async (event, context) => {
       return jsonResponse(200, rows[0]);
     }
 
-        // ───────────────── PUT ─────────────────
-    if (method === "PUT" && id) {
-      // ... (ez maradhat ahogy van)
-    }
 
     // ───────────────── DELETE ─────────────────
     if (method === "DELETE" && id) {

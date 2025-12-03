@@ -198,7 +198,6 @@ const SubjectInfo = () => {
 const handleDelete = async (id) => {
   console.log("🟠 Delete button clicked for id =", id);
 
-  if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
   try {
     const response = await fetch(`${API_BASE_URL}/reviews/${id}`, {
