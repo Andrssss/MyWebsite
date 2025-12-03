@@ -191,37 +191,40 @@ const SubjectInfo = () => {
     setIsModalOpen(true);
   };
 
-  
-const handleDelete = async (id) => {
-  console.log("handleDelete called with id =", id);
-  alert("Delete clicked, id = " + id);
+
+
+
+   
+  const handleDelete = async (id) => {
+  console.log("🔴 handleDelete called with id =", id, "userId =", userId);
+
+  if (!id) {
+    alert("Hiba: nincs ID, nem tudok törölni.");
+    return;
+  }
 
   if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/reviews/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    const response = await fetch(`/.netlify/functions/reviews/${id}`, {
+      method: "DELETE",
+    });
 
-    const txt = await response.text();
-    console.log("DELETE response status:", response.status, "body:", txt);
+    console.log("DELETE response status:", response.status);
 
     if (!response.ok && response.status !== 204) {
+      const txt = await response.text();
       throw new Error(txt || "Hiba történt a törlés során.");
     }
 
     alert("Vélemény sikeresen törölve.");
     setSubjects((prev) => prev.filter((subject) => subject.id !== id));
   } catch (err) {
+    console.error("DELETE error:", err);
     alert(`Hiba történt: ${err.message}`);
   }
 };
 
-   
-  
   
 
 
@@ -473,11 +476,18 @@ const handleDelete = async (id) => {
                                 Szerkesztés
                               </button>
                               <button
+                                type="button"
                                 className="delete-button"
-                                onClick={() => handleDelete(u.id)}
+                                style={{ pointerEvents: "auto" }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  console.log("🟠 Delete button clicked for id =", u.id);
+                                  handleDelete(u.id);
+                                }}
                               >
                                 Törlés
                               </button>
+
                             </div>
                           )}
                         </div>
