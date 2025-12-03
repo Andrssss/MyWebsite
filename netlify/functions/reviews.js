@@ -220,17 +220,28 @@ exports.handler = async (event, context) => {
     // ───────────────── DELETE ─────────────────
     // DELETE /.netlify/functions/reviews/:id?user_id=...
     // DELETE /.netlify/functions/reviews/:id
+    // ───────────────── DELETE ─────────────────
+    // DELETE /.netlify/functions/reviews?id=123
     if (method === "DELETE") {
-    // id path-ból
+    console.log("🔥 DELETE called, raw query params:", event.queryStringParameters);
 
-    // vagy query-ből
     const params = event.queryStringParameters || {};
+    const idParam = params.id;
 
-    console.log("🔴 Deleting review id =", deleteId);
+    if (!idParam) {
+        return jsonResponse(400, { error: "Hiányzik az id query param (?id=...)." });
+    }
+
+    const id = parseInt(idParam, 10);
+    if (Number.isNaN(id)) {
+        return jsonResponse(400, { error: `Érvénytelen id: ${idParam}` });
+    }
+
+    console.log("➡️ Deleting from DB, id =", id);
 
     const { rowCount } = await client.query(
-        "DELETE FROM subject_reviews WHERE id = $1",
-        [deleteId]
+        `DELETE FROM subject_reviews WHERE id = $1`,
+        [id]
     );
 
     if (rowCount === 0) {
@@ -247,9 +258,6 @@ exports.handler = async (event, context) => {
         body: "",
     };
     }
-
-
-
 
 
     // Ha egyik sem

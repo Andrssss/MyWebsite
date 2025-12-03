@@ -195,27 +195,33 @@ const SubjectInfo = () => {
 
 
  const handleDelete = async (id) => {
-  console.log("🔴 handleDelete called with id =", id, "userId =", userId);
+  if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
   try {
-    const res = await fetch(`/.netlify/functions/reviews?id=${id}`, {
-      method: "DELETE",
-    });
+    console.log("🔴 handleDelete called with id =", id, "userId =", userId);
 
-    const text = await res.text();
-    console.log("🔴 DELETE RESULT:", res.status, text);
+    const response = await fetch(
+      `${API_BASE_URL}/reviews?id=${id}`,
+      {
+        method: "DELETE",
+      }
+    );
 
-    if (!res.ok && res.status !== 204) {
-      throw new Error(text || "Delete failed");
+    const txt = await response.text();
+    console.log("🔴 DELETE RESULT:", response.status, txt);
+
+    if (!response.ok && response.status !== 204) {
+      throw new Error(txt || "Hiba történt a törlés során.");
     }
 
-    alert("Törölve.");
-    setSubjects((prev) => prev.filter((s) => s.id !== id));
+    alert("Vélemény sikeresen törölve.");
+    setSubjects((prev) => prev.filter((subject) => subject.id !== id));
   } catch (err) {
     console.error("DELETE ERROR:", err);
-    alert("Hiba: " + err.message);
+    alert(`Hiba történt: ${err.message}`);
   }
 };
+
 
 
 
