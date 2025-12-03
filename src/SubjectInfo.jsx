@@ -399,19 +399,26 @@ const SubjectInfo = () => {
               exam: s.exam,
               id: s.id,
             };
-            if (existing) {
-              if (s.user && s.user !== "N/A" && s.user.trim() !== "") {
-                existing.users.push(feedback);
-              }
+            if (
+              s.user &&
+              s.user !== "N/A" &&
+              s.user.trim() !== "" &&
+              s.user !== "placeholder"
+            ) {
+              existing.users.push(feedback);
             } else {
               acc.push({
                 name: s.name,
                 semester: s.semester,
                 id: s.id,
                 users:
-                  s.user && s.user !== "N/A" && s.user.trim() !== ""
+                  s.user &&
+                  s.user !== "N/A" &&
+                  s.user.trim() !== "" &&
+                  s.user !== "placeholder"
                     ? [feedback]
                     : [],
+
               });
             }
             return acc;
