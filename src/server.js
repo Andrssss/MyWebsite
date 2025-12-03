@@ -8,7 +8,7 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // env-ben állítod be
+  connectionString: process.env.NETLIFY_DATABASE_URL, // env-ben állítod be
 });
 
 app.get("/api/reviews", async (req, res) => {
