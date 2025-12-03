@@ -222,19 +222,67 @@ exports.handler = async (event, context) => {
     }
 
     // DELETE /api/reviews/:id?user_id=...
+    // DELETE /api/reviews/:id?user_id=...
+if (method === "DELETE" && id) {
+  const params = event.queryStringParameters || {};
+  const user_id = params.user_id;
+
+  if (!user_id) {
+    return jsonResponse(400, {
+      error: "user_id query param kötelező a törléshez.",
+    });
+  }
+
+  const { rowCount } = await client.query(
+    `DELETE FROM subject_reviews WHERE id = $1 AND user_id = $2`,
+    [id, user_id]
+  );
+
+  if (rowCount === 0) {
+    return jsonResponse(404, {
+      error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
+    });
+  }
+
+  return {
+    statusCode: 204,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: "",
+  };
+}
+    // DELETE /api/reviews/:id?user_id=...
     if (method === "DELETE" && id) {
-      const { rowCount } = await client.query(
+    const params = event.queryStringParameters || {};
+    const user_id = params.user_id;
+
+    if (!user_id) {
+        return jsonResponse(400, {
+        error: "user_id query param kötelező a törléshez.",
+        });
+    }
+
+    const { rowCount } = await client.query(
         `DELETE FROM subject_reviews WHERE id = $1 AND user_id = $2`,
         [id, user_id]
-      );
+    );
 
-      if (rowCount === 0) {
+    if (rowCount === 0) {
         return jsonResponse(404, {
-          error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
+        error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
         });
-      }
-      return jsonResponse(204, {});
     }
+
+    return {
+        statusCode: 204,
+        headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        },
+        body: "",
+    };
+    }
+
 
     return jsonResponse(405, { error: "Nem támogatott HTTP metódus." });
   } catch (err) {

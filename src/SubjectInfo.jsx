@@ -191,27 +191,28 @@ const SubjectInfo = () => {
   };
 
   const handleDelete = async (id) => {
-  if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
+    if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/reviews/${id}?user_id=${encodeURIComponent(userId)}`,
-      {
-        method: "DELETE",
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/reviews/${id}?user_id=${encodeURIComponent(userId)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok && response.status !== 204) {
+        const txt = await response.text();
+        throw new Error(txt || "Hiba történt a törlés során.");
       }
-    );
 
-    if (!response.ok && response.status !== 204) {
-      const txt = await response.text();
-      throw new Error(txt || "Hiba történt a törlés során.");
+      alert("Vélemény sikeresen törölve.");
+      setSubjects((prev) => prev.filter((subject) => subject.id !== id));
+    } catch (err) {
+      alert(`Hiba történt: ${err.message}`);
     }
+  };
 
-    alert("Vélemény sikeresen törölve.");
-    setSubjects((prev) => prev.filter((subject) => subject.id !== id));
-  } catch (err) {
-    alert(`Hiba történt: ${err.message}`);
-  }
-};
 
 
   const handleUpdate = async (e) => {
