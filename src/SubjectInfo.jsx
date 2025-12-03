@@ -189,13 +189,13 @@ const SubjectInfo = () => {
     setEditingReviewId(review.id);
     setIsModalOpen(true);
   };
-  
+
   const handleDelete = async (id) => {
   if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/reviews/${id}?user_id=${encodeURIComponent(userId)}`,
+      `${API_BASE_URL}/reviews/${id}`,
       {
         method: "DELETE",
       }

@@ -219,37 +219,30 @@ exports.handler = async (event, context) => {
 
     // ───────────────── DELETE ─────────────────
     // DELETE /.netlify/functions/reviews/:id?user_id=...
-    if (method === "DELETE" && id) {
-      const params = event.queryStringParameters || {};
-      const user_id = params.user_id;
+    // DELETE /.netlify/functions/reviews/:id
+if (method === "DELETE" && id) {
+  console.log("DELETE request for id:", id);
 
-      console.log("DELETE request:", { id, user_id });
+  const { rowCount } = await client.query(
+    `DELETE FROM subject_reviews WHERE id = $1`,
+    [id]
+  );
 
-      if (!user_id) {
-        return jsonResponse(400, {
-          error: "user_id query param kötelező a törléshez.",
-        });
-      }
+  if (rowCount === 0) {
+    return jsonResponse(404, {
+      error: "Nincs ilyen vélemény (id nem található).",
+    });
+  }
 
-      const { rowCount } = await client.query(
-        `DELETE FROM subject_reviews WHERE id = $1 AND user_id = $2`,
-        [id, user_id]
-      );
+  return {
+    statusCode: 204,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: "",
+  };
+}
 
-      if (rowCount === 0) {
-        return jsonResponse(404, {
-          error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
-        });
-      }
-
-      return {
-        statusCode: 204,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-        },
-        body: "",
-      };
-    }
 
     // Ha egyik sem
     return jsonResponse(405, { error: "Nem támogatott HTTP metódus." });
