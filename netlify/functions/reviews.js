@@ -34,7 +34,6 @@ exports.handler = async (event, context) => {
     const id = /^\d+$/.test(maybeId) ? parseInt(maybeId, 10) : null;
 
     if (method === "OPTIONS") {
-      // ha kéne CORS, itt lehetne, de ugyanazon a domaine fut → nem kell
       return {
         statusCode: 204,
         headers: {},
@@ -42,8 +41,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // GET /api/reviews → összes vélemény
-    // GET /api/reviews/:id → egy vélemény
+    // ───────────────── GET ─────────────────
     if (method === "GET") {
       if (id) {
         const { rows } = await client.query(
@@ -88,82 +86,80 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // POST /api/reviews → új vélemény
+    // ───────────────── POST ─────────────────
     if (method === "POST") {
-        const body = JSON.parse(event.body || "{}");
+      const body = JSON.parse(event.body || "{}");
 
-        const {
-            name,
-            user = "anonim",
-            general = null,
-            duringSemester = null,
-            exam = null,
-            user_id,
-        } = body;
+      const {
+        name,
+        user = "anonim",
+        general = null,
+        duringSemester = null,
+        exam = null,
+        user_id,
+      } = body;
 
-        // ⛔ Speciális: "Általános információ" tárgyra ne lehessen POST-olni
-        if (name && name.trim() === "Általános információ") {
-            return jsonResponse(400, {
-            error: 'Ehhez a tárgyhoz nem lehet új véleményt hozzáadni.',
-            });
+      // Speciális: "Általános információ" tárgyra ne lehessen POST-olni
+      if (name && name.trim() === "Általános információ") {
+        return jsonResponse(400, {
+          error: "Ehhez a tárgyhoz nem lehet új véleményt hozzáadni.",
+        });
+      }
+
+      const toIntOrNull = (v, fieldName) => {
+        if (v === undefined || v === null || v === "") return null;
+        const n = parseInt(v, 10);
+        if (Number.isNaN(n)) {
+          throw new Error(`Invalid integer value for ${fieldName}: ${v}`);
         }
+        return n;
+      };
 
-        const toIntOrNull = (v, fieldName) => {
-            if (v === undefined || v === null || v === "") return null;
-            const n = parseInt(v, 10);
-            if (Number.isNaN(n)) {
-            throw new Error(`Invalid integer value for ${fieldName}: ${v}`);
-            }
-            return n;
-        };
+      const difficulty = toIntOrNull(body.difficulty, "difficulty");
+      const usefulness = toIntOrNull(body.usefulness, "usefulness");
+      const year = toIntOrNull(body.year, "year");
+      const semester = toIntOrNull(body.semester, "semester");
 
-        const difficulty = toIntOrNull(body.difficulty, "difficulty");
-        const usefulness = toIntOrNull(body.usefulness, "usefulness");
-        const year = toIntOrNull(body.year, "year");
-        const semester = toIntOrNull(body.semester, "semester");
+      if (!name || !user_id) {
+        return jsonResponse(400, {
+          error: "name és user_id kötelező mezők.",
+        });
+      }
 
-        if (!name || !user_id) {
-            return jsonResponse(400, {
-            error: "name és user_id kötelező mezők.",
-            });
-        }
+      const { rows } = await client.query(
+        `INSERT INTO subject_reviews
+          (name, user_name, difficulty, usefulness, general, during_semester, exam, year, semester, user_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING
+           id,
+           name,
+           user_name AS "user",
+           difficulty,
+           usefulness,
+           general,
+           during_semester AS "duringSemester",
+           exam,
+           year,
+           semester,
+           user_id`,
+        [
+          name,
+          user,
+          difficulty,
+          usefulness,
+          general,
+          duringSemester,
+          exam,
+          year,
+          semester,
+          user_id,
+        ]
+      );
 
-        const { rows } = await client.query(
-            `INSERT INTO subject_reviews
-            (name, user_name, difficulty, usefulness, general, during_semester, exam, year, semester, user_id)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-            RETURNING
-            id,
-            name,
-            user_name AS "user",
-            difficulty,
-            usefulness,
-            general,
-            during_semester AS "duringSemester",
-            exam,
-            year,
-            semester,
-            user_id`,
-            [
-            name,
-            user,
-            difficulty,
-            usefulness,
-            general,
-            duringSemester,
-            exam,
-            year,
-            semester,
-            user_id,
-            ]
-        );
-
-        return jsonResponse(201, rows[0]);
+      return jsonResponse(201, rows[0]);
     }
 
-
-
-    // PUT /api/reviews/:id → vélemény frissítése
+    // ───────────────── PUT ─────────────────
     if (method === "PUT" && id) {
       const body = JSON.parse(event.body || "{}");
       const fields = [];
@@ -221,69 +217,41 @@ exports.handler = async (event, context) => {
       return jsonResponse(200, rows[0]);
     }
 
-    // DELETE /api/reviews/:id?user_id=...
-    // DELETE /api/reviews/:id?user_id=...
-if (method === "DELETE" && id) {
-  const params = event.queryStringParameters || {};
-  const user_id = params.user_id;
-
-  if (!user_id) {
-    return jsonResponse(400, {
-      error: "user_id query param kötelező a törléshez.",
-    });
-  }
-
-  const { rowCount } = await client.query(
-    `DELETE FROM subject_reviews WHERE id = $1 AND user_id = $2`,
-    [id, user_id]
-  );
-
-  if (rowCount === 0) {
-    return jsonResponse(404, {
-      error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
-    });
-  }
-
-  return {
-    statusCode: 204,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: "",
-  };
-}
-    // DELETE /api/reviews/:id?user_id=...
+    // ───────────────── DELETE ─────────────────
+    // DELETE /.netlify/functions/reviews/:id?user_id=...
     if (method === "DELETE" && id) {
-    const params = event.queryStringParameters || {};
-    const user_id = params.user_id;
+      const params = event.queryStringParameters || {};
+      const user_id = params.user_id;
 
-    if (!user_id) {
+      console.log("DELETE request:", { id, user_id });
+
+      if (!user_id) {
         return jsonResponse(400, {
-        error: "user_id query param kötelező a törléshez.",
+          error: "user_id query param kötelező a törléshez.",
         });
-    }
+      }
 
-    const { rowCount } = await client.query(
+      const { rowCount } = await client.query(
         `DELETE FROM subject_reviews WHERE id = $1 AND user_id = $2`,
         [id, user_id]
-    );
+      );
 
-    if (rowCount === 0) {
+      if (rowCount === 0) {
         return jsonResponse(404, {
-        error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
+          error: "Nincs ilyen vélemény, vagy nem te vagy a tulajdonos.",
         });
-    }
+      }
 
-    return {
+      return {
         statusCode: 204,
         headers: {
-        "Content-Type": "application/json; charset=utf-8",
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: "",
-    };
+      };
     }
 
-
+    // Ha egyik sem
     return jsonResponse(405, { error: "Nem támogatott HTTP metódus." });
   } catch (err) {
     console.error("Function error:", err);
