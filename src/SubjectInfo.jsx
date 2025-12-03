@@ -5,13 +5,11 @@ import React, { useState, useEffect } from "react";
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// Ha van külön backend URL-ed, ide írd be (pl. https://api.kacifant.hu)
-// Ha ugyanazon a domainen megy (proxyzva), maradhat üres string.
+// Ha ugyanazon a domainen megy (Netlify redirect), maradhat üres string.
 const API_BASE_URL = "";
 
-// A backend JSON-ben ezeket a mezőket adja vissza:
-/// user, name, difficulty, general, duringSemester, exam,
-/// year, semester, user_id, id
+// A backend JSON-ben:
+// id, name, user, difficulty, usefulness, general, duringSemester, exam, year, semester, user_id
 const initialNewEntry = {
   name: "",
   user: "anonim",
@@ -65,7 +63,6 @@ const SubjectInfo = () => {
       setNewEntry((prev) => ({ ...prev, user: savedUserName }));
     }
 
-    // Adatok lekérése JSON-ből (Postgres-backed API → JSON)
     const fetchTable = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/reviews`);
@@ -73,8 +70,7 @@ const SubjectInfo = () => {
           throw new Error("Nem sikerült betölteni az adatokat");
         }
         const data = await response.json();
-        // feltételezve, hogy data már abban a formában jön,
-        // ahogy korábban a parseHTMLTable visszaadta
+
         setSubjects(
           data.map((row) => ({
             user: row.user ?? "N/A",
@@ -145,7 +141,6 @@ const SubjectInfo = () => {
       setSuggestions(filtered);
     }
 
-    // Pontos egyezés esetén automatikusan beállítjuk a félévet
     const exactMatch = subjects.find((s) => s.name === value.trim());
     if (exactMatch) {
       setNewEntry((prev) => ({ ...prev, semester: exactMatch.semester }));
@@ -206,7 +201,8 @@ const SubjectInfo = () => {
           method: "DELETE",
         }
       );
-      if (!response.ok) throw new Error("Hiba történt a törlés során.");
+      if (!response.ok && response.status !== 204)
+        throw new Error("Hiba történt a törlés során.");
       alert("Vélemény sikeresen törölve.");
       setSubjects((prev) => prev.filter((subject) => subject.id !== id));
     } catch (err) {
@@ -239,7 +235,7 @@ const SubjectInfo = () => {
         }
       );
       if (!response.ok) throw new Error("Hiba történt a módosítás során.");
-      const updated = await response.json(); // backend visszaküldheti az updated row-t
+      const updated = await response.json();
 
       alert("Vélemény sikeresen módosítva.");
       setSubjects((prev) =>
@@ -314,7 +310,7 @@ const SubjectInfo = () => {
         throw new Error(txt || "Hiba történt az adatbeküldés során");
       }
 
-      const created = await response.json(); // pl. { ...payload, id: newId }
+      const created = await response.json();
 
       alert("Adatok sikeresen beküldve!");
       setSubjects((prev) => [...prev, created]);
@@ -468,7 +464,8 @@ const SubjectInfo = () => {
                         )}
                         {u.general && (
                           <p>
-                            <strong>Általános:</strong> {u.general}</p>
+                            <strong>Általános:</strong> {u.general}
+                          </p>
                         )}
                         {u.duringSemester !== "N/A" && (
                           <p>
