@@ -193,12 +193,10 @@ const SubjectInfo = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Biztosan törölni szeretnéd ezt a véleményt?")) return;
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/reviews/${id}?user_id=${encodeURIComponent(userId)}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/reviews/${id}`, {
+        method: "DELETE",
+      });
+
       if (!response.ok && response.status !== 204)
         throw new Error("Hiba történt a törlés során.");
       alert("Vélemény sikeresen törölve.");

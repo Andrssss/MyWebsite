@@ -223,14 +223,6 @@ exports.handler = async (event, context) => {
 
     // DELETE /api/reviews/:id?user_id=...
     if (method === "DELETE" && id) {
-      const params = event.queryStringParameters || {};
-      const user_id = params.user_id;
-      if (!user_id) {
-        return jsonResponse(400, {
-          error: "user_id query param kötelező a törléshez.",
-        });
-      }
-
       const { rowCount } = await client.query(
         `DELETE FROM subject_reviews WHERE id = $1 AND user_id = $2`,
         [id, user_id]
