@@ -35,6 +35,8 @@ const SubjectInfo = () => {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const [kepzesMode, setKepzesMode] = useState("MI"); // "MI" | "MB" | "BOTH"
   const cycleKepzesMode = () => {
@@ -295,6 +297,8 @@ const handleDelete = async (id) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     if (newEntry.difficulty.trim() !== "") {
       const d = parseInt(newEntry.difficulty, 10);
@@ -355,6 +359,8 @@ const handleDelete = async (id) => {
       setShowSuggestions(false);
     } catch (err) {
       alert(`Hiba történt: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -731,7 +737,9 @@ const handleDelete = async (id) => {
                   onChange={handleInputChange}
                 />
               </div>
-              <button type="submit">Hozzáadás</button>
+              <button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Küldés..." : "Hozzáadás"}
+              </button>
             </form>
           </div>
         </div>
