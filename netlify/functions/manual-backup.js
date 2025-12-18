@@ -8,8 +8,12 @@ export default async () => {
       backup: key,
       time: new Date().toISOString(),
     });
-  } catch (err) {
-    console.error(err);
-    return new Response("Manual backup failed", { status: 500 });
-  }
+    } catch (err) {
+    console.error("Manual backup error:", err);
+        return new Response(
+            `Manual backup failed: ${err?.message || String(err)}`,
+            { status: 500 }
+        );
+    }
+
 };
