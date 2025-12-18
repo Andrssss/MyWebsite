@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.4.4",
+    "@sendgrid/mail": "^8.1.6",
     "axios": "^1.7.9",
     "emailjs-com": "^3.2.0",
     "express": "^4.21.2",
