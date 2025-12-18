@@ -375,9 +375,15 @@ const handleDelete = async (id) => {
       );
 
     // Félév szűrés
+    const sem = subject.semester;
+
     const matchesSemester =
       selectedSemester === "all" ||
-      String(subject.semester ?? "") === String(selectedSemester);
+      selectedSemester === "mine" ||
+      (selectedSemester === "none"
+        ? (sem === null || sem === undefined || sem === "" || sem === "N/A")
+        : String(sem ?? "") === String(selectedSemester));
+
 
     // "Saját vélemények" szűrés (ha nálad van ilyen flag/nézet)
     const isMine = subject.user_id === userId;
@@ -441,8 +447,8 @@ const handleDelete = async (id) => {
           <option value="all">Összes félév</option>
           <option value="mine">Saját vélemények</option>
           {[...new Set(subjects.map((s) => s.semester))]
-            .filter((sem) => sem !== "N/A")
-            .sort((a, b) => a - b)
+            .filter((sem) => sem !== null && sem !== undefined && sem !== "" && sem !== "N/A")
+            .sort((a, b) => Number(a) - Number(b))
             .map((sem) => (
               <option key={sem} value={sem}>
                 {sem}. félév
@@ -512,17 +518,24 @@ const handleDelete = async (id) => {
               s.user !== "placeholder";
 
             if (existing) {
-              const prevK = String(existing.kepzes_fajtaja ?? curK).toUpperCase();
+              // csak valós vélemények döntsenek a címkéről
+              if (isRealUser) {
+                existing.kepzes_set ??= new Set();
+                existing.kepzes_set.add(curK);
 
-              existing.kepzes_fajtaja = prevK === curK ? prevK : "MIMB";
+                const hasMI = existing.kepzes_set.has("MI");
+                const hasMB = existing.kepzes_set.has("MB");
+                existing.kepzes_fajtaja = hasMI && hasMB ? "MIMB" : (hasMI ? "MI" : "MB");
 
-              if (isRealUser) existing.users.push(feedback);
+                existing.users.push(feedback);
+              }
             } else {
               acc.push({
                 name: s.name,
                 semester: s.semester,
                 id: s.id,
-                kepzes_fajtaja: curK,
+                kepzes_fajtaja: curK,         // ideiglenes
+                kepzes_set: isRealUser ? new Set([curK]) : new Set(), // csak real user-rel töltjük
                 users: isRealUser ? [feedback] : [],
               });
             }
@@ -543,7 +556,12 @@ const handleDelete = async (id) => {
                 </h3>
               </div>
               <div className="subject-semester">
-                <p>Félév: {group.semester ?? "-"}. félév</p>
+                <p>
+                  Félév: {group.semester === null || group.semester === undefined || group.semester === "" || group.semester === "N/A"
+                    ? "—"
+                    : `${group.semester}. félév`}
+                </p>
+
               </div>
               <div className="subject-details">
                 {group.users.map((u, idx) => (
