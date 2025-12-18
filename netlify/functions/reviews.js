@@ -182,6 +182,7 @@ exports.handler = async (event, context) => {
         exam: "exam",
         year: "year",
         semester: "semester",
+        user_id: "user_id",
         kepzes_fajtaja: "kepzes_fajtaja",
       };
 

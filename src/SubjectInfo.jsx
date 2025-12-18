@@ -5,12 +5,6 @@ import React, { useState, useEffect } from "react";
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-const [kepzesMode, setKepzesMode] = useState("MI"); // "MI" | "MB" | "BOTH"
-const cycleKepzesMode = () => {
-  setKepzesMode((prev) => (prev === "MI" ? "MB" : prev === "MB" ? "BOTH" : "MI"));
-};
-
-
 const normalizeName = (str) =>
   String(str ?? "")
     .replace(/\u00A0/g, " ")   // NBSP → sima space
@@ -41,6 +35,11 @@ const SubjectInfo = () => {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
+
+  const [kepzesMode, setKepzesMode] = useState("MI"); // "MI" | "MB" | "BOTH"
+  const cycleKepzesMode = () => {
+    setKepzesMode((prev) => (prev === "MI" ? "MB" : prev === "MB" ? "BOTH" : "MI"));
+  };
 
   // Kereső és félév
   const [searchTerm, setSearchTerm] = useState("");
@@ -98,7 +97,7 @@ const SubjectInfo = () => {
             semester: row.semester ?? "N/A",
             user_id: row.user_id ?? "N/A",
             id: row.id ?? null,
-            kepzes_fajtaja: row.kepzes_fajtaja ?? "MIMB",
+            kepzes_fajtaja: row.kepzes_fajtaja ?? "MI",
 
           }))
         );
@@ -257,7 +256,7 @@ const handleDelete = async (id) => {
     });
     payload.user_id = userId;
     payload.kepzes_fajtaja = kepzesMode === "BOTH" ? "MIMB" : kepzesMode;
-    
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/reviews/${editingReviewId}`,
@@ -384,7 +383,8 @@ const handleDelete = async (id) => {
         ? k === "MI"
         : kepzesMode === "MB"
         ? k === "MB"
-        : k === "MIMB"; // BOTH
+        : k === "MI" || k === "MB" || k === "MIMB";
+
 
     // Itt ugyanúgy megtartod a régi logikádat, csak hozzáadod matchesKepzes-t:
     if (selectedSemester === "mine") {
