@@ -38,7 +38,7 @@ const SubjectInfo = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-  const [kepzesMode, setKepzesMode] = useState("MI"); // "MI" | "MB" | "BOTH"
+  const [kepzesMode, setKepzesMode] = useState("BOTH"); // "MI" | "MB" | "BOTH"
   const cycleKepzesMode = () => {
     setKepzesMode((prev) => (prev === "MI" ? "MB" : prev === "MB" ? "BOTH" : "MI"));
   };
@@ -386,11 +386,10 @@ const handleDelete = async (id) => {
     const k = String(subject.kepzes_fajtaja ?? "").toUpperCase();
     const matchesKepzes =
       kepzesMode === "MI"
-        ? k === "MI"
+        ? k === "MI" || k === "MIMB"
         : kepzesMode === "MB"
-        ? k === "MB"
+        ? k === "MB" || k === "MIMB"
         : k === "MI" || k === "MB" || k === "MIMB";
-
 
     // Itt ugyanúgy megtartod a régi logikádat, csak hozzáadod matchesKepzes-t:
     if (selectedSemester === "mine") {
