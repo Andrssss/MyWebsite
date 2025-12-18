@@ -94,7 +94,7 @@ const SubjectInfo = () => {
             duringSemester: row.duringSemester ?? "N/A",
             exam: row.exam ?? "N/A",
             year: row.year ?? "N/A",
-            semester: row.semester ?? "N/A",
+            semester: row.semester ?? null,
             user_id: row.user_id ?? "N/A",
             id: row.id ?? null,
             kepzes_fajtaja: row.kepzes_fajtaja ?? "MI",
@@ -484,13 +484,11 @@ const handleDelete = async (id) => {
             return 0;
           })
           .reduce((acc, s) => {
-            // ... a meglévő reduce tartalom változatlan
-
             const existing = acc.find(
               (item) => normalizeName(item.name) === normalizeName(s.name)
             );
 
-
+            const curK = String(s.kepzes_fajtaja ?? "MI").toUpperCase();
             const feedback = {
               user: s.user,
               user_id: s.user_id,
@@ -509,19 +507,21 @@ const handleDelete = async (id) => {
               s.user !== "placeholder";
 
             if (existing) {
-              // már van ilyen nevű tárgy a listában
-              if (isRealUser) {
-                existing.users.push(feedback);
-              }
+              const prevK = String(existing.kepzes_fajtaja ?? curK).toUpperCase();
+
+              existing.kepzes_fajtaja = prevK === curK ? prevK : "MIMB";
+
+              if (isRealUser) existing.users.push(feedback);
             } else {
-              // új tárgy blokk
               acc.push({
                 name: s.name,
                 semester: s.semester,
                 id: s.id,
+                kepzes_fajtaja: curK,
                 users: isRealUser ? [feedback] : [],
               });
             }
+
 
             return acc;
           }, [])
@@ -538,7 +538,7 @@ const handleDelete = async (id) => {
                 </h3>
               </div>
               <div className="subject-semester">
-                <p>Félév: {group.semester}. félév</p>
+                <p>Félév: {group.semester ?? "-"}. félév</p>
               </div>
               <div className="subject-details">
                 {group.users.map((u, idx) => (
@@ -602,7 +602,7 @@ const handleDelete = async (id) => {
                     )}
                   </div>
                 ))}
-                {group.name !== "Általános info" && (
+                {group.name !== "Általános információ" && (
                   <div className="user-feedback write-review">
                     <p>
                       Írj te is véleményt{" "}
