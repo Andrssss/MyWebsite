@@ -5,6 +5,12 @@ import React, { useState, useEffect } from "react";
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+const [kepzesMode, setKepzesMode] = useState("MI"); // "MI" | "MB" | "BOTH"
+const cycleKepzesMode = () => {
+  setKepzesMode((prev) => (prev === "MI" ? "MB" : prev === "MB" ? "BOTH" : "MI"));
+};
+
+
 const normalizeName = (str) =>
   String(str ?? "")
     .replace(/\u00A0/g, " ")   // NBSP → sima space
@@ -28,6 +34,7 @@ const initialNewEntry = {
   year: new Date().getFullYear(),
   semester: "",
 };
+
 
 const SubjectInfo = () => {
   const [subjects, setSubjects] = useState([]);
@@ -91,6 +98,8 @@ const SubjectInfo = () => {
             semester: row.semester ?? "N/A",
             user_id: row.user_id ?? "N/A",
             id: row.id ?? null,
+            kepzes_fajtaja: row.kepzes_fajtaja ?? "MIMB",
+
           }))
         );
       } catch (err) {
@@ -247,7 +256,8 @@ const handleDelete = async (id) => {
       }
     });
     payload.user_id = userId;
-
+    payload.kepzes_fajtaja = kepzesMode === "BOTH" ? "MIMB" : kepzesMode;
+    
     try {
       const response = await fetch(
         `${API_BASE_URL}/reviews/${editingReviewId}`,
@@ -320,6 +330,7 @@ const handleDelete = async (id) => {
       ...newEntry,
       user_id: userId,
       semester: foundSubject.semester,
+      kepzes_fajtaja: kepzesMode === "BOTH" ? "MIMB" : kepzesMode,
     };
 
     try {
@@ -349,23 +360,40 @@ const handleDelete = async (id) => {
   };
 
   const filteredSubjects = subjects.filter((subject) => {
-    const normSearch = removeAccents(searchTerm.toLowerCase());
-    const normName = removeAccents(subject.name.toLowerCase());
-    const matchesSearch = normName.includes(normSearch);
+    // Keresés
+    const matchesSearch =
+      removeAccents((subject.name || "").toLowerCase()).includes(
+        removeAccents(searchTerm.toLowerCase())
+      ) ||
+      removeAccents((subject.user || "").toLowerCase()).includes(
+        removeAccents(searchTerm.toLowerCase())
+      );
 
-    // Ha "Saját vélemények" van kiválasztva → csak a saját user_id-s sorok
-    if (selectedSemester === "mine") {
-      const isMine = subject.user_id === userId;
-      return matchesSearch && isMine;
-    }
-
-    // Egyébként marad a régi logika
+    // Félév szűrés
     const matchesSemester =
       selectedSemester === "all" ||
-      subject.semester === parseInt(selectedSemester, 10);
+      String(subject.semester ?? "") === String(selectedSemester);
 
-    return matchesSearch && matchesSemester;
+    // "Saját vélemények" szűrés (ha nálad van ilyen flag/nézet)
+    const isMine = subject.user_id === userId;
+
+    // Képzés mód szűrés
+    const k = String(subject.kepzes_fajtaja ?? "").toUpperCase();
+    const matchesKepzes =
+      kepzesMode === "MI"
+        ? k === "MI"
+        : kepzesMode === "MB"
+        ? k === "MB"
+        : k === "MIMB"; // BOTH
+
+    // Itt ugyanúgy megtartod a régi logikádat, csak hozzáadod matchesKepzes-t:
+    if (selectedSemester === "mine") {
+      return matchesSearch && matchesKepzes && isMine;
+    }
+
+    return matchesSearch && matchesKepzes && matchesSemester;
   });
+
 
 
   if (loading)
@@ -424,6 +452,15 @@ const handleDelete = async (id) => {
         >
           Feltöltés
         </button>
+        <button
+          type="button"
+          className={`kepzes-toggle ${kepzesMode.toLowerCase()}`}
+          onClick={cycleKepzesMode}
+          title="Képzés mód váltása (MI → MB → BOTH)"
+        >
+          {kepzesMode}
+        </button>
+
       </div>
 
       {/* Tárgyak listája */}

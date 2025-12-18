@@ -56,7 +56,8 @@ exports.handler = async (event, context) => {
              exam,
              year,
              semester,
-             user_id
+             user_id,
+             kepzes_fajtaja
            FROM subject_reviews
            WHERE id = $1`,
           [id]
@@ -78,7 +79,8 @@ exports.handler = async (event, context) => {
              exam,
              year,
              semester,
-             user_id
+             user_id,
+             kepzes_fajtaja
            FROM subject_reviews
            ORDER BY semester, name, id`
         );
@@ -97,6 +99,7 @@ exports.handler = async (event, context) => {
         duringSemester = null,
         exam = null,
         user_id,
+        kepzes_fajtaja = "MI",
       } = body;
 
       // Speciális: "Általános információ" tárgyra ne lehessen POST-olni
@@ -128,20 +131,21 @@ exports.handler = async (event, context) => {
 
       const { rows } = await client.query(
         `INSERT INTO subject_reviews
-          (name, user_name, difficulty, usefulness, general, during_semester, exam, year, semester, user_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         RETURNING
-           id,
-           name,
-           user_name AS "user",
-           difficulty,
-           usefulness,
-           general,
-           during_semester AS "duringSemester",
-           exam,
-           year,
-           semester,
-           user_id`,
+          (name, user_name, difficulty, usefulness, general, during_semester, exam, year, semester, user_id, kepzes_fajtaja)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        RETURNING
+          id,
+          name,
+          user_name AS "user",
+          difficulty,
+          usefulness,
+          general,
+          during_semester AS "duringSemester",
+          exam,
+          year,
+          semester,
+          user_id,
+          kepzes_fajtaja`,
         [
           name,
           user,
@@ -153,8 +157,10 @@ exports.handler = async (event, context) => {
           year,
           semester,
           user_id,
+          kepzes_fajtaja,
         ]
       );
+
 
       return jsonResponse(201, rows[0]);
     }
@@ -176,6 +182,7 @@ exports.handler = async (event, context) => {
         exam: "exam",
         year: "year",
         semester: "semester",
+        kepzes_fajtaja: "kepzes_fajtaja",
       };
 
       for (const [key, column] of Object.entries(map)) {
@@ -207,8 +214,9 @@ exports.handler = async (event, context) => {
           exam,
           year,
           semester,
-          user_id
-      `;
+          user_id,
+          kepzes_fajtaja
+        `;
 
       const { rows } = await client.query(query, values);
       if (rows.length === 0) {
