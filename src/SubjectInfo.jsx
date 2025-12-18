@@ -465,8 +465,27 @@ const handleDelete = async (id) => {
 
       {/* Tárgyak listája */}
       {filteredSubjects.length > 0 ? (
-        filteredSubjects
+        [...filteredSubjects]
+          .sort((a, b) => {
+            // ✅ csak "Összes félév" + nincs keresés esetén
+            if (selectedSemester !== "all") return 0;
+            if (searchTerm.trim() !== "") return 0;
+
+            const aIsGeneral =
+              normalizeName(a.name).toLowerCase() ===
+              normalizeName("Általános információ").toLowerCase();
+
+            const bIsGeneral =
+              normalizeName(b.name).toLowerCase() ===
+              normalizeName("Általános információ").toLowerCase();
+
+            if (aIsGeneral && !bIsGeneral) return -1;
+            if (!aIsGeneral && bIsGeneral) return 1;
+            return 0;
+          })
           .reduce((acc, s) => {
+            // ... a meglévő reduce tartalom változatlan
+
             const existing = acc.find(
               (item) => normalizeName(item.name) === normalizeName(s.name)
             );
@@ -509,7 +528,14 @@ const handleDelete = async (id) => {
           .map((group, i) => (
             <div key={i} className="subject-card">
               <div className="subject-header">
-                <h3 className="subject-title">{group.name}</h3>
+                <h3 className="subject-title">
+                  {group.name}
+                  <span
+                    className={`kepzes-badge ${String(group.kepzes_fajtaja ?? "MI").toLowerCase()}`}
+                  >
+                    {String(group.kepzes_fajtaja ?? "MI").toUpperCase() === "MIMB" ? "BOTH" : String(group.kepzes_fajtaja ?? "MI").toUpperCase()}
+                  </span>
+                </h3>
               </div>
               <div className="subject-semester">
                 <p>Félév: {group.semester}. félév</p>
