@@ -7,7 +7,7 @@ export async function runBackup(key) {
     ssl: { rejectUnauthorized: false },
   });
 
-  const { rows } = await pool.query("SELECT * FROM reviews");
+  const { rows } = await pool.query("SELECT * FROM subject_reviews");
   await pool.end();
 
   const store = getStore("weekly-backups");
