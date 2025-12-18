@@ -5,6 +5,14 @@ import React, { useState, useEffect } from "react";
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+const normalizeName = (str) =>
+  String(str ?? "")
+    .replace(/\u00A0/g, " ")   // NBSP → sima space
+    .replace(/\s+/g, " ")     // több whitespace → 1 space
+    .trim()
+    .normalize("NFC");
+
+
 // Közvetlenül a Netlify functiont hívjuk
 const API_BASE_URL = "/.netlify/functions";
 
@@ -112,9 +120,10 @@ const SubjectInfo = () => {
   // Autocomplete logika
   // comment
   const handleNameFocus = () => {
-    const allNames = [...new Set(subjects.map((subj) => subj.name))].sort(
+    const allNames = [...new Set(subjects.map((subj) => normalizeName(subj.name)))].sort(
       (a, b) => a.localeCompare(b)
     );
+
     setSuggestions(allNames);
     setShowSuggestions(true);
   };
@@ -124,16 +133,17 @@ const SubjectInfo = () => {
     setNewEntry((prev) => ({ ...prev, name: value }));
 
     if (value.trim().length === 0) {
-      const allNames = [...new Set(subjects.map((subj) => subj.name))].sort(
+      const allNames = [...new Set(subjects.map((subj) => normalizeName(subj.name)))].sort(
         (a, b) => a.localeCompare(b)
       );
+
       setSuggestions(allNames);
     } else {
       const search = removeAccents(value.toLowerCase());
       const filtered = [
         ...new Set(
           subjects
-            .map((subj) => subj.name)
+            .map((subj) => normalizeName(subj.name))
             .filter((name) =>
               removeAccents(name.toLowerCase()).includes(search)
             )
@@ -142,7 +152,9 @@ const SubjectInfo = () => {
       setSuggestions(filtered);
     }
 
-    const exactMatch = subjects.find((s) => s.name === value.trim());
+    const exactMatch = subjects.find(
+      (s) => normalizeName(s.name) === normalizeName(value)
+    );
     if (exactMatch) {
       setNewEntry((prev) => ({ ...prev, semester: exactMatch.semester }));
     }
@@ -196,7 +208,6 @@ const SubjectInfo = () => {
 
  
 const handleDelete = async (id) => {
-  console.log("🟠 Delete button clicked for id =", id);
 
 
   try {
@@ -205,7 +216,6 @@ const handleDelete = async (id) => {
     });
 
     const txt = await response.text();
-    console.log("🔴 DELETE RESULT:", response.status, txt);
 
     if (!response.ok && response.status !== 204) {
       throw new Error(txt || "Hiba történt a törlés során.");
@@ -285,7 +295,10 @@ const handleDelete = async (id) => {
       }
     }
 
-    const foundSubject = subjects.find((s) => s.name === newEntry.name.trim());
+    
+    const foundSubject = subjects.find(
+      (s) => normalizeName(s.name) === normalizeName(newEntry.name)
+    );
     if (!foundSubject) {
       alert("Nincs ilyen tárgy a meglévő listában!");
       return;
@@ -417,7 +430,10 @@ const handleDelete = async (id) => {
       {filteredSubjects.length > 0 ? (
         filteredSubjects
           .reduce((acc, s) => {
-            const existing = acc.find((item) => item.name === s.name);
+            const existing = acc.find(
+              (item) => normalizeName(item.name) === normalizeName(s.name)
+            );
+
 
             const feedback = {
               user: s.user,
@@ -487,7 +503,6 @@ const handleDelete = async (id) => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
-                                  console.log("🟠 Delete button clicked for id =", u.id);
                                   handleDelete(u.id);
                                 }}
                               >
