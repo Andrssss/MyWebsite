@@ -385,6 +385,7 @@ const handleDelete = async (id) => {
         : String(sem ?? "") === String(selectedSemester));
 
 
+
     // "Saját vélemények" szűrés (ha nálad van ilyen flag/nézet)
     const isMine = subject.user_id === userId;
 
@@ -446,6 +447,7 @@ const handleDelete = async (id) => {
         >
           <option value="all">Összes félév</option>
           <option value="mine">Saját vélemények</option>
+          <option value="none">Nincs félév</option>
           {[...new Set(subjects.map((s) => s.semester))]
             .filter((sem) => sem !== null && sem !== undefined && sem !== "" && sem !== "N/A")
             .sort((a, b) => Number(a) - Number(b))
@@ -453,7 +455,8 @@ const handleDelete = async (id) => {
               <option key={sem} value={sem}>
                 {sem}. félév
               </option>
-            ))}
+          ))}
+
         </select>
 
 
@@ -561,7 +564,6 @@ const handleDelete = async (id) => {
                     ? "—"
                     : `${group.semester}. félév`}
                 </p>
-
               </div>
               <div className="subject-details">
                 {group.users.map((u, idx) => (
