@@ -443,3 +443,9 @@ button[type="button"].close-modal-button:hover {
     margin-left: 0;
   }
 }
+
+
+.modal-content {
+  padding-top: -10px;    /* ⬆️ FELFELÉ görgethető extra tér */
+  padding-bottom: 300px; 
+}
