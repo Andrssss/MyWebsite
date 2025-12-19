@@ -52,7 +52,7 @@
   white-space: normal;
   word-wrap: break-word;
 }
-@media (max-width: 500px) {
+@media (max-width: 800px) {
   .preview-tooltip {
     left: 0;
     right: 0;

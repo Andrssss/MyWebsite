@@ -406,3 +406,40 @@ button[type="button"].close-modal-button:hover {
 .kepzes-badge.mi { background: #2563eb; color: white; }
 .kepzes-badge.mb { background: #16a34a; color: white; }
 .kepzes-badge.mimb { background: #f59e0b; color: #111827; }
+
+@media (max-width: 800px) {
+  .search-filter-container {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 0.9fr;
+    grid-template-areas:
+      "search semester mode"
+      "upload upload  upload";
+    gap: 10px;
+    align-items: center;
+  }
+
+  .search-bar {
+    grid-area: search;
+    width: 100%;
+    max-width: none; /* kills the 300px cap */
+  }
+
+  .semester-filter {
+    grid-area: semester;
+    width: 100%;
+  }
+
+  /* MI / MB / BOTH single cycling button */
+  .kepzes-toggle {
+    grid-area: mode;
+    width: 100%;
+    padding: 10px 0;
+  }
+
+  /* Feltöltés full width on row 2 */
+  .open-modal-button {
+    grid-area: upload;
+    width: 100%;
+    margin-left: 0;
+  }
+}
