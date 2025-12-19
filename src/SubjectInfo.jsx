@@ -36,12 +36,22 @@ const SubjectInfo = () => {
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-
-  const [kepzesMode, setKepzesMode] = useState("BOTH"); // "MI" | "MB" | "BOTH"
+const [kepzesMode, setKepzesMode] = useState("BOTH");
   const cycleKepzesMode = () => {
-    setKepzesMode((prev) => (prev === "MI" ? "MB" : prev === "MB" ? "BOTH" : "MI"));
+  const cycleKepzesMode = () => {
+  setKepzesMode((prev) => {
+      switch (prev) {
+        case "BOTH": return "MI_BOTH";
+        case "MI_BOTH": return "MI";
+        case "MI": return "MB_BOTH";
+        case "MB_BOTH": return "MB";
+        default: return "BOTH";
+      }
+    });
   };
+
+};
+
 
   // Kereső és félév
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,16 +125,19 @@ const SubjectInfo = () => {
 
   useEffect(() => {
     if (isModalOpen) {
-      document.body.classList.add("modal-open");
+      document.documentElement.classList.add("modal-open"); // html
+      document.body.classList.add("modal-open");            // body
     } else {
+      document.documentElement.classList.remove("modal-open");
       document.body.classList.remove("modal-open");
     }
 
-    // Biztonsági cleanup
     return () => {
+      document.documentElement.classList.remove("modal-open");
       document.body.classList.remove("modal-open");
     };
   }, [isModalOpen]);
+
 
   // Keresés és félév szűrés
   const handleSemesterChange = (e) => {
@@ -404,12 +417,17 @@ const handleDelete = async (id) => {
 
     // Képzés mód szűrés
     const k = String(subject.kepzes_fajtaja ?? "").toUpperCase();
+
     const matchesKepzes =
       kepzesMode === "MI"
-        ? k === "MI" || k === "MIMB"
+        ? k === "MI"
+        : kepzesMode === "MI_BOTH"
+        ? (k === "MI" || k === "MIMB")
         : kepzesMode === "MB"
-        ? k === "MB" || k === "MIMB"
-        : k === "MI" || k === "MB" || k === "MIMB";
+        ? k === "MB"
+        : kepzesMode === "MB_BOTH"
+        ? (k === "MB" || k === "MIMB")
+        : (k === "MI" || k === "MB" || k === "MIMB"); // BOTH
 
     // Itt ugyanúgy megtartod a régi logikádat, csak hozzáadod matchesKepzes-t:
     if (selectedSemester === "mine") {
