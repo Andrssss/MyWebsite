@@ -36,21 +36,25 @@ const SubjectInfo = () => {
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-const [kepzesMode, setKepzesMode] = useState("BOTH");
+  const [kepzesMode, setKepzesMode] = useState("BOTH");
+
   const cycleKepzesMode = () => {
-  const cycleKepzesMode = () => {
-  setKepzesMode((prev) => {
+    setKepzesMode((prev) => {
       switch (prev) {
-        case "BOTH": return "MI_BOTH";
-        case "MI_BOTH": return "MI";
-        case "MI": return "MB_BOTH";
-        case "MB_BOTH": return "MB";
-        default: return "BOTH";
+        case "BOTH":
+          return "MI";
+        case "MI":
+          return "MI_BOTH";
+        case "MI_BOTH":
+          return "MB";
+        case "MB":
+          return "MB_BOTH";
+        default:
+          return "BOTH";
       }
     });
   };
 
-};
 
 
   // Kereső és félév
@@ -503,7 +507,7 @@ const handleDelete = async (id) => {
           onClick={cycleKepzesMode}
           title="Képzés mód váltása (MI → MB → BOTH)"
         >
-          {kepzesMode}
+          {kepzesMode === "MI_BOTH" ? "MI +  BOTH" : kepzesMode === "MB_BOTH" ? "MB +  BOTH" : kepzesMode}
         </button>
 
       </div>

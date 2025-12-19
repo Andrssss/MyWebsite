@@ -39,7 +39,7 @@
   margin-left: 15px; /* 15px távolságra kerül a legördülő menütől */
   padding: 10px 15px;
   font-size: 1rem;
-  background-color: #ffffff;
+  background-color: #d1d1d1;
   color: #000000;
   border: none;
   border-radius: 5px;
@@ -47,7 +47,9 @@
 }
 
 .open-modal-button:hover {
-  background-color: #0056b3;
+  background-color: #8f8f8f;
+    color: #ffffff;
+
 }
 
 /* Kártyák és vélemények */
@@ -467,12 +469,12 @@ body.modal-open {
 
 .kepzes-toggle.mi {
   background: #2563eb;
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .kepzes-toggle.mb {
   background: #16a34a;
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .kepzes-toggle.both {
@@ -483,7 +485,7 @@ body.modal-open {
 /* MIX */
 .kepzes-toggle.mi_both {
   background: linear-gradient(135deg, #2563eb 50%, #f59e0b 50%);
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .kepzes-toggle.mb_both {
