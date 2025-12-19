@@ -503,6 +503,8 @@ const handleDelete = async (id) => {
             );
 
             const curK = String(s.kepzes_fajtaja ?? "MI").toUpperCase();
+            const curKs = curK === "MIMB" ? ["MI", "MB"] : [curK];
+
             const feedback = {
               user: s.user,
               user_id: s.user_id,
@@ -524,7 +526,7 @@ const handleDelete = async (id) => {
               // csak valós vélemények döntsenek a címkéről
               if (isRealUser) {
                 existing.kepzes_set ??= new Set();
-                existing.kepzes_set.add(curK);
+                curKs.forEach(x => existing.kepzes_set.add(x));
 
                 const hasMI = existing.kepzes_set.has("MI");
                 const hasMB = existing.kepzes_set.has("MB");
@@ -537,8 +539,10 @@ const handleDelete = async (id) => {
                 name: s.name,
                 semester: s.semester,
                 id: s.id,
-                kepzes_fajtaja: curK,         // ideiglenes
-                kepzes_set: isRealUser ? new Set([curK]) : new Set(), // csak real user-rel töltjük
+                kepzes_set: isRealUser ? new Set(curKs) : new Set(),
+                kepzes_fajtaja: isRealUser
+                  ? (curKs.includes("MI") && curKs.includes("MB") ? "MIMB" : curKs[0])
+                  : curK,
                 users: isRealUser ? [feedback] : [],
               });
             }
