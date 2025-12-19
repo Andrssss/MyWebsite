@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
 import { Pool } from "pg";
 
-export async function runBackup(key) {
+export async function runBackup(key, { returnContent = false } = {}) {
   const pool = new Pool({
     connectionString: process.env.NETLIFY_DATABASE_URL_UNPOOLED,
     ssl: { rejectUnauthorized: false },
@@ -22,5 +22,5 @@ export async function runBackup(key) {
     metadata: { table: "reviews" },
   });
 
-  return key;
+  return returnContent ? { key, content } : { key };
 }
