@@ -113,6 +113,19 @@ const SubjectInfo = () => {
     fetchTable();
   }, []);
 
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.classList.add("modal-open");
+    } else {
+      document.body.classList.remove("modal-open");
+    }
+
+    // Biztonsági cleanup
+    return () => {
+      document.body.classList.remove("modal-open");
+    };
+  }, [isModalOpen]);
+
   // Keresés és félév szűrés
   const handleSemesterChange = (e) => {
     setSelectedSemester(e.target.value);

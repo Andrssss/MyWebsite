@@ -446,6 +446,18 @@ button[type="button"].close-modal-button:hover {
 
 
 .modal-content {
-  padding-top: -10px;    /* ⬆️ FELFELÉ görgethető extra tér */
-  padding-bottom: 300px; 
+  margin: 0 auto;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* ⬇️ CSAK SCROLL TÉR, NEM LAYOUT */
+.modal-content::after {
+  content: "";
+  display: block;
+  height: 300px;   /* ← ennyivel lesz hosszabb az alja */
+}
+
+body.modal-open {
+  overflow: hidden;
 }
