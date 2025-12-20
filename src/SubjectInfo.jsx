@@ -27,6 +27,7 @@ const initialNewEntry = {
   exam: "",
   year: new Date().getFullYear(),
   semester: "",
+  kepzes_fajtaja: "",   // MI | MB | MIMB
 };
 
 
@@ -196,8 +197,13 @@ const SubjectInfo = () => {
       (s) => normalizeName(s.name) === normalizeName(value)
     );
     if (exactMatch) {
-      setNewEntry((prev) => ({ ...prev, semester: exactMatch.semester }));
-    }
+      setNewEntry((prev) => ({
+        ...prev,
+        semester: exactMatch.semester,
+        kepzes_fajtaja: String(exactMatch.kepzes_fajtaja ?? ""),
+    }));
+}
+
     setShowSuggestions(true);
   };
 
@@ -207,6 +213,7 @@ const SubjectInfo = () => {
       ...prev,
       name: suggestedName,
       semester: foundSubject ? foundSubject.semester : "",
+      kepzes_fajtaja: foundSubject ? String(foundSubject.kepzes_fajtaja ?? "") : "",
     }));
     setShowSuggestions(false);
   };
@@ -227,7 +234,7 @@ const SubjectInfo = () => {
     }
   };
 
-  const openEditModal = (review, subjectName, subjectSemester) => {
+  const openEditModal = (review, subjectName, subjectSemester, subjectKepzes) => {
     setNewEntry({
       name: subjectName,
       user: review.user !== "N/A" ? review.user : "anonim",
@@ -238,6 +245,7 @@ const SubjectInfo = () => {
       exam: review.exam !== "N/A" ? review.exam : "",
       year: review.year !== "N/A" ? review.year : new Date().getFullYear(),
       semester: subjectSemester,
+      kepzes_fajtaja: subjectKepzes,
     });
     setEditingReviewId(review.id);
     setIsModalOpen(true);
@@ -287,7 +295,8 @@ const handleDelete = async (id) => {
       }
     });
     payload.user_id = userId;
-    payload.kepzes_fajtaja = kepzesMode === "BOTH" ? "MIMB" : kepzesMode;
+    payload.kepzes_fajtaja = String(newEntry.kepzes_fajtaja).toUpperCase();
+
 
     try {
       const response = await fetch(
@@ -358,13 +367,20 @@ const handleDelete = async (id) => {
       alert("Minden mezőt üresen hagytál, tölts ki legalább egyet!");
       return;
     }
+    const k = String(foundSubject.kepzes_fajtaja).toUpperCase();
+    if (!["MI", "MB", "MIMB"].includes(k)) {
+      alert("Hiba: a tárgy képzés típusa nincs jól beállítva a szerveren!");
+      setIsSubmitting(false);
+      return;
+    }
 
     const payload = {
       ...newEntry,
       user_id: userId,
       semester: foundSubject.semester,
-      kepzes_fajtaja: kepzesMode === "BOTH" ? "MIMB" : kepzesMode,
+      kepzes_fajtaja: k,
     };
+
 
     try {
       const response = await fetch(`${API_BASE_URL}/reviews`, {
@@ -618,7 +634,7 @@ const handleDelete = async (id) => {
                               <button
                                 className="edit-button"
                                 onClick={() =>
-                                  openEditModal(u, group.name, group.semester)
+                                  openEditModal(u, group.name, group.semester, group.kepzes_fajtaja)
                                 }
                               >
                                 Szerkesztés
