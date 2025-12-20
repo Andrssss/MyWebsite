@@ -34,14 +34,15 @@ export default async () => {
       return new Response("Not time yet (Budapest 21:00).", { status: 204 });
     }
 
-    // Daily unique name (one per day)
-    const keyName = `reviews-${date}.json`;
+    // ✅ FIX NÉV: mindig ezt írja felül
+    const keyName = "reviews-latest.json";
+
     const result = await runBackup(keyName);
 
     // Your runBackup currently returns { key } or key depending on your version.
     const key = typeof result === "string" ? result : result?.key ?? keyName;
 
-    return new Response(`Daily backup OK (Budapest 21:00): ${key}`, {
+    return new Response(`Daily backup OK (Budapest 21:00, ${date}): ${key}`, {
       status: 200,
     });
   } catch (err) {
