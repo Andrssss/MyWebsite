@@ -485,7 +485,7 @@ const handleDelete = async (id) => {
       <div className="search-filter-container">
         <input
           type="text"
-          placeholder="Keresés tárgy neve alapján..."
+          placeholder="Keresés tárgy vagy becenév alapján..."
           value={searchTerm}
           onChange={handleSearchTermChange}
           className="search-bar"
@@ -532,7 +532,7 @@ const handleDelete = async (id) => {
       {filteredSubjects.length > 0 ? (
         [...filteredSubjects]
           .sort((a, b) => {
-            // ✅ csak "Összes félév" + nincs keresés esetén
+            // csak "Összes félév" + nincs keresés esetén
             if (selectedSemester !== "all") return 0;
             if (searchTerm.trim() !== "") return 0;
 
