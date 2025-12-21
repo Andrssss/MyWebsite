@@ -108,30 +108,32 @@ export default function LinksLauncher({ autoOpen = false }) {
           opacity: 1;
           filter: none;
         }
-          .ll-tip {
-            margin: 16px 0 24px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
-            font-size: 0.95rem;
-            line-height: 1.5;
-          }
+        .ll-tip {
+          margin: 16px 0 24px;
+          padding: 14px 16px;
+          border-radius: 14px;
+          background: #f8fafc;
+          border: 1px solid #e5e7eb;
+          font-size: 0.95rem;
+          line-height: 1.5;
+        }
 
       `}</style>
+
+      <div className="ll-tip">
+        <strong>💡 Pro tipp:</strong> ha sok álláshirdetést nyitsz meg,
+        érdemes <strong>Tampermonkey</strong>-t vagy más userscript bővítményt használni.
+        Így automatikusan <strong>kiemelheted a számodra fontos kulcsszavakat</strong>
+        (pl. <em>intern, gyakornok, C++, embedded, remote, hybrid</em>),
+        és sokkal gyorsabban átfutod az oldalakat.
+      </div>
 
       {renderLinks('Munka portálok', JOB_PORTALS)}
       {renderLinks('Cégek', COMPANIES)}
 
       {warnModal.open && (
+        
         <div className="popup-blocker-overlay" role="dialog" aria-modal="true" aria-labelledby="warn-title">
-          <div className="ll-tip">
-            <strong>💡 Pro tipp:</strong> ha sok álláshirdetést nyitsz meg,
-            érdemes <strong>Tampermonkey</strong>-t vagy más userscript bővítményt használni.
-            Így automatikusan <strong>kiemelheted a számodra fontos kulcsszavakat</strong>
-            (pl. <em>intern, gyakornok, C++, embedded, remote, hybrid</em>),
-            és sokkal gyorsabban átfutod az oldalakat.
-          </div>
           <div className="popup-blocker-box">
             <h3 id="warn-title">Felugró ablakok – tipp</h3>
             <p>
