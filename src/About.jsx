@@ -30,18 +30,23 @@ const About = () => {
         <p>
           Hobbik terén erősnek érzem magam. Szeretek <strong>motorozni</strong>,
           szóval ha valakinek van kedve, nyugodtan keressen. Arra mindig vevő vagyok. 😄  
+          Érdekes, mert ha autót vezetek, akkor legbiztonságosabb ember vagyok. 
+          DE amint motorra ülök, akkor minden racionalitás kikapcsol. Sokszor meglep, hogy még nem tört össze semmim 4 év alatt.
           Emellett szoktam olvasni.
     
-          Imádok bütykölni és időnként jól tönkretenni dolgokat, amikor épp próbálom megjavítani a dolgokat.
+          Imádok bütykölni és időnként jól tönkretenni dolgokat, amikor épp megjavítani próbálnám őket.
+          Pl.: Laptop proci pasztázás, gondolhatod mennyire sűlt el jól. -8000ft volt az eltépett kábel.
           De hát hibákból tanul a legtöbbet az ember.
     
           Szeretek a cicussal összebújni,
           bár ez általában nem az én döntésem. xD  
           (Mert ha te emeled fel, az neki nem jó.)
+
+          Röviden talán ennyi. 
         </p>
 
         <p>
-          Jó látni, hogy sokaknak segít az oldalam,
+          Még annyi, hogy jó látni, hogy sokaknak segít az oldalam,
           mert az életben az egyik legszebb dolog
           az önzetlen adakozás.
           <br />
