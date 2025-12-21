@@ -47,6 +47,7 @@
   z-index: 10;
   min-width: 180px;
   max-width: 90vw;
+  min-height: 100px;
   text-align: left;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
   white-space: normal;
@@ -95,3 +96,4 @@
 .folder-preview:hover .emoji-icon {
   transform: scale(1.1);
 }
+
