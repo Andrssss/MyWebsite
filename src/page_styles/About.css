@@ -1,127 +1,98 @@
-
-
-
 /* About.css */
+
+/* Kártya */
 .about-container {
-    max-width: 600px;
-    margin: 20px auto;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-  
-  .about-container h2 {
-    text-align: center;
-    color: #333;
-  }
-  
-  .about-container p {
-    text-align: center;
-    font-size: 16px;
-    color: #555;
-  }
-  
-  .contact-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    margin-top: 20px;
-  }
-  
-  .contact-form label {
-    font-weight: bold;
-    color: #333;
-  }
-  
-  .contact-form input,
-  .contact-form textarea {
-    padding: 10px;
-    font-size: 14px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-  
-  .contact-form button {
-    padding: 10px;
-    font-size: 16px;
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  .contact-form button:hover {
-    background-color: #0056b3;
-  }
-  
-  .status-message {
-    text-align: center;
-    margin-top: 20px;
-    font-size: 16px;
-    color: green;
-  }
-  
-  .social-icons {
-  display: flex;
-  gap: 24px;
-  margin-top: 30px;
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.social-icons a {
-  font-size: 2.2rem;
+.about-container h2 {
+  text-align: center;
   color: #333;
-  transition: transform 0.2s ease, color 0.2s ease;
 }
 
-.social-icons a:hover {
-  transform: scale(1.15);
+/* Általános p (ha a bemutatkozó szöveg balra kell, azt lent felülírjuk) */
+.about-container p {
+  text-align: center;
+  font-size: 16px;
+  color: #555;
 }
 
-.social-icons a:hover:first-child {
-  color: #0A66C2; /* LinkedIn kék */
+/* Szöveges rész balra (ahogy nálad) */
+.about-text,
+.about-text p {
+  text-align: left;
 }
 
-.social-icons a:hover:last-child {
-  color: #E4405F; /* Instagram */
+.about-text p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
 }
 
-.contact-email {
+/* (ha tényleg használod) kontakt form */
+.contact-form {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.05rem;
-}
-
-.contact-email a {
-  color: #000;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.contact-email a:hover {
-  text-decoration: underline;
-}
-.copyable {
-  cursor: pointer;
-}
-
-.copyable:hover {
-  text-decoration: underline;
-}
-
-.social-icons {
-  display: flex;
-  gap: 24px;
+  flex-direction: column;
+  gap: 15px;
   margin-top: 20px;
 }
 
+.contact-form label {
+  font-weight: bold;
+  color: #333;
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.contact-form button {
+  padding: 10px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.contact-form button:hover {
+  background-color: #0056b3;
+}
+
+.status-message {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 16px;
+  color: green;
+}
+
+/* --- SOCIAL ICONS: a te kinézeted, csak NEM duplázva --- */
+.social-icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;        /* <-- ez volt a baj: 24 túl nagy, 12 sayed */
+  margin-top: 20px; /* marad a te 20px */
+}
+
+/* Linkek (LinkedIn, Insta) */
 .social-icons a {
+  display: inline-flex;
+  align-items: center;
+
   font-size: 2.2rem;
   color: #333;
   transition: transform 0.2s ease, color 0.2s ease;
+  text-decoration: none;
 }
 
 .social-icons a:hover {
@@ -129,10 +100,6 @@
 }
 
 /* brand színek hoverre */
-.social-icons a[aria-label="Email"]:hover {
-  color: #111;
-}
-
 .social-icons a[aria-label="LinkedIn"]:hover {
   color: #0A66C2;
 }
@@ -140,12 +107,69 @@
 .social-icons a[aria-label="Instagram"]:hover {
   color: #E4405F;
 }
-.about-text p {
-  margin-bottom: 1rem;
-  line-height: 1.6;
 
-    text-align: left;
+/* --- EMAIL: ugyanúgy ikon, mint a többinél, csak button --- */
+.email-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px; /* ikon és buborék távolság */
 }
-.about-text {
-  text-align: left;
+
+/* a gomb viselkedjen úgy, mint a link ikon */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+
+  font-size: 2.2rem; /* ugyanakkora ikon */
+  color: #333;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.icon-button:hover {
+  transform: scale(1.15);
+  color: #111; /* email hover */
+}
+
+/* kinyíló email buborék: zárva ne foglaljon helyet */
+.email-reveal {
+  overflow: hidden;
+  white-space: nowrap;
+
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-6px);
+
+  padding: 0;       /* <-- kulcs: ne csináljon rést */
+  margin: 0;
+  border-radius: 6px;
+
+  background: #222;
+  color: #fff;
+  font-size: 0.95rem;
+
+  transition:
+    max-width 0.35s ease,
+    opacity 0.25s ease,
+    transform 0.35s ease,
+    padding 0.2s ease;
+}
+
+/* nyitva: kap helyet -> tolja a 2 ikont */
+.email-block.open .email-reveal {
+  max-width: 260px;
+  opacity: 1;
+  transform: translateX(0);
+  padding: 6px 10px;
+}
+
+/* opcionális: nagyon kicsi kijelzőn kicsit kisebb legyen a buborék */
+@media (max-width: 420px) {
+  .email-block.open .email-reveal {
+    max-width: 220px;
+  }
 }

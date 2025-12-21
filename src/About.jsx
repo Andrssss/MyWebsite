@@ -1,89 +1,68 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FaLinkedin, FaInstagram, FaEnvelope } from 'react-icons/fa';
 import './page_styles/About.css';
 
 const About = () => {
+  const [showEmail, setShowEmail] = useState(false);
+
   return (
     <div className="about-main">
       <div className="about-container">
         <h2>Rövid Bemutatkozás</h2>
 
         <div className="about-text">
-        <p>
-          Szia, helo, nagyon eltévedhettél, ha ezt olvasod. 😄  
-          Végzős MI hallgató vagyok, most el is kezdtem mellette dolgozni.
-          Ami fantasztikus érzés, mert imádok dolgokat teremteni és a fejtörőket is.
-        </p>
+          <p>
+            Szia, helo, nagyon eltévedhettél, ha ezt olvasod. 😄 Végzős MI hallgató
+            vagyok, most el is kezdtem mellette dolgozni. Ami fantasztikus érzés,
+            mert imádok dolgokat teremteni és a fejlődni. Végre azt csinálom amit gyerekként is szerettem volna.
+            Nyomozó lettem. Mert az IT munka nagyrésze kitalálni 3-4 emberen keresztűl, hogy akkor mit is szeretnének. 
+            Gondolatolvasás még nem megy, de ezt tényleg nagyon élvezem. 😊
+          </p>
 
-        <p>
-          Fontos számomra a munka és az élet egyensúlya.
-          Nyilván egyetem mellett ez lehetetlen… tudom.  
-          <strong>DE</strong> most, hogy 4 év után végre szabadulok,
-          lesz időm másra is, mint monitor vagy füzet előtt ülni.
-        </p>
+          <p>
+            Fontos számomra a munka és az élet egyensúlya. Nyilván egyetem mellett
+            ez lehetetlen… tudom. <strong>DE</strong> most, hogy 4 év után végre
+            szabadulok, lesz időm másra is, mint monitor vagy füzet előtt ülni.
+          </p>
 
-        <p>
-          Anno elég <em>tryhard</em> voltam: a biztos 2-est csak akkor kapod meg,
-          ha mindent tudsz. Ez talán a jegyzeteimen is látszik.
-        </p>
+          <p>
+            Anno elég <em>tryhard</em> voltam: a biztos 2-est csak akkor kapod meg,
+            ha mindent tudsz. Ez talán a jegyzeteimen is látszik.
+          </p>
 
-        <p>
-          Hobbik terén erősnek érzem magam. Szeretek <strong>motorozni</strong>,
-          szóval ha valakinek van kedve, nyugodtan keressen. Arra mindig vevő vagyok. 😄  
-          Érdekes, mert ha autót vezetek, akkor legbiztonságosabb ember vagyok. 
-          DE amint motorra ülök, akkor minden racionalitás kikapcsol. Sokszor meglep, hogy még nem tört össze semmim 4 év alatt.
-          Emellett szoktam olvasni.
-    
-          Imádok bütykölni és időnként jól tönkretenni dolgokat, amikor épp megjavítani próbálnám őket.
-          Pl.: Laptop proci pasztázás, gondolhatod mennyire sűlt el jól. -8000ft volt az eltépett kábel.
-          De hát hibákból tanul a legtöbbet az ember.
-    
-          Szeretek a cicussal összebújni,
-          bár ez általában nem az én döntésem. xD  
-          (Mert ha te emeled fel, az neki nem jó.)
+          <p>
+            Hobbik terén erősnek érzem magam. Szeretek <strong>motorozni</strong>,
+            szóval ha valakinek van kedve, nyugodtan keressen. 😄 Érdekes, mert ha
+            autót vezetek, akkor legbiztonságosabb ember vagyok. DE amint motorra
+            ülök, akkor minden racionalitás kikapcsol. Ezen kívűl olvasni szeretek, 
+            meg srácokkal elleni valamerre. Szeretek a cicussal összebújni, bár ez általában nem az én döntésem. xD
+          </p>
 
-          Röviden talán ennyi. 
-        </p>
+          <p>
+            Kb. röviden ennyi.
+          </p>
 
-        <p>
-          Még annyi, hogy jó látni, hogy sokaknak segít az oldalam,
-          mert az életben az egyik legszebb dolog
-          az önzetlen adakozás.
-          <br />
-          De azért egy sörre meghívhatsz. xD
-        </p>
-
-        <p>
-          Köszi, hogy elolvastad - puszi, pá. 😘
-        </p>
-      </div>
-        <div className="social-icons">
-          <a
-            href="mailto:bak.andrs@gmail.com"
-            aria-label="Email"
-            title="Email"
-          >
-            <FaEnvelope />
-          </a>
-
-          <a
-            href="https://www.linkedin.com/in/SAJAT-LINKEDIN"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LinkedIn"
-          >
-            <FaLinkedin />
-          </a>
-
-          <a
-            href="https://www.instagram.com/SAJAT-INSTA"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Instagram"
-          >
-            <FaInstagram />
-          </a>
+          <p>Köszi, hogy elolvastad - puszi, pá. 😘</p>
         </div>
+
+        {/* ICON SOR */}
+        <div className="social-icons">
+  <div className={`email-block ${showEmail ? 'open' : ''}`}>
+    <button className="icon-button" onClick={() => setShowEmail(v => !v)} aria-label="Email">
+      <FaEnvelope />
+    </button>
+    <span className="email-reveal">bak.andrs@gmail.com</span>
+  </div>
+
+  <a href="https://www.linkedin.com/in/andras-bako123/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+    <FaLinkedin />
+  </a>
+
+  <a href="https://www.instagram.com/and51s/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+    <FaInstagram />
+  </a>
+</div>
+
       </div>
     </div>
   );
