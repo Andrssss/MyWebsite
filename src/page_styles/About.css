@@ -87,3 +87,65 @@
 .social-icons a:hover:last-child {
   color: #E4405F; /* Instagram */
 }
+
+.contact-email {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+}
+
+.contact-email a {
+  color: #000;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.contact-email a:hover {
+  text-decoration: underline;
+}
+.copyable {
+  cursor: pointer;
+}
+
+.copyable:hover {
+  text-decoration: underline;
+}
+
+.social-icons {
+  display: flex;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.social-icons a {
+  font-size: 2.2rem;
+  color: #333;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.social-icons a:hover {
+  transform: scale(1.15);
+}
+
+/* brand színek hoverre */
+.social-icons a[aria-label="Email"]:hover {
+  color: #111;
+}
+
+.social-icons a[aria-label="LinkedIn"]:hover {
+  color: #0A66C2;
+}
+
+.social-icons a[aria-label="Instagram"]:hover {
+  color: #E4405F;
+}
+.about-text p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
+
+    text-align: left;
+}
+.about-text {
+  text-align: left;
+}

@@ -1,4 +1,5 @@
 import  { useEffect, useState, useCallback } from 'react';
+import CopyCode from "./components/CopyCode";
 
 const JOB_PORTALS = [
   { label: 'Melódiák – gyakornoki', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki' },
@@ -34,6 +35,130 @@ const COMPANIES = [
   { label: 'prohardver – állások', url: 'https://prohardver.hu/allasok/index.html' },
 
 ];
+
+const TM_HIGHLIGHTER = String.raw`// ==UserScript==
+// @name         Job Keyword Highlighter (yellow, HU+IT)
+// @namespace    hu.job.highlight
+// @version      1.1.0
+// @description  Highlight keywords in yellow on selected job sites
+// @author       you
+// @run-at       document-end
+// @grant        none
+// @noframes     true
+
+// @match https://*.melodiak.hu/*
+// @match https://*.minddiak.hu/*
+// @match https://*.muisz.hu/*
+// @match https://*.cvcentrum.hu/*
+// @match https://*.zyntern.com/*
+// @match https://*.profession.hu/*
+// @match https://*.furgediak.hu/*
+// @match https://*.schonherz.hu/*
+// @match https://*.pannondiak.hu/*
+// @match https://*.frissdiplomas.hu/*
+// @match https://*.prodiak.hu/*
+// @match https://*.linkedin.com/*
+
+// @match https://karrier.ih.gov.hu/*
+// @match https://*.nixstech.com/*
+// @match https://*.otpbank.hu/*
+// @match https://hungarycareer.tcsapps.com/*
+// @match https://jobs.avl.com/*
+// @match https://*.molgroup.taleo.net/*
+// @match https://*.taboola.com/*
+// @match https://jobs.siemens.com/*
+// @match https://*.mediso.com/*
+// @match https://jobs.thyssenkrupp.com/*
+// @match https://jobs.continental.com/*
+// @match https://karrier.kh.hu/*
+// @match https://piller.karrierportal.hu/*
+// ==/UserScript==
+
+(() => {
+  'use strict';
+
+  // Edit this list if you want more words
+  const KEYWORDS = ["gyakornok", "intern", "IT"];
+
+  // Build a case-insensitive regex for the words (no lookbehind: max compatibility)
+  const esc = s => s.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
+  const RE = new RegExp(KEYWORDS.map(esc).join("|"), "gi");
+
+  // "Word" test that covers Latin + accents (Hungarian-friendly)
+  const WORD_CHAR = /[A-Za-z0-9_\u00C0-\u024F\u1E00-\u1EFF]/; // Latin-1 + Extended + Accents
+  const isWordChar = ch => !!ch && WORD_CHAR.test(ch);
+
+  // Don’t touch inside these tags
+  const SKIP = new Set(["SCRIPT","STYLE","NOSCRIPT","IFRAME","INPUT","TEXTAREA","CODE","PRE","SVG","MATH"]);
+
+  function highlightIn(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (t) => {
+        if (!t.nodeValue || !t.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const p = t.parentElement;
+        if (!p || SKIP.has(p.tagName) || p.isContentEditable) return NodeFilter.FILTER_REJECT;
+        // Avoid double-processing (if already wrapped)
+        if (p.closest && p.closest('.tm-hi-span')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    for (const textNode of nodes) {
+      const text = textNode.nodeValue;
+      RE.lastIndex = 0;
+      let m, last = 0, changed = false;
+      const frag = document.createDocumentFragment();
+
+      while ((m = RE.exec(text)) !== null) {
+        const i = m.index;
+        const j = i + m[0].length;
+
+        // word-boundary check without lookbehind/lookahead
+        const prev = text[i - 1];
+        const next = text[j];
+        if (isWordChar(prev) || isWordChar(next)) continue; // inside a bigger word, skip
+
+        if (i > last) frag.appendChild(document.createTextNode(text.slice(last, i)));
+
+        const span = document.createElement('span');
+        span.className = 'tm-hi-span';
+        span.style.background = 'yellow';
+        span.textContent = text.slice(i, j);
+        frag.appendChild(span);
+
+        last = j;
+        changed = true;
+      }
+
+      if (!changed) continue;
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      textNode.parentNode.replaceChild(frag, textNode);
+    }
+  }
+
+  // Initial pass
+  highlightIn(document.body);
+
+  // Handle dynamically added content (SPAs, infinite scroll)
+  let scheduled = false;
+  const observer = new MutationObserver(() => {
+    if (scheduled) return;
+    scheduled = true;
+    // throttle to once per animation frame
+    requestAnimationFrame(() => {
+      scheduled = false;
+      highlightIn(document.body);
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Debug hint
+  console.info('[Job Keyword Highlighter] active on', location.hostname);
+})();`;
+
 
 function getDomain(u) {
   try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; }
@@ -116,20 +241,26 @@ export default function LinksLauncher({ autoOpen = false }) {
           border: 1px solid #e5e7eb;
           font-size: 0.95rem;
           line-height: 1.5;
+          color: #000;
         }
 
       `}</style>
 
       <div className="ll-tip">
-        <strong>💡 Pro tipp:</strong> ha sok álláshirdetést nyitsz meg,
-        érdemes <strong>Tampermonkey</strong>-t vagy más userscript bővítményt használni.
-        Így automatikusan <strong>kiemelheted a számodra fontos kulcsszavakat</strong>
-        (pl. <em>intern, gyakornok, C++, embedded, remote, hybrid</em>),
-        és sokkal gyorsabban átfutod az oldalakat.
+        <strong>💡 Pro tipp:</strong> Tampermonkey (vagy más userscript) segítségével
+        automatikusan <strong>kiemelheted</strong> a kulcsszavakat az álláshirdetésekben.
+        Így gyorsabban átfutod az oldalakat. Erre alul van egy mintakód, amit anno én használtam. Ezt bemásolod a Tampermonkey-ban és kész is.
       </div>
+
+      
 
       {renderLinks('Munka portálok', JOB_PORTALS)}
       {renderLinks('Cégek', COMPANIES)}
+
+      <CopyCode
+        code={TM_HIGHLIGHTER}
+        label="Tampermonkey – Kulcsszó kiemelő script (másold be)"
+      />
 
       {warnModal.open && (
         

@@ -94,7 +94,7 @@ useEffect(() => {
               <li><Link to="/masok_oldalai" onClick={() => setMenuOpen(false)}>Mások oldalai</Link></li>
               <li><Link to="/User_oldalak" onClick={() => setMenuOpen(false)}>User oldalak</Link></li>
               <li><Link to="/gyakornoki_poziciok" onClick={() => setMenuOpen(false)}>Gyakornoki linkek</Link></li>
-              <li><Link to="/kapcsolat" onClick={() => setMenuOpen(false)}>Kapcsolat</Link></li>
+              <li><Link to="/rolam" onClick={() => setMenuOpen(false)}>Rólam</Link></li>
             </ul>
 
           </nav>
@@ -112,7 +112,7 @@ useEffect(() => {
                 <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
                 <li><Link to="/User_oldalak">🧭 User oldalak</Link></li>
                 <li><Link to="/gyakornoki_poziciok">💼 Gyakornoki pozi</Link></li>
-                <li><Link to="/kapcsolat">📬 Kapcsolat</Link></li>
+                <li><Link to="/rolam">👤 Rólam</Link></li>
                 
               </ul>
             </nav>
@@ -127,7 +127,7 @@ useEffect(() => {
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
           <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
           <Route path="/User_oldalak" element={<User_pages />} />
-          <Route path="/kapcsolat" element={<About />} />
+          <Route path="/rolam" element={<About />} />
           <Route
             path="/gyakornoki_poziciok"
             element={<div className="main-content re-page"><LinksLauncher /></div>}
@@ -151,7 +151,6 @@ const App = () => (
 
 
 
-// npm run dev -- --host
 
 
 export default App;
