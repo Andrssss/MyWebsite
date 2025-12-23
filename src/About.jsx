@@ -12,11 +12,11 @@ const About = () => {
 
         <div className="about-text">
           <p>
-            Szia, helo, nagyon eltévedhettél, ha ezt olvasod. 😄 Végzős MI hallgató
+            Szia, hello, nagyon eltévedhettél, ha ezt olvasod. 😄 Végzős Mérnökinformatikus hallgató
             vagyok, most el is kezdtem mellette dolgozni. Ami fantasztikus érzés,
             mert imádok dolgokat teremteni és a fejlődni. Végre azt csinálom amit gyerekként is szerettem volna.
             Nyomozó lettem. Mert az IT munka nagyrésze kitalálni 3-4 emberen keresztűl, hogy akkor mit is szeretnének. 
-            Gondolatolvasás még nem megy, de ezt tényleg nagyon élvezem. 😊
+            Gondolatolvasás még nem megy, de egyre jobb vagyok benne. 😊
           </p>
 
           <p>
@@ -27,15 +27,17 @@ const About = () => {
 
           <p>
             Anno elég <em>tryhard</em> voltam: a biztos 2-est csak akkor kapod meg,
-            ha mindent tudsz. Ez talán a jegyzeteimen is látszik.
+            ha mindent tudsz. Ez talán a jegyzeteimen is látszik. Erre is talán büszke vagyok. 
+            Sajnos a PPKE-n szerzett tudás nagy része haszontalan, szóval inkább a skillek miatt érte meg. (interjúkon szétszedtek)
           </p>
 
           <p>
             Hobbik terén erősnek érzem magam. Szeretek <strong>motorozni</strong>,
-            szóval ha valakinek van kedve, nyugodtan keressen. 😄 Érdekes, mert ha
-            autót vezetek, akkor legbiztonságosabb ember vagyok. DE amint motorra
-            ülök, akkor minden racionalitás kikapcsol. Ezen kívűl olvasni szeretek, 
-            meg srácokkal elleni valamerre. Szeretek a cicussal összebújni, bár ez általában nem az én döntésem. xD
+            szóval ha valakinek van kedve, nyugodtan keressen. 😄 Mellette kocsikázni is szeretek, főleg este, amikor kevés a sün.
+            Ezen kívűl olvasni szeretek, 
+            meg srácokkal elleni valamerre. Párommal random helyeket felfedezni. 
+            Művészet terén a főzés az én szívem választottja.
+            Szeretek a cicussunkkal összebújni, bár ez általában nem az én döntésem. xD
           </p>
 
           <p>

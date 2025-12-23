@@ -500,3 +500,7 @@ body.modal-open {
   height: 100%;
 }
 
+.preserve-newlines {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

@@ -12,6 +12,18 @@ const normalizeName = (str) =>
     .trim()
     .normalize("NFC");
 
+const decodeNewlines = (s) =>
+  String(s ?? "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n/g, "\n");
+
+
+const encodeNewlines = (s) =>
+  String(s ?? "")
+    .replace(/\r\n/g, "\n")   // Windows -> egységesít
+    .replace(/\n/g, "\\n");   // valódi newline -> "\n" szöveg
+
 
 // Közvetlenül a Netlify functiont hívjuk
 const API_BASE_URL = "/.netlify/functions";
@@ -239,14 +251,19 @@ const SubjectInfo = () => {
       name: subjectName,
       user: review.user !== "N/A" ? review.user : "anonim",
       difficulty: review.difficulty !== "N/A" ? review.difficulty : "",
-      general: review.general !== "N/A" ? review.general : "",
+      general:
+        review.general !== "N/A" ? decodeNewlines(review.general) : "",
       duringSemester:
-        review.duringSemester !== "N/A" ? review.duringSemester : "",
-      exam: review.exam !== "N/A" ? review.exam : "",
+        review.duringSemester !== "N/A"
+          ? decodeNewlines(review.duringSemester)
+          : "",
+      exam:
+        review.exam !== "N/A" ? decodeNewlines(review.exam) : "",
       year: review.year !== "N/A" ? review.year : new Date().getFullYear(),
       semester: subjectSemester,
       kepzes_fajtaja: subjectKepzes,
     });
+
     setEditingReviewId(review.id);
     setIsModalOpen(true);
   };
@@ -294,9 +311,19 @@ const handleDelete = async (id) => {
         payload[key] = newEntry[key];
       }
     });
+
     payload.user_id = userId;
     payload.kepzes_fajtaja = String(newEntry.kepzes_fajtaja).toUpperCase();
 
+    //  SORTÖRÉSEK KÓDOLÁSA UPDATE-NÉL
+    if (payload.general !== undefined)
+      payload.general = encodeNewlines(payload.general);
+
+    if (payload.duringSemester !== undefined)
+      payload.duringSemester = encodeNewlines(payload.duringSemester);
+
+    if (payload.exam !== undefined)
+      payload.exam = encodeNewlines(payload.exam);
 
     try {
       const response = await fetch(
@@ -376,10 +403,14 @@ const handleDelete = async (id) => {
 
     const payload = {
       ...newEntry,
+      general: encodeNewlines(newEntry.general),
+      duringSemester: encodeNewlines(newEntry.duringSemester),
+      exam: encodeNewlines(newEntry.exam),
       user_id: userId,
       semester: foundSubject.semester,
       kepzes_fajtaja: k,
     };
+
 
 
     try {
@@ -664,20 +695,24 @@ const handleDelete = async (id) => {
                           </p>
                         )}
                         {u.general && (
-                          <p>
-                            <strong>Általános:</strong> {u.general}
+                          <p className="preserve-newlines">
+                            <strong>Általános:</strong>{" "}
+                            {decodeNewlines(u.general)}
                           </p>
                         )}
                         {u.duringSemester !== "N/A" && (
-                          <p>
-                            <strong>Évközben:</strong> {u.duringSemester}
+                          <p className="preserve-newlines">
+                            <strong>Évközben:</strong>{" "}
+                            {decodeNewlines(u.duringSemester)}
                           </p>
                         )}
                         {u.exam !== "N/A" && (
-                          <p>
-                            <strong>Vizsga:</strong> {u.exam}
+                          <p className="preserve-newlines">
+                            <strong>Vizsga:</strong>{" "}
+                            {decodeNewlines(u.exam)}
                           </p>
                         )}
+
                       </>
                     )}
                   </div>
