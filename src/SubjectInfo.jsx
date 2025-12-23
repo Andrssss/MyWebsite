@@ -700,18 +700,20 @@ const handleDelete = async (id) => {
                             {decodeNewlines(u.general)}
                           </p>
                         )}
-                        {u.duringSemester !== "N/A" && (
+                        {String(u.duringSemester ?? "").trim() !== "" && u.duringSemester !== "N/A" && (
                           <p className="preserve-newlines">
                             <strong>Évközben:</strong>{" "}
                             {decodeNewlines(u.duringSemester)}
                           </p>
                         )}
-                        {u.exam !== "N/A" && (
+
+                        {String(u.exam ?? "").trim() !== "" && u.exam !== "N/A" && (
                           <p className="preserve-newlines">
                             <strong>Vizsga:</strong>{" "}
                             {decodeNewlines(u.exam)}
                           </p>
                         )}
+
 
                       </>
                     )}
