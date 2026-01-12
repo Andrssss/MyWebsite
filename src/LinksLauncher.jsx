@@ -15,8 +15,10 @@ const JOB_PORTALS = [
   { label: 'Pannondiak ', url: 'https://pannondiak.hu/jobs/?category%5B%5D=250&category%5B%5D=1845&category%5B%5D=1848' },
   { label: 'Frissdiplomás – állások', url: 'https://www.frissdiplomas.hu/allasok' },
   { label: 'Prodiák – IT állások', url: 'https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/osszes/kulfold' },
+  { label: 'Qdiák', url: 'https://cloud.qdiak.hu/munkak' },
   { label: 'LinkedIn – PAST 24H', url: 'https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R' }
 ];
+
 
 const COMPANIES = [
   { label: 'GOV.HU – állások', url: 'https://karrier.ih.gov.hu/index.php/nyitott-poziciok/' },
