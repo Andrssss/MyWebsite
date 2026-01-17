@@ -59,7 +59,8 @@ const TM_HIGHLIGHTER = String.raw`// ==UserScript==
 // @match https://*.pannondiak.hu/*
 // @match https://*.frissdiplomas.hu/*
 // @match https://*.prodiak.hu/*
-// @match https://*.linkedin.com/*
+// @match https://*.qdiak.hu/*
+// @match https://*.linkedin.com/*  
 
 // @match https://karrier.ih.gov.hu/*
 // @match https://*.nixstech.com/*
