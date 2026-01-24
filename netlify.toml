@@ -19,5 +19,5 @@
 [functions]
   node_bundler = "esbuild"
 
-[functions."scrape-jobs"]
+[functions."scrape_jobs"]
   schedule = "0 4 * * *"
