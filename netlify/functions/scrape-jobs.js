@@ -1,4 +1,9 @@
 // netlify/functions/scrape-jobs.js
+// ✅ MUST be first (before any require/import)
+global.File ??= class File {};
+global.Blob ??= class Blob {};
+global.FormData ??= class FormData {};
+
 const axios = require("axios");
 const cheerio = require("cheerio");
 const { Pool } = require("pg");
@@ -185,17 +190,23 @@ function isAuthorized(event) {
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
+
+  // 🧪 DEBUG – csak teszteléshez
+  if (event.queryStringParameters?.debug === "1") {
     return {
-      statusCode: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, x-scrape-secret",
-      },
-      body: "",
+      statusCode: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        nodeVersion: process.version,
+        hasFile: typeof File !== "undefined",
+        hasBlob: typeof Blob !== "undefined",
+        hasFormData: typeof FormData !== "undefined",
+      }),
     };
   }
+
+  // ⬇️ IDE jön a scraper valódi kódja
+
 
   if (!isAuthorized(event)) {
     return json(401, { ok: false, error: "Unauthorized. Missing/invalid key." });
