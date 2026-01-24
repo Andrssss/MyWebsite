@@ -1,16 +1,214 @@
-.job-search{
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(0,0,0,0.35);
-  color: #fff;
-  outline: none;
+/* ====== ROOT ====== */
+.job-watcher {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  color: #eaeaea;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.job-tab-count{
-  margin-left: 8px;
+/* ====== HEADER ====== */
+.job-watcher-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.job-watcher h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.job-meta {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #a0a0a0;
+}
+
+/* ====== ACTIONS ====== */
+.job-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.job-search {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  min-width: 220px;
+}
+
+.job-search::placeholder {
+  color: #888;
+}
+
+.job-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #ccc;
+}
+
+.job-checkbox input {
+  accent-color: #4f8cff;
+}
+
+.job-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #4f8cff, #6aa9ff);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.job-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(79, 140, 255, 0.35);
+}
+
+.job-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ====== TABS ====== */
+.job-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.job-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: #ccc;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.job-tab:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.job-tab.active {
+  background: linear-gradient(135deg, #4f8cff, #6aa9ff);
+  color: #fff;
+  border-color: transparent;
+}
+
+.job-tab-count {
+  background: rgba(255,255,255,0.25);
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
+}
+
+/* ====== STATUS ====== */
+.job-status {
+  margin: 24px 0;
+  color: #aaa;
+  font-size: 15px;
+}
+
+/* ====== LIST ====== */
+.job-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* ====== CARD ====== */
+.job-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 18px 20px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.job-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+}
+
+/* ====== CARD HEADER ====== */
+.job-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.job-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.job-title:hover {
+  text-decoration: underline;
+}
+
+.job-source {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
   background: rgba(255,255,255,0.12);
+  color: #ddd;
+  white-space: nowrap;
+}
+
+/* ====== DESCRIPTION ====== */
+.job-desc {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #cfcfcf;
+  line-height: 1.5;
+}
+
+/* ====== META ====== */
+.job-meta {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+  color: #aaa;
+  align-items: center;
+}
+
+.job-meta .dot {
+  opacity: 0.6;
+}
+
+/* ====== BADGE ====== */
+.job-badge {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  color: #0f2a1a;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
 }
