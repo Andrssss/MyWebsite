@@ -17,11 +17,39 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
       ...extraHeaders,
     },
     body: JSON.stringify(body),
   };
 }
+
+// ✅ ugyanaz a FIXED lista, mint a cronban (key/label/url)
+const FIXED = [
+  { key: "melodiak", label: "Melódiák – gyakornoki", url: "https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki" },
+  { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/position?page=2" },
+  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-intern-it", label: "CV Centrum – intern IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=16" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
+  { key: "profession-gyakornok", label: "Profession – Gyakornok", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
+  { key: "furgediak", label: "Fürge Diák – gyakornok", url: "https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7" },
+  { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
+  { key: "pannondiak", label: "Pannondiak", url: "https://pannondiak.hu/jobs/?category%5B%5D=250&category%5B%5D=1845&category%5B%5D=1848&regio%5B%5D=267#job_list" },
+  { key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
+  { key: "qdiak", label: "Qdiák", url: "https://cloud.qdiak.hu/munkak" },
+  { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
+  { key: "nix-junior", label: "NIX – junior", url: "https://nixstech.com/hu/allasok/?level=junior-hu" },
+  { key: "nix-trainee", label: "NIX – trainee", url: "https://nixstech.com/hu/allasok/?level=trainee-hu" },
+  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=" },
+  { key: "mol", label: "MOL", url: "https://molgroup.taleo.net/careersection/external/jobsearch.ftl?lang=hu" },
+  { key: "taboola", label: "TABOOLA", url: "https://www.taboola.com/careers/jobs#team=&location=31734" },
+  { key: "mediso", label: "MEDISO", url: "https://mediso.com/global/hu/career?search=&location=&category=9" },
+  { key: "continental", label: "CONTINENTAL", url: "https://jobs.continental.com/hu/#/?fieldOfWork_stringS=3a2330f4-2793-4895-b7c7-aee9c965ae22,b99ff13c-96c8-4a72-b427-dec7effd7338&location=%7B%22title%22:%22Magyarorsz%C3%A1g%22,%22type%22:%22country%22,%22countryCode%22:%22hu%22%7D&searchTerm=intern" },
+  { key: "kh", label: "K+H", url: "https://karrier.kh.hu/allasok?q=c3BlY2lhbGl0aWVzJTVCJTVEJTNESVQlMjAlQzMlQTlzJTIwaW5ub3YlQzMlQTFjaSVDMyVCMyUyNmNpdGllcyU1QiU1RCUzREJ1ZGFwZXN0JTI2#!" },
+  { key: "piller", label: "PILLER", url: "https://piller.karrierportal.hu/allasok?q=Y2l0aWVzJTVCJTVEJTNEQnVkYXBlc3QlMjYuuzzuuzz#!" },
+];
 
 exports.handler = async (event) => {
   const client = await pool.connect();
@@ -44,53 +72,22 @@ exports.handler = async (event) => {
       };
     }
 
-    // GET /jobs?source=...&limit=...
     if (method === "GET") {
       const qs = event.queryStringParameters || {};
       const source = qs.source || null;
       const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 1000);
 
-      // ✅ ÚJ: GET /jobs/sources  (források listája tabokhoz)
-      // Netlify path tipikusan: "/.netlify/functions/jobs/sources"
-      // ✅ GET /jobs/sources  (fix lista + DB stat)
+      // ✅ GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
-        const FIXED = [
-          { key: "melodiak", label: "Melódiák – gyakornoki", url: "https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki" },
-          { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/position?page=2" },
-          { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
-          { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
-          { key: "cvcentrum-intern-it", label: "CV Centrum – intern IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
-          { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=16" },
-          { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
-          { key: "profession-gyakornok", label: "Profession – Gyakornok", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
-          { key: "furgediak", label: "Fürge Diák – gyakornok", url: "https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7" },
-          { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
-          { key: "pannondiak", label: "Pannondiak", url: "https://pannondiak.hu/jobs/?category%5B%5D=250&category%5B%5D=1845&category%5B%5D=1848&regio%5B%5D=267#job_list" },
-          { key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
-          { key: "qdiak", label: "Qdiák", url: "https://cloud.qdiak.hu/munkak" },
-          { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
-          { key: "nix-junior", label: "NIX – junior", url: "https://nixstech.com/hu/allasok/?level=junior-hu" },
-          { key: "nix-trainee", label: "NIX – trainee", url: "https://nixstech.com/hu/allasok/?level=trainee-hu" },
-          { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=" },
-          { key: "mol", label: "MOL", url: "https://molgroup.taleo.net/careersection/external/jobsearch.ftl?lang=hu" },
-          { key: "taboola", label: "TABOOLA", url: "https://www.taboola.com/careers/jobs#team=&location=31734" },
-          { key: "mediso", label: "MEDISO", url: "https://mediso.com/global/hu/career?search=&location=&category=9" },
-          { key: "continental", label: "CONTINENTAL", url: "https://jobs.continental.com/hu/#/?fieldOfWork_stringS=3a2330f4-2793-4895-b7c7-aee9c965ae22,b99ff13c-96c8-4a72-b427-dec7effd7338&location=%7B%22title%22:%22Magyarorsz%C3%A1g%22,%22type%22:%22country%22,%22countryCode%22:%22hu%22%7D&searchTerm=intern" },
-          { key: "kh", label: "K+H", url: "https://karrier.kh.hu/allasok?q=c3BlY2lhbGl0aWVzJTVCJTVEJTNESVQlMjAlQzMlQTlzJTIwaW5ub3YlQzMlQTFjaSVDMyVCMyUyNmNpdGllcyU1QiU1RCUzREJ1ZGFwZXN0JTI2#!" },
-          { key: "piller", label: "PILLER", url: "https://piller.karrierportal.hu/allasok?q=Y2l0aWVzJTVCJTVEJTNEQnVkYXBlc3QlMjYuuzzuuzz#!" },
-        ];
-
         const { rows } = await client.query(`
-          SELECT
-            source AS key,
-            COUNT(*)::int AS count,
-            MAX(last_seen) AS "lastSeen"
+          SELECT source AS key,
+                 COUNT(*)::int AS count,
+                 MAX(last_seen) AS "lastSeen"
           FROM job_posts
           GROUP BY source
         `);
 
         const map = new Map(rows.map((r) => [r.key, r]));
-
         const out = FIXED.map((s) => ({
           key: s.key,
           label: s.label,
@@ -99,10 +96,10 @@ exports.handler = async (event) => {
           lastSeen: map.get(s.key)?.lastSeen ?? null,
         }));
 
-        return jsonResponse(200, out, { "Access-Control-Allow-Origin": "*" });
+        return jsonResponse(200, out);
       }
 
-
+      // GET /jobs/:id
       if (id) {
         const { rows } = await client.query(
           `SELECT id, source, title, url, description,
@@ -112,10 +109,11 @@ exports.handler = async (event) => {
            WHERE id = $1`,
           [id]
         );
-        if (rows.length === 0) return jsonResponse(404, { error: "Nem található." }, { "Access-Control-Allow-Origin": "*" });
-        return jsonResponse(200, rows[0], { "Access-Control-Allow-Origin": "*" });
+        if (rows.length === 0) return jsonResponse(404, { error: "Nem található." });
+        return jsonResponse(200, rows[0]);
       }
 
+      // GET /jobs?source=...
       if (source) {
         const { rows } = await client.query(
           `SELECT id, source, title, url, description,
@@ -127,9 +125,10 @@ exports.handler = async (event) => {
            LIMIT $2`,
           [source, limit]
         );
-        return jsonResponse(200, rows, { "Access-Control-Allow-Origin": "*" });
+        return jsonResponse(200, rows);
       }
 
+      // GET /jobs
       const { rows } = await client.query(
         `SELECT id, source, title, url, description,
                 first_seen AS "firstSeen",
@@ -139,13 +138,12 @@ exports.handler = async (event) => {
          LIMIT $1`,
         [limit]
       );
-      return jsonResponse(200, rows, { "Access-Control-Allow-Origin": "*" });
+      return jsonResponse(200, rows);
     }
 
-    // DELETE /jobs/:id
     if (method === "DELETE" && id) {
       const { rowCount } = await client.query(`DELETE FROM job_posts WHERE id = $1`, [id]);
-      if (rowCount === 0) return jsonResponse(404, { error: "Nincs ilyen id." }, { "Access-Control-Allow-Origin": "*" });
+      if (rowCount === 0) return jsonResponse(404, { error: "Nincs ilyen id." });
 
       return {
         statusCode: 204,
@@ -157,10 +155,10 @@ exports.handler = async (event) => {
       };
     }
 
-    return jsonResponse(405, { error: "Nem támogatott HTTP metódus." }, { "Access-Control-Allow-Origin": "*" });
+    return jsonResponse(405, { error: "Nem támogatott HTTP metódus." });
   } catch (err) {
     console.error("Function error:", err);
-    return jsonResponse(500, { error: "Szerver hiba", details: err.message }, { "Access-Control-Allow-Origin": "*" });
+    return jsonResponse(500, { error: "Szerver hiba", details: err.message });
   } finally {
     client.release();
   }

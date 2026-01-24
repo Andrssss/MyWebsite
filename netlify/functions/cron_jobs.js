@@ -1,3 +1,5 @@
+// netlify/functions/cron_jobs.js
+
 globalThis.File ??= class File {};
 globalThis.Blob ??= class Blob {};
 globalThis.FormData ??= class FormData {};
@@ -7,9 +9,7 @@ const http = require("http");
 const cheerio = require("cheerio");
 const { Pool } = require("pg");
 
-exports.config = {
-  schedule: "0 4 * * *", // 04:00 UTC (~05:00 Budapest télen)
-};
+// ⚠️ NINCS schedule itt -> wrapper functionök kapnak schedule-t
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -22,12 +22,16 @@ const pool = new Pool({
 function json(statusCode, body) {
   return {
     statusCode,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    },
     body: JSON.stringify(body),
   };
 }
 
-const JOB_PORTALS = [
+// ✅ VÉGLEGES forráslista: key + label + url
+const SOURCES = [
   { key: "melodiak", label: "Melódiák – gyakornoki", url: "https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki" },
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/position?page=2" },
   { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
@@ -53,8 +57,6 @@ const JOB_PORTALS = [
   { key: "piller", label: "PILLER", url: "https://piller.karrierportal.hu/allasok?q=Y2l0aWVzJTVCJTVEJTNEQnVkYXBlc3QlMjYuuzzuuzz#!" },
 ];
 
-
-
 const KEYWORDS = [
   "gyakornok",
   "intern",
@@ -65,73 +67,62 @@ const KEYWORDS = [
   "data",
   "business",
   "developer",
-  "devops"
 ];
 
 function stripAccents(s) {
-  return String(s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-
 function normalizeText(s) {
-  return stripAccents(String(s ?? ""))
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  return stripAccents(String(s ?? "")).replace(/\s+/g, " ").trim().toLowerCase();
 }
-
-// IT special: only match as separate token or uppercase IT in original
 function matchesIT(original, normalized) {
   if (/\bIT\b/.test(String(original ?? ""))) return true;
-  // normalized "it" token as separate word
   return /\bit\b/.test(normalized);
 }
-
 function matchesKeywords(title, desc) {
   const original = `${title ?? ""} ${desc ?? ""}`;
   const n = normalizeText(original);
-
-  // IT külön kezelés, hogy ne legyen fals pozitív
   const itOk = matchesIT(original, n);
-
   const kwOk = KEYWORDS.some((kw) => n.includes(normalizeText(kw)));
-
-  // akkor engedjük át, ha:
-  // - van rendes kulcsszó, vagy
-  // - IT találat + mellette van valami szakmai jellegű (developer/data/business/fejleszt)
   if (kwOk) return true;
-
   if (itOk) {
     const extra = ["developer", "data", "business", "fejleszt", "trainee", "intern", "internship"].some((k) =>
       n.includes(k)
     );
     return extra;
   }
-
   return false;
 }
 
-function absolutize(href, base) {
+function normalizeWhitespace(s) {
+  return String(s ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeUrl(raw) {
   try {
-    return new URL(href, base).toString();
+    const u = new URL(raw);
+    u.hash = "";
+    ["utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid"].forEach(p => u.searchParams.delete(p));
+    return u.toString().replace(/\?$/, "");
   } catch {
-    return null;
+    return raw;
   }
+}
+
+function absolutize(href, base) {
+  try { return new URL(href, base).toString(); } catch { return null; }
 }
 
 function dedupeByUrl(items) {
   const seen = new Set();
   return items.filter((x) => {
     if (!x.url) return false;
-    if (seen.has(x.url)) return false;
-    seen.add(x.url);
+    const u = normalizeUrl(x.url);
+    if (seen.has(u)) return false;
+    seen.add(u);
+    x.url = u;
     return true;
   });
-}
-
-function normalizeWhitespace(s) {
-  return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
 function fetchText(url, redirectLeft = 5) {
@@ -148,7 +139,7 @@ function fetchText(url, redirectLeft = 5) {
           "Accept": "text/html,application/xhtml+xml",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
         },
-        timeout: 25000,
+        timeout: 12000, // ✅ kisebb timeout, hogy ne fogja meg a futást
       },
       (res) => {
         const code = res.statusCode || 0;
@@ -178,7 +169,7 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
-// Heurisztikus kinyerés: "értelmes" linkek + cím környezetből
+// Heurisztikus link kinyerés
 function extractCandidates(html, baseUrl) {
   const $ = cheerio.load(html);
   const items = [];
@@ -190,11 +181,9 @@ function extractCandidates(html, baseUrl) {
     const url = absolutize(href, baseUrl);
     if (!url) return;
 
-    // csak http(s) és ne legyen asset
     if (!/^https?:\/\//i.test(url)) return;
     if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
 
-    // cím: link szöveg vagy közeli heading
     let title = normalizeWhitespace($(el).text());
     if (!title || title.length < 4) {
       const card = $(el).closest("article, li, .card, .item, .job, .position, .listing, div");
@@ -202,24 +191,15 @@ function extractCandidates(html, baseUrl) {
         normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
         normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
     }
-
     if (!title || title.length < 4) return;
 
-    // kis extra leírás próbálkozás
     const card2 = $(el).closest("article, li, .card, .item, .job, .position, .listing, div");
-    const desc =
-      normalizeWhitespace(card2.find("p").first().text()) ||
-      null;
+    const desc = normalizeWhitespace(card2.find("p").first().text()) || null;
 
     items.push({ title: title.slice(0, 300), url, description: desc ? desc.slice(0, 800) : null });
   });
 
   return dedupeByUrl(items);
-}
-
-function portalSourceKey(label) {
-  // label -> forrás kulcs (db source mező)
-  return normalizeText(label).replace(/[^a-z0-9]+/g, "-").slice(0, 50) || "source";
 }
 
 async function upsertJob(client, source, item) {
@@ -235,20 +215,31 @@ async function upsertJob(client, source, item) {
       description = COALESCE(EXCLUDED.description, job_posts.description),
       last_seen = NOW()
     `,
-    [
-      source,            // $1
-      item.title,        // $2
-      item.url,          // $3
-      item.description,  // $4
-    ]
+    [source, item.title, item.url, item.description]
   );
 }
 
-exports.handler = async () => {
+function pickBatch(list, batchIndex = 0, batchSize = 3) {
+  const start = batchIndex * batchSize;
+  return list.slice(start, start + batchSize);
+}
+
+exports.SOURCES = SOURCES; // ✅ megosztjuk jobs.js-nek is, ha szeretnéd require-ral
+
+exports.handler = async (event) => {
+  const qs = event.queryStringParameters || {};
+  const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
+  const batchSize = Math.min(Math.max(parseInt(qs.size || "3", 10) || 3, 1), 6);
+
   const client = await pool.connect();
+
   const stats = {
     ok: true,
     node: process.version,
+    ranAt: new Date().toISOString(),
+    batch,
+    batchSize,
+    totalSources: SOURCES.length,
     portals: [],
     totalFetched: 0,
     totalCandidates: 0,
@@ -257,7 +248,13 @@ exports.handler = async () => {
   };
 
   try {
-    for (const p of JOB_PORTALS) {
+    const list = pickBatch(SOURCES, batch, batchSize);
+
+    if (list.length === 0) {
+      return json(200, { ...stats, message: "No sources for this batch (done)." });
+    }
+
+    for (const p of list) {
       const source = p.key;
 
       let html;
@@ -265,7 +262,6 @@ exports.handler = async () => {
         html = await fetchText(p.url);
         stats.totalFetched++;
       } catch (err) {
-        // ne álljon meg az egész scraper egy site miatt
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
@@ -294,7 +290,6 @@ exports.handler = async () => {
       });
     }
 
-    stats.ranAt = new Date().toISOString();
     return json(200, stats);
   } catch (err) {
     console.error(err);
