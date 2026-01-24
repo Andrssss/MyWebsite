@@ -158,48 +158,8 @@ function keywordHit(title, desc) {
   return KEYWORDS.filter((k) => n.includes(normalizeText(k)));
 }
 
-const CTA_TITLES = new Set([
-  "megnézem",
-  "megnezem",
-  "részletek",
-  "reszletek",
-  "tovább",
-  "tovabb",
-  "bővebben",
-  "bovebben",
-  "jelentkezem",
-  "jelentkezés",
-  "jelentkezes",
-  "apply",
-  "details",
-  "view",
-  "open",
-  "more",
-]);
-
-function isCtaTitle(s) {
-  const n = normalizeText(s);
-  return !n || n.length < 4 || CTA_TITLES.has(n);
-}
-
 // =====================
-// Debug: find API hints in HTML
-// =====================
-function findApiHints(html) {
-  const hints = new Set();
-
-  (html.match(/https?:\/\/[^"' ]+(api|graphql)[^"' ]+/gi) || []).forEach((x) => hints.add(x));
-  (html.match(/\/(api|graphql)\/[^"' ]+/gi) || []).forEach((x) => hints.add(x));
-
-  (html.match(/(apiUrl|baseUrl|endpoint|jobSearch|searchJobs)[^<]{0,200}/gi) || [])
-    .slice(0, 20)
-    .forEach((x) => hints.add(x));
-
-  return [...hints].slice(0, 30);
-}
-
-// =====================
-// Site-specific extraction (Melódiák)
+// Melódiák extraction (SSR HTML)
 // =====================
 function extractMelodiakCards(html) {
   const $ = cheerio.load(html);
@@ -217,7 +177,6 @@ function extractMelodiakCards(html) {
     const cls = $el.attr("class") || "";
     const tokens = cls.split(/\s+/).filter(Boolean);
 
-    // prefer token with prefix if present
     const rawSlug =
       tokens.find((t) => t.startsWith("job-list-component-")) ||
       tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) ||
@@ -228,13 +187,10 @@ function extractMelodiakCards(html) {
     const slug = rawSlug.replace(/^job-list-component-/, "");
     const url = `https://www.melodiak.hu/diakmunkak/${slug}/`;
 
-    const desc =
-      normalizeWhitespace($el.find(".job-desc, .job-description, p").first().text()) || null;
-
     items.push({
       title: title.slice(0, 300),
       url,
-      description: desc ? desc.slice(0, 800) : null,
+      description: null,
     });
   });
 
@@ -242,7 +198,7 @@ function extractMelodiakCards(html) {
 }
 
 // =====================
-// Fetch HTML
+// Fetch (supports gzip/deflate/br + redirect)
 // =====================
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
@@ -255,7 +211,7 @@ function fetchText(url, redirectLeft = 5) {
         method: "GET",
         headers: {
           "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml",
+          Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
         },
@@ -298,57 +254,6 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 // =====================
-// Generic extraction
-// =====================
-function extractCandidates(html, baseUrl) {
-  const $ = cheerio.load(html);
-  const items = [];
-
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-
-    const url = absolutize(href, baseUrl);
-    if (!url) return;
-
-    if (!/^https?:\/\//i.test(url)) return;
-    if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
-
-    // not too broad
-    let card = $(el).closest(
-      "app-job-list-item, article, li, .job-list-item, .job, .position, .listing, .card, .item"
-    );
-    if (!card.length) card = $(el).closest("div");
-
-    const linkText = normalizeWhitespace($(el).text());
-    const headingText =
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
-      normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
-
-    let title = linkText;
-    if (headingText && (isCtaTitle(linkText) || headingText.length > linkText.length + 3)) {
-      title = headingText;
-    }
-
-    title = normalizeWhitespace(title);
-    if (!title || title.length < 4) return;
-
-    const desc =
-      normalizeWhitespace(card.find("p").first().text()) ||
-      normalizeWhitespace(card.find(".description, .job-desc, .job-description").first().text()) ||
-      null;
-
-    items.push({
-      title: title.slice(0, 300),
-      url,
-      description: desc ? desc.slice(0, 800) : null,
-    });
-  });
-
-  return dedupeByUrl(items);
-}
-
-// =====================
 // DB upsert
 // =====================
 async function upsertJob(client, source, item) {
@@ -373,34 +278,74 @@ function pickBatch(list, batchIndex = 0, batchSize = 3) {
 }
 
 // =====================
+// Bundle debug helpers (for Melódiák API discovery)
+// =====================
+function extractScriptSrcs(html, baseUrl) {
+  const $ = cheerio.load(html);
+  return $("script[src]")
+    .map((_, s) => absolutize($(s).attr("src"), baseUrl))
+    .get()
+    .filter(Boolean);
+}
+
+function findBundleApiHints(jsText) {
+  const hits = new Set();
+
+  // általános endpoint minták
+  (jsText.match(/\/api\/[a-z0-9_\-\/]+/gi) || []).forEach((x) => hits.add(x));
+  (jsText.match(/\/graphql\b/gi) || []).forEach((x) => hits.add(x));
+  (jsText.match(/https?:\/\/[^"' ]+\/api\/[^"' ]+/gi) || []).forEach((x) => hits.add(x));
+
+  // job/search minták (Angular appoknál gyakori)
+  (jsText.match(/\/(jobs?|works?|positions?|search)[a-z0-9_\-\/]*/gi) || [])
+    .slice(0, 200)
+    .forEach((x) => {
+      if (x.length >= 6) hits.add(x);
+    });
+
+  return [...hits].slice(0, 80);
+}
+
+function bundleContextSamples(jsText, patterns, limit = 10) {
+  const out = [];
+  for (const p of patterns) {
+    const idx = jsText.indexOf(p);
+    if (idx >= 0) {
+      const start = Math.max(0, idx - 80);
+      const end = Math.min(jsText.length, idx + p.length + 80);
+      out.push({ hit: p, context: jsText.slice(start, end) });
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
+}
+
+// =====================
 // Handler
 // =====================
 exports.handler = async (event) => {
   const qs = event.queryStringParameters || {};
-  const manual = qs.run === "1";
   const debug = qs.debug === "1";
   const hardDebug = qs.harddebug === "1";
+  const bundleDebug = qs.bundledebug === "1";
 
   const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
   const batchSize = Math.min(Math.max(parseInt(qs.size || "3", 10) || 3, 1), 6);
 
-  const listToProcess = manual ? SOURCES.slice(0, 3) : pickBatch(SOURCES, batch, batchSize);
-
+  const listToProcess = pickBatch(SOURCES, batch, batchSize);
   const client = await pool.connect();
 
   const stats = {
     ok: true,
     node: process.version,
     ranAt: new Date().toISOString(),
-
-    manual,
     debug,
     hardDebug,
+    bundleDebug,
     batch,
     batchSize,
     totalSources: SOURCES.length,
     processedThisRun: listToProcess.length,
-
     portals: [],
     totalFetched: 0,
     totalCandidates: 0,
@@ -425,15 +370,12 @@ exports.handler = async (event) => {
         continue;
       }
 
-      // candidates
-      let candidates = source === "melodiak" ? extractMelodiakCards(html) : extractCandidates(html, p.url);
+      let candidates = source === "melodiak" ? extractMelodiakCards(html) : [];
       stats.totalCandidates += candidates.length;
 
-      // matched
       const matched = candidates.filter((c) => matchesKeywords(c.title, c.description));
       stats.totalMatched += matched.length;
 
-      // upsert with errors
       let up = 0;
       const upsertErrors = [];
       for (const it of matched) {
@@ -446,15 +388,6 @@ exports.handler = async (event) => {
       }
       stats.totalUpserted += up;
 
-      // melodiak counts + api hints
-      let melodiakJobListItemCount = null;
-      let apiHints = null;
-      if (debug && source === "melodiak") {
-        const $ = cheerio.load(html);
-        melodiakJobListItemCount = $(".job-list-item").length;
-        apiHints = findApiHints(html);
-      }
-
       const portalStat = {
         source,
         label: p.label,
@@ -463,8 +396,6 @@ exports.handler = async (event) => {
         candidates: candidates.length,
         matched: matched.length,
         upserted: up,
-        ...(melodiakJobListItemCount !== null ? { melodiakJobListItemCount } : {}),
-        ...(apiHints ? { apiHints } : {}),
         ...(debug && upsertErrors.length ? { upsertErrors: upsertErrors.slice(0, 10) } : {}),
       };
 
@@ -472,13 +403,13 @@ exports.handler = async (event) => {
         portalStat.candidatesSample = candidates.slice(0, 30).map((x) => ({
           title: x.title,
           url: x.url,
-          desc: x.description ? x.description.slice(0, 120) : null,
+          desc: x.description,
           hits: keywordHit(x.title, x.description),
         }));
         portalStat.matchedSample = matched.slice(0, 30).map((x) => ({
           title: x.title,
           url: x.url,
-          desc: x.description ? x.description.slice(0, 120) : null,
+          desc: x.description,
           hits: keywordHit(x.title, x.description),
         }));
       }
@@ -490,9 +421,34 @@ exports.handler = async (event) => {
           .map((c) => ({
             title: c.title,
             url: c.url,
-            desc: c.description ? c.description.slice(0, 120) : null,
+            desc: c.description,
             hits: keywordHit(c.title, c.description),
           }));
+      }
+
+      // ✅ Bundle debug: script src + grepping in first bundle
+      if (debug && bundleDebug && source === "melodiak") {
+        const scriptSrcs = extractScriptSrcs(html, p.url);
+        portalStat.scriptSrcs = scriptSrcs.slice(0, 20);
+
+        // próbáljuk meg az első "nagy" bundle-t (main.*.js tipikusan)
+        const mainLike =
+          scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
+          scriptSrcs.find((s) => /\.js(\?|$)/i.test(s)) ||
+          null;
+
+        portalStat.mainBundle = mainLike || null;
+
+        if (mainLike) {
+          try {
+            const jsText = await fetchText(mainLike);
+            const bundleApiHints = findBundleApiHints(jsText);
+            portalStat.bundleApiHints = bundleApiHints;
+            portalStat.bundleSample = bundleContextSamples(jsText, bundleApiHints, 12);
+          } catch (e) {
+            portalStat.bundleError = e.message;
+          }
+        }
       }
 
       stats.portals.push(portalStat);
