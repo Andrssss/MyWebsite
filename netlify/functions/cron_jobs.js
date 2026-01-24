@@ -153,19 +153,73 @@ function matchesKeywords(title, desc) {
   return KEYWORDS.some((k) => n.includes(normalizeText(k)));
 }
 
-// (opcionális) link-szűrő: ha túl sok menü/nav link jön be, ezzel lehet szigorítani
-function looksLikeJobUrl(sourceKey, url) {
-  if (!url) return false;
 
-  // Melódiák: tipikusan /diakmunkak/ és valami egyedi azonosító/slug.
-  if (sourceKey === "melodiak") {
-    // engedjük: diakmunkak + valami egyedi (id vagy slug)
-    // ha túl szigorú lenne, ezt lazíthatod.
-    return /melodiak\.hu/i.test(url) && /diakmunkak/i.test(url) && /(\d{4,}|\/[^\/?#]{8,})/i.test(url);
-  }
+const CTA_TITLES = new Set([
+  "megnézem",
+  "megnezem",
+  "részletek",
+  "reszletek",
+  "tovább",
+  "tovabb",
+  "bővebben",
+  "bovebben",
+  "jelentkezem",
+  "jelentkezés",
+  "jelentkezes",
+  "apply",
+  "details",
+  "view",
+  "open",
+  "more",
+]);
 
-  // Default: mindent engedünk (mert portálonként eltér)
-  return true;
+function isCtaTitle(s) {
+  const n = normalizeText(s);
+  return !n || n.length < 4 || CTA_TITLES.has(n);
+}
+
+
+// =====================
+// Site-specific extraction (Melódiák)
+// =====================
+
+// A Melódiák listában a job kártyák nem <a href>-ek, hanem kattintható div-ek.
+// A kártya class listájában tipikusan benne van egy slug-szerű token (pl. ...-14603)
+// Ebből építünk detail URL-t: https://www.melodiak.hu/diakmunkak/<slug>/
+function extractMelodiakCards(html) {
+  const $ = cheerio.load(html);
+  const items = [];
+
+  $(".job-list-item").each((_, el) => {
+    const $el = $(el);
+
+    const title =
+      normalizeWhitespace($el.find(".job-title").first().text()) ||
+      normalizeWhitespace($el.find("h1,h2,h3,h4,h5,h6").first().text());
+
+    if (!title || title.length < 4) return;
+
+    const cls = $el.attr("class") || "";
+    const tokens = cls.split(/\s+/).filter(Boolean);
+
+    // slug-szerű token: legalább 3 kötőjel (word-word-word...)
+    // és csak a-z0-9- karakterek
+    const slug = tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) || null;
+    if (!slug) return;
+
+    const url = `https://www.melodiak.hu/diakmunkak/${slug}/`;
+
+    const desc =
+      normalizeWhitespace($el.find(".job-desc, .job-description, p").first().text()) || null;
+
+    items.push({
+      title: title.slice(0, 300),
+      url,
+      description: desc ? desc.slice(0, 800) : null,
+    });
+  });
+
+  return dedupeByUrl(items);
 }
 
 // =====================
@@ -227,7 +281,7 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 // =====================
-// Candidate extraction
+// Generic candidate extraction (fallback)
 // =====================
 function extractCandidates(html, baseUrl) {
   const $ = cheerio.load(html);
@@ -243,17 +297,30 @@ function extractCandidates(html, baseUrl) {
     if (!/^https?:\/\//i.test(url)) return;
     if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
 
-    let title = normalizeWhitespace($(el).text());
-    if (!title || title.length < 4) {
-      const card = $(el).closest("article, li, .card, .item, .job, .position, .listing, div");
-      title =
-        normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
-        normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
+    // kártya konténer (minél “kártyásabb”, annál jobb)
+    const card = $(el).closest("app-job-list-item, article, li, .card, .item, .job, .position, .listing, div");
+
+    const linkText = normalizeWhitespace($(el).text());
+    const headingText =
+      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
+      normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
+
+    // ✅ címválasztás:
+    // - ha a linkszöveg CTA (pl. "Megnézem"), akkor heading
+    // - ha van heading és hosszabb/értelmesebb, akkor heading
+    let title = linkText;
+
+    if (headingText && (isCtaTitle(linkText) || headingText.length > linkText.length + 3)) {
+      title = headingText;
     }
+
+    title = normalizeWhitespace(title);
     if (!title || title.length < 4) return;
 
-    const card2 = $(el).closest("article, li, .card, .item, .job, .position, .listing, div");
-    const desc = normalizeWhitespace(card2.find("p").first().text()) || null;
+    const desc =
+      normalizeWhitespace(card.find("p").first().text()) ||
+      normalizeWhitespace(card.find(".description, .job-desc, .job-description").first().text()) ||
+      null;
 
     items.push({
       title: title.slice(0, 300),
@@ -266,7 +333,7 @@ function extractCandidates(html, baseUrl) {
 }
 
 // =====================
-// DB upsert
+// DB upsert (NO last_seen, only first_seen)
 // =====================
 async function upsertJob(client, source, item) {
   await client.query(
@@ -284,7 +351,6 @@ async function upsertJob(client, source, item) {
   );
 }
 
-
 function pickBatch(list, batchIndex = 0, batchSize = 3) {
   const start = batchIndex * batchSize;
   return list.slice(start, start + batchSize);
@@ -301,7 +367,6 @@ exports.handler = async (event) => {
   const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
   const batchSize = Math.min(Math.max(parseInt(qs.size || "3", 10) || 3, 1), 6);
 
-  // ✅ EGYSZER számoljuk ki, és MINDENHOL ezt használjuk (nem árnyékoljuk)
   const listToProcess = manual ? SOURCES.slice(0, 3) : pickBatch(SOURCES, batch, batchSize);
 
   const client = await pool.connect();
@@ -342,15 +407,13 @@ exports.handler = async (event) => {
         continue;
       }
 
-      // candidates
-      let candidates = extractCandidates(html, p.url);
-
-      // opcionális URL szűrés (különösen Melódiáknál hasznos)
-      candidates = candidates.filter((c) => looksLikeJobUrl(source, c.url));
+      // ✅ candidates
+      let candidates =
+        source === "melodiak" ? extractMelodiakCards(html) : extractCandidates(html, p.url);
 
       stats.totalCandidates += candidates.length;
 
-      // keyword match
+      // ✅ keyword match
       const matched = candidates.filter((c) => matchesKeywords(c.title, c.description));
       stats.totalMatched += matched.length;
 
