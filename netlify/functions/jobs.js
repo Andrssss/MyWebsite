@@ -44,11 +44,28 @@ exports.handler = async (event) => {
       };
     }
 
-    // GET /jobs?source=melodiak&limit=200
+    // GET /jobs?source=...&limit=...
     if (method === "GET") {
       const qs = event.queryStringParameters || {};
       const source = qs.source || null;
       const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 1000);
+
+      // ✅ ÚJ: GET /jobs/sources  (források listája tabokhoz)
+      // Netlify path tipikusan: "/.netlify/functions/jobs/sources"
+      if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
+        const { rows } = await client.query(
+          `SELECT
+             source AS key,
+             source AS label,
+             COUNT(*)::int AS count,
+             MAX(last_seen) AS "lastSeen"
+           FROM job_posts
+           GROUP BY source
+           ORDER BY count DESC, source ASC`
+        );
+
+        return jsonResponse(200, rows, { "Access-Control-Allow-Origin": "*" });
+      }
 
       if (id) {
         const { rows } = await client.query(
@@ -59,7 +76,7 @@ exports.handler = async (event) => {
            WHERE id = $1`,
           [id]
         );
-        if (rows.length === 0) return jsonResponse(404, { error: "Nem található." });
+        if (rows.length === 0) return jsonResponse(404, { error: "Nem található." }, { "Access-Control-Allow-Origin": "*" });
         return jsonResponse(200, rows[0], { "Access-Control-Allow-Origin": "*" });
       }
 
@@ -89,10 +106,10 @@ exports.handler = async (event) => {
       return jsonResponse(200, rows, { "Access-Control-Allow-Origin": "*" });
     }
 
-    // DELETE /jobs/:id (opcionális admin takarításhoz)
+    // DELETE /jobs/:id
     if (method === "DELETE" && id) {
       const { rowCount } = await client.query(`DELETE FROM job_posts WHERE id = $1`, [id]);
-      if (rowCount === 0) return jsonResponse(404, { error: "Nincs ilyen id." });
+      if (rowCount === 0) return jsonResponse(404, { error: "Nincs ilyen id." }, { "Access-Control-Allow-Origin": "*" });
 
       return {
         statusCode: 204,
