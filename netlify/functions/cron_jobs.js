@@ -61,13 +61,22 @@ const KEYWORDS = [
   "gyakornok",
   "intern",
   "internship",
+  "trainee",
+  "junior",
+  "it",
+  "developer",
   "fejlesztő",
   "fejleszto",
-  "trainee",
   "data",
-  "business",
-  "developer",
+  "analyst",
+  "support",
+  "operations",
+  "qa",
+  "tester",
+  "sysadmin",
+  "network",
 ];
+
 
 function stripAccents(s) {
   return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -80,19 +89,10 @@ function matchesIT(original, normalized) {
   return /\bit\b/.test(normalized);
 }
 function matchesKeywords(title, desc) {
-  const original = `${title ?? ""} ${desc ?? ""}`;
-  const n = normalizeText(original);
-  const itOk = matchesIT(original, n);
-  const kwOk = KEYWORDS.some((kw) => n.includes(normalizeText(kw)));
-  if (kwOk) return true;
-  if (itOk) {
-    const extra = ["developer", "data", "business", "fejleszt", "trainee", "intern", "internship"].some((k) =>
-      n.includes(k)
-    );
-    return extra;
-  }
-  return false;
+  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  return KEYWORDS.some(k => n.includes(normalizeText(k)));
 }
+
 
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
@@ -124,6 +124,7 @@ function dedupeByUrl(items) {
     return true;
   });
 }
+const zlib = require("zlib");
 
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
@@ -138,12 +139,14 @@ function fetchText(url, redirectLeft = 5) {
           "User-Agent": "JobWatcher/1.0",
           "Accept": "text/html,application/xhtml+xml",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+          "Accept-Encoding": "gzip,deflate,br", // ✅ elfogadjuk, de ki is bontjuk
         },
-        timeout: 12000, // ✅ kisebb timeout, hogy ne fogja meg a futást
+        timeout: 12000,
       },
       (res) => {
         const code = res.statusCode || 0;
 
+        // redirect
         if ([301, 302, 303, 307, 308].includes(code)) {
           const loc = res.headers.location;
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
@@ -153,13 +156,22 @@ function fetchText(url, redirectLeft = 5) {
           return resolve(fetchText(nextUrl, redirectLeft - 1));
         }
 
+        // ✅ decompress
+        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
+        let stream = res;
+
+        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
+        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
+        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
+
         let data = "";
-        res.setEncoding("utf8");
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
+        stream.setEncoding("utf8");
+        stream.on("data", (chunk) => (data += chunk));
+        stream.on("end", () => {
           if (code >= 200 && code < 300) resolve(data);
           else reject(new Error(`HTTP ${code} for ${url}`));
         });
+        stream.on("error", reject);
       }
     );
 
@@ -168,6 +180,7 @@ function fetchText(url, redirectLeft = 5) {
     req.end();
   });
 }
+
 
 // Heurisztikus link kinyerés
 function extractCandidates(html, baseUrl) {
