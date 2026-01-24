@@ -3,14 +3,5 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# ELŐSZÖR: API → function
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-# UTÁNA: SPA fallback
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+[functions]
+  node_bundler = "esbuild"
