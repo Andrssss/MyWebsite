@@ -84,42 +84,11 @@ async function upsertJob(client, source, item) {
   );
 }
 
-exports.handler = async (event) => {
-  const client = await pool.connect();
-  try {
-    let totalFound = 0;
-    let totalUpserted = 0;
-
-    for (const s of SOURCES) {
-      const res = await axios.get(s.url, {
-        timeout: 25000,
-        headers: { "User-Agent": "JobWatcher/1.0" },
-      });
-
-      const items = extractLinksCheerio(res.data, s.url).map((it) => ({
-        ...it,
-        source: s.source,
-      }));
-
-      totalFound += items.length;
-
-      for (const it of items) {
-        if (!it.title || !it.url) continue;
-        await upsertJob(client, s.source, it);
-        totalUpserted++;
-      }
-    }
-
-    return json(200, {
-      ok: true,
-      totalFound,
-      totalUpserted,
-      ranAt: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.error(err);
-    return json(500, { ok: false, error: err.message });
-  } finally {
-    client.release();
-  }
+exports.handler = async () => {
+  return {
+    statusCode: 200,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ ok: true, step: "handler-reached", node: process.version }),
+  };
 };
+
