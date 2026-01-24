@@ -93,8 +93,14 @@ const JobWatcher = () => {
       });
     }
 
-    return list;
+    // ✅ LEGFRISSEBB FELÜL: lastSeen (fallback: firstSeen) DESC
+    return [...list].sort((a, b) => {
+      const ta = new Date(a.lastSeen || a.firstSeen || 0).getTime();
+      const tb = new Date(b.lastSeen || b.firstSeen || 0).getTime();
+      return tb - ta;
+    });
   }, [jobs, onlyNew, q]);
+
 
   const tabs = useMemo(() => {
     // all + dynamic sources

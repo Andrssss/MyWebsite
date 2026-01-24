@@ -230,22 +230,27 @@ exports.handler = async (event) => {
   const qs = event.queryStringParameters || {};
   const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
   const batchSize = Math.min(Math.max(parseInt(qs.size || "3", 10) || 3, 1), 6);
-
+  const list = manual ? SOURCES.slice(0, 3) : SOURCES.slice(batch * batchSize, batch * batchSize + batchSize);
   const client = await pool.connect();
 
   const stats = {
     ok: true,
     node: process.version,
     ranAt: new Date().toISOString(),
+
+    manual,
     batch,
     batchSize,
     totalSources: SOURCES.length,
+    processedThisRun: list.length,
+
     portals: [],
     totalFetched: 0,
     totalCandidates: 0,
     totalMatched: 0,
     totalUpserted: 0,
   };
+
 
   try {
     const list = pickBatch(SOURCES, batch, batchSize);
