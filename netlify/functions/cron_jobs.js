@@ -1,11 +1,17 @@
+// ✅ polyfill még importok előtt (Node 18 + undici kompat)
 globalThis.File ??= class File {};
 globalThis.Blob ??= class Blob {};
 globalThis.FormData ??= class FormData {};
 
-const axios = require("axios");
+const https = require("https");
+const http = require("http");
 const cheerio = require("cheerio");
 const { Pool } = require("pg");
 
+// ✅ In-file schedule (ha ezt akarod)
+exports.config = {
+  schedule: "0 4 * * *", // 04:00 UTC ~ 05:00 HU télen
+};
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -21,6 +27,42 @@ function json(statusCode, body) {
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify(body),
   };
+}
+
+function fetchText(url) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const lib = u.protocol === "https:" ? https : http;
+
+    const req = lib.request(
+      u,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "JobWatcher/1.0",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+        },
+        timeout: 25000,
+      },
+      (res) => {
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(data);
+          } else {
+            reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+          }
+        });
+      }
+    );
+
+    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 function absolutize(href, base) {
@@ -45,14 +87,14 @@ function dedupeByUrl(items) {
   });
 }
 
-// TODO: ide tedd a konkrét listaoldalakat (nem főoldal)
+// ⚠️ TODO: IDE TEDD A KONKRÉT ÁLLÁSLISTA OLDALAKAT (nem főoldal)
 const SOURCES = [
   { source: "melodiak", url: "https://melodiak.hu/" },
   { source: "minddiak", url: "https://minddiak.hu/" },
   { source: "muisz", url: "https://muisz.hu/" },
 ];
 
-// TODO: oldal-specifikus szűrés/szelektor (ez most csak minta!)
+// ⚠️ TODO: később pontos szelektorok (most csak linkek)
 function extractLinksCheerio(html, baseUrl) {
   const $ = cheerio.load(html);
   const items = [];
@@ -65,9 +107,9 @@ function extractLinksCheerio(html, baseUrl) {
     const url = absolutize(href, baseUrl);
     if (!url) return;
 
-    // TODO: SZŰRÉS, hogy csak álláshirdetések legyenek
+    // TODO: SZŰRÉS – ide írjuk majd, hogy csak állás linkek legyenek
     // pl:
-    // if (!url.includes("gyakornok") && !url.includes("allas")) return;
+    // if (!url.includes("allas") && !url.includes("gyakornok")) return;
 
     items.push({ title: title.slice(0, 300), url, description: null });
   });
@@ -89,10 +131,39 @@ async function upsertJob(client, source, item) {
 }
 
 exports.handler = async () => {
-  return {
-    statusCode: 200,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ ok: true, step: "handler-reached", node: process.version }),
-  };
-};
+  const client = await pool.connect();
+  try {
+    let totalFound = 0;
+    let totalUpserted = 0;
 
+    for (const s of SOURCES) {
+      const html = await fetchText(s.url);
+
+      const items = extractLinksCheerio(html, s.url).map((it) => ({
+        ...it,
+        source: s.source,
+      }));
+
+      totalFound += items.length;
+
+      for (const it of items) {
+        if (!it.title || !it.url) continue;
+        await upsertJob(client, s.source, it);
+        totalUpserted++;
+      }
+    }
+
+    return json(200, {
+      ok: true,
+      node: process.version,
+      totalFound,
+      totalUpserted,
+      ranAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    return json(500, { ok: false, error: err.message, node: process.version });
+  } finally {
+    client.release();
+  }
+};
