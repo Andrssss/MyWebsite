@@ -1,6 +1,3 @@
-export const config = {
-  schedule: "0 4 * * *", // 04:00 UTC ~ 05:00 HU télen
-};
 
 const INGEST_URL = "https://bakan7.netlify.app/.netlify/functions/jobs_ingest";
 // ha helyben akarod, lehet relatív is, de cronban jobb fix:
