@@ -227,6 +227,8 @@ function pickBatch(list, batchIndex = 0, batchSize = 3) {
 exports.SOURCES = SOURCES; // ✅ megosztjuk jobs.js-nek is, ha szeretnéd require-ral
 
 exports.handler = async (event) => {
+  const manual = qs.run === "1";
+
   const qs = event.queryStringParameters || {};
   const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
   const batchSize = Math.min(Math.max(parseInt(qs.size || "3", 10) || 3, 1), 6);
