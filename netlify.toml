@@ -6,6 +6,3 @@
 [functions]
   node_bundler = "esbuild"
 
-[[edge_functions]]
-  function = "cron_jobs"
-  path = "/edge/cron_jobs"
