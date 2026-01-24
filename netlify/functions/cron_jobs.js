@@ -153,6 +153,10 @@ function matchesKeywords(title, desc) {
   return KEYWORDS.some((k) => n.includes(normalizeText(k)));
 }
 
+function keywordHit(title, desc) {
+  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  return KEYWORDS.filter((k) => n.includes(normalizeText(k)));
+}
 
 const CTA_TITLES = new Set([
   "megnézem",
@@ -178,14 +182,9 @@ function isCtaTitle(s) {
   return !n || n.length < 4 || CTA_TITLES.has(n);
 }
 
-
 // =====================
 // Site-specific extraction (Melódiák)
 // =====================
-
-// A Melódiák listában a job kártyák nem <a href>-ek, hanem kattintható div-ek.
-// A kártya class listájában tipikusan benne van egy slug-szerű token (pl. ...-14603)
-// Ebből építünk detail URL-t: https://www.melodiak.hu/diakmunkak/<slug>/
 function extractMelodiakCards(html) {
   const $ = cheerio.load(html);
   const items = [];
@@ -202,8 +201,6 @@ function extractMelodiakCards(html) {
     const cls = $el.attr("class") || "";
     const tokens = cls.split(/\s+/).filter(Boolean);
 
-    // slug-szerű token: legalább 3 kötőjel (word-word-word...)
-    // és csak a-z0-9- karakterek
     const slug = tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) || null;
     if (!slug) return;
 
@@ -223,7 +220,7 @@ function extractMelodiakCards(html) {
 }
 
 // =====================
-// Fetch HTML (gzip/deflate/br + redirect)
+// Fetch HTML
 // =====================
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
@@ -245,7 +242,6 @@ function fetchText(url, redirectLeft = 5) {
       (res) => {
         const code = res.statusCode || 0;
 
-        // redirect
         if ([301, 302, 303, 307, 308].includes(code)) {
           const loc = res.headers.location;
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
@@ -255,7 +251,6 @@ function fetchText(url, redirectLeft = 5) {
           return resolve(fetchText(nextUrl, redirectLeft - 1));
         }
 
-        // decompress
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
         let stream = res;
 
@@ -281,7 +276,7 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 // =====================
-// Generic candidate extraction (fallback)
+// Generic extraction
 // =====================
 function extractCandidates(html, baseUrl) {
   const $ = cheerio.load(html);
@@ -297,19 +292,16 @@ function extractCandidates(html, baseUrl) {
     if (!/^https?:\/\//i.test(url)) return;
     if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
 
-    // kártya konténer (minél “kártyásabb”, annál jobb)
-    const card = $(el).closest("app-job-list-item, article, li, .card, .item, .job, .position, .listing, div");
+    // FONTOS: ne legyen túl tág - ne legyen a végén sima div
+    let card = $(el).closest("app-job-list-item, article, li, .job-list-item, .job, .position, .listing, .card, .item");
+    if (!card.length) card = $(el).closest("div");
 
     const linkText = normalizeWhitespace($(el).text());
     const headingText =
       normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
       normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
 
-    // ✅ címválasztás:
-    // - ha a linkszöveg CTA (pl. "Megnézem"), akkor heading
-    // - ha van heading és hosszabb/értelmesebb, akkor heading
     let title = linkText;
-
     if (headingText && (isCtaTitle(linkText) || headingText.length > linkText.length + 3)) {
       title = headingText;
     }
@@ -333,7 +325,7 @@ function extractCandidates(html, baseUrl) {
 }
 
 // =====================
-// DB upsert (NO last_seen, only first_seen)
+// DB upsert
 // =====================
 async function upsertJob(client, source, item) {
   await client.query(
@@ -363,6 +355,7 @@ exports.handler = async (event) => {
   const qs = event.queryStringParameters || {};
   const manual = qs.run === "1";
   const debug = qs.debug === "1";
+  const hardDebug = qs.harddebug === "1";
 
   const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
   const batchSize = Math.min(Math.max(parseInt(qs.size || "3", 10) || 3, 1), 6);
@@ -378,6 +371,7 @@ exports.handler = async (event) => {
 
     manual,
     debug,
+    hardDebug,
     batch,
     batchSize,
     totalSources: SOURCES.length,
@@ -408,21 +402,32 @@ exports.handler = async (event) => {
       }
 
       // ✅ candidates
-      let candidates =
-        source === "melodiak" ? extractMelodiakCards(html) : extractCandidates(html, p.url);
-
+      let candidates = source === "melodiak" ? extractMelodiakCards(html) : extractCandidates(html, p.url);
       stats.totalCandidates += candidates.length;
 
-      // ✅ keyword match
+      // ✅ matched
       const matched = candidates.filter((c) => matchesKeywords(c.title, c.description));
       stats.totalMatched += matched.length;
 
+      // ✅ upsert with error capture
       let up = 0;
+      const upsertErrors = [];
       for (const it of matched) {
-        await upsertJob(client, source, it);
-        up++;
+        try {
+          await upsertJob(client, source, it);
+          up++;
+        } catch (e) {
+          upsertErrors.push({ title: it.title, url: it.url, error: e.message });
+        }
       }
       stats.totalUpserted += up;
+
+      // optional: check if melodiak selector hits anything
+      let melodiakJobListItemCount = null;
+      if (debug && source === "melodiak") {
+        const $ = cheerio.load(html);
+        melodiakJobListItemCount = $(".job-list-item").length;
+      }
 
       const portalStat = {
         source,
@@ -432,11 +437,35 @@ exports.handler = async (event) => {
         candidates: candidates.length,
         matched: matched.length,
         upserted: up,
+        ...(melodiakJobListItemCount !== null ? { melodiakJobListItemCount } : {}),
+        ...(debug && upsertErrors.length ? { upsertErrors: upsertErrors.slice(0, 10) } : {}),
       };
 
       if (debug) {
-        portalStat.candidatesSample = candidates.slice(0, 20).map((x) => ({ title: x.title, url: x.url }));
-        portalStat.matchedSample = matched.slice(0, 20).map((x) => ({ title: x.title, url: x.url }));
+        portalStat.candidatesSample = candidates.slice(0, 30).map((x) => ({
+          title: x.title,
+          url: x.url,
+          desc: x.description ? x.description.slice(0, 120) : null,
+          hits: keywordHit(x.title, x.description),
+        }));
+        portalStat.matchedSample = matched.slice(0, 30).map((x) => ({
+          title: x.title,
+          url: x.url,
+          desc: x.description ? x.description.slice(0, 120) : null,
+          hits: keywordHit(x.title, x.description),
+        }));
+      }
+
+      if (debug && hardDebug) {
+        portalStat.rejectedSample = candidates
+          .filter((c) => !matchesKeywords(c.title, c.description))
+          .slice(0, 30)
+          .map((c) => ({
+            title: c.title,
+            url: c.url,
+            desc: c.description ? c.description.slice(0, 120) : null,
+            hits: keywordHit(c.title, c.description),
+          }));
       }
 
       stats.portals.push(portalStat);
