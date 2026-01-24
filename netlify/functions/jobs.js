@@ -24,7 +24,7 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
   };
 }
 
-// ✅ ugyanaz a FIXED lista, mint a cronban (key/label/url)
+// FIXED lista (key/label/url)
 const FIXED = [
   { key: "melodiak", label: "Melódiák – gyakornoki", url: "https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki" },
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/position?page=2" },
@@ -77,12 +77,11 @@ exports.handler = async (event) => {
       const source = qs.source || null;
       const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 1000);
 
-      // ✅ GET /jobs/sources
+      // GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
         const { rows } = await client.query(`
           SELECT source AS key,
-                 COUNT(*)::int AS count,
-                 MAX(last_seen) AS "lastSeen"
+                 COUNT(*)::int AS count
           FROM job_posts
           GROUP BY source
         `);
@@ -93,7 +92,6 @@ exports.handler = async (event) => {
           label: s.label,
           url: s.url,
           count: map.get(s.key)?.count ?? 0,
-          lastSeen: map.get(s.key)?.lastSeen ?? null,
         }));
 
         return jsonResponse(200, out);
@@ -103,8 +101,7 @@ exports.handler = async (event) => {
       if (id) {
         const { rows } = await client.query(
           `SELECT id, source, title, url, description,
-                  first_seen AS "firstSeen",
-                  last_seen  AS "lastSeen"
+                  first_seen AS "firstSeen"
            FROM job_posts
            WHERE id = $1`,
           [id]
@@ -117,8 +114,7 @@ exports.handler = async (event) => {
       if (source) {
         const { rows } = await client.query(
           `SELECT id, source, title, url, description,
-                  first_seen AS "firstSeen",
-                  last_seen  AS "lastSeen"
+                  first_seen AS "firstSeen"
            FROM job_posts
            WHERE source = $1
            ORDER BY first_seen DESC, id DESC
@@ -131,8 +127,7 @@ exports.handler = async (event) => {
       // GET /jobs
       const { rows } = await client.query(
         `SELECT id, source, title, url, description,
-                first_seen AS "firstSeen",
-                last_seen  AS "lastSeen"
+                first_seen AS "firstSeen"
          FROM job_posts
          ORDER BY first_seen DESC, id DESC
          LIMIT $1`,

@@ -95,9 +95,10 @@ const JobWatcher = () => {
 
     // ✅ LEGFRISSEBB FELÜL: lastSeen (fallback: firstSeen) DESC
     return [...list].sort((a, b) => {
-      const ta = new Date(a.lastSeen || a.firstSeen || 0).getTime();
-      const tb = new Date(b.lastSeen || b.firstSeen || 0).getTime();
+      const ta = new Date(a.firstSeen || 0).getTime();
+      const tb = new Date(b.firstSeen || 0).getTime();
       return tb - ta;
+
     });
   }, [jobs, onlyNew, q]);
 
@@ -206,13 +207,6 @@ const JobWatcher = () => {
                     Első találat:{" "}
                     {job.firstSeen
                       ? new Date(job.firstSeen).toLocaleString("hu-HU")
-                      : "—"}
-                  </span>
-                  <span className="dot">•</span>
-                  <span>
-                    Utoljára látta:{" "}
-                    {job.lastSeen
-                      ? new Date(job.lastSeen).toLocaleString("hu-HU")
                       : "—"}
                   </span>
                 </div>
