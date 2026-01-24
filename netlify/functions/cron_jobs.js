@@ -213,14 +213,23 @@ function portalSourceKey(label) {
 
 async function upsertJob(client, source, item) {
   await client.query(
-    `INSERT INTO job_posts (source, title, url, description, first_seen, last_seen)
-     VALUES ($1,$2,$3,$4,NOW(),NOW())
-     ON CONFLICT (source, url)
-     DO UPDATE SET
-       title = EXCLUDED.title,
-       description = COALESCE(EXCLUDED.description, job_posts.description),
-       last_seen = NOW()`,
-    [source, item.title, item.url, item.description]
+    `
+    INSERT INTO job_posts
+      (source, title, url, description, first_seen, last_seen)
+    VALUES
+      ($1, $2, $3, $4, NOW(), NOW())
+    ON CONFLICT (source, url)
+    DO UPDATE SET
+      title = EXCLUDED.title,
+      description = COALESCE(EXCLUDED.description, job_posts.description),
+      last_seen = NOW()
+    `,
+    [
+      source,            // $1
+      item.title,        // $2
+      item.url,          // $3
+      item.description,  // $4
+    ]
   );
 }
 
