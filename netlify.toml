@@ -3,13 +3,14 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# ELŐSZÖR: API → function
+[build.environment]
+  NODE_VERSION = "20"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# UTÁNA: SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -18,6 +19,5 @@
 [functions]
   node_bundler = "esbuild"
 
-# 04:00 UTC = 05:00 CET (tél). Nyáron 06:00 lesz.
 [functions."scrape-jobs"]
   schedule = "0 4 * * *"
