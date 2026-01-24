@@ -17,6 +17,7 @@ import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
 import LinksLauncher from './LinksLauncher.jsx';
 import User_pages from './User_pages.tsx';
+import JobWatcher from "./JobWatcher.jsx";
 
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -133,9 +134,10 @@ useEffect(() => {
             element={<div className="main-content re-page"><LinksLauncher /></div>}
           />
           <Route
-            path="/gyakornoki_poziciok/auto" 
-            element={<div className="main-content re-page"><LinksLauncher autoOpen /></div>}
+            path="/allasfigyelo"
+            element={<JobWatcher />}
           />
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

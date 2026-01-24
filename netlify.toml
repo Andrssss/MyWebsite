@@ -14,3 +14,10 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[functions]
+  node_bundler = "esbuild"
+
+# 04:00 UTC = 05:00 CET (tél). Nyáron 06:00 lesz.
+[functions."scrape-jobs"]
+  schedule = "0 4 * * *"
