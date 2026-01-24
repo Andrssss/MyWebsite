@@ -4,17 +4,17 @@ import CopyCode from "./components/CopyCode";
 const JOB_PORTALS = [
   { label: 'Melódiák – gyakornoki', url: 'https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki' },
   { label: 'Minddiák ', url: 'https://minddiak.hu/position?page=2' },
-  { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3' },
-  { label: 'CV Centrum – gyakornok IT', url: 'https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes' },
-  { label: 'CV Centrum – intern IT', url: 'https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job' },
+  { label: 'Muisz – gyakornoki kategória', url: 'https://muisz.hu/hu/diakmunkaink?categories=3&locations=10' },
+  { label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { label: "CV Centrum – intern IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
   { label: 'Zyntern – IT/fejlesztés', url: 'https://zyntern.com/jobs?fields=16' },
   { label: 'Profession – Intern', url: 'https://www.profession.hu/allasok/it-programozas-fejlesztes/1,10,0,intern' },
   { label: 'Profession – Gyakornok', url: 'https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/1,25,0,gyakornok' },
   { label: 'Fürge Diák – gyakornok', url: 'https://gyakornok.furgediak.hu/allasok?statikusmunkakor=7' },
   { label: 'Schönherz – Budapest fejlesztő/tesztelő', url: 'https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo' },
-  { label: 'Pannondiak ', url: 'https://pannondiak.hu/jobs/?category%5B%5D=250&category%5B%5D=1845&category%5B%5D=1848' },
+  { label: "Pannondiak", url: "https://pannondiak.hu/jobs/?category%5B%5D=250&category%5B%5D=1845&category%5B%5D=1848&regio%5B%5D=267#job_list" },
   { label: 'Frissdiplomás – állások', url: 'https://www.frissdiplomas.hu/allasok' },
-  { label: 'Prodiák – IT állások', url: 'https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/osszes/kulfold' },
+  { label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
   { label: 'Qdiák', url: 'https://cloud.qdiak.hu/munkak' },
   { label: 'LinkedIn – PAST 24H', url: 'https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R' }
 ];
@@ -22,8 +22,8 @@ const JOB_PORTALS = [
 
 const COMPANIES = [
   { label: 'GOV.HU – állások', url: 'https://karrier.ih.gov.hu/index.php/nyitott-poziciok/' },
-  { label: 'NixsTech – állások', url: 'https://nixstech.com/hu/allasok/' },
-  { label: 'OTP Karrier – GYAKORNOK', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
+  { label: "NIX – junior", url: "https://nixstech.com/hu/allasok/?level=junior-hu" },
+  { label: "NIX – trainee", url: "https://nixstech.com/hu/allasok/?level=trainee-hu" },  { label: 'OTP Karrier – GYAKORNOK', url: 'https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=' },
   { label: 'TCS Hungary – állások', url: 'https://hungarycareer.tcsapps.com/?s=' },
   { label: 'AVL – állások', url: 'https://jobs.avl.com/search/?createNewAlert=false&q=&locationsearch=hu' },
   { label: 'MOL – állások', url: 'https://molgroup.taleo.net/careersection/external/jobsearch.ftl?lang=hu' },
