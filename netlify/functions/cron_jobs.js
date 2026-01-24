@@ -1,3 +1,7 @@
+globalThis.File ??= class File {};
+globalThis.Blob ??= class Blob {};
+globalThis.FormData ??= class FormData {};
+
 const axios = require("axios");
 const cheerio = require("cheerio");
 const { Pool } = require("pg");
