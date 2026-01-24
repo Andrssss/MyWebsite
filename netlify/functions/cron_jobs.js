@@ -2,10 +2,6 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const { Pool } = require("pg");
 
-// ✅ In-file schedule (Node scheduled function)
-exports.config = {
-  schedule: "0 4 * * *", // 04:00 UTC (≈ 05:00 HU télen)
-};
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
