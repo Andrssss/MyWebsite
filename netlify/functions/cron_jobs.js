@@ -29,7 +29,7 @@ function json(statusCode, body) {
   };
 }
 
-function fetchText(url) {
+function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
@@ -46,15 +46,25 @@ function fetchText(url) {
         timeout: 25000,
       },
       (res) => {
+        const code = res.statusCode || 0;
+
+        // ✅ Redirect kezelés
+        if ([301, 302, 303, 307, 308].includes(code)) {
+          const loc = res.headers.location;
+          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
+          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
+
+          const nextUrl = new URL(loc, url).toString();
+          res.resume(); // ürítsük a streamet
+          return resolve(fetchText(nextUrl, redirectLeft - 1));
+        }
+
         let data = "";
         res.setEncoding("utf8");
         res.on("data", (chunk) => (data += chunk));
         res.on("end", () => {
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(data);
-          } else {
-            reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-          }
+          if (code >= 200 && code < 300) resolve(data);
+          else reject(new Error(`HTTP ${code} for ${url}`));
         });
       }
     );
