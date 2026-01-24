@@ -183,6 +183,22 @@ function isCtaTitle(s) {
 }
 
 // =====================
+// Debug: find API hints in HTML
+// =====================
+function findApiHints(html) {
+  const hints = new Set();
+
+  (html.match(/https?:\/\/[^"' ]+(api|graphql)[^"' ]+/gi) || []).forEach((x) => hints.add(x));
+  (html.match(/\/(api|graphql)\/[^"' ]+/gi) || []).forEach((x) => hints.add(x));
+
+  (html.match(/(apiUrl|baseUrl|endpoint|jobSearch|searchJobs)[^<]{0,200}/gi) || [])
+    .slice(0, 20)
+    .forEach((x) => hints.add(x));
+
+  return [...hints].slice(0, 30);
+}
+
+// =====================
 // Site-specific extraction (Melódiák)
 // =====================
 function extractMelodiakCards(html) {
@@ -201,9 +217,15 @@ function extractMelodiakCards(html) {
     const cls = $el.attr("class") || "";
     const tokens = cls.split(/\s+/).filter(Boolean);
 
-    const slug = tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) || null;
-    if (!slug) return;
+    // prefer token with prefix if present
+    const rawSlug =
+      tokens.find((t) => t.startsWith("job-list-component-")) ||
+      tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) ||
+      null;
 
+    if (!rawSlug) return;
+
+    const slug = rawSlug.replace(/^job-list-component-/, "");
     const url = `https://www.melodiak.hu/diakmunkak/${slug}/`;
 
     const desc =
@@ -292,8 +314,10 @@ function extractCandidates(html, baseUrl) {
     if (!/^https?:\/\//i.test(url)) return;
     if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
 
-    // FONTOS: ne legyen túl tág - ne legyen a végén sima div
-    let card = $(el).closest("app-job-list-item, article, li, .job-list-item, .job, .position, .listing, .card, .item");
+    // not too broad
+    let card = $(el).closest(
+      "app-job-list-item, article, li, .job-list-item, .job, .position, .listing, .card, .item"
+    );
     if (!card.length) card = $(el).closest("div");
 
     const linkText = normalizeWhitespace($(el).text());
@@ -401,15 +425,15 @@ exports.handler = async (event) => {
         continue;
       }
 
-      // ✅ candidates
+      // candidates
       let candidates = source === "melodiak" ? extractMelodiakCards(html) : extractCandidates(html, p.url);
       stats.totalCandidates += candidates.length;
 
-      // ✅ matched
+      // matched
       const matched = candidates.filter((c) => matchesKeywords(c.title, c.description));
       stats.totalMatched += matched.length;
 
-      // ✅ upsert with error capture
+      // upsert with errors
       let up = 0;
       const upsertErrors = [];
       for (const it of matched) {
@@ -422,11 +446,13 @@ exports.handler = async (event) => {
       }
       stats.totalUpserted += up;
 
-      // optional: check if melodiak selector hits anything
+      // melodiak counts + api hints
       let melodiakJobListItemCount = null;
+      let apiHints = null;
       if (debug && source === "melodiak") {
         const $ = cheerio.load(html);
         melodiakJobListItemCount = $(".job-list-item").length;
+        apiHints = findApiHints(html);
       }
 
       const portalStat = {
@@ -438,6 +464,7 @@ exports.handler = async (event) => {
         matched: matched.length,
         upserted: up,
         ...(melodiakJobListItemCount !== null ? { melodiakJobListItemCount } : {}),
+        ...(apiHints ? { apiHints } : {}),
         ...(debug && upsertErrors.length ? { upsertErrors: upsertErrors.slice(0, 10) } : {}),
       };
 
