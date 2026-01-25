@@ -119,7 +119,7 @@ const JobWatcher = () => {
         <div>
           <h1>💼 Állásfigyelő</h1>
           <div className="job-meta">
-            Forrásonként gyűjtött hirdetések, automatikus frissítéssel.
+            Forrásonként gyűjtött hirdetések, automatikus frissítéssel. Minden nap UTC szerint 15-re fut le az összes kersés.
           </div>
         </div>
 
