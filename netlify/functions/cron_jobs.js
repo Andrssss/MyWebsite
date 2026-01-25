@@ -471,7 +471,6 @@ function looksLikeJobUrl(sourceKey, url) {
 }
 
 
-
 // =====================
 // Fetch (gzip/deflate/br + redirect)
 // =====================
@@ -648,8 +647,6 @@ function extractScriptSrcs(html, baseUrl) {
 
 function findBundleApiHints(jsText) {
   const hits = new Set();
-  (jsText.match(/admin-ajax\.php/gi) || []).forEach((x) => hits.add("admin-ajax.php"));
-  (jsText.match(/nonce|security|ajax|diakmunkak|diakmunka|ad-list/gi) || []).slice(0,200).forEach(x => hits.add(x));
   (jsText.match(/\/api\/[a-z0-9_\-\/]+/gi) || []).forEach((x) => hits.add(x));
   (jsText.match(/\/graphql\b/gi) || []).forEach((x) => hits.add(x));
   (jsText.match(/https?:\/\/[^"' ]+\/api\/[^"' ]+/gi) || []).forEach((x) => hits.add(x));
@@ -693,46 +690,6 @@ async function upsertJob(client, source, item) {
     `,
     [source, item.title, item.url, item.description]
   );
-}
-
-function extractSchonherz(html, baseUrl) {
-  const $ = cheerio.load(html);
-  const items = [];
-
-  // 1 hirdetés = 1 darab .col-md-8 a #ads alatt
-  $("#ads .row.ad-list .col-md-8").each((_, el) => {
-    const $card = $(el);
-
-    // URL: az első diakmunka link a kártyában
-    const href = $card.find("a[href*='/diakmunka/']").first().attr("href");
-    const url = href ? absolutize(href, baseUrl) : null;
-    if (!url) return;
-
-    // TITLE: preferáltan a h4-ben lévő link szövege (ez a valódi pozíció név)
-    let title = normalizeWhitespace($card.find("h4 a[href*='/diakmunka/']").first().text());
-
-    // fallback: ha nincs h4, akkor a leghosszabb nem-CTA link szöveg a kártyában
-    if (!title || title.length < 4) {
-      const candidates = $card
-        .find("a[href*='/diakmunka/']")
-        .map((_, a) => normalizeWhitespace($(a).text()))
-        .get()
-        .filter((t) => t && t.length >= 4 && !isCtaTitle(t));
-
-      candidates.sort((a, b) => b.length - a.length);
-      title = candidates[0] || null;
-    }
-
-    if (!title || title.length < 4) return;
-
-    items.push({
-      title: title.slice(0, 300),
-      url: normalizeUrl(url),
-      description: null,
-    });
-  });
-
-  return dedupeByUrl(items);
 }
 
 
@@ -818,20 +775,12 @@ exports.handler = async (event) => {
           melodiakSSR = extractMelodiakCards(html).filter((c) => looksLikeJobUrl(source, c.url));
         }
 
-        let schonherz = [];
-        if (source === "schonherz") {
-          schonherz = extractSchonherz(html, p.url);
-        }
-
-        merged = source === "schonherz"
-          ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-          : mergeCandidates(generic, ssr, melodiakSSR);
-
+        merged = mergeCandidates(generic, ssr, melodiakSSR);
         if (source === "melodiak") {
-          merged = await enrichMelodiakItems(merged, 20);
+          merged = await enrichMelodiakItems(merged, 20); // 20 = nálad 14, tehát mindet
         }
-      }
 
+      }
 
       // =========================
       // MATCH + DEBUG REJECTED
@@ -858,7 +807,6 @@ exports.handler = async (event) => {
             };
           });
       }
-  
 
       // =========================
       // DB UPSERT
@@ -897,29 +845,14 @@ exports.handler = async (event) => {
       };
 
       if (debug) {
-        portalStat.mergedLinks = merged.map((x) => ({
-          title: x.title,
-          url: x.url,
-          hits: keywordHit(x.title, x.description),
-          normPreview: normalizeText(`${x.title ?? ""} ${x.description ?? ""}`).slice(0, 200),
-        }));
+        portalStat.rejectedSample = rejected;
+        if (upsertErrors.length) portalStat.upsertErrors = upsertErrors.slice(0, 10);
       }
-      if (debug && source === "schonherz") {
-        const $ = cheerio.load(html);
-        portalStat._schCounts = {
-          colMd8: $("#ads .col-md-8").length,
-          cards: $("#ads .row.ad-list .col-md-8").length,
-          diakmunkaLinks: $("#ads a[href*='/diakmunka/']").length,
-          htmlBytes: Buffer.byteLength(html, "utf8"),
-        };
-      }
-
-
 
       // =========================
       // bundle debug (melodiak + zyntern)
       // =========================
-      if (debug && bundleDebug && (source === "melodiak" || source === "zyntern" || source === "schonherz")) {
+      if (debug && bundleDebug && (source === "melodiak" || source === "zyntern")) {
         const scriptSrcs = extractScriptSrcs(html, p.url);
         portalStat.scriptSrcs = scriptSrcs.slice(0, 25);
 
@@ -944,11 +877,6 @@ exports.handler = async (event) => {
           }
         }
       }
-        // --- MINDEN PORTÁLNÁL: mergelt linkek kiírása
-      if (!debug) {
-        portalStat.mergedLinks = merged.map((x) => ({ title: x.title, url: x.url }));
-      }
-
 
       stats.portals.push(portalStat);
     }
