@@ -299,14 +299,12 @@ async function getMinddiakApiToken() {
   const cached = globalThis.__minddiakTokenCache;
   if (cached?.token && isJwtStillValid(cached.token)) {
     const p = decodeJwtPayload(cached.token);
-    console.log("[minddiak token] using cached token exp:", p?.exp);
     return cached.token;
   }
 
 
   const envToken = process.env.MINDDIAK_API_BEARER;
   if (envToken && isJwtStillValid(envToken)) {
-    console.log("[minddiak token] using env token");
     cached.token = envToken;
     return envToken;
   }
@@ -390,7 +388,6 @@ function extractGuestEndpointFromBundle(jsText) {
   if (idx < 0) return null;
 
   const snippet = jsText.slice(idx, Math.min(jsText.length, idx + 8000));
-  console.log("[minddiak token] guest() snippet:", snippet.slice(0, 1200));
 
   // key:"guest",value:function(){var Z="".concat(this.API_URL,"SOME_PATH");
   let m = snippet.match(/concat\(this\.API_URL,\s*"([^"]+)"\)/i);
@@ -463,8 +460,8 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
     const items = arr
       .map((j) => {
         const title = j?.positionFrontend?.title || j?.title || j?.name || null;
-        const id = j?.id ?? null;
-        const url = id ? `https://minddiak.hu/diakmunka-${id}` : null;
+        const url = buildMinddiakDetailUrl(j);
+
 
         const description =
           j?.positionFrontend?.short_description ||
@@ -475,7 +472,7 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
 
         return {
           title: title ? String(title).slice(0, 300) : null,
-          url: url ? normalizeUrl(url) : null,
+          url: url || null,
           description: description ? String(description).slice(0, 800) : null,
         };
       })
@@ -500,7 +497,7 @@ async function minddiakCount(where, token) {
   ];
 
   for (const base of candidates) {
-    const u = new URL(base);
+    const u  = new URL("https://api.humancentrum.hu/positions/count");
     u.searchParams.set("where", JSON.stringify(where));
     try {
       const txt = await fetchTextWithHeaders(u.toString(), {
@@ -543,9 +540,6 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
   const apiBase = extractApiBaseFromBundle(jsText);
 
   const guestUrl = new URL(guestPath, apiBase).toString();
-  console.log("[minddiak token] apiBase:", apiBase);
-  console.log("[minddiak token] guestPath from bundle:", guestPath);
-  console.log("[minddiak token] guestUrl:", guestUrl);
 
   const common = {
     Origin: "https://minddiak.hu",
@@ -827,6 +821,37 @@ function looksLikeJobUrl(sourceKey, url) {
   return true;
 }
 
+function buildMinddiakDetailUrl(j) {
+  const id = j?.id ?? null;
+  const pf = j?.positionFrontend || {};
+
+  // MindDiák jellemző mezők
+  const raw = (pf.url ?? pf.path ?? pf.link ?? pf.slug ?? "").toString().trim();
+
+  // 1) ha már teljes URL
+  if (/^https?:\/\//i.test(raw)) return normalizeUrl(raw);
+
+  // 2) ha relatív útvonal (tipikusan "/diakmunka/...." vagy "diakmunka/....")
+  if (raw) {
+    let p = raw.split(/[?#]/)[0].trim();
+
+    // rakjunk elé slash-t
+    if (!p.startsWith("/")) p = "/" + p;
+
+    // ha valamiért csak slug jönne "logisztikus-...-52079", akkor tegyük elé a /diakmunka/-t
+    if (!p.startsWith("/diakmunka/") && !p.startsWith("/diakmunka-")) {
+      // ha már tartalmaz id-t vagy slug-id formát, akkor is jó így
+      p = "/diakmunka/" + p.replace(/^\/+/, "");
+    }
+
+    return normalizeUrl("https://minddiak.hu" + p);
+  }
+
+  // 3) fallback, ha nincs frontend path/url (utolsó mentsvár)
+  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-${id}`);
+
+  return null;
+}
 
 
 // =====================
@@ -1120,8 +1145,7 @@ export const handler = async (event) => {
 
   try {
     for (const p of listToProcess) {
-      console.log("[cron_jobs] START source:", p.key, "bundleDebug:", bundleDebug, "debug:", debug, "url:", p.url);
-      console.log("[cron_jobs] qs:", event.queryStringParameters);
+
       const source = p.key;
 
       let html = null;
@@ -1138,9 +1162,7 @@ export const handler = async (event) => {
     // ✅ IDE jön
     if (source === "minddiak" && debug && bundleDebug) {
       try {
-        console.log("=== MINDDIAK BUNDLE DEBUG ===");
         const scriptSrcs = extractScriptSrcs(html, p.url);
-        console.log("scriptSrcs:", scriptSrcs.slice(0, 40));
 
         const mainLike =
           scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
@@ -1150,21 +1172,15 @@ export const handler = async (event) => {
           scriptSrcs.find((s) => /\.js(\?|$)/i.test(s)) ||
           null;
 
-        console.log("mainBundle:", mainLike);
 
         if (mainLike) {
           const jsText = await fetchText(mainLike);
 
           // ✅ ADD EZT:
           const guestPath2 = extractGuestEndpointFromBundle(jsText);
-          console.log("[minddiak token] bundle guestPath2:", guestPath2);
 
           const apiBase2 = extractApiBaseFromBundle(jsText);
-          console.log("[minddiak token] bundle apiBase2:", apiBase2);
 
-          if (guestPath2) {
-            console.log("[minddiak token] bundle guestUrl2:", new URL(guestPath2, apiBase2).toString());
-          }
 
           const interestingStrings = [];
           const rx = /"([^"]*(auth|login|guest|token|refresh|me|ping)[^"]*)"/gi;
@@ -1172,18 +1188,14 @@ export const handler = async (event) => {
           while ((m = rx.exec(jsText)) && interestingStrings.length < 200) {
             interestingStrings.push(m[1]);
           }
-          console.log("interestingStrings sample:", interestingStrings.slice(0, 120));
 
           const pathMatches =
             jsText.match(/\/[a-z0-9_\-\/]*(auth|login|guest|token|refresh|me|ping)[a-z0-9_\-\/]*/gi) || [];
-          console.log("pathMatches sample:", [...new Set(pathMatches)].slice(0, 80));
 
           const idxAuthFn = jsText.toLowerCase().indexOf("authenticate");
-          console.log("authenticate idx:", idxAuthFn);
           if (idxAuthFn >= 0) {
             const start = Math.max(0, idxAuthFn - 800);
             const end = Math.min(jsText.length, idxAuthFn + 2000);
-            console.log("authenticate vicinity:", jsText.slice(start, end).slice(0, 1500));
           }
         }
 
