@@ -170,6 +170,7 @@ const SOURCES = [
   { key: "continental", label: "CONTINENTAL", url: "https://jobs.continental.com/hu/#/?fieldOfWork_stringS=3a2330f4-2793-4895-b7c7-aee9c965ae22,b99ff13c-96c8-4a72-b427-dec7effd7338&location=%7B%22title%22:%22Magyarorsz%C3%A1g%22,%22type%22:%22country%22,%22countryCode%22:%22hu%22%7D&searchTerm=intern" },
   { key: "kh", label: "K+H", url: "https://karrier.kh.hu/allasok?q=c3BlY2lhbGl0aWVzJTVCJTVEJTNESVQlMjAlQzMlQTlzJTIwaW5ub3YlQzMlQTFjaSVDMyVCMyUyNmNpdGllcyU1QiU1RCUzREJ1ZGFwZXN0JTI2#!" },
   { key: "piller", label: "PILLER", url: "https://piller.karrierportal.hu/allasok?q=Y2l0aWVzJTVCJTVEJTNEQnVkYXBlc3QlMjYuuzzuuzz#!" },
+  { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" }
 ];
 
 // =====================
@@ -297,6 +298,25 @@ function extractSSR(html, baseUrl) {
 
   return dedupeByUrl(items);
 }
+
+const SOURCE_ADAPTERS = {
+  // zyntern már megvan nálad
+  zyntern: {
+    type: "api",
+    fetch: async () => {
+      const url = `https://zyntern.com/api/jobs?fields=16&page=1&limit=50`;
+      const payload = await fetchJson(url);
+      const arr = Array.isArray(payload?.data) ? payload.data : [];
+      return arr.map(j => ({
+        title: j?.title ? String(j.title).slice(0, 300) : null,
+        url: j?.url ? normalizeUrl(String(j.url)) : null,
+        description: j?.description ? String(j.description).slice(0, 800) : null,
+      })).filter(x => x.title && x.url);
+    }
+  },
+
+  // ide jönnek majd: mol, taboola, mediso, continental, kh, piller...
+};
 
 
 async function fetchJsonApi(url, redirectLeft = 5) {
@@ -672,6 +692,8 @@ async function upsertJob(client, source, item) {
   );
 }
 
+
+
 // =====================
 // Handler (ONE RUN, FIRST 4 SOURCES)
 // =====================
@@ -763,10 +785,10 @@ exports.handler = async (event) => {
       // =========================
       // MATCH + DEBUG REJECTED
       // =========================
-      const matched =
-        source === "melodiak"
-          ? merged
-          : merged.filter((c) => matchesKeywords(c.title, c.description));
+    const matched =
+      source === "melodiak"
+        ? merged
+        : merged.filter((c) => matchesKeywords(c.title, c.description));
 
       let rejected = [];
       if (debug) {
