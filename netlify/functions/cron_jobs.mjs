@@ -12,7 +12,7 @@ globalThis.FormData ??= class FormData {};
 import https from "node:https";
 import http from "node:http";
 import zlib from "node:zlib";
-import cheerio from "cheerio";
+import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 
@@ -599,7 +599,7 @@ function matchesKeywords(title, desc) {
 }
 
 function extractSSR(html, baseUrl) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
   const items = [];
 
   // Tipikus "kártya" konténerek / list item-ek
@@ -764,7 +764,7 @@ function keywordHit(title, desc) {
 }
 
 function extractMelodiakDetail(html, baseUrl) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
 
   const title =
     normalizeWhitespace($("h1,h2").first().text()) ||
@@ -957,7 +957,8 @@ function isCtaTitle(s) {
 }
 
 function extractCandidates(html, baseUrl) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
+
   const items = [];
 
   $("a[href]").each((_, el) => {
@@ -1005,7 +1006,8 @@ function extractCandidates(html, baseUrl) {
 // Melódiák SSR extraction
 // =====================
 function extractMelodiakCards(html) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
+
   const items = [];
 
   $(".job-list-item").each((_, el) => {
@@ -1039,7 +1041,8 @@ function extractMelodiakCards(html) {
 // Bundle debug for Melódiák API discovery
 // =====================
 function extractScriptSrcs(html, baseUrl) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
+
 
   // ✅ Minddiák: base mindig root legyen
   let base = baseUrl;
@@ -1088,7 +1091,8 @@ async function upsertJob(client, source, item) {
 }
 
 function extractSchonherz(html, baseUrl) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
+
   const items = [];
 
   // 1 hirdetés = 1 darab .col-md-8 a #ads alatt
