@@ -157,7 +157,7 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
-  { key: "melodiak", label: "Melódiák – gyakornoki", url: "https://www.melodiak.hu/diakmunkak/?l=gyakornoki-szakmai-munkak&ca=informatikai-mernoki-muszaki" },
+  { key: "melodiak", label: "Melódiák – gyakornoki", url: "https://www.melodiak.hu/diakmunkak/?r=budapest&ca=informatikai-mernoki-muszaki&o=recent" },
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
   { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
@@ -1252,10 +1252,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // MATCH + DEBUG REJECTED
       // =========================
-      const matched =
-        source === "melodiak"
-          ? merged
-          : merged.filter((c) => matchesKeywords(c.title, c.description));
+      const matched = merged.filter((c) => matchesKeywords(c.title, c.description));
+
 
       let rejected = [];
       if (debug) {
