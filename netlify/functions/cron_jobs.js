@@ -1,5 +1,5 @@
 // netlify/functions/cron_jobs.js
-
+console.log("CRON_JOBS LOADED");
 export const config = {
   schedule: "0 4,16 * * *", // UTC 04:00 és 16:00
 };
