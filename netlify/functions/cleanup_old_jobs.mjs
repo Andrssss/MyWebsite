@@ -1,13 +1,10 @@
-// netlify/functions/cleanup_old_jobs.mjs
-console.log("CLEANUP_OLD_JOBS LOADED");
-
-// Weekly – every Monday 01:30 UTC (állítsd ahogy akarod)
-export const config = {
-  schedule: "30 1 * * 1",
-};
-
 import pkg from "pg";
 const { Pool } = pkg;
+
+export const config = {
+  // pl. minden nap 01:30 UTC
+  schedule: "30 1 * * *",
+};
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -20,20 +17,16 @@ const pool = new Pool({
 export default async () => {
   const client = await pool.connect();
   try {
-    // törlés 2 hónapnál régebbi first_seen alapján
-    const sql = `
+    // 10 napnál régebbiek törlése first_seen alapján
+    const { rowCount } = await client.query(`
       DELETE FROM job_posts
-      WHERE first_seen < (NOW() - INTERVAL '2 months')
-    `;
+      WHERE first_seen < (NOW() - INTERVAL '10 days')
+    `);
 
-    const res = await client.query(sql);
-
-    console.log("[cleanup] deleted rows:", res.rowCount);
-
-    return new Response(`Cleanup OK. Deleted: ${res.rowCount}`, { status: 200 });
+    return new Response(`cleanup OK: deleted ${rowCount}`, { status: 200 });
   } catch (err) {
-    console.error("[cleanup] failed:", err);
-    return new Response("Cleanup failed", { status: 500 });
+    console.error(err);
+    return new Response("cleanup failed", { status: 500 });
   } finally {
     client.release();
   }
