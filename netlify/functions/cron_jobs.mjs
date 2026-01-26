@@ -1,7 +1,7 @@
 
 // netlify/functions/cron_jobs.js
 console.log("CRON_JOBS LOADED");
-exports.config = {
+export const config = {
   schedule: "0 4,16 * * *",
 };
 
@@ -9,11 +9,12 @@ globalThis.File ??= class File {};
 globalThis.Blob ??= class Blob {};
 globalThis.FormData ??= class FormData {};
 
-const https = require("https");
-const http = require("http");
-const zlib = require("zlib");
-const cheerio = require("cheerio");
-const { Pool } = require("pg");
+import https from "node:https";
+import http from "node:http";
+import zlib from "node:zlib";
+import cheerio from "cheerio";
+import pkg from "pg";
+const { Pool } = pkg;
 
 // =====================
 // DB
@@ -27,7 +28,20 @@ const pool = new Pool({
 });
 
 
-          
+// =====================
+// MAIN (darabolt futás)
+// =====================
+async function runAllBatches() {
+  const size = 4;
+  const totalBatches = Math.ceil(SOURCES.length / size);
+
+  for (let batch = 0; batch < totalBatches; batch++) {
+    await runBatch({ batch, size, write: 1 });
+    await sleep(500);
+  }
+
+}
+            
 
 // =====================
 // HELPERS
@@ -1117,11 +1131,29 @@ function extractSchonherz(html, baseUrl) {
 
 // =====================
 // Handler (ONE RUN, FIRST 4 SOURCES)
-// =====================// =====================
-// BATCH runner (közös cron + debug)
 // =====================
-async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
-  console.log("[runBatch] batch:", batch, "size:", size, "write:", write);
+export default async function (request, context) {
+  const url = new URL(request.url);
+  const qs = url.searchParams;
+
+  const debug = qs.debug === "1";
+
+  // Ha cron futtatja (nincs debug param), akkor futtasd le az összes batch-et egyben
+  if (!debug) {
+    await runAllBatches();
+    return {
+      statusCode: 200,
+      body: "Cron jobs done",
+    };
+  }
+
+  const bundleDebug = qs.bundledebug === "1";
+  const isDebug = qs.debug === "1";
+  const write = qs.write === "1" || !isDebug;
+
+  // ---- batching (cron + timeout védelem)
+  const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
+  const size = Math.min(Math.max(parseInt(qs.size || "4", 10) || 4, 1), 8);
 
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
 
@@ -1131,9 +1163,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
     ok: true,
     node: process.version,
     ranAt: new Date().toISOString(),
-    debug: !!debug,
-    bundleDebug: !!bundleDebug,
-    write: !!write,
+    debug,
+    bundleDebug,
+    write,
     batch,
     size,
     processedThisRun: listToProcess.length,
@@ -1143,9 +1175,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
   try {
     for (const p of listToProcess) {
+
       const source = p.key;
 
       let html = null;
+
+      // Zynternnél később sem kell html, de a bundledebughoz hasznos lehet
       try {
         html = await fetchText(p.url);
       } catch (err) {
@@ -1153,32 +1188,55 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         continue;
       }
 
-      // -------- bundledebug (csak debug esetén) -------
-      if (source === "minddiak" && debug && bundleDebug) {
-        try {
-          const scriptSrcs = extractScriptSrcs(html, p.url);
 
-          const mainLike =
-            scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /index\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /runtime\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /app\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /\.js(\?|$)/i.test(s)) ||
-            null;
+    // ✅ IDE jön
+    if (source === "minddiak" && debug && bundleDebug) {
+      try {
+        const scriptSrcs = extractScriptSrcs(html, p.url);
 
-          if (mainLike) {
-            const jsText = await fetchText(mainLike);
-            const guestPath2 = extractGuestEndpointFromBundle(jsText);
-            const apiBase2 = extractApiBaseFromBundle(jsText);
-            console.log("[minddiak bundledebug] apiBase:", apiBase2, "guestPath:", guestPath2);
+        const mainLike =
+          scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
+          scriptSrcs.find((s) => /index\..*\.js(\?|$)/i.test(s)) ||
+          scriptSrcs.find((s) => /runtime\..*\.js(\?|$)/i.test(s)) ||
+          scriptSrcs.find((s) => /app\..*\.js(\?|$)/i.test(s)) ||
+          scriptSrcs.find((s) => /\.js(\?|$)/i.test(s)) ||
+          null;
+
+
+        if (mainLike) {
+          const jsText = await fetchText(mainLike);
+
+          // ✅ ADD EZT:
+          const guestPath2 = extractGuestEndpointFromBundle(jsText);
+
+          const apiBase2 = extractApiBaseFromBundle(jsText);
+
+
+          const interestingStrings = [];
+          const rx = /"([^"]*(auth|login|guest|token|refresh|me|ping)[^"]*)"/gi;
+          let m;
+          while ((m = rx.exec(jsText)) && interestingStrings.length < 200) {
+            interestingStrings.push(m[1]);
           }
-        } catch (e) {
-          console.log("minddiak bundledebug error:", e.message);
+
+          const pathMatches =
+            jsText.match(/\/[a-z0-9_\-\/]*(auth|login|guest|token|refresh|me|ping)[a-z0-9_\-\/]*/gi) || [];
+
+          const idxAuthFn = jsText.toLowerCase().indexOf("authenticate");
+          if (idxAuthFn >= 0) {
+            const start = Math.max(0, idxAuthFn - 800);
+            const end = Math.min(jsText.length, idxAuthFn + 2000);
+          }
         }
+
+      } catch (e) {
+        console.log("minddiak bundledebug error:", e.message);
       }
+    }
+
 
       // =========================
-      // MERGED KÉPZÉS
+      //  MERGED KÉPZÉS (ITT A LÉNYEG)
       // =========================
       let merged = [];
 
@@ -1209,7 +1267,11 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           continue;
         }
       } else {
-        // ✅ HTML-es források
+        // ... HTML-es rész
+
+
+        // ✅ MINDEN MÁS: a jelenlegi HTML-es logikád
+
         let generic = extractCandidates(html, p.url);
         generic = generic.filter((c) => looksLikeJobUrl(source, c.url));
 
@@ -1226,23 +1288,26 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           schonherz = extractSchonherz(html, p.url);
         }
 
-        merged =
-          source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-            : mergeCandidates(generic, ssr, melodiakSSR);
+        merged = source === "schonherz"
+          ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
+          : mergeCandidates(generic, ssr, melodiakSSR);
 
         if (source === "melodiak") {
           merged = await enrichMelodiakItems(merged, 20);
         }
       }
 
+      
+
+
+
       // =========================
       // MATCH + DEBUG REJECTED
       // =========================
-      const matched =
-        source === "melodiak"
-          ? merged
-          : merged.filter((c) => matchesKeywords(c.title, c.description));
+    const matched =
+      source === "melodiak"
+        ? merged
+        : merged.filter((c) => matchesKeywords(c.title, c.description));
 
       let rejected = [];
       if (debug) {
@@ -1261,6 +1326,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             };
           });
       }
+  
 
       // =========================
       // DB UPSERT
@@ -1288,6 +1354,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         url: p.url,
         ok: true,
         counts: {
+          // Zynternnél ezek nem értelmezettek úgy, mint HTML-nél
+          generic: source === "zyntern" ? 0 : undefined,
+          ssr: source === "zyntern" ? 0 : undefined,
+          melodiakSSR: source === "melodiak" ? undefined : 0,
           merged: merged.length,
           matched: matched.length,
           upserted,
@@ -1301,7 +1371,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           hits: keywordHit(x.title, x.description),
           normPreview: normalizeText(`${x.title ?? ""} ${x.description ?? ""}`).slice(0, 200),
         }));
-
+      }
+      if (debug) {
         portalStat.matchedLinks = matched.map((x) => ({
           title: x.title,
           url: x.url,
@@ -1309,67 +1380,34 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           normPreview: normalizeText(`${x.title ?? ""} ${x.description ?? ""}`).slice(0, 200),
         }));
 
-        portalStat.rejected = rejected;
-        portalStat.upsertErrors = upsertErrors;
-      } else {
-        // cron/normal futásnál elég a cím+url (kisebb response/log)
+        // opcionális: gyors összevetés
+        portalStat._debugCounts = {
+          merged: merged.length,
+          matched: matched.length,
+          rejected: rejected.length,
+        };
+      }
+
+
+
+
+
+        // --- MINDEN PORTÁLNÁL: mergelt linkek kiírása
+      if (!debug) {
         portalStat.mergedLinks = merged.map((x) => ({ title: x.title, url: x.url }));
       }
+
 
       stats.portals.push(portalStat);
     }
 
-    return stats;
+    return json(200, stats);
   } catch (err) {
-    console.error("[runBatch] error:", err);
-    return { ok: false, error: err.message, batch, size };
+    console.error(err);
+    return json(500, { ok: false, error: err.message, node: process.version });
   } finally {
     if (client) client.release();
   }
-}
-
-
-// =====================
-// MAIN (darabolt futás - CRON)
-// =====================
-async function runAllBatches() {
-  const size = 4;
-  const totalBatches = Math.ceil(SOURCES.length / size);
-
-  console.log("[runAllBatches] totalBatches:", totalBatches, "size:", size);
-
-  for (let batch = 0; batch < totalBatches; batch++) {
-    try {
-      const res = await runBatch({ batch, size, write: 1, debug: false });
-      console.log("[runAllBatches] batch done:", batch, "processed:", res?.processedThisRun);
-    } catch (e) {
-      console.error("[runAllBatches] batch failed:", batch, e);
-    }
-    await sleep(500);
-  }
-}
-
-
-
-exports.handler = async (event) => {
-  const qs = event.queryStringParameters || {};
-  const debug = qs.debug === "1";
-  const bundleDebug = qs.bundledebug === "1";
-
-  // CRON / normal futás
-  if (!debug) {
-    await runAllBatches();
-    return { statusCode: 200, body: "Cron jobs done" };
-  }
-
-  // DEBUG futás: egy batch-et futtatsz paraméterrel
-  const batch = Math.max(parseInt(qs.batch || "0", 10) || 0, 0);
-  const size = Math.min(Math.max(parseInt(qs.size || "4", 10) || 4, 1), 8);
-  const write = qs.write === "1";
-
-  const stats = await runBatch({ batch, size, write, debug: true, bundleDebug });
-  return json(200, stats);
 };
-
 
 
