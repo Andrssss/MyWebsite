@@ -1,4 +1,9 @@
 // netlify/functions/cron_jobs.js
+
+export const config = {
+  schedule: "0 4,16 * * *", // UTC 04:00 és 16:00
+};
+
 globalThis.File ??= class File {};
 globalThis.Blob ??= class Blob {};
 globalThis.FormData ??= class FormData {};
@@ -10,7 +15,7 @@ const cheerio = require("cheerio");
 const { Pool } = require("pg");
 
 // =====================
-// DB (write=1 esetén)
+// DB
 // =====================
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -21,30 +26,54 @@ const pool = new Pool({
 });
 
 // =====================
-// Response helper
+// MAIN
 // =====================
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: JSON.stringify(body),
-  };
+export default async () => {
+  const size = 4;
+  const write = 1;
+
+  for (let batch = 0; batch < 6; batch++) {
+    try {
+      await runBatch({ batch, size, write });
+      await sleep(500); // védelem timeout ellen
+    } catch (err) {
+      console.error(`Batch ${batch} failed`, err);
+    }
+  }
+
+  return new Response("Cron jobs done", { status: 200 });
+};
+
+// =====================
+// BATCH
+// =====================
+async function runBatch({ batch, size, write }) {
+  console.log("Running batch", batch, size, write);
+
+  // IDE jön a konkrét scrape / DB logika
 }
 
 // =====================
-// Text helpers
+// HELPERS
 // =====================
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function stripAccents(s) {
   return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
+
 function normalizeText(s) {
-  return stripAccents(String(s ?? "")).replace(/\s+/g, " ").trim().toLowerCase();
+  return stripAccents(s).replace(/\s+/g, " ").trim().toLowerCase();
 }
+
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
+}
+
+async function fetchText(url, redirectLeft = 5) {
+  // ide jön a http/https/zlib fetch kódod
 }
 
 async function fetchJson(url, redirectLeft = 5) {
@@ -52,13 +81,9 @@ async function fetchJson(url, redirectLeft = 5) {
   try {
     return JSON.parse(txt);
   } catch (e) {
-    const preview = txt.slice(0, 300);
-    throw new Error(`JSON parse failed for ${url}: ${e.message}. Preview: ${preview}`);
+    throw new Error(`JSON parse failed for ${url}: ${e.message}`);
   }
 }
-
-
-
 
 function extractZynternFromApiPayload(payload) {
   const arr = Array.isArray(payload?.data) ? payload.data : [];
