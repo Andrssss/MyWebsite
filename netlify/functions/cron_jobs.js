@@ -1,8 +1,8 @@
 
 // netlify/functions/cron_jobs.js
 console.log("CRON_JOBS LOADED");
-export const config = {
-  schedule: "0 4,16 * * *", // UTC 04:00 és 16:00
+exports.config = {
+  schedule: "0 4,16 * * *",
 };
 
 globalThis.File ??= class File {};
@@ -26,33 +26,21 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// =====================
-// MAIN
-// =====================
-export default async () => {
-  const size = 4;
-  const write = 1;
 
-  for (let batch = 0; batch < 6; batch++) {
-    try {
-      await runBatch({ batch, size, write });
-      await sleep(500); // védelem timeout ellen
-    } catch (err) {
-      console.error(`Batch ${batch} failed`, err);
-    }
+// =====================
+// MAIN (darabolt futás)
+// =====================
+async function runAllBatches() {
+  const size = 4;
+  const totalBatches = Math.ceil(SOURCES.length / size);
+
+  for (let batch = 0; batch < totalBatches; batch++) {
+    await runBatch({ batch, size, write: 1 });
+    await sleep(500);
   }
 
-  return new Response("Cron jobs done", { status: 200 });
-};
-
-// =====================
-// BATCH
-// =====================
-async function runBatch({ batch, size, write }) {
-  console.log("Running batch", batch, size, write);
-
-  // IDE jön a konkrét scrape / DB logika
 }
+            
 
 // =====================
 // HELPERS
@@ -73,18 +61,7 @@ function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
-async function fetchText(url, redirectLeft = 5) {
-  // ide jön a http/https/zlib fetch kódod
-}
 
-async function fetchJson(url, redirectLeft = 5) {
-  const txt = await fetchText(url, redirectLeft);
-  try {
-    return JSON.parse(txt);
-  } catch (e) {
-    throw new Error(`JSON parse failed for ${url}: ${e.message}`);
-  }
-}
 
 function extractZynternFromApiPayload(payload) {
   const arr = Array.isArray(payload?.data) ? payload.data : [];
@@ -97,6 +74,12 @@ function extractZynternFromApiPayload(payload) {
     }))
     .filter((x) => x.title && x.url);
 }
+
+async function fetchJson(url, redirectLeft = 5) {
+  const txt = await fetchText(url, redirectLeft);
+  return JSON.parse(txt);
+}
+
 
 async function fetchAllZynternJobs({ fields = 16, limit = 50, maxPages = 5 }) {
   let page = 1;
@@ -700,6 +683,14 @@ function extractSSR(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
+function json(statusCode, obj) {
+  return {
+    statusCode,
+    headers: { "content-type": "application/json; charset=utf-8" },
+    body: JSON.stringify(obj),
+  };
+}
+
 
 
 
@@ -1140,9 +1131,19 @@ function extractSchonherz(html, baseUrl) {
 // =====================
 // Handler (ONE RUN, FIRST 4 SOURCES)
 // =====================
-export const handler = async (event) => {
+exports.handler  = async (event) => {
   const qs = event.queryStringParameters || {};
   const debug = qs.debug === "1";
+
+  // Ha cron futtatja (nincs debug param), akkor futtasd le az összes batch-et egyben
+  if (!debug) {
+    await runAllBatches();
+    return {
+      statusCode: 200,
+      body: "Cron jobs done",
+    };
+  }
+
   const bundleDebug = qs.bundledebug === "1";
   const isDebug = qs.debug === "1";
   const write = qs.write === "1" || !isDebug;
