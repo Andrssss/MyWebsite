@@ -127,7 +127,7 @@ const JobWatcher = () => {
         <div>
           <h3>
             <p>
-                Forrásonként gyűjtött, automatikus frissítéssel. Minden nap UTC szerint 4 illetve 14-re fut le. Ekkor frissül.
+                Automata scraper. Minden nap UTC szerint 4 illetve 14-re fut le. Ekkor frissül.
             </p>
             <p>
               Elég kakán néz ki maszív fejlesztés alatt van. Ötleteket meghallgatok, de sajnos egy nehéz és lassú folyamat, ezért kérlek donétolj 500ft -t. xd  
