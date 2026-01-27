@@ -754,3 +754,33 @@ body {
 
 /* Mobil */
 @media (max-width:768px){ .others-ll__modal{ padding:12px; } }
+
+
+.header-row {
+  display: flex;
+  align-items: center;        /* Függőlegesen középre igazítja a címet és a képet */
+  justify-content: space-between; 
+  margin-bottom: 20px;
+}
+
+.about-title {
+  flex-grow: 1;              /* A cím kitölti a rendelkezésre álló helyet */
+  text-align: center;        /* Középre igazítja a címet */
+  margin: 0;                 /* Ne legyen extra margó */
+}
+
+.profile-image img {
+  width: 160px;              /* állítsd az igény szerint */
+  height: auto;              /* arányt megtartja */
+  border-radius: 0;          /* nincs kerekítés */
+  object-fit: cover;
+  border: 3px solid #333;    /* sötétszürke keret */
+  padding: 0px;              /* opcionális: kis belső távolság a keret és a kép között */
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.3); /* opcionális: kis árnyék a kiemeléshez */
+}
+
+@media (max-width:768px){ .profile-image img{ 
+  width:100px; 
+  padding: 0px;
+} }
+
