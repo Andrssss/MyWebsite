@@ -9,6 +9,13 @@ const hoursSince = (iso) => {
   return ms / (1000 * 60 * 60);
 };
 
+const [onlyNew, setOnlyNew] = useState(() => {
+  // Ha van mentett érték a localStorage-ban, azt olvassa be
+  const saved = localStorage.getItem("jobWatcherOnlyNew");
+  return saved === "true"; // stringet booleanre konvertál
+});
+
+
 const JobWatcher = () => {
   const navigate = useNavigate();
   const [sources, setSources] = useState([]); // [{key,label,count,lastSeen}]
@@ -155,10 +162,14 @@ const JobWatcher = () => {
             <input
               type="checkbox"
               checked={onlyNew}
-              onChange={(e) => setOnlyNew(e.target.checked)}
+              onChange={(e) => {
+                setOnlyNew(e.target.checked);
+                localStorage.setItem("jobWatcherOnlyNew", e.target.checked);
+              }}
             />
             Csak új (24h)
           </label>
+
 
           <button
             className="job-btn"
