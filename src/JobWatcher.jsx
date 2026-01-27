@@ -127,11 +127,10 @@ const JobWatcher = () => {
         <div>
           <h3>
             <p>
-                Forrásonként gyűjtött hirdetések, automatikus frissítéssel. Minden nap UTC szerint 4 illetve 14-re fut le az összes kersés. Ekkor a megtaláltakat frissiti a db-be.
+                Forrásonként gyűjtött, automatikus frissítéssel. Minden nap UTC szerint 4 illetve 14-re fut le. Ekkor frissül.
             </p>
             <p>
-              Elég kakán néz ki a design és nem is minden link működik egyenlőre. Hidd el, dolgozok rajta. Viszont amit talál az valid és megtalálható az oldalon. Csak a linket nehéz kinyerni.
-            Idővel bővülés várható, ha van ötleted mi legyen a következő ami a listára kerűljön keress nyugodtan. Sajnos egy nehéz és lassú folyamat ezeket megírni, ezért kérlek küld át 500ft -t a számlámra. xd  
+              Elég kakán néz ki maszív fejlesztés alatt van. Ötleteket meghallgatok, de sajnos egy nehéz és lassú folyamat, ezért kérlek donétolj 500ft -t. xd  
             </p>
             <h4>
               <p>
