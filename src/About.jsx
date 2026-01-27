@@ -38,7 +38,7 @@ const About = () => {
             Anno elég <em>tryhard </em> voltam, mivel nekem a célom az volt, hogy megtanuljak mindent és ezzel kerüljek mások elé. 
             Erre rásegít a munkamániásságom, a kitartásom és a makacsságom. Utolsó kettő tulajdonságomat a két év profibb szintű <strong>Crossfit</strong>-nek köszönhetem. 
             Az egy izgalmas sport, ha komolyan veszed. Sok stratégia van, amivel a tested kitartóképességét lehet növelni.  (Pl.: étkezés, düh kezelés, gondolat manipulálás)
-            Ezek a skillek talán a jegyzeteimen is látszanak. Erre is büszke vagyok talán. Meg jó érzés, hogy ez segíteni fog a pisiseknek. 😄 
+            Ezek a skillek talán a jegyzeteimen is látszanak. Erre is büszke vagyok. Meg jó érzés, hogy ez segíteni fog a pisiseknek. 😄 
             Sajnos a PPKE-n szerzett tudás nagy része haszontalan, szóval inkább a skillek miatt érte meg. (interjúkon szétszedtek)
           </p>
 
