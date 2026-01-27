@@ -9,11 +9,6 @@ const hoursSince = (iso) => {
   return ms / (1000 * 60 * 60);
 };
 
-const [onlyNew, setOnlyNew] = useState(() => {
-  // Ha van mentett érték a localStorage-ban, azt olvassa be
-  const saved = localStorage.getItem("jobWatcherOnlyNew");
-  return saved === "true"; // stringet booleanre konvertál
-});
 
 
 const JobWatcher = () => {
@@ -23,9 +18,13 @@ const JobWatcher = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
-  const [onlyNew, setOnlyNew] = useState(false);
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
+
+  const [onlyNew, setOnlyNew] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherOnlyNew");
+    return saved === "true"; // string → boolean
+  });
 
   // sources betöltés
   const fetchSources = async () => {
