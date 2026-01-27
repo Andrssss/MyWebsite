@@ -8,12 +8,42 @@
 }
 
 /* ====== HEADER ====== */
+/* ====== HEADER ====== */
 .job-watcher-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 24px;
   margin-bottom: 24px;
+
+  /* mobilon oszlopba rendezés */
+  flex-wrap: wrap;
+}
+
+@media (max-width: 588px) {
+  .job-watcher-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .job-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .job-search {
+    width: 100%;
+  }
+
+  .job-btn {
+    width: 100%;
+  }
+
+  .job-checkbox {
+    justify-content: flex-start;
+  }
 }
 
 .job-watcher h1 {
@@ -42,7 +72,7 @@
   border: 1px solid rgb(255, 255, 255);
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  min-width: 220px;
+  min-width: 200px;
 }
 
 .job-search::placeholder {
@@ -211,4 +241,10 @@
   padding: 4px 10px;
   border-radius: 999px;
   font-weight: 700;
+}
+
+.job-meta {
+  font-size: 18px; /* vagy akár 18px */
+  line-height: 1.6; /* jobb olvashatóság */
+  color: #ccc; /* ha túl sötét, világosítsd */
 }

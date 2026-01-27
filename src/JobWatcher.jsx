@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
@@ -9,6 +10,7 @@ const hoursSince = (iso) => {
 };
 
 const JobWatcher = () => {
+  const navigate = useNavigate();
   const [sources, setSources] = useState([]); // [{key,label,count,lastSeen}]
   const [activeSource, setActiveSource] = useState("all");
   const [jobs, setJobs] = useState([]);
@@ -117,10 +119,28 @@ const JobWatcher = () => {
     <div className="job-watcher">
       <div className="job-watcher-header">
         <div>
-          <h1>💼 Állásfigyelő</h1>
-          <div className="job-meta">
-            Forrásonként gyűjtött hirdetések, automatikus frissítéssel. Minden nap UTC szerint 15-re fut le az összes kersés.
-          </div>
+          <h3>
+            <p>
+                Forrásonként gyűjtött hirdetések, automatikus frissítéssel. Minden nap UTC szerint 4 illetve 14-re fut le az összes kersés. Ekkor a megtaláltakat frissiti a db-be.
+            </p>
+            <p>
+              Elég kakán néz ki a design és nem is minden link működik egyenlőre. Hidd el, dolgozok rajta. Viszont amit talál az valid és megtalálható az oldalon. Csak a linket nehéz kinyerni.
+            Idővel bővülés várható, ha van ötleted mi legyen a következő ami a listára kerűljön keress nyugodtan. Sajnos egy nehéz és lassú folyamat ezeket megírni, ezért kérlek küld át 500ft -t a számlámra. xd  
+            </p>
+            <h4>
+              <p>
+                Donate button :{" "}
+                <span
+                  style={{ cursor: 'pointer',  color: '#4f8cff' }}
+                  onClick={() => window.open("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "_blank")}
+                >
+                  --button--
+                </span>
+              </p>
+
+            </h4>
+
+          </h3>
         </div>
 
         <div className="job-actions">

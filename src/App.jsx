@@ -95,6 +95,7 @@ useEffect(() => {
               <li><Link to="/masok_oldalai" onClick={() => setMenuOpen(false)}>Mások oldalai</Link></li>
               <li><Link to="/User_oldalak" onClick={() => setMenuOpen(false)}>User oldalak</Link></li>
               <li><Link to="/gyakornoki_poziciok" onClick={() => setMenuOpen(false)}>Gyakornoki linkek</Link></li>
+              <li><Link to="/allasfigyelo" onClick={() => setMenuOpen(false)}>Állásfigyelő</Link></li>
               <li><Link to="/rolam" onClick={() => setMenuOpen(false)}>Rólam</Link></li>
             </ul>
 
@@ -113,6 +114,7 @@ useEffect(() => {
                 <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
                 <li><Link to="/User_oldalak">🧭 User oldalak</Link></li>
                 <li><Link to="/gyakornoki_poziciok">💼 Gyakornoki pozi</Link></li>
+                <li><Link to="/allasfigyelo">✨ Állásfigyelő</Link></li>
                 <li><Link to="/rolam">👤 Rólam</Link></li>
                 
               </ul>
@@ -129,17 +131,30 @@ useEffect(() => {
           <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
           <Route path="/User_oldalak" element={<User_pages />} />
           <Route path="/rolam" element={<About />} />
+
+          {/* Gyakornoki linkek */}
           <Route
             path="/gyakornoki_poziciok"
-            element={<div className="main-content re-page"><LinksLauncher /></div>}
+            element={
+              <div className={`${isMobile ? 'content' : 'main-content'} re-page`}>
+                <LinksLauncher />
+              </div>
+            }
           />
+
+          {/* Állásfigyelő */}
           <Route
             path="/allasfigyelo"
-            element={<JobWatcher />}
+            element={
+              <div className={`${isMobile ? 'content' : 'main-content'} re-page`}>
+                <JobWatcher />
+              </div>
+            }
           />
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+
       </main>
     </div>
   );

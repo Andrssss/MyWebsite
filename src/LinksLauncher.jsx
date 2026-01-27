@@ -1,4 +1,5 @@
 import  { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import CopyCode from "./components/CopyCode";
 
 const JOB_PORTALS = [
@@ -199,7 +200,7 @@ export default function LinksLauncher({ autoOpen = false }) {
         </div>
         <div className="ll-actions">
           <button
-            className="btn btn-primary btn-red"
+            className="btn-white x"
             onClick={() => handleOpenAllClick(links)}
           >
             Összes megnyitása
@@ -254,7 +255,7 @@ export default function LinksLauncher({ autoOpen = false }) {
         automatikusan <strong>kiemelheted</strong> a kulcsszavakat az álláshirdetésekben.
         Így gyorsabban átfutod az oldalakat. Erre alul van egy mintakód, amit anno én használtam. Ezt bemásolod a Tampermonkey-ban és kész is.
       </div>
-
+     
       
 
       {renderLinks('Munka portálok', JOB_PORTALS)}

@@ -701,7 +701,7 @@ body {
 
 /* Piros stílus az „Összes megnyitása” gombhoz */
 .btn-red {
-  background-color: #e53935 !important;
+  background-color: #848484 !important;
   border-color: #e53935 !important;
   color: #fff !important;
 }
@@ -783,4 +783,30 @@ body {
   width:100px; 
   padding: 0px;
 } }
+
+.btn-primary {
+  background-color: #e53935 !important;
+  border-color: #e53935 !important;
+  color: #fff !important;
+}
+
+.btn-white {
+  background-color: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #000000 !important;
+
+  border-radius: 10px; /* ugyanaz, mint a .btn-primary */
+  padding: 10px 16px;  /* ha szükséges a méret egyezéshez */
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-white:hover {
+  background-color: #dcdcdc !important;
+  border-color: #cecece !important;
+}
+
+
+
 
