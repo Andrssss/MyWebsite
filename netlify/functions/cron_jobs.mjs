@@ -1240,16 +1240,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // MATCH + DEBUG REJECTED
       // =========================
-      const matched = merged.filter((c) => matchesKeywords(c.title, c.description));
+      let matchedList = merged.filter((c) => matchesKeywords(c.title, c.description));
 
       // ⚠️ Profession blacklist
       if (source.startsWith("profession")) {
         const BLACKLIST_URLS = [
           "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship"
         ];
-        matched = matched.filter((c) => !BLACKLIST_URLS.includes(c.url));
+        matchedList = matchedList.filter((c) => !BLACKLIST_URLS.includes(c.url));
       }
 
+      // debug info
       let rejected = [];
       if (debug) {
         rejected = merged
@@ -1267,6 +1268,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             };
           });
       }
+
 
       // =========================
       // DB UPSERT
