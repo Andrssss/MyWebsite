@@ -89,7 +89,7 @@ const JobWatcher = () => {
     let list = jobs;
 
     if (onlyNew) {
-      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 10);
+      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
     }
 
     const nq = q.trim().toLowerCase();
@@ -211,7 +211,7 @@ const JobWatcher = () => {
       ) : (
         <ul className="job-list">
           {visibleJobs.map((job) => {
-            const isNew = job.firstSeen && hoursSince(job.firstSeen) <= 24;
+            const isNew = job.firstSeen && hoursSince(job.firstSeen) <= 10;
             return (
               <li key={job.id} className="job-card">
                 <div className="job-row">
