@@ -1125,8 +1125,7 @@ function extractSchonherz(html, baseUrl) {
 }
 
 
-
-// ✅ TELJES runBatch() – ezt tedd be a fájlba (pl. a helper-ek után, a handler elé)
+// ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
 
@@ -1152,18 +1151,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
       let html = null;
       try {
-        // Zynternnél nem kellene, de bundleDebug / egységes flow miatt maradhat
         html = await fetchText(p.url);
       } catch (err) {
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
 
-      // -------- bundledebug (csak debug esetén) -------
+      // -------- bundle debug -------
       if (source === "minddiak" && debug && bundleDebug) {
         try {
           const scriptSrcs = extractScriptSrcs(html, p.url);
-
           const mainLike =
             scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
             scriptSrcs.find((s) => /index\..*\.js(\?|$)/i.test(s)) ||
@@ -1184,7 +1181,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       }
 
       // =========================
-      // MERGED KÉPZÉS
+      // MERGE JOBS
       // =========================
       let merged = [];
 
@@ -1192,63 +1189,42 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllZynternJobs({ fields: 16, limit: 50, maxPages: 5 });
         } catch (e) {
-          stats.portals.push({
-            source,
-            label: p.label,
-            url: p.url,
-            ok: false,
-            error: `Zyntern API error: ${e.message}`,
-          });
+          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
           continue;
         }
       } else if (source === "minddiak") {
         try {
           merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 6, debug });
         } catch (e) {
-          stats.portals.push({
-            source,
-            label: p.label,
-            url: p.url,
-            ok: false,
-            error: `MindDiák API error: ${e.message}`,
-          });
+          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
           continue;
         }
       } else {
-        // ✅ HTML-es források
-        let generic = extractCandidates(html, p.url);
-        generic = generic.filter((c) => looksLikeJobUrl(source, c.url));
-
-        let ssr = extractSSR(html, p.url);
-        ssr = ssr.filter((c) => looksLikeJobUrl(source, c.url));
+        let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
+        let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
 
         let melodiakSSR = [];
-        if (source === "melodiak") {
-          melodiakSSR = extractMelodiakCards(html).filter((c) => looksLikeJobUrl(source, c.url));
-        }
+        if (source === "melodiak") melodiakSSR = extractMelodiakCards(html).filter((c) => looksLikeJobUrl(source, c.url));
 
         let schonherz = [];
-        if (source === "schonherz") {
-          schonherz = extractSchonherz(html, p.url);
-        }
+        if (source === "schonherz") schonherz = extractSchonherz(html, p.url);
 
         merged =
           source === "schonherz"
             ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
             : mergeCandidates(generic, ssr, melodiakSSR);
 
-        if (source === "melodiak") {
-          merged = await enrichMelodiakItems(merged, 20);
-        }
+        if (source === "melodiak") merged = await enrichMelodiakItems(merged, 20);
       }
 
       // =========================
-      // MATCH + DEBUG REJECTED
+      // FILTER & KEYWORD MATCH
       // =========================
-     // 1. Szűrés a kulcsszavakra
       let matchedList = merged.filter((c) => matchesKeywords(c.title, c.description));
 
-      // 2. URL blacklistek
+      // =========================
+      // BLACKLISTING
+      // =========================
       const BLACKLIST_SOURCES = ["profession", "cvonline", "jobline", "otp"];
       const BLACKLIST_URLS = [
         "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
@@ -1258,26 +1234,23 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
       ];
 
-      // Forrás szerinti URL tiltás
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
-      // Külön szabály a cvonline céges oldalakra
       if (source === "cvonline") {
         matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
       }
 
-      // 3. Szavak szerinti blacklist
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
       matchedList = matchedList.filter(item => {
         const text = `${item.title ?? ""} ${item.description ?? ""}`.toLowerCase();
         return !BLACKLIST_WORDS.some(word => text.includes(word.toLowerCase()));
       });
 
-
-
-      // debug info
+      // =========================
+      // DEBUG REJECTED
+      // =========================
       let rejected = [];
       if (debug) {
         rejected = merged
@@ -1296,73 +1269,23 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           });
       }
 
+      stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length, rejected });
 
       // =========================
       // DB UPSERT
       // =========================
-      let upserted = 0;
-      const upsertErrors = [];
-
       if (write && client) {
-        for (const it of matched) {
-          try {
-            await upsertJob(client, source, it);
-            upserted++;
-          } catch (e) {
-            upsertErrors.push({ title: it.title, url: it.url, error: e.message });
-          }
+        for (const item of matchedList) {
+          await upsertJob(client, source, item);
         }
       }
-
-      // =========================
-      // PORTAL STAT
-      // =========================
-      const portalStat = {
-        source,
-        label: p.label,
-        url: p.url,
-        ok: true,
-        counts: {
-          merged: merged.length,
-          matched: matched.length,
-          upserted,
-        },
-      };
-
-      if (debug) {
-        portalStat.mergedLinks = merged.map((x) => ({
-          title: x.title,
-          url: x.url,
-          hits: keywordHit(x.title, x.description),
-          normPreview: normalizeText(`${x.title ?? ""} ${x.description ?? ""}`).slice(0, 200),
-        }));
-
-        portalStat.matchedLinks = matched.map((x) => ({
-          title: x.title,
-          url: x.url,
-          hits: keywordHit(x.title, x.description),
-          normPreview: normalizeText(`${x.title ?? ""} ${x.description ?? ""}`).slice(0, 200),
-        }));
-
-        portalStat.rejected = rejected;
-        portalStat.upsertErrors = upsertErrors;
-      } else {
-        // cron/normal futásnál kisebb output
-        portalStat.mergedLinks = merged.map((x) => ({ title: x.title, url: x.url }));
-      }
-
-      stats.portals.push(portalStat);
     }
-
-    return stats;
-  } catch (err) {
-    console.error("[runBatch] error:", err);
-    return { ok: false, error: err.message, batch, size, node: process.version };
   } finally {
     if (client) client.release();
   }
-}
 
+  return stats;
+}
 
 
 export default async (request) => {
