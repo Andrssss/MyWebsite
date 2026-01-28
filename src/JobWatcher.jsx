@@ -89,7 +89,7 @@ const JobWatcher = () => {
     let list = jobs;
 
     if (onlyNew) {
-      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
+      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 10);
     }
 
     const nq = q.trim().toLowerCase();
