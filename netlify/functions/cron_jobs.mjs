@@ -1254,10 +1254,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://jobline.hu/allasok/25,200307,162",
-        "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q="
+        "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
       ];
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
         matchedList = matchedList.filter((c) => !BLACKLIST_URLS.includes(c.url));
+      }
+
+      if (source === "cvonline") {
+        matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
       }
 
 
