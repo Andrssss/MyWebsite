@@ -1245,10 +1245,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // MATCH + DEBUG REJECTED
       // =========================
+     // 1. Szűrés a kulcsszavakra
       let matchedList = merged.filter((c) => matchesKeywords(c.title, c.description));
 
-
-      // URL blacklist
+      // 2. URL blacklistek
       const BLACKLIST_SOURCES = ["profession", "cvonline", "jobline", "otp"];
       const BLACKLIST_URLS = [
         "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
@@ -1258,19 +1258,23 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
       ];
 
+      // Forrás szerinti URL tiltás
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
+      // Külön szabály a cvonline céges oldalakra
       if (source === "cvonline") {
         matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
       }
 
+      // 3. Szavak szerinti blacklist
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
       matchedList = matchedList.filter(item => {
         const text = `${item.title ?? ""} ${item.description ?? ""}`.toLowerCase();
         return !BLACKLIST_WORDS.some(word => text.includes(word.toLowerCase()));
       });
+
 
 
       // debug info
