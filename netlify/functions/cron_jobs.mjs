@@ -1247,8 +1247,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       let matchedList = merged.filter((c) => matchesKeywords(c.title, c.description));
 
-      // ⚠️ Profession blacklist
-      const BLACKLIST_SOURCES = ["profession", "cvonline", "jobline", "otp"]; // ide sorolod a forrásokat
+
+      // URL blacklist
+      const BLACKLIST_SOURCES = ["profession", "cvonline", "jobline", "otp"];
       const BLACKLIST_URLS = [
         "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
         "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
@@ -1256,20 +1257,21 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://jobline.hu/allasok/25,200307,162",
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
       ];
+
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
-        matchedList = matchedList.filter((c) => !BLACKLIST_URLS.includes(c.url));
+        matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
       if (source === "cvonline") {
         matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
       }
 
-
-      const BLACKLIST_WORDS = [ "marketing", "sales", "oktatásfejlesztő","support"]; // példa szavak
+      const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
       matchedList = matchedList.filter(item => {
         const text = `${item.title ?? ""} ${item.description ?? ""}`.toLowerCase();
         return !BLACKLIST_WORDS.some(word => text.includes(word.toLowerCase()));
       });
+
 
       // debug info
       let rejected = [];
