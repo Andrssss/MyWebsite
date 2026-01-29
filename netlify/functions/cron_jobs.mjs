@@ -194,8 +194,7 @@ const KEYWORDS_STRONG = [
   "qa",
   "tester",
   "sysadmin",
-  "network",
-  "Diákmunka"
+  "network"
 ];
 
 function hasWord(n, w) {
