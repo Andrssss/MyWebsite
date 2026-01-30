@@ -147,9 +147,9 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
-  { key: "jobline", label: "OTP", url: "https://jobline.hu/allasok/25,200306,200307,162" },
+  //{ key: "jobline", label: "OTP", url: "https://jobline.hu/allasok/25,200306,200307,162" },
   { key: "LinkedIn",label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R" },
-  { key: "cvonline",  label:  "vizmuvek", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=" }
+  //{ key: "cvonline",  label:  "vizmuvek", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=" }
 ];
 
 // =====================  
@@ -224,6 +224,15 @@ const LINKEDIN_TITLE_WHITELIST = [
 function linkedinTitleAllowed(title) {
   const t = normalizeText(title);
   return LINKEDIN_TITLE_WHITELIST.some(word => t.includes(normalizeText(word)));
+}
+
+function isReallinkedinJobUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/");
+  } catch {
+    return false;
+  }
 }
   
 function isRealCvonlineJobUrl(url) {
@@ -807,8 +816,11 @@ exports.handler = async (event) => {
 
       // 5️⃣ LinkedIn whitelist (csak IT jellegű címek maradnak)
       if (source === "LinkedIn") {
-        matched = matched.filter((c) => linkedinTitleAllowed(c.title));
+        matched = matched.filter(
+          (c) => linkedinTitleAllowed(c.title) && isReallinkedinJobUrl(c.url)
+        );
       }
+
 
       // 6️⃣ CVOnline – csak valódi álláshirdetés URL maradhat
       if (source === "cvonline") {
