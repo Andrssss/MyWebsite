@@ -172,8 +172,7 @@ const KEYWORDS_STRONG = [
   "qa",
   "tester",
   "sysadmin",
-  "network",
-  "Diákmunka"
+  "network"
 ];
 
 function hasWord(n, w) {
@@ -339,7 +338,7 @@ function fetchTextWithHeaders(url, extraHeaders = {}, redirectLeft = 5) {
           return resolve(fetchTextWithHeaders(nextUrl, extraHeaders, redirectLeft - 1));
         }
 
-        const enc = String(res.headers["content-encoding"] || "").toLowerCasex
+        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
         let stream = res;
         if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
         else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());

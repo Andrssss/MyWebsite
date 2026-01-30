@@ -195,6 +195,28 @@ const KEYWORDS_STRONG = [
   "network"
 ];
 
+const TITLE_BLACKLIST = [
+  "marketing",
+  "sales",
+  "hr",
+  "finance",
+  "pénzügy",
+  "könyvelő",
+  "accountant",
+  "manager",
+  "vezető",
+  "director",
+  "adminisztráció",
+  "asszisztens",
+  "ügyfélszolgálat",
+  "customer service",
+  "call center",
+  "értékesítő",
+  "biztosítás",
+  "tanácsadó",    
+];
+
+
 function hasWord(n, w) {
   // szóhatár: it ne találjon bele más szavakba
   const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
@@ -1229,11 +1251,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://jobline.hu/allasok/25,200307,162",
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
-        “https://muisz.hu/hu/diakmunkaink”,
-        “https://muisz.hu/hu/“,
-        “https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern,0,0,0,0,0,0,0,0,0,10”,
-        “https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship”,
-        “https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,adminisztrációs%20diákmunka",
       ];
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
