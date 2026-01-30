@@ -130,7 +130,7 @@ const JobWatcher = () => {
                 Automata scraper. Minden nap UTC szerint 4 illetve 14-kor fut. Ekkor frissül.
             </p>
             <p>
-              Elég kakán néz ki, maszív fejlesztés alatt van. Nem minden link működik, de amit talál az legit és megtalálható az oldalon. EZ egy nehéz és lassú folyamat, ezért kérlek donétolj 500ft -t. xd  
+              Elég kakán néz ki, maszív fejlesztés alatt van. "LinkedIn" és "cvonline" letiltotta a nagy datacenter IP-ket, szóval erre proxyt fogok csinálni a kövi hetekben. Nem minden link működik, de amit talál az legit és megtalálható az oldalon.
             </p>
             <h4>
               <p>

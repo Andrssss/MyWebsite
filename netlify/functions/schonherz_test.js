@@ -147,13 +147,12 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
-
   { key: "jobline", label: "OTP", url: "https://jobline.hu/allasok/25,200306,200307,162" },
-  { key: "l",label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R" },
+  { key: "LinkedIn",label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R" },
   { key: "cvonline",  label:  "vizmuvek", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=" }
 ];
 
-// =====================
+// =====================  
 // Keywords
 // =====================
 const KEYWORDS_STRONG = [
@@ -174,6 +173,67 @@ const KEYWORDS_STRONG = [
   "sysadmin",
   "network"
 ];
+
+const TITLE_BLACKLIST = [
+  "marketing",
+  "sales",
+  "hr",
+  "finance",
+  "pénzügy",
+  "könyvelő",
+  "accountant",
+  "manager",
+  "vezető",
+  "director",
+  "adminisztráció",
+  "asszisztens",
+  "ügyfélszolgálat",
+  "customer service",
+  "call center",
+  "értékesítő",
+  "biztosítás",
+  "tanácsadó",     // nem IT consultant, hanem business jellegű
+];
+
+function titleNotBlacklisted(title) {
+  const t = normalizeText(title);
+  return !TITLE_BLACKLIST.some(word => t.includes(normalizeText(word)));
+}
+
+const LINKEDIN_TITLE_WHITELIST = [
+  "developer",
+  "fejlesztő",
+  "fejleszto",
+  "software",
+  "engineer",
+  "data",
+  "analyst",
+  "qa",
+  "tester",
+  "devops",
+  "cloud",
+  "backend",
+  "frontend",
+  "fullstack",
+  "it",
+  "security",
+  "network",
+  "sysadmin",
+];
+
+function linkedinTitleAllowed(title) {
+  const t = normalizeText(title);
+  return LINKEDIN_TITLE_WHITELIST.some(word => t.includes(normalizeText(word)));
+}
+  
+function isRealCvonlineJobUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.includes("cvonline.hu") && u.pathname.startsWith("/hu/allas/");
+  } catch {
+    return false;
+  }
+}
 
 function hasWord(n, w) {
   // szóhatár: it ne találjon bele más szavakba
@@ -723,52 +783,42 @@ exports.handler = async (event) => {
       // =========================
       //  MERGED KÉPZÉS (ITT A LÉNYEG)
       // =========================
-      let merged = [];
+      // =========================
 
-      if (source === "zyntern") {
-        try {
-          merged = await fetchAllZynternJobs({ fields: 16, limit: 50, maxPages: 5 });
-        } catch (e) {
-          stats.portals.push({
-            source,
-            label: p.label,
-            url: p.url,
-            ok: false,
-            error: `Zyntern API error: ${e.message}`,
-          });
-          continue;
-        }
-      } else {
-        // ... HTML-es rész
+      // 1️⃣ HTML alapú találatok
+      let generic = extractCandidates(html, p.url).filter((c) =>
+        looksLikeJobUrl(source, c.url)
+      );
 
+      let ssr = extractSSR(html, p.url).filter((c) =>
+        looksLikeJobUrl(source, c.url)
+      );
 
-        // ✅ MINDEN MÁS: a jelenlegi HTML-es logikád
+      // 2️⃣ Összefésülés + URL alapú deduplikálás
+      let merged = mergeCandidates(generic, ssr);
 
-        let generic = extractCandidates(html, p.url);
-        generic = generic.filter((c) => looksLikeJobUrl(source, c.url));
+      // 3️⃣ Keyword szűrés
+      let matched = merged.filter((c) =>
+        matchesKeywords(c.title, c.description)
+      );
 
-        let ssr = extractSSR(html, p.url);
-        ssr = ssr.filter((c) => looksLikeJobUrl(source, c.url));
+      // 4️⃣ Globális title blacklist
+      matched = matched.filter((c) => titleNotBlacklisted(c.title));
 
-        let melodiakSSR = [];
-        if (source === "melodiak") {
-          melodiakSSR = extractMelodiakCards(html).filter((c) => looksLikeJobUrl(source, c.url));
-        }
-
-        merged = mergeCandidates(generic, ssr, melodiakSSR);
-        if (source === "melodiak") {
-          merged = await enrichMelodiakItems(merged, 20); // 20 = nálad 14, tehát mindet
-        }
-
+      // 5️⃣ LinkedIn whitelist (csak IT jellegű címek maradnak)
+      if (source === "LinkedIn") {
+        matched = matched.filter((c) => linkedinTitleAllowed(c.title));
       }
+
+      // 6️⃣ CVOnline – csak valódi álláshirdetés URL maradhat
+      if (source === "cvonline") {
+        matched = matched.filter((c) => isRealCvonlineJobUrl(c.url));
+      }
+
 
       // =========================
       // MATCH + DEBUG REJECTED
       // =========================
-    const matched =
-      source === "melodiak"
-        ? merged
-        : merged.filter((c) => matchesKeywords(c.title, c.description));
 
       let rejected = [];
       if (debug) {
@@ -792,18 +842,19 @@ exports.handler = async (event) => {
       // DB UPSERT
       // =========================
       let upserted = 0;
-      const upsertErrors = [];
+        const upsertErrors = [];
 
-      if (write && client) {
-        for (const it of matched) {
-          try {
-            await upsertJob(client, source, it);
-            upserted++;
-          } catch (e) {
-            upsertErrors.push({ title: it.title, url: it.url, error: e.message });
+        if (write && client) {
+          for (const it of matched) {
+            try {
+              await upsertJob(client, source, it);
+              upserted++;
+            } catch (e) {
+              upsertErrors.push({ title: it.title, url: it.url, error: e.message });
+            }
           }
         }
-      }
+
 
       // =========================
       // PORTAL STAT
