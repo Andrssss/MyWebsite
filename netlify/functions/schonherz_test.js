@@ -103,15 +103,27 @@ async function fetchAllZynternJobs({ fields = 16, limit = 50, maxPages = 5 }) {
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
+
+    // --- LINKEDIN FIX ---
+    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
+      u.search = "";   // minden ?param törlése
+      u.hash = "";
+      return u.toString();
+    }
+
+    // --- ÁLTALÁNOS TISZTÍTÁS ---
     u.hash = "";
-    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"].forEach((p) =>
-      u.searchParams.delete(p)
-    );
+    [
+      "utm_source","utm_medium","utm_campaign","utm_term",
+      "utm_content","fbclid","gclid"
+    ].forEach(p => u.searchParams.delete(p));
+
     return u.toString().replace(/\?$/, "");
   } catch {
     return raw;
   }
 }
+
 
 function absolutize(href, base) {
   try {
@@ -148,7 +160,7 @@ function dedupeByUrl(items) {
 // =====================
 const SOURCES = [
   { key: "LinkedIn",label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R" },
-  { key: "cvonline",  label:  "vizmuvek", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=" }
+  { key: "cvonline",  label:  "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=" }
 ];
 
 // =====================  
@@ -720,6 +732,24 @@ function bundleContextSamples(jsText, patterns, limit = 12) {
   }
   return out;
 }
+
+function canonicalizeCvUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+
+    // csak a cvcentrum.hu domainre alkalmazzuk
+    if (u.hostname === "cvcentrum.hu" && u.pathname.startsWith("/allasok/")) {
+      const slug = u.pathname.replace("/allasok/", "").replace(/\/$/, "");
+
+      return `https://www.cvonline.hu/hu/allas/${slug}`;
+    }
+
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+}
+
 
 // =====================
 // DB upsert (csak write=1 esetén)
