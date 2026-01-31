@@ -278,7 +278,24 @@
 
 
 
-/* ====== MOBILE WIDTH SAFETY ====== */
+
+
+/* ============================= */
+/* 🔒 GLOBAL WIDTH SAFETY */
+/* ============================= */
+*, *::before, *::after {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* ============================= */
+/* 📱 REAL MOBILE FIX 700px alatt */
+/* ============================= */
 @media (max-width: 700px) {
 
   .job-watcher {
@@ -286,44 +303,59 @@
     padding-right: 14px;
   }
 
-  /* Tabs ne lógjanak ki */
-  .job-tabs {
+  /* ===== SEARCH INPUT NEM LÓGHAT KI ===== */
+  .job-search {
     width: 100%;
-    overflow-x: hidden;
-  }
-
-  .job-tab {
+    min-width: 0;
     max-width: 100%;
-    flex-shrink: 1;
   }
 
-  /* Kártyák ne nyúljanak túl */
-  .job-card {
-    width: 100%;
+  /* ===== FLEX ELEMEK NE TOLJÁK KI A SORT ===== */
+  .job-row,
+  .job-actions,
+  .job-tabs {
     min-width: 0;
   }
 
-  /* Cím + source wrap */
+  /* ===== KÁRTYA FEJLÉC MOBILON STACKELT ===== */
   .job-row {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
   }
 
-  .job-title {
+  /* ===== SZÖVEGEK TÖRHETŐEK LEGYENEK ===== */
+  .job-title,
+  .job-desc,
+  .job-meta,
+  .job-source {
     word-break: break-word;
+    overflow-wrap: anywhere;
   }
 
+  /* ===== BADGE NE KÉNYSZERÍTSEN SORT ===== */
   .job-source {
     white-space: normal;
   }
 
-  /* Leírás se tudjon kilógni */
-  .job-desc {
-    word-break: break-word;
+  /* ===== META SOR MOBILON KISEBB ===== */
+  .job-meta {
+    font-size: 14px;
+    line-height: 1.5;
   }
 
-  /* Grid biztonság */
-  .job-list {
+  /* ===== TAB GOMBOK NE LÓGJANAK KI ===== */
+  .job-tab {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* ===== KÁRTYÁK BIZTOSAN NE LÓGJANAK KI ===== */
+  .job-card {
     width: 100%;
-    overflow-x: hidden;
+    min-width: 0;
+    overflow: hidden;
   }
 }
+  
