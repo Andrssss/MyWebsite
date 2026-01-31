@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
@@ -9,24 +8,26 @@ const hoursSince = (iso) => {
   return ms / (1000 * 60 * 60);
 };
 
-
-
 const JobWatcher = () => {
-  const navigate = useNavigate();
-  const [sources, setSources] = useState([]); // [{key,label,count,lastSeen}]
-  const [activeSource, setActiveSource] = useState("all");
+  const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
 
-  const [onlyNew, setOnlyNew] = useState(() => {
-    const saved = localStorage.getItem("jobWatcherOnlyNew");
-    return saved === "true"; // string → boolean
+  // Three-state sources
+  const [sourceStates, setSourceStates] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherSourceStates");
+    return saved ? JSON.parse(saved) : {};
   });
 
-  // sources betöltés
+  const [onlyNew, setOnlyNew] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherOnlyNew");
+    return saved === "true";
+  });
+
+  // ----------------------
   const fetchSources = async () => {
     setLoadingSources(true);
     try {
@@ -43,19 +44,12 @@ const JobWatcher = () => {
     }
   };
 
-  const endpoint = useMemo(() => {
-    const limit = 500;
-    if (activeSource === "all") return `${API_BASE_URL}/jobs?limit=${limit}`;
-    return `${API_BASE_URL}/jobs?source=${encodeURIComponent(activeSource)}&limit=${limit}`;
-  }, [activeSource]);
-
   const fetchJobs = async () => {
     setLoading(true);
     setStatus("");
     try {
-      const res = await fetch(endpoint);
+      const res = await fetch(`${API_BASE_URL}/jobs?limit=500`);
       const txt = await res.text();
-
       if (!res.ok) {
         try {
           const errJson = JSON.parse(txt);
@@ -64,7 +58,6 @@ const JobWatcher = () => {
           throw new Error(txt || "Hiba a betöltésnél.");
         }
       }
-
       const data = JSON.parse(txt);
       setJobs(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -78,13 +71,26 @@ const JobWatcher = () => {
 
   useEffect(() => {
     fetchSources();
+    fetchJobs();
   }, []);
 
-  useEffect(() => {
-    fetchJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint]);
+  // ----------------------
+  // Three-state toggle
+  const handleSourceClick = (key) => {
+    setSourceStates((prev) => {
+      const current = prev[key] || "neutral"; // neutral, selected, excluded
+      let next;
+      if (current === "neutral") next = "selected";
+      else if (current === "selected") next = "excluded";
+      else next = "neutral";
 
+      const newStates = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherSourceStates", JSON.stringify(newStates));
+      return newStates;
+    });
+  };
+
+  // ----------------------
   const visibleJobs = useMemo(() => {
     let list = jobs;
 
@@ -101,51 +107,29 @@ const JobWatcher = () => {
       });
     }
 
-    // ✅ LEGFRISSEBB FELÜL: lastSeen (fallback: firstSeen) DESC
+    const selected = Object.keys(sourceStates).filter((k) => sourceStates[k] === "selected");
+    const excluded = Object.keys(sourceStates).filter((k) => sourceStates[k] === "excluded");
+
+    if (selected.length > 0) {
+      list = list.filter((j) => selected.includes(j.source));
+    } else if (excluded.length > 0) {
+      list = list.filter((j) => !excluded.includes(j.source));
+    }
+
     return [...list].sort((a, b) => {
       const ta = new Date(a.firstSeen || 0).getTime();
       const tb = new Date(b.firstSeen || 0).getTime();
       return tb - ta;
-
     });
-  }, [jobs, onlyNew, q]);
+  }, [jobs, onlyNew, q, sourceStates]);
 
-
-  const tabs = useMemo(() => {
-    // all + dynamic sources
-    const dynamic = sources.map((s) => ({
-      key: s.key,
-      label: s.label ?? s.key,
-      count: s.count,
-    }));
-    return [{ key: "all", label: "Összes" }, ...dynamic];
-  }, [sources]);
-
+  // ----------------------
   return (
     <div className="job-watcher">
       <div className="job-watcher-header">
         <div>
-          <h3>
-            <p>
-                Automata scraper. Minden nap UTC szerint 4 illetve 14-kor fut. Ekkor frissül.
-            </p>
-            <p>
-              Elég kakán néz ki, maszív fejlesztés alatt van. "LinkedIn" és "cvonline" letiltotta a nagy datacenter IP-ket, szóval erre proxyt fogok csinálni a kövi hetekben. Nem minden link működik, de amit talál az legit és megtalálható az oldalon.
-            </p>
-            <h4>
-              <p>
-                Donate button :{" "}
-                <span
-                  style={{ cursor: 'pointer',  color: '#4f8cff' }}
-                  onClick={() => window.open("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "_blank")}
-                >
-                  --button--
-                </span>
-              </p>
-
-            </h4>
-
-          </h3>
+          <h1>Automata scraper</h1>
+          <p>Minden nap UTC szerint 4 illetve 14-kor fut. Ekkor frissül.</p>
         </div>
 
         <div className="job-actions">
@@ -168,7 +152,6 @@ const JobWatcher = () => {
             Csak új (24h)
           </label>
 
-
           <button
             className="job-btn"
             onClick={() => {
@@ -183,22 +166,29 @@ const JobWatcher = () => {
       </div>
 
       <div className="job-tabs">
-        {loadingSources && tabs.length === 1 ? (
+        {loadingSources ? (
           <div className="job-status">Források betöltése…</div>
         ) : (
-          tabs.map((s) => (
-            <button
-              key={s.key}
-              className={`job-tab ${activeSource === s.key ? "active" : ""}`}
-              onClick={() => setActiveSource(s.key)}
-              title={s.key === "all" ? "Összes forrás" : s.key}
-            >
-              {s.label}
-              {typeof s.count === "number" ? (
-                <span className="job-tab-count">{s.count}</span>
-              ) : null}
-            </button>
-          ))
+          sources.map((s) => {
+            const state = sourceStates[s.key] || "neutral";
+            let className = "job-tab";
+            if (state === "selected") className += " active";
+            if (state === "excluded") className += " highlighted";
+
+            return (
+              <button
+                key={s.key}
+                className={className}
+                onClick={() => handleSourceClick(s.key)}
+                title={s.key}
+              >
+                {s.label}
+                {typeof s.count === "number" && (
+                  <span className="job-tab-count">{s.count}</span>
+                )}
+              </button>
+            );
+          })
         )}
       </div>
 
@@ -226,17 +216,13 @@ const JobWatcher = () => {
                   <span className="job-source">{job.source}</span>
                 </div>
 
-                {job.description ? (
-                  <div className="job-desc">{job.description}</div>
-                ) : null}
+                {job.description && <div className="job-desc">{job.description}</div>}
 
                 <div className="job-meta">
-                  {isNew ? <span className="job-badge">Új</span> : null}
+                  {isNew && <span className="job-badge">Új</span>}
                   <span>
                     Első találat:{" "}
-                    {job.firstSeen
-                      ? new Date(job.firstSeen).toLocaleString("hu-HU")
-                      : "—"}
+                    {job.firstSeen ? new Date(job.firstSeen).toLocaleString("hu-HU") : "—"}
                   </span>
                 </div>
               </li>

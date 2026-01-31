@@ -31,7 +31,7 @@
   flex-wrap: wrap;
 }
 
-@media (max-width: 588px) {
+@media (max-width: 700px) {
   .job-watcher-header {
     flex-direction: column;
     align-items: stretch;
@@ -258,4 +258,72 @@
   font-size: 18px; /* vagy akár 18px */
   line-height: 1.6; /* jobb olvashatóság */
   color: #ccc; /* ha túl sötét, világosítsd */
+}
+
+.job-tab.highlighted {
+  background-color: #ff4d4f;
+  color: white;
+}
+
+.job-tab.active {
+  background-color: #4caf50; /* zöld = selected */
+  color: white;
+  border-color: transparent;
+}
+
+.job-tab.highlighted {
+  background-color: #ff4d4f; /* piros = excluded */
+  color: white;
+}
+
+
+
+/* ====== MOBILE WIDTH SAFETY ====== */
+@media (max-width: 700px) {
+
+  .job-watcher {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  /* Tabs ne lógjanak ki */
+  .job-tabs {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .job-tab {
+    max-width: 100%;
+    flex-shrink: 1;
+  }
+
+  /* Kártyák ne nyúljanak túl */
+  .job-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Cím + source wrap */
+  .job-row {
+    flex-wrap: wrap;
+  }
+
+  .job-title {
+    word-break: break-word;
+  }
+
+  .job-source {
+    white-space: normal;
+  }
+
+  /* Leírás se tudjon kilógni */
+  .job-desc {
+    word-break: break-word;
+  }
+
+  /* Grid biztonság */
+  .job-list {
+    width: 100%;
+    overflow-x: hidden;
+  }
 }
