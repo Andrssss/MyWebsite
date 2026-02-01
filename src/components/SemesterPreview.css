@@ -1,97 +1,64 @@
-.folder-preview {
-  position: relative;
-  display: inline-block;
-  text-align: center;
-  margin: 1rem;
-  cursor: pointer;
-  color: white;
+.folder-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 220px;
+  background: #1e1e1e; /* sötét kártya */
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  padding: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.folder-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.5);
+}
+
+.folder-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-decoration: none;
+  margin-bottom: 10px;
 }
 
-/* ICON */
 .emoji-icon {
-  font-size: 60px;
-  transition: transform 0.2s ease;
-}
-
-.folder-preview:hover .emoji-icon {
-  transform: scale(1.1);
+  font-size: 50px;
 }
 
 .folder-title {
-  display: block;
-  margin-top: 0.5rem;
-  color: #ccc;
+  margin-top: 6px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #ffcc66; /* sárga félév neve */
+  text-align: center;
 }
 
-/* TOOLTIP */
-.preview-tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #222;
-  color: #fff;
-  padding: 10px;
-  border-radius: 8px;
-  z-index: 10;
-
-  min-width: 180px;
-  max-width: 90vw;
-  min-height: 100px;
-
-  text-align: left;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
-  white-space: normal;
-  word-wrap: break-word;
-
-  /* hidden by default */
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
+/* Tárgyak statikusan alatta, sötétebb kártyán */
+.subjects-container {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 6px;
 }
 
-/* SHOW tooltip when hovering folder OR tooltip itself */
-.folder-preview:hover .preview-tooltip,
-.preview-tooltip:hover {
-  visibility: visible;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* ARROW */
-.preview-tooltip::before {
-  content: "";
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-bottom-color: #222;
-}
-
-/* HOVER BRIDGE — PREVENTS GAP ISSUE */
-.preview-tooltip::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: 0;
-  right: 0;
-  height: 6px;
-}
-
-/* SUBJECT LINKS */
 .subject-item {
   display: block;
-  padding: 4px 0;
-  color: white;
+  padding: 6px 8px;
+  background: #2a2a2a;
+  border-radius: 8px;
   text-decoration: none;
-  transition: color 0.2s ease;
+  color: #fff;
+  font-size: 0.95rem;
+  text-align: center;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .subject-item:hover {
-  color: #ffcc66;
-  text-decoration: underline;
+  background: #ffcc66;
+  color: #222;
 }
 
 /* GRID */
@@ -100,15 +67,24 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 2rem;
-  overflow: visible;
 }
 
 /* MOBILE */
-@media (max-width: 800px) {
-  .preview-tooltip {
-    left: 0;
-    right: 0;
-    transform: none;
-    margin: 0 auto;
+@media (max-width: 600px) {
+  .folder-card {
+    width: 90%;
+    padding: 10px;
+  }
+
+  .emoji-icon {
+    font-size: 40px;
+  }
+
+  .folder-title {
+    font-size: 1rem;
+  }
+
+  .subject-item {
+    font-size: 0.9rem;
   }
 }
