@@ -130,7 +130,7 @@ export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = (
                         <a href={url} target="_blank" rel="noopener noreferrer" className="others-ll__cardLink">
                             <div className="others-ll__title" title={label}>{label}</div>
                             <div className="others-ll__meta">
-                                <span className="others-ll__dot" />
+
                             </div>
                         </a>
                     </li>
@@ -187,7 +187,7 @@ export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = (
                                             <a className="others-ll__cardLink" href={url} target="_blank" rel="noopener noreferrer">
                                                 <div className="others-ll__title" title={label}>{label}</div>
                                                 <div className="others-ll__meta">
-                                                    <span className="others-ll__dot" />
+
                                                 </div>
                                             </a>
                                         </li>
