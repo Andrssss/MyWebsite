@@ -131,8 +131,6 @@ export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = (
                             <div className="others-ll__title" title={label}>{label}</div>
                             <div className="others-ll__meta">
                                 <span className="others-ll__dot" />
-                                <span>{getDomain(url)}</span>
-                                <span className="others-ll__ext" aria-hidden>↗</span>
                             </div>
                         </a>
                     </li>
@@ -190,8 +188,6 @@ export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = (
                                                 <div className="others-ll__title" title={label}>{label}</div>
                                                 <div className="others-ll__meta">
                                                     <span className="others-ll__dot" />
-                                                    <span>{getDomain(url)}</span>
-                                                    <span className="others-ll__ext" aria-hidden>↗</span>
                                                 </div>
                                             </a>
                                         </li>
