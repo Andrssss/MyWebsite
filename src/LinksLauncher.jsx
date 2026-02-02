@@ -216,7 +216,6 @@ export default function LinksLauncher({ autoOpen = false }) {
               <div className="card-meta">
                 <span className="dot" />
                 <span>{getDomain(url)}</span>
-                <span className="ext" aria-hidden="true">↗</span>
               </div>
             </a>
           </li>
