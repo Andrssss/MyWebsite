@@ -269,7 +269,7 @@ const getKeywordNotesForJob = (job) => {
                 {job.description && <div className="job-desc">{job.description}</div>}
                 {keywordNotes.length > 0 && (
                   <div className="job-note">
-                    🧠 Kb. mit szokott ez a cím jelenteni:
+                    💭 Megjegyzés:
                     <ul>
                       {keywordNotes.map((note, i) => (
                         <li key={i}>{note}</li>
