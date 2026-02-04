@@ -8,6 +8,9 @@ const hoursSince = (iso) => {
   return ms / (1000 * 60 * 60);
 };
 
+
+
+
 const JobWatcher = () => {
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -15,6 +18,45 @@ const JobWatcher = () => {
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
+
+
+  const JOB_KEYWORD_NOTES = {
+  "helpdesk": "Nem mérnöki munka. Rabszolga munka. Engedd el. Ő kezeli az IT jelszavakat és eszközöket.",
+  "ServiceNOW": "Egy másikféle helpdesk. Jogosultságokat kezel, telepít szoftvereket. Ilyesmik.",
+
+  "it gyakornok": "Általában ingyenmunkát jelent, ha ez a címe a poziciónak. Nem IT munka, ilyen szolgameló szokott lenni.",
+  "business analyst": "Ő áll az IT és business között. A munkája nagy része a tervezés és szervezés. Kell tudni beszélni.",
+  "system he": "Gyakran üzemeltetés + support keverék, nem feltétlen fejlesztés.",
+  "IT üzemeltetési": "Ha egy software kész, az átkerűl az üzemeltetéshez.",
+  "IT üzemeltető": "Ha egy software kész, az átkerűl az üzemeltetéshez.",
+
+  "Manuális tesztelő": "Név jól leírja. Frontend, API, egyéb dolgokat tesztelnek. Nem IT munka. Nem kell hozzá nagy technikai tudás.",
+  "Wordpress": "Nem IT munka. Ez inkább marketingeseknek lett kitalálva. Karrier semmiképp se lesz belőle. Kb. akkora redflag, mint amikor azt írják, h MS office ismeretek.",
+  "Test engineer": "Ez izgi, fizetésben kicsit kevesebb, mint egy fejlesztői. De senior millióba bele tud kostólni és kevésbé stresszes. Ugyanúgy fejlesztői állás ez is. DB, API, OOP fontos hozzá.",
+  "QA": "Tesztelés + gyakran automatizálás.",
+  "DevOps": "Development + Operations. Általában ők csinálják a pipeline-okat. Menedzselik a repokat. Felhős környezeteket konfigurálnak. Mostanában nagy rá a kereslet. Jó cucc. Nem csak Docker, de kubernet is.",
+  "UAT": "User Acceptance Testing (üzleti tesztelés).",
+"L1": "helpdesk kezdőszíntje. Szar meló.",
+
+};
+
+const getKeywordNotesForJob = (job) => {
+  if (!job.title) return [];
+
+  const title = job.title.toLowerCase();
+  const matches = [];
+
+  for (const [keyword, note] of Object.entries(JOB_KEYWORD_NOTES)) {
+    if (title.includes(keyword.toLowerCase())) {
+      matches.push(note);
+    }
+  }
+
+  return matches;
+};
+
+
+
 
   // Three-state sources
   const [sourceStates, setSourceStates] = useState(() => {
@@ -90,6 +132,9 @@ const JobWatcher = () => {
     });
   };
 
+
+
+
   // ----------------------
   const visibleJobs = useMemo(() => {
     let list = jobs;
@@ -103,9 +148,13 @@ const JobWatcher = () => {
       list = list.filter((j) => {
         const t = String(j.title ?? "").toLowerCase();
         const d = String(j.description ?? "").toLowerCase();
-        return t.includes(nq) || d.includes(nq);
+        const notes = getKeywordNotesForJob(j).join(" ").toLowerCase();
+
+        return t.includes(nq) || d.includes(nq) || notes.includes(nq);
       });
     }
+
+
 
     const selected = Object.keys(sourceStates).filter((k) => sourceStates[k] === "selected");
     const excluded = Object.keys(sourceStates).filter((k) => sourceStates[k] === "excluded");
@@ -201,7 +250,8 @@ const JobWatcher = () => {
       ) : (
         <ul className="job-list">
           {visibleJobs.map((job) => {
-            const isNew = job.firstSeen && hoursSince(job.firstSeen) <= 10;
+              const isNew = job.firstSeen && hoursSince(job.firstSeen) <= 10;
+              const keywordNotes = getKeywordNotesForJob(job);
             return (
               <li key={job.id} className="job-card">
                 <div className="job-row">
@@ -217,6 +267,16 @@ const JobWatcher = () => {
                 </div>
 
                 {job.description && <div className="job-desc">{job.description}</div>}
+                {keywordNotes.length > 0 && (
+                  <div className="job-note">
+                    🧠 Kb. mit szokott ez a cím jelenteni:
+                    <ul>
+                      {keywordNotes.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="job-meta">
                   {isNew && <span className="job-badge">Új</span>}

@@ -283,9 +283,11 @@ async function upsertJob(client, source, item) {
 // =====================
 const SOURCES = [
   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
-  { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" }
-];
+  { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
+  { key: "frissdiplomas", label: "frissdiplomas", url: "https://.frissdiplomas.hu/allasok" }
 
+
+];
 // =====================
 // Handler
 // =====================

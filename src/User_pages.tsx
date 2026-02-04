@@ -24,7 +24,11 @@ const User_pages: React.FC = () => {
   }, [os]);
 
   return (
+
+    
     <div className="others-ll">
+
+      
       <div role="tablist" aria-label="OS választó" className="others-ll__tabs">
         {TABS.map(({ key, label }) => (
           <button
@@ -40,6 +44,24 @@ const User_pages: React.FC = () => {
           </button>
         ))}
       </div>
+
+
+
+  {/* 🎬 Videó szekció */}
+  <div className="others-ll__videoSection">
+    <div className="others-ll__videoCard">
+      <div className="video-wrapper">
+        <iframe
+          src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+          title="YouTube video player"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  </div>
+
+
 
       <div
         role="tabpanel"

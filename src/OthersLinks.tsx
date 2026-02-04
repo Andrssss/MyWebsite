@@ -85,9 +85,7 @@ const ADDITIONAL_LINKS = {
     ],
 };
 
-function getDomain(u) {
-    try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; }
-}
+
 
 export default function OthersLinksStyled({ autoOpen = false, onNavigateAway = () => { } }: { autoOpen?: boolean; onNavigateAway?: () => void; }) {
     const [warn, setWarn] = useState < { open: boolean; links: { url: string }[] } > ({ open: false, links: [] });

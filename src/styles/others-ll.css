@@ -118,12 +118,18 @@
     }
 
 .others-ll__cardLink {
-    display: block;
+    display: flex;              /* EZ a lényeg */
+    flex-direction: column;
+    align-items: center;        /* vízszintesen középre */
+    justify-content: center;    /* függőlegesen középre */
+    text-align: center;
     padding: 14px 14px 12px;
     text-decoration: none;
     color: inherit;
     min-height: 96px;
 }
+
+
 
 .others-ll__title {
     font-weight: 600;
@@ -132,6 +138,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
+      text-align: center;
+      width: 100%;
 }
 
 .others-ll__meta {
