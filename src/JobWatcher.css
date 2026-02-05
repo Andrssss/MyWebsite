@@ -378,3 +378,48 @@ html, body {
   color: white;
   border-color: #6c5ce7;
 }
+
+.job-tabs-header {
+  margin: 8px 0 6px;
+}
+
+/* ===== TOGGLE GOMB ===== */
+.job-tabs-toggle {
+  background: #2563eb;            /* szép kék */
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* hover */
+.job-tabs-toggle:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+
+/* kattintás */
+.job-tabs-toggle:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.25);
+}
+
+/* ===== TAB LENYITÁS ===== */
+.job-tabs-wrapper {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.job-tabs-wrapper.open {
+  max-height: 600px;
+}

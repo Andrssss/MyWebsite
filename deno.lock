@@ -28,6 +28,7 @@
         "npm:gh-pages@^6.3.0",
         "npm:globals@^15.14.0",
         "npm:googleapis@144",
+        "npm:node-cron@^4.2.1",
         "npm:pg@^8.18.0",
         "npm:puppeteer@^24.36.0",
         "npm:react-dom@^18.3.1",
