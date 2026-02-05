@@ -17,10 +17,10 @@ const pool = new Pool({
 export default async () => {
   const client = await pool.connect();
   try {
-    // 10 napnál régebbiek törlése first_seen alapján
+    // 30 napnál régebbiek törlése first_seen alapján
     const { rowCount } = await client.query(`
       DELETE FROM job_posts
-      WHERE first_seen < (NOW() - INTERVAL '10 days')
+      WHERE first_seen < (NOW() - INTERVAL '30 days')
     `);
 
     return new Response(`cleanup OK: deleted ${rowCount}`, { status: 200 });
