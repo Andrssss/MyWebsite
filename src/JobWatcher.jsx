@@ -162,13 +162,18 @@ const JobWatcher = () => {
         const title = (j.title || "").toLowerCase();
         const source = (j.source || "").toLowerCase();
 
-        const internLike = INTERN_KEYWORDS.some(
-          (k) => title.includes(k) || source.includes(k)
+        // Ha a forrás diákszövetkezet, akkor NE legyen junior
+        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) =>
+          source.includes(s)
         );
 
-        return !internLike;
+        // Ha a cím tipikusan gyakornok/diák, akkor sem junior
+        const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k));
+
+        return !isInternSource && !isInternTitle;
       });
     }
+
 
 
 
