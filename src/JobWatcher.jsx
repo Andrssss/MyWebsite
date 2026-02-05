@@ -41,7 +41,6 @@ const JOB_KEYWORD_NOTES = {
   QA: "Tesztelés + automatizálás.",
   DevOps:
     "Pipeline, cloud, infra. Nagy kereslet, jó irány.",
-  UAT: "User Acceptance Testing.",
   L1: "Helpdesk belépőszint.",
 };
 
