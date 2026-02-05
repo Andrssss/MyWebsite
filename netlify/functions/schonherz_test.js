@@ -137,13 +137,19 @@ const TITLE_BLACKLIST = [
   "marketing","sales","hr","finance","pénzügy","könyvelő",
   "accountant","manager","vezető","director","adminisztráció",
   "asszisztens","ügyfélszolgálat","customer service","call center",
-  "értékesítő","bizto sítás","tanácsadó"
+  "értékesítő","bizto sítás","tanácsadó",
+  "biztosítás",
+  "Adótanácsadó" ,
+  "Auditor",
+  "Accountant",
+  "Accounts",
+  "Tanácsadó"
 ];
 
 const LINKEDIN_TITLE_WHITELIST = [
   "developer","fejlesztő","fejleszto","software","engineer",
-  "data","analyst","qa","tester","devops","cloud",
-  "backend","frontend","fullstack","it","security","network","sysadmin"
+  "data","analyst","qa","tester","devops","cloud","python","sql","devops","tesztelő","Rendszerszervező",
+  "backend","frontend","front-end","fullstack","full stack","full-stack","it","security","network","sysadmin","java", "junior"
 ];
 
 function titleNotBlacklisted(title) {
@@ -151,10 +157,6 @@ function titleNotBlacklisted(title) {
   return !TITLE_BLACKLIST.some(word => t.includes(normalizeText(word)));
 }
 
-function linkedinTitleAllowed(title) {
-  const t = normalizeText(title);
-  return LINKEDIN_TITLE_WHITELIST.some(word => t.includes(normalizeText(word)));
-}
 
 function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
@@ -283,10 +285,14 @@ async function upsertJob(client, source, item) {
 // =====================
 const SOURCES = [
   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4369621858&distance=10&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4365154173&distance=10&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4362319694&distance=10&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4369621858&distance=10&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4369621858&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4369621858&distance=5&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
   { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
-  { key: "frissdiplomas", label: "frissdiplomas", url: "https://.frissdiplomas.hu/allasok" }
-
-
+  { key: "kpmg", label: "kpmg", url: "https://kpmg.hrfelho.hu/" },
 ];
 // =====================
 // Handler
@@ -297,7 +303,7 @@ exports.handler = async (event) => {
   const write = qs.write === "1" || !debug;
 
   const batch = Math.max(parseInt(qs.batch || "0",10),0);
-  const size = Math.min(Math.max(parseInt(qs.size || "4",10),1),8);
+  const size = Math.min(Math.max(parseInt(qs.size || "10",10),1),8);
   const listToProcess = SOURCES.slice(batch*size, batch*size+size);
   const client = write ? await pool.connect() : null;
 
@@ -322,8 +328,7 @@ exports.handler = async (event) => {
   items = rawJobs.filter(job => {
     const t = normalizeText(job.title);
     const hasInternJunior = /\b(intern|gyakornok|junior|trainee)\b/i.test(t);
-    const hasWhitelistWord = LINKEDIN_TITLE_WHITELIST.some(w => t.includes(normalizeText(w)));
-    return hasInternJunior && hasWhitelistWord && titleNotBlacklisted(job.title);
+    return hasInternJunior && titleNotBlacklisted(job.title);
   });
 }
  else {

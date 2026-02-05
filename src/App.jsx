@@ -31,8 +31,9 @@ const AppContent = () => {
 
 
   useEffect(() => {
-    setParticlesActive(location.pathname !== '/targy_info');
+    setParticlesActive(!['/targy_info', '/allasfigyelo'].includes(location.pathname));
   }, [location]);
+
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 800);
