@@ -3,7 +3,7 @@ const { Pool } = pkg;
 
 export const config = {
   // pl. minden nap 01:30 UTC
-  schedule: "30 1 * * *",
+  schedule: "10 1 * * 1",
 };
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -20,7 +20,7 @@ export default async () => {
     // 30 napnál régebbiek törlése first_seen alapján
     const { rowCount } = await client.query(`
       DELETE FROM job_posts
-      WHERE first_seen < (NOW() - INTERVAL '30 days')
+      WHERE first_seen < (NOW() - INTERVAL '60 days')
     `);
 
     return new Response(`cleanup OK: deleted ${rowCount}`, { status: 200 });
