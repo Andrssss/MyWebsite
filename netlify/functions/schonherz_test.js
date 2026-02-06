@@ -284,8 +284,8 @@ async function upsertJob(client, source, item) {
 // Sources
 // =====================
 const SOURCES = [
-  { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
-  { key: "tudatosdiak", label: "tudatosdiak", url: "https://tudatosdiak.anyway.hu/en/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
+
+  { key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
 
   { key: "kpmg", label: "kpmg", url: "https://kpmg.hrfelho.hu/" },
 ];

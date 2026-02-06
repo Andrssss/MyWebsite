@@ -198,11 +198,10 @@ const JobWatcher = () => {
     if (nq) {
       list = list.filter((j) => {
         const t = (j.title || "").toLowerCase();
-        const d = (j.description || "").toLowerCase();
-        const notes = getKeywordNotesForJob(j).join(" ").toLowerCase();
-        return t.includes(nq) || d.includes(nq) || notes.includes(nq);
+        return t.includes(nq);
       });
     }
+
 
     if (internMode) {
       list = list.filter((j) => {
