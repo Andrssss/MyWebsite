@@ -164,6 +164,8 @@ const SOURCES = [
   { key: "cvcentrum-intern-it", label: "CV Centrum – intern IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=16" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
+  { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
+
   { key: "profession-gyakornok", label: "Profession – Gyakornok", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
   { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
   { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
@@ -843,12 +845,11 @@ async function enrichMelodiakItems(items, limit = 12) {
   return out;
 }
 
-
 function looksLikeJobUrl(sourceKey, url) {
   if (!url) return false;
   const u = new URL(url);
 
-  // általános szemét: login, account, category, tag, keresőoldal
+  // általános szemét
   const bad = [
     "/fiokom",
     "/csomagok",
@@ -860,22 +861,31 @@ function looksLikeJobUrl(sourceKey, url) {
   ];
   if (bad.some(p => u.pathname.startsWith(p))) return false;
 
-  // CVCentrum: csak a konkrét hirdetés oldalak
+  // =========================
+  // PROFESSION – CSAK VALÓDI ÁLLÁS
+  // =========================
+  if (sourceKey.startsWith("profession")) {
+    /**
+     * Elfogadott minták:
+     * /allas/<slug>-<szam>
+     * /allas/<slug>-<szam>/pro
+     */
+    const ok = /^\/allas\/[^\/]+-\d+(\/pro)?\/?$/.test(u.pathname);
+    return ok;
+  }
+
+  // CVCentrum
   if (sourceKey.startsWith("cvcentrum")) {
-    // jó: /allasok/<slug>/
     if (!/^\/allasok\/[^\/]+\/?$/.test(u.pathname)) return false;
   }
 
   if (sourceKey === "zyntern") {
-    // csak a konkrét job oldalak
     if (!/^\/job\/\d+/.test(u.pathname)) return false;
   }
 
-
-  // MUISZ-nál pl később lehet más szabály
-
   return true;
 }
+
 
 function buildMinddiakDetailUrl(j) {
   const id = j?.id ?? null;
@@ -1277,6 +1287,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       const BLACKLIST_SOURCES = ["profession", "cvonline", "jobline", "otp","muisz"];
       const BLACKLIST_URLS = [
         "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
+        "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23",
         "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://jobline.hu/allasok/25,200307,162",
@@ -1284,7 +1295,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://muisz.hu/hu/regisztracio",
         "https://muisz.hu/hu/diakmunkaink",
         "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
+        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
+        "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75",
+        "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
+x
       ];
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
