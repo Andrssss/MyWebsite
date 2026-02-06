@@ -284,9 +284,7 @@ async function upsertJob(client, source, item) {
 // Sources
 // =====================
 const SOURCES = [
-
   { key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
-
   { key: "kpmg", label: "kpmg", url: "https://kpmg.hrfelho.hu/" },
 ];
 // =====================

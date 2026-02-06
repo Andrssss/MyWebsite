@@ -314,7 +314,7 @@ const JobWatcher = () => {
         className="job-tabs-toggle"
         onClick={toggleSources}
       >
-        {sourcesOpen ? "▲ Források elrejtése" : "▼ Források megjelenítése"}
+        {sourcesOpen ? "▲ Források elrejtése" : "▼ Források kiválasztása"}
       </button>
     </div>
 
