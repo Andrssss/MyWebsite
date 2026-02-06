@@ -14,6 +14,20 @@ const hoursSince = (iso) => {
 const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
 const JUNIOR_KEYWORD = "junior";
 
+const JUNIOR_EXCLUDED_SOURCES = [
+  "minddiak",
+  "muisz",
+  "cvcentrum",
+  "zyntern",
+  "schonherz",
+  "prodiak",
+  "tudasdiak",
+  "otp",
+  "vizmuvek",
+  "tudatosdiak",
+  "onejob"
+];
+
 /* =======================
    KEYWORD MEGJEGYZÉSEK
 ======================= */
@@ -33,11 +47,9 @@ const JOB_KEYWORD_NOTES = {
   "IT üzemeltető":
     "Kész rendszerek működtetése, nem fejlesztés.",
   "Manuális tesztelő":
-    "Frontend/API tesztelés, kevés technikai mélység.",
+    "Frontend/API tesztelés, kevés technikai mélység. Elég uncsi, de nagy rá a kereslet, főleg AI miatt.",
   Wordpress:
     "Inkább marketing irány, nem klasszikus IT karrier.",
-  "Test engineer":
-    "Automatizált tesztelés, DB, API, OOP fontos.",
   QA: "Tesztelés + automatizálás.",
   DevOps:
     "Pipeline, cloud, infra. Nagy kereslet, jó irány.",
@@ -194,10 +206,13 @@ const JobWatcher = () => {
 
     if (internMode) {
       list = list.filter((j) => {
+        const source = (j.source || "").toLowerCase();
         const t = (j.title || "").toLowerCase();
+        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s) );
+        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k)); 
+
         return (
-          INTERN_KEYWORDS.some((k) => t.includes(k)) &&
-          !t.includes(JUNIOR_KEYWORD)
+          (internLike && !t.includes(JUNIOR_KEYWORD)) || isInternSource
         );
       });
     }
@@ -205,8 +220,18 @@ const JobWatcher = () => {
     if (juniorMode) {
       list = list.filter((j) => {
         const t = (j.title || "").toLowerCase();
-        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
-        return !internLike;
+        const title = (j.title || "").toLowerCase();
+        const source = (j.source || "").toLowerCase();
+
+        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k)); 
+
+        // Ha a forrás diákszövetkezet, akkor NE legyen junior
+        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s) );
+
+        // Ha a cím tipikusan gyakornok/diák, akkor sem junior
+        const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k) );
+
+        return !isInternSource && !isInternTitle && !internLike;
       });
     }
 
@@ -235,7 +260,10 @@ const JobWatcher = () => {
   return (
   <div className="job-watcher">
     <div className="job-watcher-header">
-      <h1>Automata scraper</h1>
+      <div>
+          <h1>Automata scraper</h1>
+          <p>Minden nap UTC szerint 4 és 14 órakor frissül. Kivéve ami nem, mivel folyamatos fejlesztés alatt van.</p>
+      </div>
 
       <div className="job-actions">
         <input
