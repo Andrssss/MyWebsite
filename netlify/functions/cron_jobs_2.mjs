@@ -116,6 +116,11 @@ function normalizeUrl(raw) {
     ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"].forEach((p) =>
       u.searchParams.delete(p)
     );
+
+    if (u.searchParams.has("sessionId")) {
+      u.searchParams.delete("sessionId");
+    }
+
     return u.toString().replace(/\?$/, "");
   } catch {
     return raw;
