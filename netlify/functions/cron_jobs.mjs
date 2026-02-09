@@ -1300,7 +1300,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
         "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75",
         "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
-x
+
       ];
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
