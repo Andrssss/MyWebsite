@@ -121,6 +121,10 @@ function normalizeUrl(raw) {
       u.searchParams.delete("sessionId");
     }
 
+    if (sourceKey.startsWith("cvcentrum")) {
+      u.pathname = u.pathname.replace(/\/\d+(?:-\d+)?\/?$/, "");
+    }
+
     return u.toString().replace(/\?$/, "");
   } catch {
     return raw;
@@ -163,7 +167,7 @@ function dedupeByUrl(items) {
 const SOURCES = [
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
-  { key: "cvcentrum-intern-it", label: "CV Centrum – intern IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
   
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
   { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
