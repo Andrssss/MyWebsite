@@ -199,7 +199,9 @@ const KEYWORDS_STRONG = [
   "qa",
   "tester",
   "sysadmin",
-  "network"
+  "network",
+  "jog",
+  "jogi"
 ];
 
 const TITLE_BLACKLIST = [
