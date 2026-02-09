@@ -1,4 +1,4 @@
-// netlify/functions/cron_jobs.js
+// netlify/functions/cron_jobs_2.mjs
 console.log("CRON_JOBS LOADED");
 export const config = {
   schedule: "1 4,16 * * *",
