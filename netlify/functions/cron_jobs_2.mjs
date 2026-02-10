@@ -1123,16 +1123,14 @@ function buildMinddiakWhere_UI() {
 // =====================
 async function upsertJob(client, source, item) {
   await client.query(
-    `
-    INSERT INTO job_posts
-      (source, title, url, description, first_seen)
-    VALUES
-      ($1, $2, $3, $4, NOW())
-    ON CONFLICT (source, url)
-    DO UPDATE SET
-      title = EXCLUDED.title,
-      description = COALESCE(EXCLUDED.description, job_posts.description)
-    `,
+      `
+      INSERT INTO job_posts
+        (source, title, url, description, first_seen)
+      VALUES
+        ($1, $2, $3, $4, NOW())
+      ON CONFLICT (source, url)
+      DO NOTHING;
+      `,
     [source, item.title, item.url, item.description]
   );
 }

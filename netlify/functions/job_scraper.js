@@ -1,17 +1,15 @@
-export const config = {
-  schedule: "1 4,16 * * *",
-};
+#!/usr/bin/env node
+require("dotenv").config();
+const { Pool } = require("pg");
+const https = require("https");
+const http = require("http");
+const zlib = require("zlib");
+const cheerio = require("cheerio");
 
-import { Pool } from "pg";
-import https from "https";
-import http from "http";
-import zlib from "zlib";
-import { load as cheerioLoad } from "cheerio";
-
-/* ---------------------
-   DB connection
---------------------- */
-const connectionString = process.env.NETLIFY_DATABASE_URL;
+// ---------------------
+// DB connection
+// ---------------------
+const connectionString = "postgresql://neondb_owner:npg_gxcq7S8tbkLO@ep-raspy-bar-aepg18at-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require";
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
 const pool = new Pool({
@@ -19,9 +17,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-/* ---------------------
-   Helper functions
---------------------- */
+// ---------------------
+// Helper functions
+// ---------------------
+
 function normalizeText(s) {
   return String(s ?? "")
     .normalize("NFD")
@@ -57,7 +56,6 @@ function dedupeByUrl(items) {
     return true;
   });
 }
-
 function matchesKeywords(title, desc) {
   const KEYWORDS_STRONG = [
     "gyakornok","intern","internship","trainee","junior","c++","java","python","web",
@@ -67,25 +65,24 @@ function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
   const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
   const itHit = /\bit\b/i.test(n);
-  return strongHit || (
-    itHit &&
-    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n)
-  );
+  return strongHit || (itHit && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n));
 }
 
-/* =====================
-   URL helpers
-===================== */
+// =====================
+// URL helpers
+// =====================
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
+    // --- LINKEDIN FIX ---
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
       u.search = "";
       u.hash = "";
       return u.toString();
     }
 
+    // --- ÁLTALÁNOS TISZTÍTÁS ---
     u.hash = "";
     [
       "utm_source","utm_medium","utm_campaign","utm_term",
@@ -97,10 +94,9 @@ function normalizeUrl(raw) {
     return raw;
   }
 }
-
-/* ---------------------
-   Fetch helper
---------------------- */
+// ---------------------
+// Fetch helper (proxy nélkül)
+// ---------------------
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
     console.log(`Script started at ${new Date().toISOString()}`);
@@ -128,7 +124,7 @@ function fetchText(url, redirectLeft = 5) {
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
           const nextUrl = new URL(loc, url).toString();
           res.resume();
-          return resolve(fetchText(nextUrl, redirectLeft - 1));
+          return resolve(fetchText(nextUrl, redirectLeft-1));
         }
 
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
@@ -154,12 +150,11 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
-/* ---------------------
-   HTML extraction
---------------------- */
+// ---------------------
+// HTML extraction
+// ---------------------
 function extractCandidates(html, baseUrl) {
-  const $ = cheerioLoad(html);
-
+  const $ = cheerio.load(html);
   const items = [];
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
@@ -170,9 +165,7 @@ function extractCandidates(html, baseUrl) {
     let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
     if (!card.length) card = $(el).closest("div");
 
-    let title =
-      normalizeWhitespace($(el).text()) ||
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
+    let title = normalizeWhitespace($(el).text()) || normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
     if (!title || title.length < 4) return;
 
     const desc = normalizeWhitespace(card.find("p").first().text()) || null;
@@ -181,11 +174,11 @@ function extractCandidates(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
-/* ---------------------
-   LinkedIn extraction
---------------------- */
+// ---------------------
+// LinkedIn extraction
+// ---------------------
 function extractLinkedInJobs(html) {
-  const $ = cheerioLoad(html);
+  const $ = cheerio.load(html);
   const jobs = [];
 
   $("ul.jobs-search__results-list li").each((_, el) => {
@@ -202,43 +195,58 @@ function extractLinkedInJobs(html) {
 function canonicalizeLinkedInJobUrl(raw) {
   try {
     const u = new URL(raw);
+
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
       const lastPart = u.pathname.split("/jobs/view/")[1];
       const canonicalSlug = lastPart.replace(/-\d+$/, "");
       return `https://www.linkedin.com/jobs/view/${canonicalSlug}`;
     }
+
     return raw;
   } catch {
     return raw;
   }
 }
-
 function getDedupeKey(rawUrl) {
   const u = normalizeUrl(rawUrl);
   if (u.includes("linkedin.com/jobs/view/")) return canonicalizeLinkedInJobUrl(u);
   return u;
 }
 
-/* ---------------------
-   DB upsert
---------------------- */
+// ---------------------
+// DB upsert
+// ---------------------
 async function upsertJob(client, source, item) {
-  const canonicalUrl =
-    source === "LinkedIn"
-      ? canonicalizeLinkedInJobUrl(item.url)
-      : item.url;
-
+  const canonicalUrl = source === "LinkedIn" ? canonicalizeLinkedInJobUrl(item.url) : item.url;
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, canonical_url, description, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
-     ON CONFLICT (source, url)
      ON CONFLICT (source, canonical_url)
-        DO NOTHING;
-        `,
+     DO UPDATE SET title = EXCLUDED.title,
+                   description = COALESCE(EXCLUDED.description, job_posts.description)
+    `,
     [source, item.title, item.url, canonicalUrl, item.description || null]
   );
 }
+
+function matchesKeywords(title, desc) {
+  const KEYWORDS_STRONG = [
+    "gyakornok","intern","internship","trainee","junior",
+    "developer","fejlesztő","fejleszto","data","analyst",
+    "support","operations","qa","tester","sysadmin","network"
+  ];
+
+  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
+  const itHit = /\bit\b/i.test(n);
+
+  return strongHit || (
+    itHit &&
+    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n)
+  );
+}
+
 
 function levelNotBlacklisted(title, desc) {
   const LEVEL_BLACKLIST = [
@@ -250,9 +258,21 @@ function levelNotBlacklisted(title, desc) {
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
 
-/* =========================
-   BLACKLISTING
-========================= */
+function matchesJuniorLevel(title, desc) {
+  const JUNIOR_KEYWORDS = [
+    "gyakornok", "intern", "internship",
+    "trainee", "junior", "palyakezdo",
+    "entry level", "graduate"
+  ];
+
+  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  return JUNIOR_KEYWORDS.some(k => n.includes(normalizeText(k)));
+}
+
+
+// =========================
+// BLACKLISTING
+// =========================
 const BLACKLIST_SOURCES = ["profession"];
 
 const BLACKLIST_URLS = [
@@ -261,10 +281,10 @@ const BLACKLIST_URLS = [
   "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
 ];
 
-/* ---------------------
-   Main (Netlify handler)
---------------------- */
-export default async () => {
+// ---------------------
+// Main script
+// ---------------------
+async function run() {
   function applyBlacklist(items, sourceKey) {
     const sourceBlocked = BLACKLIST_SOURCES.some(src =>
       sourceKey.toLowerCase().startsWith(src)
@@ -277,66 +297,81 @@ export default async () => {
     );
   }
 
-  const SOURCES = [
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?currentJobId=4345945964&discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=5&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 
-    { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
-  ];
+  const SOURCES = [
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?currentJobId=4345945964&discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },  
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=5&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+
+
+
+  { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
+  
+  //{ key: "kpmg", label: "kpmg", url: "https://kpmg.hrfelho.hu/" },
+  //{ key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
+
+  // { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
+  //{ key: "profession-gyakornok", label: "Profession – Gyakornok", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
+  //{ key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
+  //{ key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
+  //{ key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
+];
 
   const client = await pool.connect();
 
   try {
     for (const p of SOURCES) {
       let html;
-      try {
-        html = await fetchText(p.url);
-      } catch (err) {
-        console.error(p.key, "fetch failed:", err.message);
-        continue;
-      }
+      try { html = await fetchText(p.url); } 
+      catch (err) { console.error(p.key, "fetch failed:", err.message); continue; }
 
+      let items = [];
       const rawItems =
         p.key === "LinkedIn"
           ? extractLinkedInJobs(html)
           : extractCandidates(html, p.url);
 
-      let items = rawItems.filter(it => {
+      items = rawItems.filter(it => {
         const needKeywords = p.key === "LinkedIn" || p.key === "cvonline";
-        if (needKeywords && !matchesKeywords(it.title, it.description)) return false;
+
+        if (needKeywords && !matchesKeywords(it.title, it.description)) {
+          return false;
+        }
+
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
+
         return true;
       });
+
+
 
       items = applyBlacklist(items, p.key);
 
       for (const it of items) {
-        try {
-          await upsertJob(client, p.key, it);
-        } catch (err) {
-          console.error(err);
-        }
+        try { await upsertJob(client, p.key, it); } catch(err){ console.error(err); }
       }
 
       console.log(`${p.key}: ${items.length} items processed.`);
     }
+
   } finally {
     console.log(`Script started at ${new Date().toISOString()}`);
     client.release();
     pool.end();
   }
+}
 
-  return new Response("OK");
-};
+run().catch(err => {
+  console.error("Script failed:", err);
+});
