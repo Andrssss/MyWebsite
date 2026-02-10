@@ -93,7 +93,7 @@ exports.handler = async (event) => {
       // GET /jobs/:id
       if (id) {
         const { rows } = await client.query(
-          `SELECT id, source, title, url, description,
+          `SELECT id, source, title, url,
                   first_seen AS "firstSeen"
            FROM job_posts
            WHERE id = $1`,
@@ -106,7 +106,7 @@ exports.handler = async (event) => {
       // GET /jobs?source=...
       if (source) {
         const { rows } = await client.query(
-          `SELECT id, source, title, url, description,
+          `SELECT id, source, title, url,
                   first_seen AS "firstSeen"
            FROM job_posts
            WHERE source = $1
@@ -119,7 +119,7 @@ exports.handler = async (event) => {
 
       // GET /jobs
       const { rows } = await client.query(
-        `SELECT id, source, title, url, description,
+        `SELECT id, source, title, url,
                 first_seen AS "firstSeen"
          FROM job_posts
          ORDER BY first_seen DESC, id DESC
