@@ -232,7 +232,7 @@ async function upsertJob(client, source, item) {
     `INSERT INTO job_posts
       (source, title, url, canonical_url, description, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
-     ON CONFLICT (source, canonical_url)
+     ON CONFLICT (source, url)
      DO UPDATE SET
        title = EXCLUDED.title,
        description = COALESCE(EXCLUDED.description, job_posts.description)`,
