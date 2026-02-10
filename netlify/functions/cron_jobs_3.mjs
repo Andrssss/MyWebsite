@@ -335,7 +335,6 @@ export default async () => {
   } finally {
     console.log(`Script started at ${new Date().toISOString()}`);
     client.release();
-    pool.end();
   }
 
   return new Response("OK");
