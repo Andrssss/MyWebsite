@@ -230,12 +230,12 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, description, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, canonical_url, first_seen)
+     VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, canonical_url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl, item.description || null]
+    [source, item.title, item.url, canonicalUrl]
   );
 }
 
