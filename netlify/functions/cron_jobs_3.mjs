@@ -6,7 +6,7 @@ import { Pool } from "pg";
 import https from "https";
 import http from "http";
 import zlib from "zlib";
-import cheerio from "cheerio";
+import { load as cheerioLoad } from "cheerio";
 
 /* ---------------------
    DB connection
@@ -158,7 +158,8 @@ function fetchText(url, redirectLeft = 5) {
    HTML extraction
 --------------------- */
 function extractCandidates(html, baseUrl) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
+
   const items = [];
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
@@ -184,7 +185,7 @@ function extractCandidates(html, baseUrl) {
    LinkedIn extraction
 --------------------- */
 function extractLinkedInJobs(html) {
-  const $ = cheerio.load(html);
+  const $ = cheerioLoad(html);
   const jobs = [];
 
   $("ul.jobs-search__results-list li").each((_, el) => {
