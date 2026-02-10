@@ -36,7 +36,7 @@ async function runAllBatches() {
 
   for (let batch = 0; batch < totalBatches; batch++) {
     await runBatch({ batch, size, write: true, debug: false, bundleDebug: false });
-    await sleep(500);
+    await sleep(50);
   }
 }
 
@@ -112,18 +112,27 @@ async function fetchAllZynternJobs({ fields = 16, limit = 50, maxPages = 5 }) {
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
+
+    // Remove hash
     u.hash = "";
-    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"].forEach((p) =>
-      u.searchParams.delete(p)
-    );
 
-    if (u.searchParams.has("sessionId")) {
-      u.searchParams.delete("sessionId");
-    }
-    console.log(u.toString()); // ✅ https://example.com/
+    // Remove common tracking params
+    [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "fbclid",
+      "gclid",
+      "sessionId", // remove sessionId universally
+    ].forEach((p) => u.searchParams.delete(p));
 
-    if (sourceKey.startsWith("cvcentrum")) {
-      u.pathname = u.pathname.replace(/\/\d+(?:-\d+)?\/?$/, "");
+    // =========================
+    // CV Centrum: strip numeric suffix like -2-2 at the end
+    // =========================
+    if (u.hostname.includes("cvcentrum.hu") && /^\/allasok\/.*-\d+-\d+\/?$/.test(u.pathname)) {
+      u.pathname = u.pathname.replace(/-\d+-\d+\/?$/, "");
     }
 
     return u.toString().replace(/\?$/, "");
@@ -131,6 +140,7 @@ function normalizeUrl(raw) {
     return raw;
   }
 }
+
 
 function absolutize(href, base) {
   try {
@@ -171,11 +181,11 @@ const SOURCES = [
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
   
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
-  { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
-  { key: "profession-gyakornok", label: "Profession – Gyakornok", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
-  { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
-  { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
-  { key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
 ];
 
 // =====================
