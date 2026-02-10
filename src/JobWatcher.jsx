@@ -261,7 +261,7 @@ const JobWatcher = () => {
     <div className="job-watcher-header">
       <div>
           <h1>Automata scraper</h1>
-          <p>Minden nap UTC szerint 4 és 14 órakor frissül. Kivéve ami nem, mivel folyamatos fejlesztés alatt van.</p>
+          <p>Minden nap UTC szerint 4 és 14 órakor frissül. Kivéve ami nem, mivel folyamatos fejlesztés alatt van. Ha szeretnél új Forrást itt látni szólj nyugodtan.</p>
       </div>
 
       <div className="job-actions">
