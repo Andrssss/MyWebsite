@@ -120,6 +120,7 @@ function normalizeUrl(raw) {
     if (u.searchParams.has("sessionId")) {
       u.searchParams.delete("sessionId");
     }
+    console.log(u.toString()); // ✅ https://example.com/
 
     if (sourceKey.startsWith("cvcentrum")) {
       u.pathname = u.pathname.replace(/\/\d+(?:-\d+)?\/?$/, "");
