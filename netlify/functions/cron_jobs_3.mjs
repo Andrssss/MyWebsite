@@ -80,10 +80,16 @@ function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
+    /*
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
       u.search = "";
       u.hash = "";
       return u.toString();
+    }
+      */
+
+    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
+      return `https://${u.hostname}${u.pathname}`; // teljesen eldobjuk a query stringet
     }
 
     u.hash = "";
