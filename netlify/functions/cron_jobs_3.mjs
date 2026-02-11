@@ -89,7 +89,7 @@ function normalizeUrl(raw) {
     u.hash = "";
     [
       "utm_source","utm_medium","utm_campaign","utm_term",
-      "utm_content","fbclid","gclid"
+      "utm_content","fbclid","gclid","trackingId","pageNum","position","refId"
     ].forEach(p => u.searchParams.delete(p));
 
     return u.toString().replace(/\?$/, "");
