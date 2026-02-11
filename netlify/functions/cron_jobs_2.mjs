@@ -131,10 +131,10 @@ function normalizeUrl(raw) {
 ].forEach((p) => u.searchParams.delete(p));
 
     // =========================
-    // CV Centrum: strip numeric suffix like -2-2 at the end
+    // CV Centrum: strip numeric suffix like -2-2 and -3 at the end
     // =========================
     if (u.hostname.includes("cvcentrum.hu") && /^\/allasok\/.*-\d+-\d+\/?$/.test(u.pathname)) {
-      u.pathname = u.pathname.replace(/-\d+-\d+\/?$/, "");
+      u.pathname = u.pathname.replace(/-\d+(-\d+)?\/?$/, "");    
     }
 
     return u.toString().replace(/\?$/, "");
