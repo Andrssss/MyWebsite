@@ -118,15 +118,17 @@ function normalizeUrl(raw) {
 
     // Remove common tracking params
     [
-      "utm_source",
-      "utm_medium",
-      "utm_campaign",
-      "utm_term",
-      "utm_content",
-      "fbclid",
-      "gclid",
-      "sessionId", // remove sessionId universally
-    ].forEach((p) => u.searchParams.delete(p));
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "fbclid",
+  "gclid",
+  "sessionId",
+  "hash",
+  "keyword"
+].forEach((p) => u.searchParams.delete(p));
 
     // =========================
     // CV Centrum: strip numeric suffix like -2-2 at the end
