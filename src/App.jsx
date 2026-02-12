@@ -95,7 +95,6 @@ useEffect(() => {
               <li><Link to="/egyetemi_linkek" onClick={() => setMenuOpen(false)}>Egyetemi Linkek</Link></li>
               <li><Link to="/masok_oldalai" onClick={() => setMenuOpen(false)}>Mások oldalai</Link></li>
               <li><Link to="/User_oldalak" onClick={() => setMenuOpen(false)}>User oldalak</Link></li>
-              <li><Link to="/gyakornoki_poziciok" onClick={() => setMenuOpen(false)}>Gyakornoki linkek</Link></li>
               <li><Link to="/allasfigyelo" onClick={() => setMenuOpen(false)}>Állásfigyelő</Link></li>
               <li><Link to="/rolam" onClick={() => setMenuOpen(false)}>Rólam</Link></li>
             </ul>
@@ -114,7 +113,6 @@ useEffect(() => {
                 <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
                 <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
                 <li><Link to="/User_oldalak">🧭 User oldalak</Link></li>
-                <li><Link to="/gyakornoki_poziciok">💼 Gyakornoki pozi</Link></li>
                 <li><Link to="/allasfigyelo">✨ Állásfigyelő</Link></li>
                 <li><Link to="/rolam">👤 Rólam</Link></li>
                 
