@@ -19,7 +19,7 @@ const About = () => {
 
         <div className="about-text">
           <p>
-            Szia, hello, nagyon eltévedhettél, ha ezt olvasod. 😄 
+            Szia. Örülök, hogy ezt olvasod. :) 
           </p>
           <p>
             Végzős Mérnökinformatikus hallgató vagyok, most el is kezdtem mellette dolgozni, mint <strong>teszt autómatizáció</strong>-s gyakornok.
