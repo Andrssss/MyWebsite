@@ -2,7 +2,7 @@
 // netlify/functions/cron_jobs.js
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "0 4,16 * * *",
+  schedule: "0 4,10,16 * * *",
 };
 
 globalThis.File ??= class File {};
