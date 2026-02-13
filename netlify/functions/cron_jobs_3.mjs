@@ -41,7 +41,17 @@ function titleNotBlacklisted(title) {
     "accountant","manager","vezető","director","adminisztráció",
     "asszisztens","ügyfélszolgálat","customer service","call center",
     "értékesítő","bizto sítás","tanácsadó","biztosítás",
-    "Adótanácsadó","Auditor","Accountant","Accounts","Tanácsadó"
+    "Adótanácsadó","Auditor","Accountant","Accounts","Tanácsadó",
+     "senior",
+    "szenior",
+    "medior",
+  "lead",
+  "principal",
+  "staff",
+  "architect",
+  "expert",
+  "vezető fejlesztő",
+  "tech lead"
   ];
   const t = normalizeText(title);
   return !TITLE_BLACKLIST.some(word => t.includes(normalizeText(word)));

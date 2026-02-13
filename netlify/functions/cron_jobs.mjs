@@ -2,7 +2,7 @@
 // netlify/functions/cron_jobs.js
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "0 4,10,16 * * *",
+  schedule: "0 4,16 * * *",
 };
 
 globalThis.File ??= class File {};
@@ -221,6 +221,8 @@ const TITLE_BLACKLIST = [
 
 const SENIOR_KEYWORDS = [
   "senior",
+  "szenior",
+  "medior",
   "lead",
   "principal",
   "staff",
@@ -852,23 +854,7 @@ function looksLikeJobUrl(sourceKey, url) {
   ];
   if (bad.some(p => u.pathname.startsWith(p))) return false;
 
-  // =========================
-  // PROFESSION – CSAK VALÓDI ÁLLÁS
-  // =========================
-  if (sourceKey.startsWith("profession")) {
-    /**
-     * Elfogadott minták:
-     * /allas/<slug>-<szam>
-     * /allas/<slug>-<szam>/pro
-     */
-    const ok = /^\/allas\/[^\/]+-\d+(\/pro)?\/?$/.test(u.pathname);
-    return ok;
-  }
 
-  // CVCentrum
-  if (sourceKey.startsWith("cvcentrum")) {
-    if (!/^\/allasok\/[^\/]+\/?$/.test(u.pathname)) return false;
-  }
 
   if (sourceKey === "zyntern") {
     if (!/^\/job\/\d+/.test(u.pathname)) return false;
@@ -905,7 +891,7 @@ function buildMinddiakDetailUrl(j) {
   }
 
   // 3) fallback, ha nincs frontend path/url (utolsó mentsvár)
-  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-${id}`);
+  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-226/work_type/it-mernok-10`);
 
   return null;
 }
@@ -1273,20 +1259,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // BLACKLISTING
       // =========================
-      const BLACKLIST_SOURCES = ["profession", "cvonline", "jobline", "otp","muisz"];
+      const BLACKLIST_SOURCES = [ "jobline", "otp","muisz"];
       const BLACKLIST_URLS = [
-        "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-        "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23",
-        "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
-        "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://jobline.hu/allasok/25,200307,162",
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
         "https://muisz.hu/hu/regisztracio",
         "https://muisz.hu/hu/diakmunkaink",
-        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
-        "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75",
-        "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
 
       ];
 

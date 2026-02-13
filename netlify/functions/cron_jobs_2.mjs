@@ -242,6 +242,8 @@ const TITLE_BLACKLIST = [
 
 const SENIOR_KEYWORDS = [
   "senior",
+    "szenior",
+    "medior",
   "lead",
   "principal",
   "staff",
