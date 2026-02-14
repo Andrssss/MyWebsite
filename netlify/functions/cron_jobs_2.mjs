@@ -654,49 +654,68 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // DB UPSERT
       // =========================
-      if (write && client) {
-        for (const item of matchedList) {
-          if (!item.description) continue; // skip if no preview
+      // =========================
+// DB UPSERT (DETAIL FETCH)
+// =========================
+if (write && client) {
+  for (const item of matchedList) {
+    let detailHtml;
+    try {
+      if (!item.url) continue;
+      detailHtml = await fetchText(item.url);
 
-          let detailHtml;
-          try {
-            detailHtml = await fetchText(item.url);
-
-            if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
-              console.warn("Detail page empty or invalid:", item.url);
-              continue;
-            }
-            console.log("Fetched length:", detailHtml.length, "url:", item.url);
-
-
-            // skip if empty or not a string
-            if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
-              console.warn("Detail page empty or invalid:", item.url);
-              continue;
-            }
-
-            const $job = cheerioLoad(detailHtml);
-            const fullDesc = normalizeWhitespace(
-              $job.find(".job-description, .description, .job-desc, p").text()
-            );
-            if (!fullDesc) {
-              console.warn("No description found:", item.url);
-              continue; // optional, or you can still upsert with empty description
-            }
-                          
-                          
-            item.description = fullDesc;
-
-          } catch (err) {
-            console.warn("Failed to fetch detail page:", item.url, err.message);
-            continue;
-          }
-
-          await upsertJob(client, source, item);
-        }
-
-
+      if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
+        console.warn("Detail page empty or invalid:", item.url);
+        continue;
       }
+
+      const $job = cheerioLoad(String(detailHtml));
+      if (!$job || typeof $job.find !== "function") {
+        console.warn("Cheerio load failed for:", item.url);
+        continue;
+      }
+
+      // Try common HTML selectors first
+      let fullDesc = normalizeWhitespace(
+        $job.find(".job-detail, .job-description, .description, .job-desc, p").text()
+      );
+
+      // Fallback: JSON-LD structured data
+      if (!fullDesc) {
+        const jsonLD = $job('script[type="application/ld+json"]').html();
+        if (jsonLD) {
+          try {
+            const data = JSON.parse(jsonLD);
+            if (data && data.description) {
+              fullDesc = normalizeWhitespace(data.description);
+            }
+          } catch (err) {
+            // ignore JSON parse errors
+          }
+        }
+      }
+
+      if (!fullDesc) {
+        console.warn("No description found for:", item.url);
+        continue; // skip if no description even after JSON-LD
+      }
+
+      item.description = fullDesc;
+
+    } catch (err) {
+      console.warn("Failed to fetch detail page:", item.url, err.message);
+      continue;
+    }
+
+    try {
+      await upsertJob(client, source, item);
+      console.log("Upserted job:", item.title, item.url);
+    } catch (err) {
+      console.warn("DB upsert failed for:", item.url, err.message);
+    }
+  }
+}
+
 
     }
   } finally {
