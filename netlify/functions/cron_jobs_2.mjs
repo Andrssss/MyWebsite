@@ -14,7 +14,8 @@ import zlib from "node:zlib";
 import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
-import { chromium } from "playwright"; // at the top of your file
+import chromium from "@sparticuz/chromium";
+import { chromium as playwrightChromium } from "playwright-core";
 
 // =====================
 // DB
@@ -662,7 +663,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 // UPSERT loop with Playwright for Profession.hu
 // =======================
 if (write && client) {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await playwrightChromium.launch({
+  executablePath: await chromium.executablePath(),
+  args: chromium.args,
+  headless: chromium.headless,
+  ignoreHTTPSErrors: true,
+});
   const page = await browser.newPage();
 
   for (const item of matchedList) {
