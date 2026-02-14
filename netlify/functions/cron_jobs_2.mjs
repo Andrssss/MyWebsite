@@ -656,9 +656,28 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       if (write && client) {
         for (const item of matchedList) {
+          // Only fetch detail page if preview exists
+          if (item.description) {
+            try {
+              const html = await fetchText(item.url);
+              const $job = cheerioLoad(html);
+
+              // Grab full description from detail page
+              const fullDesc = normalizeWhitespace(
+                $job.find(".job-description, .description, .job-desc, p").text()
+              );
+
+              if (fullDesc) item.description = fullDesc;
+            } catch (err) {
+              console.warn("Failed to fetch detail page:", item.url, err.message);
+            }
+          }
+
+          // Now insert/update DB
           await upsertJob(client, source, item);
         }
       }
+
     }
   } finally {
     if (client) client.release();
