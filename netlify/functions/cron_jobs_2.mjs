@@ -570,8 +570,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       const BLACKLIST_URLS = [
         "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
         "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23",
-        "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
-        "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=",
         "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
         "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
         "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75",

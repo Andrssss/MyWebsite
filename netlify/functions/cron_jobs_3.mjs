@@ -267,7 +267,7 @@ function levelNotBlacklisted(title, desc) {
 
 /* =========================
    BLACKLISTING
-========================= */
+========================= 
 const BLACKLIST_SOURCES = ["profession"];
 
 const BLACKLIST_URLS = [
@@ -276,21 +276,13 @@ const BLACKLIST_URLS = [
   "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
 ];
 
-/* ---------------------
+ ---------------------
    Main (Netlify handler)
 --------------------- */
 export default async () => {
-  function applyBlacklist(items, sourceKey) {
-    const sourceBlocked = BLACKLIST_SOURCES.some(src =>
-      sourceKey.toLowerCase().startsWith(src)
-    );
+  
 
-    if (!sourceBlocked) return items;
 
-    return items.filter(it =>
-      !BLACKLIST_URLS.includes(normalizeUrl(it.url))
-    );
-  }
 
   const SOURCES = [
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
@@ -335,7 +327,7 @@ export default async () => {
         return true;
       });
 
-      items = applyBlacklist(items, p.key);
+     // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
         try {
