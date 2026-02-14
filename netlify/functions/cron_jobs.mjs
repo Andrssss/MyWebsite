@@ -1157,6 +1157,27 @@ function extractSchonherz(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
+function cleanJobTitle(rawTitle) {
+  if (!rawTitle) return null;
+  // Cut at 'ÚJ' or similar markers
+  const cutMarkers = ["ÚJ", "NEW", "FRISS"]; // extend if needed
+  let title = rawTitle;
+  for (const marker of cutMarkers) {
+    const idx = title.indexOf(marker);
+    if (idx >= 0) {
+      title = title.slice(0, idx);
+      break;
+    }
+  }
+  // Trim extra spaces and punctuation at the end
+  return title.trim().replace(/[-–:]+$/g, "").trim();
+}
+
+// Example:
+const raw = "German Speaking Junior Project Manager – Public Transport ÚJ 650k – 1.1M HUF Project Manager Communication skills Completed studies Decision-making skills Deutsche Telekom TSI Hungary Kft. Budapest +3";
+console.log(cleanJobTitle(raw));
+// Output: "German Speaking Junior Project Manager – Public Transport"
+
 
 // ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
@@ -1213,6 +1234,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       }
 
+
+
       // =========================
       // MERGE JOBS
       // =========================
@@ -1254,6 +1277,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // FILTER & KEYWORD MATCH
       // =========================
       let matchedList = merged
+        .map((c) => {
+          if (source === "nofluffjobs") c.title = cleanJobTitle(c.title);
+          return c;
+        })
         .filter((c) => matchesKeywords(c.title, c.description))
         .filter((c) => !isSeniorLike(c.title, c.description));
 
