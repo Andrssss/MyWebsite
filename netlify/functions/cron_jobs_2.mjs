@@ -489,6 +489,7 @@ function extractCandidates(html, baseUrl) {
 // =====================
 async function upsertJob(client, source, item) {
   const experience = extractExperience(item.description);
+  console.log(item.description);
 
   await client.query(
     `INSERT INTO job_posts
