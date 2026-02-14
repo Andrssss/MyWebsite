@@ -174,6 +174,22 @@ function dedupeByUrl(items) {
   });
 }
 
+function extractExperience(description) {
+  if (!description) return null;
+  const expRegex = /(\d+\s?(?:[-+]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi;
+  const matches = description.match(expRegex);
+  return matches ? matches.join(", ") : null;
+}
+
+function extractDescriptionFromCard(card) {
+  const texts = [];
+  card.find("*").each((_, el) => {
+    const t = normalizeWhitespace(cheerio(el).text());
+    if (t && t.length > 20) texts.push(t);
+  });
+  return texts.join(" ");
+}
+
 // =====================
 // Sources (csak az első 4 debugolásra)
 // =====================
@@ -1137,16 +1153,16 @@ function buildMinddiakWhere_UI() {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
-  await client.query(
-      `
-      INSERT INTO job_posts
-        (source, title, url, first_seen)
-      VALUES
-        ($1, $2, $3, NOW())
-      ON CONFLICT (source, url)
-      DO NOTHING;
-      `,
-    [source, item.title, item.url]
+    await client.query(
+    `
+    INSERT INTO job_posts
+      (source, title, url, description, experience, first_seen)
+    VALUES
+      ($1, $2, $3, $4, $5, NOW())
+    ON CONFLICT (source, url)
+    DO NOTHING;
+    `,
+    [source, item.title, item.url, item.description, item.experience]
   );
 }
 
@@ -1289,8 +1305,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       let matchedList = merged
         .filter((c) => matchesKeywords(c.title, c.description))
-        .filter((c) => !isSeniorLike(c.title, c.description));
-
+        .filter((c) => !isSeniorLike(c.title, c.description))
+        .map((c) => {
+          // Extract experience info
+          const experience = extractExperience(c.description);
+          return { ...c, experience };
+        });
 
 
       // =========================
