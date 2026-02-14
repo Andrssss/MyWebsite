@@ -79,11 +79,14 @@ exports.handler = async (event) => {
 
         const map = new Map(rows.map((r) => [r.key, r]));
         const out = FIXED.map((s) => ({
-          key: s.key,
-          label: s.label,
-          url: s.url,
-          count: map.get(s.key)?.count ?? 0,
-        }));
+        key: s.key,
+        label: s.label,
+        url:
+          s.key === "minddiak"
+            ? "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10"
+            : s.url,
+        count: map.get(s.key)?.count ?? 0,
+      }));
 
         return jsonResponse(200, out);
       }

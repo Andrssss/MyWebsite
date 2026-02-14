@@ -293,7 +293,7 @@ function extractSSR(html, baseUrl) {
     items.push({
       title: title.slice(0, 300),
       url,
-      description: desc ? desc.slice(0, 800) : null,
+      description: desc ? desc.slice(0, 5000) : null,
     });
   });
 
@@ -475,7 +475,7 @@ function extractCandidates(html, baseUrl) {
     items.push({
       title: title.slice(0, 300),
       url,
-      description: desc ? desc.slice(0, 800) : null,
+      description: desc ? desc.slice(0, 5000) : null,
     });
   });
 
