@@ -656,33 +656,30 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       if (write && client) {
         for (const item of matchedList) {
-          // Only fetch detail page if preview is missing or too short
-          if (!item.description || item.description.length < 100) {
+          // Only fetch detail page if preview exists
+          if (item.description) {
             try {
               const html = await fetchText(item.url);
-              if (!html) continue;
-
+              if (!html || html.trim().length === 0) {
+                console.warn("Empty HTML for detail page:", item.url);
+                continue;
+              }
               const $job = cheerioLoad(html);
 
-              // Try multiple selectors to grab full description
-              const fullDesc =
-                normalizeWhitespace(
-                  $job.find(
-                    ".job-description, .description, .job-desc, #job-description, .vacancy-description, article p"
-                  )
-                  .text()
-                ) || null;
+              // Grab full description from detail page
+              const fullDesc = normalizeWhitespace(
+                $job.find(".job-description, .description, .job-desc, p").text()
+              );
 
               if (fullDesc) item.description = fullDesc;
             } catch (err) {
               console.warn("Failed to fetch detail page:", item.url, err.message);
-              continue;
             }
           }
 
+          // Now insert/update DB
           await upsertJob(client, source, item);
         }
-
       }
 
     }
