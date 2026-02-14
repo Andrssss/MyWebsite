@@ -659,9 +659,15 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           if (!item.description) continue; // skip if no preview
 
           let detailHtml;
-          console.log("Fetched length:", detailHtml.length, "url:", item.url);
           try {
             detailHtml = await fetchText(item.url);
+
+            if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
+              console.warn("Detail page empty or invalid:", item.url);
+              continue;
+            }
+            console.log("Fetched length:", detailHtml.length, "url:", item.url);
+
 
             // skip if empty or not a string
             if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
