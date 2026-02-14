@@ -14,6 +14,7 @@ import zlib from "node:zlib";
 import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
+import { chromium } from "playwright"; // at the top of your file
 
 // =====================
 // DB
@@ -657,64 +658,58 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
 // DB UPSERT (DETAIL FETCH)
 // =========================
+// =======================
+// UPSERT loop with Playwright for Profession.hu
+// =======================
 if (write && client) {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
   for (const item of matchedList) {
-    let detailHtml;
-    try {
-      if (!item.url) continue;
-      detailHtml = await fetchText(item.url);
+    if (!item.description) {
+      // Only fetch detail page if description is missing
+      try {
+        let detailHtml;
 
-      if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
-        console.warn("Detail page empty or invalid:", item.url);
-        continue;
-      }
-
-      const $job = cheerioLoad(String(detailHtml));
-      if (!$job || typeof $job.find !== "function") {
-        console.warn("Cheerio load failed for:", item.url);
-        continue;
-      }
-
-      // Try common HTML selectors first
-      let fullDesc = normalizeWhitespace(
-        $job.find(".job-detail, .job-description, .description, .job-desc, p").text()
-      );
-
-      // Fallback: JSON-LD structured data
-      if (!fullDesc) {
-        const jsonLD = $job('script[type="application/ld+json"]').html();
-        if (jsonLD) {
-          try {
-            const data = JSON.parse(jsonLD);
-            if (data && data.description) {
-              fullDesc = normalizeWhitespace(data.description);
-            }
-          } catch (err) {
-            // ignore JSON parse errors
-          }
+        if (item.url.includes("profession.hu")) {
+          // Use Playwright for JS-rendered Profession.hu pages
+          await page.goto(item.url, { waitUntil: "networkidle" });
+          detailHtml = await page.content();
+        } else {
+          // Normal fetch for SSR/static pages
+          detailHtml = await fetchText(item.url);
         }
+
+        if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
+          console.warn("Detail page empty or invalid:", item.url);
+          continue;
+        }
+
+        const $job = cheerioLoad(detailHtml);
+        const fullDesc = normalizeWhitespace(
+          $job.find(".job-description, .description, .job-desc, p").text()
+        );
+
+        if (!fullDesc) {
+          console.warn("No description found:", item.url);
+          continue; // optional: upsert empty
+        }
+
+        item.description = fullDesc;
+
+      } catch (err) {
+        console.warn("Failed to fetch detail page:", item.url, err.message);
+        continue;
       }
-
-      if (!fullDesc) {
-        console.warn("No description found for:", item.url);
-        continue; // skip if no description even after JSON-LD
-      }
-
-      item.description = fullDesc;
-
-    } catch (err) {
-      console.warn("Failed to fetch detail page:", item.url, err.message);
-      continue;
     }
 
-    try {
-      await upsertJob(client, source, item);
-      console.log("Upserted job:", item.title, item.url);
-    } catch (err) {
-      console.warn("DB upsert failed for:", item.url, err.message);
-    }
+    // Upsert into DB
+    await upsertJob(client, source, item);
   }
+
+  await browser.close();
 }
+
 
 
     }
