@@ -14,8 +14,6 @@ import zlib from "node:zlib";
 import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
-import chromium from "@sparticuz/chromium";
-import { chromium as playwrightChromium } from "playwright-core";
 
 // =====================
 // DB
@@ -137,9 +135,9 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
- // { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
- // { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
- // { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=intern&category%5B%5D=information-technology&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&category%5B%5D=networking&type=&_noo_job_field_year_experience=&post_type=noo_job" },
   
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
@@ -295,7 +293,7 @@ function extractSSR(html, baseUrl) {
     items.push({
       title: title.slice(0, 300),
       url,
-      description: desc ? desc.slice(0, 5000) : null,
+      description: desc ? desc.slice(0, 800) : null,
     });
   });
 
@@ -367,7 +365,7 @@ function fetchText(url, redirectLeft = 5) {
       {
         method: "GET",
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+          "User-Agent": "JobWatcher/1.0",
           Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
@@ -477,7 +475,7 @@ function extractCandidates(html, baseUrl) {
     items.push({
       title: title.slice(0, 300),
       url,
-      description: desc ? desc.slice(0, 5000) : null,
+      description: desc ? desc.slice(0, 800) : null,
     });
   });
 
@@ -490,8 +488,8 @@ function extractCandidates(html, baseUrl) {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
+  const canonicalUrl = normalizeUrl(item.url);
   const experience = extractExperience(item.description);
-  //console.log(item.description);
 
   await client.query(
     `INSERT INTO job_posts
@@ -507,6 +505,7 @@ async function upsertJob(client, source, item) {
       source,
       item.title,
       item.url,
+      canonicalUrl,
       item.description || null,
       experience
     ]
@@ -656,68 +655,11 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // DB UPSERT
       // =========================
-      // =========================
-// DB UPSERT (DETAIL FETCH)
-// =========================
-// =======================
-// UPSERT loop with Playwright for Profession.hu
-// =======================
-if (write && client) {
-  const browser = await playwrightChromium.launch({
-  executablePath: await chromium.executablePath(),
-  args: chromium.args,
-  headless: chromium.headless,
-  ignoreHTTPSErrors: true,
-});
-  const page = await browser.newPage();
-
-  for (const item of matchedList) {
-    if (!item.description) {
-      // Only fetch detail page if description is missing
-      try {
-        let detailHtml;
-
-        if (item.url.includes("profession.hu")) {
-          // Use Playwright for JS-rendered Profession.hu pages
-          await page.goto(item.url, { waitUntil: "networkidle" });
-          detailHtml = await page.content();
-        } else {
-          // Normal fetch for SSR/static pages
-          detailHtml = await fetchText(item.url);
+      if (write && client) {
+        for (const item of matchedList) {
+          await upsertJob(client, source, item);
         }
-
-        if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
-          console.warn("Detail page empty or invalid:", item.url);
-          continue;
-        }
-
-        const $job = cheerioLoad(detailHtml);
-        const fullDesc = normalizeWhitespace(
-          $job.find(".job-description, .description, .job-desc, p").text()
-        );
-
-        if (!fullDesc) {
-          console.warn("No description found:", item.url);
-          continue; // optional: upsert empty
-        }
-
-        item.description = fullDesc;
-
-      } catch (err) {
-        console.warn("Failed to fetch detail page:", item.url, err.message);
-        continue;
       }
-    }
-
-    // Upsert into DB
-    await upsertJob(client, source, item);
-  }
-
-  await browser.close();
-}
-
-
-
     }
   } finally {
     if (client) client.release();
