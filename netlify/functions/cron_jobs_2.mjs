@@ -488,7 +488,6 @@ function extractCandidates(html, baseUrl) {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
-  const canonicalUrl = normalizeUrl(item.url);
   const experience = extractExperience(item.description);
 
   await client.query(
@@ -505,7 +504,6 @@ async function upsertJob(client, source, item) {
       source,
       item.title,
       item.url,
-      canonicalUrl,
       item.description || null,
       experience
     ]
