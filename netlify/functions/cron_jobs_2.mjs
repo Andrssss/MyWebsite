@@ -656,30 +656,25 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       if (write && client) {
         for (const item of matchedList) {
-          // Only fetch detail page if preview exists
-          if (item.description) {
-            try {
-              const html = await fetchText(item.url);
-              if (!html || html.trim().length === 0) {
-                console.warn("Empty HTML for detail page:", item.url);
-                continue;
-              }
-              const $job = cheerioLoad(html);
+          if (!item.description) continue; // skip if no preview
 
-              // Grab full description from detail page
-              const fullDesc = normalizeWhitespace(
-                $job.find(".job-description, .description, .job-desc, p").text()
-              );
-
-              if (fullDesc) item.description = fullDesc;
-            } catch (err) {
-              console.warn("Failed to fetch detail page:", item.url, err.message);
-            }
+          let detailHtml;
+          try {
+            detailHtml = await fetchText(item.url); 
+            if (!detailHtml || detailHtml.trim().length === 0) throw new Error("Empty HTML");
+            const $job = cheerioLoad(detailHtml);
+            const fullDesc = normalizeWhitespace(
+              $job.find(".job-description, .description, .job-desc, p").text()
+            );
+            if (fullDesc) item.description = fullDesc;
+          } catch (err) {
+            console.warn("Failed to fetch detail page:", item.url, err.message);
+            continue;
           }
 
-          // Now insert/update DB
           await upsertJob(client, source, item);
         }
+
       }
 
     }
