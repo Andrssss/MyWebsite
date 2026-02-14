@@ -676,17 +676,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             }
 
             const $job = cheerioLoad(detailHtml);
-
-            // check if $job is valid
-            if (!$job || typeof $job.find !== "function") {
-              console.warn("$job invalid:", item.url);
-              continue;
-            }
-
             const fullDesc = normalizeWhitespace(
               $job.find(".job-description, .description, .job-desc, p").text()
             );
-            if (fullDesc) item.description = fullDesc;
+            if (!fullDesc) {
+              console.warn("No description found:", item.url);
+              continue; // optional, or you can still upsert with empty description
+            }
+                          
+                          
+            item.description = fullDesc;
 
           } catch (err) {
             console.warn("Failed to fetch detail page:", item.url, err.message);
