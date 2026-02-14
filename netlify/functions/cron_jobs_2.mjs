@@ -365,7 +365,7 @@ function fetchText(url, redirectLeft = 5) {
       {
         method: "GET",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
           Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
@@ -660,13 +660,27 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
           let detailHtml;
           try {
-            detailHtml = await fetchText(item.url); 
-            if (!detailHtml || detailHtml.trim().length === 0) throw new Error("Empty HTML");
+            detailHtml = await fetchText(item.url);
+
+            // skip if empty or not a string
+            if (!detailHtml || typeof detailHtml !== "string" || detailHtml.trim() === "") {
+              console.warn("Detail page empty or invalid:", item.url);
+              continue;
+            }
+
             const $job = cheerioLoad(detailHtml);
+
+            // check if $job is valid
+            if (!$job || typeof $job.find !== "function") {
+              console.warn("$job invalid:", item.url);
+              continue;
+            }
+
             const fullDesc = normalizeWhitespace(
               $job.find(".job-description, .description, .job-desc, p").text()
             );
             if (fullDesc) item.description = fullDesc;
+
           } catch (err) {
             console.warn("Failed to fetch detail page:", item.url, err.message);
             continue;
@@ -674,6 +688,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
           await upsertJob(client, source, item);
         }
+
 
       }
 
