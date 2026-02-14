@@ -891,7 +891,7 @@ function buildMinddiakDetailUrl(j) {
   }
 
   // 3) fallback, ha nincs frontend path/url (utolsó mentsvár)
-  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-226/work_type/it-mernok-10`);
+  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-${id}`);
 
   return null;
 }

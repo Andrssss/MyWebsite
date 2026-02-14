@@ -488,18 +488,56 @@ function extractCandidates(html, baseUrl) {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
+  const canonicalUrl = normalizeUrl(item.url);
+  const experience = extractExperience(item.description);
+
   await client.query(
-      `
-      INSERT INTO job_posts
-        (source, title, url, first_seen)
-      VALUES
-        ($1, $2, $3, NOW())
-      ON CONFLICT (source, url)
-      DO NOTHING;
-      `,
-    [source, item.title, item.url]
+    `INSERT INTO job_posts
+      (source, title, url, description, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
+     ON CONFLICT (source, url)
+     DO UPDATE SET 
+       title = EXCLUDED.title,
+       description = COALESCE(EXCLUDED.description, job_posts.description),
+       experience = COALESCE(EXCLUDED.experience, job_posts.experience)
+    `,
+    [
+      source,
+      item.title,
+      item.url,
+      canonicalUrl,
+      item.description || null,
+      experience
+    ]
   );
 }
+
+
+
+// ---------------------
+// Experience extractor
+// ---------------------
+function extractExperience(description) {
+  if (!description) return null;
+
+  const patterns = [
+    /(\d+\s?\+\s?(?:év|years?))/gi,
+    /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
+    /(minimum\s?\d+\s?(?:év|years?))/gi,
+    /(at least\s?\d+\s?(?:years?))/gi
+  ];
+
+  const matches = [];
+
+  for (const regex of patterns) {
+    const found = description.match(regex);
+    if (found) matches.push(...found);
+  }
+
+  return matches.length ? [...new Set(matches)].join(", ") : null;
+}
+
+
 
 
 // ✅ Fixed runBatch()
