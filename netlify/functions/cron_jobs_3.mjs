@@ -290,13 +290,12 @@ function extractJobDetails(html) {
 
   if (description) {
     // Match 1-2 digit numbers, optionally +, or ranges (1-3)
-    // Ignore anything above 20 (unlikely for candidate experience)
+    // Allow the number to be attached to letters (e.g., Requirements5+)
     const match = description.match(
-      /(?:^|\s)(\d{1,2}\+?|\d{1,2}\s*-\s*\d{1,2})\s*(?:years?|év)\b/i
+      /(?:^|[^0-9])(\d{1,2}\+?|\d{1,2}\s*-\s*\d{1,2})\s*(?:years?|év)\b/i
     );
 
     if (match) {
-      // Extract numeric part
       experience = match[1];
 
       // Optional: filter out absurdly high numbers
@@ -310,6 +309,7 @@ function extractJobDetails(html) {
 
   return { description, experience };
 }
+
 
 
 
