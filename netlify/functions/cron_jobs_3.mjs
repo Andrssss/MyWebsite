@@ -278,6 +278,7 @@ function levelNotBlacklisted(title, desc) {
 function extractJobDetails(html) {
   const $ = cheerioLoad(html);
 
+  // Grab main job description
   const description =
     normalizeWhitespace(
       $(".description, .job-description, #job-details, .show-more-less-html__markup")
@@ -288,17 +289,28 @@ function extractJobDetails(html) {
   let experience = null;
 
   if (description) {
+    // Match 1-2 digit numbers, optionally +, or ranges (1-3)
+    // Ignore anything above 20 (unlikely for candidate experience)
     const match = description.match(
-  /\b(\d{1,2}\s*(?:\+)?\s*(?:years?|év))\b|\b(\d{1,2}\s*-\s*\d{1,2}\s*(?:years?|év))\b/i
+      /(?:^|\s)(\d{1,2}\+?|\d{1,2}\s*-\s*\d{1,2})\s*(?:years?|év)\b/i
     );
 
     if (match) {
-      experience = match[0]; // teljes stringet mentjük
+      // Extract numeric part
+      experience = match[1];
+
+      // Optional: filter out absurdly high numbers
+      const maxReasonable = 20;
+      const nums = experience.split("-").map(s => parseInt(s, 10));
+      if (nums.some(n => isNaN(n) || n > maxReasonable)) {
+        experience = null;
+      }
     }
   }
 
   return { description, experience };
 }
+
 
 
 /* --------------------
