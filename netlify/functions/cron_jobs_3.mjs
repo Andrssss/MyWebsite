@@ -240,7 +240,7 @@ async function upsertJob(client, source, item) {
     `INSERT INTO job_posts
       (source, title, url, canonical_url, description, experience, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, canonical_url)
+     ON CONFLICT (source, url)
      DO UPDATE SET
        description = EXCLUDED.description,
        experience = EXCLUDED.experience;
@@ -315,7 +315,7 @@ export default async () => {
 
   const SOURCES = [
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?currentJobId=4345945964&discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
+   /* { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?currentJobId=4345945964&discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
@@ -328,7 +328,7 @@ export default async () => {
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=5&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 
-    { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
+    { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },*/
   ];
 
   const client = await pool.connect();
@@ -359,33 +359,43 @@ export default async () => {
      // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
-        try {
-          let details = { description: null, experience: null };
+  try {
+    let details = { description: null, experience: null };
 
+    try {
+      const detailHtml = await fetchText(it.url);
+      details = extractJobDetails(detailHtml);
 
-          
-          try {
-            const detailHtml = await fetchText(it.url);
-            details = extractJobDetails(detailHtml);
-          } catch (err) {
-            console.error("Detail fetch failed:", err.message);
-          }
+      console.log("--------------------------------------------------");
+      console.log("SOURCE:", p.key);
+      console.log("TITLE:", it.title);
+      console.log("URL:", it.url);
 
-          if (details.description) {
-              console.log("DESCRIPTION (first 500 chars):");
-              console.log(details.description.slice(0, 1000));
-            } 
-
-          await upsertJob(client, p.key, {
-            ...it,
-            description: details.description,
-            experience: details.experience
-          });
-
-        } catch (err) {
-          console.error(err);
-        }
+      if (details.description) {
+        console.log("DESCRIPTION (first 500 chars):");
+        console.log(details.description.slice(0, 500));
+      } else {
+        console.log("DESCRIPTION: NOT FOUND");
       }
+
+      console.log("EXPERIENCE:", details.experience ?? "NOT FOUND");
+      console.log("--------------------------------------------------");
+
+    } catch (err) {
+      console.error("Detail fetch failed:", err.message);
+    }
+
+    await upsertJob(client, p.key, {
+      ...it,
+      description: details.description,
+      experience: details.experience
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 
 
       console.log(`${p.key}: ${items.length} items processed.`);
