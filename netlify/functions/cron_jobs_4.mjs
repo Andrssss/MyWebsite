@@ -157,8 +157,8 @@ export default async () => {
     const { rows } = await client.query(`
     SELECT id, url
     FROM job_posts
-    WHERE first_seen >= NOW() - INTERVAL '3 day'
-        AND first_seen < NOW() - INTERVAL '2 day'
+    WHERE first_seen >= NOW() - INTERVAL '4 day'
+        AND first_seen < NOW() - INTERVAL '3 day'
         AND (experience IS NULL OR experience = '-')
     ORDER BY first_seen DESC
     `);
@@ -193,7 +193,7 @@ export default async () => {
             );
 
         success++;
-        await sleep(500);
+        await sleep(250);
 
       } catch (err) {
         console.error("FAILED ID:", row.id, "|", err.message);
