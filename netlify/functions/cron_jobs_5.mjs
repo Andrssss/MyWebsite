@@ -123,16 +123,13 @@ function extractProfession(html) {
 
   return { profession, description };
 }
-
 function extractJobDetails(html) {
   const $ = cheerioLoad(html);
 
-  const description =
-    normalizeWhitespace(
-      $(".description, .job-description, #job-details, .show-more-less-html__markup")
-        .first()
-        .text()
-    ) || null;
+  // Grab description from the requirements box if normal description is missing
+  let description = normalizeWhitespace(
+    $("#box_az-allashoz-tartozo-elvarasok").text()
+  ) || null;
 
   let experience = null;
 
@@ -153,7 +150,6 @@ function extractJobDetails(html) {
 
     if (matches.length) {
       const maxReasonable = 15;
-
       const filtered = matches.filter(m => {
         const nums = m.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
         return nums.every(n => n <= maxReasonable);
@@ -171,6 +167,9 @@ function extractJobDetails(html) {
 
   return { description, experience };
 }
+
+
+
 /* ======================
    MAIN WORKER
 ====================== */
