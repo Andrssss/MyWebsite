@@ -105,10 +105,9 @@ function extractProfession(html) {
   // Kinyerjük a profession-t a szelektorokból
   const profession =
     normalizeWhitespace(
-      $(".profession, .job-profession, #job-profession, .job-category")
-        .first()
-        .text()
+        $("h1.job-title, h1").first().text()
     ) || null;
+
 
   // Kinyerjük a teljes leírást a debughoz (pl. .description vagy #job-details)
   const description =
@@ -126,23 +125,27 @@ function extractProfession(html) {
 function extractJobDetails(html) {
   const $ = cheerioLoad(html);
 
-  // Grab description from the requirements box if normal description is missing
-  let description = normalizeWhitespace(
-    $("#box_az-allashoz-tartozo-elvarasok").text()
-  ) || null;
+  // Grab description from box and combine all <li> items
+  const box = $("#box_az-allashoz-tartozo-elvarasok");
+  const listText = box.find("ul > li")
+    .map((i, el) => normalizeWhitespace($(el).text()))
+    .get()
+    .join(" ");
 
+  let description = normalizeWhitespace(box.text()) || "";
+  description = description ? description + " " + listText : listText || null;
+
+  // Extract experience from description and <li> combined
   let experience = null;
-
   if (description) {
     const patterns = [
-      /(\d+\s?\+\s?(?:év|years?))/gi,
-      /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
-      /(minimum\s?\d+\s?(?:év|years?))/gi,
-      /(at least\s?\d+\s?(?:years?))/gi
+      /\b\d+\s?\+\s?(?:év|years?)\b/gi,
+      /\b\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?)\b/gi,
+      /\bminimum\s?\d+\s?(?:év|years?)\b/gi,
+      /\bat least\s?\d+\s?(?:years?)\b/gi
     ];
 
     const matches = [];
-
     for (const regex of patterns) {
       const found = description.match(regex);
       if (found) matches.push(...found);
@@ -164,8 +167,30 @@ function extractJobDetails(html) {
   }
 
   console.log("Extracted Experience:", experience ?? "NOT FOUND");
+  console.log("Description snippet:", description?.slice(0, 120) ?? "NOT FOUND");
 
   return { description, experience };
+}
+
+function extractProfession(html) {
+  const $ = cheerioLoad(html);
+
+  // Better profession extraction for profession.hu
+  let profession =
+    normalizeWhitespace(
+      $("h1.job-title").first().text()
+    ) || normalizeWhitespace($("h1").first().text()) || null;
+
+  // Fallback: sometimes profession is in breadcrumb or meta
+  if (!profession) {
+    profession =
+      normalizeWhitespace($(".breadcrumb li").last().text()) ||
+      normalizeWhitespace($("meta[name='keywords']").attr("content")) ||
+      null;
+  }
+
+  console.log("Extracted Profession:", profession ?? "NOT FOUND");
+  return { profession };
 }
 
 
