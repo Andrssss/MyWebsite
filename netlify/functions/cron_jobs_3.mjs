@@ -114,6 +114,13 @@ function sleep(ms) {
 /* ---------------------
    Fetch helper
 --------------------- */
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/121.0.0.0 Safari/537.36";
+
+
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -124,13 +131,16 @@ function fetchText(url, redirectLeft = 5) {
       {
         method: "GET",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
+          "User-Agent": BROWSER_UA,
           Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
+          "Connection": "keep-alive",
+          "Upgrade-Insecure-Requests": "1",
         },
         timeout: 50000,
       },
+
       (res) => {
         const code = res.statusCode || 0;
 
