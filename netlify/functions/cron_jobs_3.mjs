@@ -242,8 +242,8 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, description, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      (source, title, url, canonical_url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, canonical_url)
      DO UPDATE SET
        title = EXCLUDED.title,
@@ -256,7 +256,6 @@ async function upsertJob(client, source, item) {
       item.title,
       item.url,
       canonicalUrl,
-      item.description ?? null,
       item.experience ?? null
     ]
   );
@@ -395,20 +394,20 @@ export default async () => {
       // RANDOM WAIT 
       await sleep(perItemDelay);
 
-      console.log("--------------------------------------------------");
-      console.log("SOURCE:", p.key);
-      console.log("TITLE:", it.title);
-      console.log("URL:", it.url);
+      //console.log("--------------------------------------------------");
+      //console.log("SOURCE:", p.key);
+      //console.log("TITLE:", it.title);
+      //console.log("URL:", it.url);
 
       if (details.description) {
-        console.log("DESCRIPTION (first 500 chars):");
-        console.log(details.description.slice(0, 5000));
+        //console.log("DESCRIPTION (first 500 chars):");
+        //console.log(details.description.slice(0, 5000));
       } else {
-        console.log("DESCRIPTION: NOT FOUND");
+        //console.log("DESCRIPTION: NOT FOUND");
       }
 
-      console.log("EXPERIENCE:", details.experience ?? "NOT FOUND");
-      console.log("--------------------------------------------------");
+      //console.log("EXPERIENCE:", details.experience ?? "NOT FOUND");
+      //console.log("--------------------------------------------------");
 
     } catch (err) {
       console.error("Detail fetch failed:", err.message);

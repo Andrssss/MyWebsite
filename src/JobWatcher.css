@@ -423,3 +423,10 @@ html, body {
 .job-tabs-wrapper.open {
   max-height: 600px;
 }
+
+
+.job-experience {
+  margin-left: 1rem;
+  font-weight: bold;
+  color: #007acc;
+}
