@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "1 4-22/3 * * *",
+  schedule: "15 4-22/3 * * *",
 };
 
 import { Pool } from "pg";
@@ -196,7 +196,7 @@ export default async () => {
 
 
         success++;
-        await sleep(1000);
+        await sleep(500);
 
       } catch (err) {
         console.error("FAILED ID:", row.id, "|", err.message);
