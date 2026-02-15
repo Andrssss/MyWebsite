@@ -96,7 +96,8 @@ exports.handler = async (event) => {
       if (id) {
         const { rows } = await client.query(
           `SELECT id, source, title, url,
-                  first_seen AS "firstSeen"
+                  first_seen AS "firstSeen",
+                  experience
            FROM job_posts
            WHERE id = $1`,
           [id]
@@ -109,7 +110,8 @@ exports.handler = async (event) => {
       if (source) {
         const { rows } = await client.query(
           `SELECT id, source, title, url,
-                  first_seen AS "firstSeen"
+                  first_seen AS "firstSeen",
+                  experience
            FROM job_posts
            WHERE source = $1
            ORDER BY first_seen DESC, id DESC
@@ -122,7 +124,8 @@ exports.handler = async (event) => {
       // GET /jobs
       const { rows } = await client.query(
         `SELECT id, source, title, url,
-                first_seen AS "firstSeen"
+                first_seen AS "firstSeen",
+                experience
          FROM job_posts
          ORDER BY first_seen DESC, id DESC
          LIMIT $1`,
