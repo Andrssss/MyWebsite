@@ -246,11 +246,8 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, canonical_url)
      DO UPDATE SET
-       title = EXCLUDED.title,
-       url = EXCLUDED.url,
-       description = EXCLUDED.description,
-       experience = EXCLUDED.experience;
-    `,
+       experience = COALESCE(EXCLUDED.experience, job_posts.experience);    
+      `,
     [
       source,
       item.title,
@@ -376,7 +373,7 @@ export default async () => {
         return true;
       });
 
-      const TOTAL_BUDGET_MS = 29500;
+      const TOTAL_BUDGET_MS = 25000;
       const perItemDelay = Math.floor(
         TOTAL_BUDGET_MS / Math.max(items.length, 1)
       );
@@ -393,7 +390,8 @@ export default async () => {
 
       // RANDOM WAIT 
       await sleep(perItemDelay);
-
+      
+      /*
       //console.log("--------------------------------------------------");
       //console.log("SOURCE:", p.key);
       //console.log("TITLE:", it.title);
@@ -408,6 +406,7 @@ export default async () => {
 
       //console.log("EXPERIENCE:", details.experience ?? "NOT FOUND");
       //console.log("--------------------------------------------------");
+      */
 
     } catch (err) {
       console.error("Detail fetch failed:", err.message);
@@ -416,7 +415,7 @@ export default async () => {
     await upsertJob(client, p.key, {
       ...it,
       description: details.description,
-      experience: details.experience
+      experience: details.experience ?? "nincs megadva"
     });
 
   } catch (err) {
