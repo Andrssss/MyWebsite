@@ -202,34 +202,34 @@ const JobWatcher = () => {
 const isMedior = (experience) => {
   if (!experience) return false;
 
-  // Split multiple experience strings (1-3 years, 2+ év, stb.)
   const parts = experience.split(",").map((s) => s.trim());
 
   for (const part of parts) {
-    // Egyszerű range: "1-3 years" vagy "1-3 év"
+    // Egyszerű range: "1-3 years", "3-5 év", stb.
     const rangeMatch = part.match(/(\d+)\s*[-–]\s*(\d+)\s*(év|years?|yrs?)/i);
     if (rangeMatch) {
       const [, min, max] = rangeMatch.map(Number);
-      if (min >= 2 || max >= 2) return true; // ha bármelyik szám ≥2 év → medior
+      if (min > 3 || max > 3) return true; // >3 év → medior
     }
 
     // Plus jel: "2+ év"
     const plusMatch = part.match(/(\d+)\+\s*(év|years?)/i);
     if (plusMatch) {
       const n = Number(plusMatch[1]);
-      if (n >= 1) return true; // 1+ év már medior
+      if (n > 3) return true;
     }
 
-    // Egy szám: "3 years", "3 év"
+    // Egy szám: "3 years", "4 év"
     const singleMatch = part.match(/(\d+)\s*(év|years?)/i);
     if (singleMatch) {
       const n = Number(singleMatch[1]);
-      if (n >= 2) return true;
+      if (n > 3) return true;
     }
   }
 
   return false;
 };
+
 
 
   /* =======================
@@ -263,13 +263,24 @@ const visibleJobs = useMemo(() => {
     list = list.filter((j) => {
       const t = (j.title || "").toLowerCase();
       const source = (j.source || "").toLowerCase();
+      const isInternTitle = INTERN_KEYWORDS.some((k) => t.includes(k));
       const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) =>
         source.includes(s)
       );
-      const isInternTitle = INTERN_KEYWORDS.some((k) => t.includes(k));
-      return !isInternSource && !isInternTitle;
+
+      const expParts = j.experience?.split(",").map(s => s.trim()) || [];
+
+      const isJuniorByExperience = expParts.every(exp => {
+        const nums = exp.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+
+        // Minden szám 2 vagy 3 kell legyen → 1-es vagy >3 kiszűrve
+        return nums.length > 0 && nums.every(n => n >= 2 && n <= 3);
+      });
+
+      return !isInternSource && !isInternTitle && isJuniorByExperience;
     });
   }
+
 
   if (mediorMode) {
   list = list.filter((j) => isMedior(j.experience));
@@ -442,7 +453,7 @@ const visibleJobs = useMemo(() => {
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
                 {job.experience && (
-                  <div className="job-experience">Tapasztalat: {job.experience}</div>                )}
+                  <div className="job-experience">{job.experience}</div>                )}
                 <div>
                   {job.firstSeen
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")

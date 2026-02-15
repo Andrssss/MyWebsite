@@ -46,7 +46,6 @@ function fetchText(url) {
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
 
-    console.log("Fetching:", url);
 
     const req = lib.request(
       u,
@@ -79,7 +78,6 @@ function fetchText(url) {
         stream.setEncoding("utf8");
         stream.on("data", c => data += c);
         stream.on("end", () => {
-          console.log("Fetched OK:", url, "| Status:", code);
           resolve(data);
         });
         stream.on("error", reject);
@@ -157,12 +155,14 @@ export default async () => {
   try {
 
     const { rows } = await client.query(`
-      SELECT id, url
-      FROM job_posts
-      WHERE first_seen >= NOW() - INTERVAL '1 day'
+    SELECT id, url
+    FROM job_posts
+    WHERE first_seen >= NOW() - INTERVAL '2 day'
+        AND first_seen < NOW() - INTERVAL '1 day'
         AND (experience IS NULL OR experience = '-')
-      ORDER BY first_seen DESC
+    ORDER BY first_seen DESC
     `);
+
 
     console.log("Jobs to process:", rows.length);
 
@@ -191,9 +191,6 @@ export default async () => {
                 row.id
             ]
             );
-
-            console.log("Updated experience for ID:", row.id);
-
 
         success++;
         await sleep(500);
