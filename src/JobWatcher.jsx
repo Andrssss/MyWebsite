@@ -72,8 +72,6 @@ const JobWatcher = () => {
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
 
-
-
   /* =======================
      FORRÁS SZŰRÉS (3 állapot)
   ======================= */
@@ -186,104 +184,74 @@ const JobWatcher = () => {
     }
   };
 
-
-/* =======================
-   MEDIOR LOGIKA
-======================= */
-const isMedior = (experience) => {
-  if (!experience) return false;
-
-  // Split multiple experience strings (1-3 years, 2+ év, stb.)
-  const parts = experience.split(",").map((s) => s.trim());
-
-  for (const part of parts) {
-    // Egyszerű range: "1-3 years" vagy "1-3 év"
-    const rangeMatch = part.match(/(\d+)\s*[-–]\s*(\d+)\s*(év|years?|yrs?)/i);
-    if (rangeMatch) {
-      const [, min, max] = rangeMatch.map(Number);
-      if (min >= 2 || max >= 2) return true; // ha bármelyik szám ≥2 év → medior
-    }
-
-    // Plus jel: "2+ év"
-    const plusMatch = part.match(/(\d+)\+\s*(év|years?)/i);
-    if (plusMatch) {
-      const n = Number(plusMatch[1]);
-      if (n >= 1) return true; // 1+ év már medior
-    }
-
-    // Egy szám: "3 years", "3 év"
-    const singleMatch = part.match(/(\d+)\s*(év|years?)/i);
-    if (singleMatch) {
-      const n = Number(singleMatch[1]);
-      if (n >= 2) return true;
-    }
-  }
-
-  return false;
-};
-
-
   /* =======================
      SZŰRT LISTA
   ======================= */
-const visibleJobs = useMemo(() => {
-  let list = jobs;
+  const visibleJobs = useMemo(() => {
+    let list = jobs;
 
-  if (onlyNew) {
-    list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
-  }
+    if (onlyNew) {
+      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
+    }
 
-  const nq = q.trim().toLowerCase();
-  if (nq) {
-    list = list.filter((j) => (j.title || "").toLowerCase().includes(nq));
-  }
-
-  if (internMode) {
-    list = list.filter((j) => {
-      const source = (j.source || "").toLowerCase();
-      const t = (j.title || "").toLowerCase();
-      const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) =>
-        source.includes(s)
-      );
-      const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
-      return (internLike && !t.includes(JUNIOR_KEYWORD)) || isInternSource;
-    });
-  }
-
-  if (juniorMode) {
-    list = list.filter((j) => {
-      const t = (j.title || "").toLowerCase();
-      const source = (j.source || "").toLowerCase();
-      const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) =>
-        source.includes(s)
-      );
-      const isInternTitle = INTERN_KEYWORDS.some((k) => t.includes(k));
-      return !isInternSource && !isInternTitle;
-    });
-  }
-
-  if (mediorMode) {
-  list = list.filter((j) => isMedior(j.experience));
-}
+    const nq = q.trim().toLowerCase();
+    if (nq) {
+      list = list.filter((j) => {
+        const t = (j.title || "").toLowerCase();
+        return t.includes(nq);
+      });
+    }
 
 
-  // Apply source selection / exclusion
-  const selected = Object.keys(sourceStates).filter(
-    (k) => sourceStates[k] === "selected"
-  );
-  const excluded = Object.keys(sourceStates).filter(
-    (k) => sourceStates[k] === "excluded"
-  );
+    if (internMode) {
+      list = list.filter((j) => {
+        const source = (j.source || "").toLowerCase();
+        const t = (j.title || "").toLowerCase();
+        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s) );
+        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k)); 
 
-  if (selected.length) list = list.filter((j) => selected.includes(j.source));
-  else if (excluded.length)
-    list = list.filter((j) => !excluded.includes(j.source));
+        return (
+          (internLike && !t.includes(JUNIOR_KEYWORD)) || isInternSource
+        );
+      });
+    }
 
-  return [...list].sort(
-    (a, b) => new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
-  );
-}, [jobs, q, onlyNew, internMode, juniorMode, mediorMode, sourceStates]);
+    if (juniorMode) {
+      list = list.filter((j) => {
+        const t = (j.title || "").toLowerCase();
+        const title = (j.title || "").toLowerCase();
+        const source = (j.source || "").toLowerCase();
 
+        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k)); 
+
+        // Ha a forrás diákszövetkezet, akkor NE legyen junior
+        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s) );
+
+        // Ha a cím tipikusan gyakornok/diák, akkor sem junior
+        const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k) );
+
+        return !isInternSource && !isInternTitle && !internLike;
+      });
+    }
+
+    const selected = Object.keys(sourceStates).filter(
+      (k) => sourceStates[k] === "selected"
+    );
+    const excluded = Object.keys(sourceStates).filter(
+      (k) => sourceStates[k] === "excluded"
+    );
+
+    if (selected.length) {
+      list = list.filter((j) => selected.includes(j.source));
+    } else if (excluded.length) {
+      list = list.filter((j) => !excluded.includes(j.source));
+    }
+
+    return [...list].sort(
+      (a, b) =>
+        new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
+    );
+  }, [jobs, q, onlyNew, internMode, juniorMode, sourceStates]);
 
   /* =======================
      RENDER
@@ -321,6 +289,7 @@ const visibleJobs = useMemo(() => {
           />
           Csak junior
         </label>
+
         <label className="job-checkbox">
           <input
             type="checkbox"
@@ -423,12 +392,13 @@ const visibleJobs = useMemo(() => {
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
                 {job.experience && (
-                  <div className="job-experience">{job.experience}</div>                )}
-                <div>
+                  <span className="job-experience">{job.experience}</span>
+                )}
+                <span>
                   {job.firstSeen
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")
                     : "—"}
-                </div>
+                </span>
               </div>
             </li>
           );
