@@ -391,7 +391,7 @@ export default async () => {
 
       if (details.description) {
         console.log("DESCRIPTION (first 500 chars):");
-        console.log(details.description.slice(0, 500));
+        console.log(details.description.slice(0, 5000));
       } else {
         console.log("DESCRIPTION: NOT FOUND");
       }
