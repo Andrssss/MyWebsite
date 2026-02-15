@@ -320,8 +320,6 @@ const BLACKLIST_URLS = [
 --------------------- */
 
 
-const TOTAL_BUDGET_MS = 30000;
-const perItemDelay = Math.floor(TOTAL_BUDGET_MS / Math.max(items.length, 1));
 
 export default async () => {
   
@@ -370,6 +368,11 @@ export default async () => {
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
+
+      const TOTAL_BUDGET_MS = 30000;
+      const perItemDelay = Math.floor(
+        TOTAL_BUDGET_MS / Math.max(items.length, 1)
+      );
 
      // items = applyBlacklist(items, p.key);
 
