@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "15 4-22/3 * * *", // az eredeti cron
+  schedule: "5 4-22/3 * * *", // az eredeti cron
 };
 
 import { Pool } from "pg";
@@ -85,6 +85,7 @@ function fetchText(url) {
 function extractProfession(html) {
   const $ = cheerioLoad(html);
 
+  // Kinyerjük a profession-t a szelektorokból
   const profession =
     normalizeWhitespace(
       $(".profession, .job-profession, #job-profession, .job-category")
@@ -92,10 +93,20 @@ function extractProfession(html) {
         .text()
     ) || null;
 
-  console.log("Extracted Profession:", profession ?? "NOT FOUND");
+  // Kinyerjük a teljes leírást a debughoz (pl. .description vagy #job-details)
+  const description =
+    normalizeWhitespace(
+      $(".description, .job-description, #job-details, .show-more-less-html__markup")
+        .first()
+        .text()
+    ) || null;
 
-  return { profession };
+  console.log("Extracted Profession:", profession ?? "NOT FOUND");
+  console.log("Description found:", description ?? "NOT FOUND");
+
+  return { profession, description };
 }
+
 
 /* ======================
    MAIN WORKER
@@ -128,10 +139,18 @@ export default async () => {
         const html = await fetchText(row.url);
         const details = extractProfession(html);
 
+        
+
         await client.query(
-          `UPDATE job_posts SET profession = $1 WHERE id = $2`,
-          [details.profession ?? "-", row.id]
+            `
+            UPDATE job_posts
+            SET experience = $1
+            WHERE id = $2
+            `,
+            [details.profession ?? "-", row.id]
         );
+
+
 
         console.log(`✅ Updated ID: ${row.id} with profession: ${details.profession ?? "-"}`);
         success++;
