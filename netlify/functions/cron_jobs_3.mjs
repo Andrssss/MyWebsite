@@ -90,14 +90,6 @@ function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
-    /*
-    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
-      u.search = "";
-      u.hash = "";
-      return u.toString();
-    }
-      */
-
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
       return `https://${u.hostname}${u.pathname}`; // teljesen eldobjuk a query stringet
     }
@@ -246,14 +238,24 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, canonical_url, description, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, canonical_url)
-        DO NOTHING;
-        `,
-    [source, item.title, item.url, canonicalUrl]
+     DO UPDATE SET
+       description = EXCLUDED.description,
+       experience = EXCLUDED.experience;
+    `,
+    [
+      source,
+      item.title,
+      item.url,
+      canonicalUrl,
+      item.description ?? null,
+      item.experience ?? null
+    ]
   );
 }
+
 
 function levelNotBlacklisted(title, desc) {
   const LEVEL_BLACKLIST = [
@@ -264,6 +266,33 @@ function levelNotBlacklisted(title, desc) {
   const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
+
+
+function extractJobDetails(html) {
+  const $ = cheerioLoad(html);
+
+  const description =
+    normalizeWhitespace(
+      $(".description, .job-description, #job-details, .show-more-less-html__markup")
+        .first()
+        .text()
+    ) || null;
+
+  let experience = null;
+
+  if (description) {
+    const match = description.match(
+      /(\d+\s*(\+)?\s*(years?|év))|(\d+\s*-\s*\d+\s*(years?|év))/i
+    );
+
+    if (match) {
+      experience = match[0]; // teljes stringet mentjük
+    }
+  }
+
+  return { description, experience };
+}
+
 
 /* =========================
    BLACKLISTING
@@ -331,11 +360,26 @@ export default async () => {
 
       for (const it of items) {
         try {
-          await upsertJob(client, p.key, it);
+          let details = { description: null, experience: null };
+
+          try {
+            const detailHtml = await fetchText(it.url);
+            details = extractJobDetails(detailHtml);
+          } catch (err) {
+            console.error("Detail fetch failed:", err.message);
+          }
+
+          await upsertJob(client, p.key, {
+            ...it,
+            description: details.description,
+            experience: details.experience
+          });
+
         } catch (err) {
           console.error(err);
         }
       }
+
 
       console.log(`${p.key}: ${items.length} items processed.`);
     }
