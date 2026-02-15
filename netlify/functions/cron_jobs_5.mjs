@@ -1,5 +1,6 @@
+console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "5 4-22/3 * * *", // az eredeti cron
+  schedule: "10 4,10,16 * * *",
 };
 
 import { Pool } from "pg";
@@ -178,14 +179,15 @@ export default async () => {
   const client = await pool.connect();
 
   try {
-      const { rows } = await client.query(`
+const { rows } = await client.query(`
   SELECT id, url
   FROM job_posts
-  WHERE first_seen BETWEEN NOW() - INTERVAL '7 days' AND NOW() - INTERVAL '3 days'
+  WHERE first_seen >= NOW() - INTERVAL '10 minutes'
       AND (experience IS NULL OR experience = '-')
       AND source = 'profession-intern'
   ORDER BY first_seen DESC;
 `);
+
 
 
 
