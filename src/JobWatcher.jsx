@@ -73,15 +73,6 @@ const JobWatcher = () => {
   const [q, setQ] = useState("");
 
 
-  const [mediorMode, setMediorMode] = useState(
-    () => localStorage.getItem("jobWatcherMediorMode") === "true"
-  );
-
-  const handleMediorToggle = (checked) => {
-    setMediorMode(checked);
-    localStorage.setItem("jobWatcherMediorMode", checked);
-  };
-
 
   /* =======================
      FORRÁS SZŰRÉS (3 állapot)
@@ -331,16 +322,6 @@ const visibleJobs = useMemo(() => {
           Csak junior
         </label>
         <label className="job-checkbox">
-        <input
-          type="checkbox"
-          checked={mediorMode}
-          onChange={(e) => handleMediorToggle(e.target.checked)}
-          />
-          Csak medior
-        </label>
-
-
-        <label className="job-checkbox">
           <input
             type="checkbox"
             checked={onlyNew}
@@ -442,7 +423,7 @@ const visibleJobs = useMemo(() => {
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
                 {job.experience && (
-                  <div className="job-experience">Exp: {job.experience}</div>                )}
+                  <div className="job-experience">{job.experience}</div>                )}
                 <div>
                   {job.firstSeen
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")
