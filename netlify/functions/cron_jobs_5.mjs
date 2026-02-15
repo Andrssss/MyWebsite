@@ -96,32 +96,6 @@ function extractRequirements(html) {
 }
 
 
-/* ======================
-   Profession Extraction
-====================== */
-function extractProfession(html) {
-  const $ = cheerioLoad(html);
-
-  // Kinyerjük a profession-t a szelektorokból
-  const profession =
-    normalizeWhitespace(
-        $("h1.job-title, h1").first().text()
-    ) || null;
-
-
-  // Kinyerjük a teljes leírást a debughoz (pl. .description vagy #job-details)
-  const description =
-    normalizeWhitespace(
-      $(".description, .job-description, #job-details, .show-more-less-html__markup")
-        .first()
-        .text()
-    ) || null;
-
-  console.log("Extracted Profession:", profession ?? "NOT FOUND");
-  console.log("Description found:", description ?? "NOT FOUND");
-
-  return { profession, description };
-}
 function extractJobDetails(html) {
   const $ = cheerioLoad(html);
 
