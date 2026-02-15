@@ -274,7 +274,6 @@ function levelNotBlacklisted(title, desc) {
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
 
-
 function extractJobDetails(html) {
   const $ = cheerioLoad(html);
 
@@ -305,13 +304,23 @@ function extractJobDetails(html) {
     }
 
     if (matches.length) {
-      // Normalize spacing & lowercase, remove duplicates
-      experience = [...new Set(matches.map(m => m.replace(/\s+/g, ' ').trim().toLowerCase()))].join(", ");
+      // Filter out absurdly high numbers (>15)
+      const maxReasonable = 15;
+      const filtered = matches.filter(m => {
+        const nums = m.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+        return nums.every(n => n <= maxReasonable);
+      });
+
+      if (filtered.length) {
+        // Normalize spacing & lowercase, remove duplicates
+        experience = [...new Set(filtered.map(m => m.replace(/\s+/g, ' ').trim().toLowerCase()))].join(", ");
+      }
     }
   }
 
   return { description, experience };
 }
+
 
 
 
