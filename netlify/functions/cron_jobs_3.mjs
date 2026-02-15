@@ -362,12 +362,19 @@ export default async () => {
         try {
           let details = { description: null, experience: null };
 
+
+          
           try {
             const detailHtml = await fetchText(it.url);
             details = extractJobDetails(detailHtml);
           } catch (err) {
             console.error("Detail fetch failed:", err.message);
           }
+
+          if (details.description) {
+              console.log("DESCRIPTION (first 500 chars):");
+              console.log(details.description.slice(0, 1000));
+            } 
 
           await upsertJob(client, p.key, {
             ...it,
