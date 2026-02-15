@@ -124,7 +124,53 @@ function extractProfession(html) {
   return { profession, description };
 }
 
+function extractJobDetails(html) {
+  const $ = cheerioLoad(html);
 
+  const description =
+    normalizeWhitespace(
+      $(".description, .job-description, #job-details, .show-more-less-html__markup")
+        .first()
+        .text()
+    ) || null;
+
+  let experience = null;
+
+  if (description) {
+    const patterns = [
+      /(\d+\s?\+\s?(?:év|years?))/gi,
+      /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
+      /(minimum\s?\d+\s?(?:év|years?))/gi,
+      /(at least\s?\d+\s?(?:years?))/gi
+    ];
+
+    const matches = [];
+
+    for (const regex of patterns) {
+      const found = description.match(regex);
+      if (found) matches.push(...found);
+    }
+
+    if (matches.length) {
+      const maxReasonable = 15;
+
+      const filtered = matches.filter(m => {
+        const nums = m.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+        return nums.every(n => n <= maxReasonable);
+      });
+
+      if (filtered.length) {
+        experience = [...new Set(
+          filtered.map(m => m.replace(/\s+/g, ' ').trim().toLowerCase())
+        )].join(", ");
+      }
+    }
+  }
+
+  console.log("Extracted Experience:", experience ?? "NOT FOUND");
+
+  return { description, experience };
+}
 /* ======================
    MAIN WORKER
 ====================== */
@@ -154,18 +200,24 @@ export default async () => {
 
       try {
         const html = await fetchText(row.url);
-        const details = extractProfession(html);
 
-        console.log(`ID ${row.id} Requirements:`, details.requirements.join(", "));
+        // Extract both profession and requirements
+        const professionDetails = extractProfession(html);
+        const jobDetails = extractJobDetails(html); // <-- this gets experience via regex
 
+        // Merge all info
+        const details = { ...professionDetails, ...jobDetails };
+
+        // Use the extracted experience
         await client.query(
-            `
-            UPDATE job_posts
-            SET experience = $1
-            WHERE id = $2
-            `,
-            [details.requirements.join("; ") || "-", row.id]
+        `
+        UPDATE job_posts
+        SET experience = $1
+        WHERE id = $2
+        `,
+        [details.experience || "-", row.id]
         );
+
 
 
 
