@@ -155,13 +155,13 @@ export default async () => {
   try {
 
     const { rows } = await client.query(`
-  SELECT id, url
-  FROM job_posts
-  WHERE first_seen >= NOW() - INTERVAL '30 minutes'
-    AND (experience IS NULL OR experience = '-')
-    AND source = 'LinkedIn'
-  ORDER BY first_seen DESC;
-`);
+        SELECT id, url
+        FROM job_posts
+        WHERE first_seen >= NOW() - INTERVAL '30 minutes'
+            AND (experience IS NULL OR experience = '-')
+            AND source = 'LinkedIn'
+        ORDER BY first_seen DESC;
+        `);
 
 
 

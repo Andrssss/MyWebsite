@@ -106,14 +106,15 @@ export default async () => {
   const client = await pool.connect();
 
   try {
-       const { rows } = await client.query(`
-  SELECT id, url
-  FROM job_posts
-  WHERE first_seen >= NOW() - INTERVAL '30 minutes'
-    AND (experience IS NULL OR experience = '-')
-    AND source = 'profession-intern'
-  ORDER BY first_seen DESC;
-`);
+        const { rows } = await client.query(`
+        SELECT id, url
+        FROM job_posts
+        WHERE first_seen >= NOW() - INTERVAL '3 days'
+            AND (experience IS NULL OR experience = '-')
+            AND source = 'profession-intern'
+        ORDER BY first_seen DESC;
+        `);
+
 
     console.log("Jobs to process:", rows.length);
 
