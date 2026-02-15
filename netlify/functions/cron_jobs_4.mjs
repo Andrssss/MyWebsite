@@ -1,3 +1,7 @@
+export const config = {
+  schedule: "1 4-22/3 * * *",
+};
+
 import { Pool } from "pg";
 import https from "https";
 import http from "http";
