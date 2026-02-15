@@ -157,10 +157,9 @@ export default async () => {
     const { rows } = await client.query(`
     SELECT id, url
     FROM job_posts
-    WHERE first_seen >= NOW() - INTERVAL '4 day'
-        AND first_seen < NOW() - INTERVAL '3 day'
-        AND (experience IS NULL OR experience = '-')
-    ORDER BY first_seen DESC
+    WHERE first_seen >= NOW() - INTERVAL '30 minutes'
+    AND (experience IS NULL OR experience = '-')
+    ORDER BY first_seen DESC;
     `);
 
 
