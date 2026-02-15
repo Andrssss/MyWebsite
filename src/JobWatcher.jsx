@@ -442,8 +442,7 @@ const visibleJobs = useMemo(() => {
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
                 {job.experience && (
-                  <span className="job-experience">Tapasztalat: {job.experience}</span>
-                )}
+                  <div className="job-experience">Tapasztalat: {job.experience}</div>                )}
                 <span>
                   {job.firstSeen
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")
