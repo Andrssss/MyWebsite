@@ -415,7 +415,7 @@ export default async () => {
     await upsertJob(client, p.key, {
       ...it,
       description: details.description,
-      experience: details.experience ?? "nincs megadva"
+      experience: details.experience ?? " - "
     });
 
   } catch (err) {
