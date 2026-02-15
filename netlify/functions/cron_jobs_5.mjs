@@ -79,6 +79,23 @@ function fetchText(url) {
   });
 }
 
+function extractRequirements(html) {
+  const $ = cheerioLoad(html);
+
+  // A box, ahol az elvárások vannak
+  const requirementsBox = $("#box_az-allashoz-tartozo-elvarasok");
+
+  // Kinyerjük az összes <li> elemet
+  const requirements = requirementsBox.find("ul > li")
+    .map((i, el) => normalizeWhitespace($(el).text()))
+    .get(); // .get() visszaadja arrayként
+
+  console.log("Requirements found:", requirements.length ? requirements : "NOT FOUND");
+
+  return { requirements };
+}
+
+
 /* ======================
    Profession Extraction
 ====================== */
@@ -139,7 +156,7 @@ export default async () => {
         const html = await fetchText(row.url);
         const details = extractProfession(html);
 
-        
+        console.log(`ID ${row.id} Requirements:`, details.requirements.join(", "));
 
         await client.query(
             `
@@ -147,7 +164,7 @@ export default async () => {
             SET experience = $1
             WHERE id = $2
             `,
-            [details.profession ?? "-", row.id]
+            [details.requirements.join("; ") || "-", row.id]
         );
 
 
