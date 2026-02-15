@@ -289,7 +289,7 @@ function extractJobDetails(html) {
 
   if (description) {
     const match = description.match(
-      /(\d+\s*(\+)?\s*(years?|év))|(\d+\s*-\s*\d+\s*(years?|év))/i
+  /\b(\d{1,2}\s*(?:\+)?\s*(?:years?|év))\b|\b(\d{1,2}\s*-\s*\d{1,2}\s*(?:years?|év))\b/i
     );
 
     if (match) {
