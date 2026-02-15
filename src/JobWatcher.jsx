@@ -195,6 +195,43 @@ const JobWatcher = () => {
     }
   };
 
+
+/* =======================
+   MEDIOR LOGIKA
+======================= */
+const isMedior = (experience) => {
+  if (!experience) return false;
+
+  // Split multiple experience strings (1-3 years, 2+ év, stb.)
+  const parts = experience.split(",").map((s) => s.trim());
+
+  for (const part of parts) {
+    // Egyszerű range: "1-3 years" vagy "1-3 év"
+    const rangeMatch = part.match(/(\d+)\s*[-–]\s*(\d+)\s*(év|years?|yrs?)/i);
+    if (rangeMatch) {
+      const [, min, max] = rangeMatch.map(Number);
+      if (min >= 2 || max >= 2) return true; // ha bármelyik szám ≥2 év → medior
+    }
+
+    // Plus jel: "2+ év"
+    const plusMatch = part.match(/(\d+)\+\s*(év|years?)/i);
+    if (plusMatch) {
+      const n = Number(plusMatch[1]);
+      if (n >= 1) return true; // 1+ év már medior
+    }
+
+    // Egy szám: "3 years", "3 év"
+    const singleMatch = part.match(/(\d+)\s*(év|years?)/i);
+    if (singleMatch) {
+      const n = Number(singleMatch[1]);
+      if (n >= 2) return true;
+    }
+  }
+
+  return false;
+};
+
+
   /* =======================
      SZŰRT LISTA
   ======================= */
@@ -235,8 +272,9 @@ const visibleJobs = useMemo(() => {
   }
 
   if (mediorMode) {
-    list = list.filter((j) => isMedior(j.experience));
-  }
+  list = list.filter((j) => isMedior(j.experience));
+}
+
 
   // Apply source selection / exclusion
   const selected = Object.keys(sourceStates).filter(
