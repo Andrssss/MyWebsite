@@ -496,10 +496,7 @@ async function upsertJob(client, source, item) {
       (source, title, url, description, experience, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
-     DO UPDATE SET 
-       title = EXCLUDED.title,
-       description = COALESCE(EXCLUDED.description, job_posts.description),
-       experience = COALESCE(EXCLUDED.experience, job_posts.experience)
+     DO NOTHING;
     `,
     [
       source,

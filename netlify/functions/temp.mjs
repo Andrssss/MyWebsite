@@ -1,6 +1,6 @@
-export const config = {
+/*export const config = {
   schedule: "1 4-22/3 * * *",
-};
+};*/
 
 import { Pool } from "pg";
 import https from "https";
@@ -90,14 +90,6 @@ function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
-    /*
-    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
-      u.search = "";
-      u.hash = "";
-      return u.toString();
-    }
-      */
-
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
       return `https://${u.hostname}${u.pathname}`; // teljesen eldobjuk a query stringet
     }
@@ -114,12 +106,23 @@ function normalizeUrl(raw) {
   }
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
 /* ---------------------
    Fetch helper
 --------------------- */
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/121.0.0.0 Safari/537.36";
+
+
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
-    console.log(`Script started at ${new Date().toISOString()}`);
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
 
@@ -128,13 +131,16 @@ function fetchText(url, redirectLeft = 5) {
       {
         method: "GET",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
+          "User-Agent": BROWSER_UA,
           Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
+          "Connection": "keep-alive",
+          "Upgrade-Insecure-Requests": "1",
         },
         timeout: 50000,
       },
+
       (res) => {
         const code = res.statusCode || 0;
 
@@ -246,14 +252,22 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, canonical_url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, canonical_url)
-        DO NOTHING;
-        `,
-    [source, item.title, item.url, canonicalUrl]
+     DO NOTHING; 
+      `,
+    [
+      source,
+      item.title,
+      item.url,
+      canonicalUrl,
+      item.experience ?? null
+    ]
   );
 }
+
+
 
 function levelNotBlacklisted(title, desc) {
   const LEVEL_BLACKLIST = [
@@ -265,18 +279,65 @@ function levelNotBlacklisted(title, desc) {
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
 
-/* =========================
-   BLACKLISTING
-========================= 
-const BLACKLIST_SOURCES = ["profession"];
+function extractJobDetails(html) {
+  const $ = cheerioLoad(html);
 
-const BLACKLIST_URLS = [
-  "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
-];
+  // Grab main job description
+  const description =
+    normalizeWhitespace(
+      $(".description, .job-description, #job-details, .show-more-less-html__markup")
+        .first()
+        .text()
+    ) || null;
 
- ---------------------
+  let experience = null;
+
+  if (description) {
+    // Extract experience using multiple robust patterns
+    const patterns = [
+      /(\d+\s?\+\s?(?:év|years?))/gi,
+      /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
+      /(minimum\s?\d+\s?(?:év|years?))/gi,
+      /(at least\s?\d+\s?(?:years?))/gi
+    ];
+
+    const matches = [];
+
+    for (const regex of patterns) {
+      const found = description.match(regex);
+      if (found) matches.push(...found);
+    }
+
+    if (matches.length) {
+      // Filter out absurdly high numbers (>15)
+      const maxReasonable = 15;
+      const filtered = matches.filter(m => {
+        const nums = m.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+        return nums.every(n => n <= maxReasonable);
+      });
+
+      if (filtered.length) {
+        // Normalize spacing & lowercase, remove duplicates
+        experience = [...new Set(filtered.map(m => m.replace(/\s+/g, ' ').trim().toLowerCase()))].join(", ");
+      }
+    }
+  }
+
+  return { description, experience };
+}
+
+
+
+const BASE_DELAY = 150;
+const JITTER = 50;
+
+function getRandomDelay() {
+  return BASE_DELAY + (Math.random() * 2 * JITTER - JITTER);
+}
+
+
+
+/* --------------------
    Main (Netlify handler)
 --------------------- */
 export default async () => {
@@ -287,12 +348,12 @@ export default async () => {
   const SOURCES = [
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?keywords=developer&location=Budapest" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?currentJobId=4345945964&discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
+   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/collections/recommended/?discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
@@ -327,15 +388,59 @@ export default async () => {
         return true;
       });
 
+      /*
+      const TOTAL_BUDGET_MS = 25000;
+      const perItemDelay = Math.floor(
+        TOTAL_BUDGET_MS / Math.max(items.length, 1)
+      );
+      */
+
      // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
-        try {
-          await upsertJob(client, p.key, it);
-        } catch (err) {
-          console.error(err);
-        }
+  try {
+    let details = { description: null, experience: null };
+
+    try {
+      const detailHtml = await fetchText(it.url);
+      details = extractJobDetails(detailHtml);
+
+      // RANDOM WAIT 
+      await sleep(getRandomDelay());
+      
+      /*
+      //console.log("--------------------------------------------------");
+      //console.log("SOURCE:", p.key);
+      //console.log("TITLE:", it.title);
+      //console.log("URL:", it.url);
+
+      if (details.description) {
+        //console.log("DESCRIPTION (first 500 chars):");
+        //console.log(details.description.slice(0, 5000));
+      } else {
+        //console.log("DESCRIPTION: NOT FOUND");
       }
+
+      //console.log("EXPERIENCE:", details.experience ?? "NOT FOUND");
+      //console.log("--------------------------------------------------");
+      */
+
+    } catch (err) {
+      console.error("Detail fetch failed:", err.message);
+    }
+
+    await upsertJob(client, p.key, {
+      ...it,
+      description: details.description,
+      experience: details.experience ?? " - "
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+
 
       console.log(`${p.key}: ${items.length} items processed.`);
     }
