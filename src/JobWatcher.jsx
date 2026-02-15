@@ -32,17 +32,27 @@ const JUNIOR_EXCLUDED_SOURCES = [
    KEYWORD MEGJEGYZÉSEK
 ======================= */
 const JOB_KEYWORD_NOTES = {
-  helpdesk: "Nem mérnöki munka. Rabszolga munka. Engedd el. Ő kezeli az IT jelszavakat és eszközöket.",
-  ServiceNOW: "Egy másikféle helpdesk. Jogosultságokat kezel, telepít szoftvereket.",
-  "it gyakornok": "Általában ingyenmunkát jelent, nem igazi IT pozíció.",
-  "business analyst": "IT és business között közvetít. Sok szervezés és kommunikáció.",
-  "system he": "Gyakran üzemeltetés + support keverék.",
-  "IT üzemeltetési": "Kész rendszerek működtetése, nem fejlesztés.",
-  "IT üzemeltető": "Kész rendszerek működtetése, nem fejlesztés.",
-  "Manuális tesztelő": "Frontend/API tesztelés, kevés technikai mélység. Elég uncsi, de nagy rá a kereslet, főleg AI miatt.",
-  Wordpress: "Inkább marketing irány, nem klasszikus IT karrier.",
+  helpdesk:
+    "Nem mérnöki munka. Rabszolga munka. Engedd el. Ő kezeli az IT jelszavakat és eszközöket.",
+  ServiceNOW:
+    "Egy másikféle helpdesk. Jogosultságokat kezel, telepít szoftvereket.",
+  "it gyakornok":
+    "Általában ingyenmunkát jelent, nem igazi IT pozíció.",
+  "business analyst":
+    "IT és business között közvetít. Sok szervezés és kommunikáció.",
+  "system he":
+    "Gyakran üzemeltetés + support keverék.",
+  "IT üzemeltetési":
+    "Kész rendszerek működtetése, nem fejlesztés.",
+  "IT üzemeltető":
+    "Kész rendszerek működtetése, nem fejlesztés.",
+  "Manuális tesztelő":
+    "Frontend/API tesztelés, kevés technikai mélység. Elég uncsi, de nagy rá a kereslet, főleg AI miatt.",
+  Wordpress:
+    "Inkább marketing irány, nem klasszikus IT karrier.",
   QA: "Tesztelés + automatizálás.",
-  DevOps: "Pipeline, cloud, infra. Nagy kereslet, jó irány.",
+  DevOps:
+    "Pipeline, cloud, infra. Nagy kereslet, jó irány.",
   L1: "Helpdesk belépőszint.",
 };
 
@@ -54,27 +64,6 @@ const getKeywordNotesForJob = (job) => {
     .map(([, v]) => v);
 };
 
-/* =======================
-   JUNIOR / MEDIOR LOGIKA
-======================= */
-const isJunior = (experience) => {
-  if (!experience) return false;
-  const parts = experience.split(",").map((s) => s.trim());
-  for (const part of parts) {
-    const nums = part.match(/\d+/g)?.map(Number) || [];
-    if (nums.includes(1)) return true; // csak 1-es → junior
-  }
-  return false;
-};
-
-const isMedior = (experience) => {
-  if (!experience) return false;
-  return !isJunior(experience); // minden más medior
-};
-
-/* =======================
-   COMPONENT
-======================= */
 const JobWatcher = () => {
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -83,27 +72,45 @@ const JobWatcher = () => {
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
 
+
   const [mediorMode, setMediorMode] = useState(
     () => localStorage.getItem("jobWatcherMediorMode") === "true"
   );
+
+  const handleMediorToggle = (checked) => {
+    setMediorMode(checked);
+    localStorage.setItem("jobWatcherMediorMode", checked);
+  };
+
+
+  /* =======================
+     FORRÁS SZŰRÉS (3 állapot)
+  ======================= */
+  const [sourceStates, setSourceStates] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherSourceStates");
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  /* =======================
+     INTERN / JUNIOR / NEW
+  ======================= */
   const [internMode, setInternMode] = useState(
     () => localStorage.getItem("jobWatcherInternMode") === "true"
   );
+
   const [juniorMode, setJuniorMode] = useState(
     () => localStorage.getItem("jobWatcherJuniorMode") === "true"
   );
+
   const [onlyNew, setOnlyNew] = useState(
     () => localStorage.getItem("jobWatcherOnlyNew") === "true"
   );
+
   const [sourcesOpen, setSourcesOpen] = useState(() => {
     const saved = localStorage.getItem("jobWatcherSourcesOpen");
     return saved !== null ? saved === "true" : true;
   });
 
-  const [sourceStates, setSourceStates] = useState(() => {
-    const saved = localStorage.getItem("jobWatcherSourceStates");
-    return saved ? JSON.parse(saved) : {};
-  });
 
   /* =======================
      FETCH
@@ -143,12 +150,31 @@ const JobWatcher = () => {
     fetchJobs();
   }, []);
 
+  const toggleSources = () => {
+    setSourcesOpen((prev) => {
+      localStorage.setItem("jobWatcherSourcesOpen", !prev);
+      return !prev;
+    });
+  };
+
+
   /* =======================
      TOGGLE HANDLERS
   ======================= */
-  const handleMediorToggle = (checked) => {
-    setMediorMode(checked);
-    localStorage.setItem("jobWatcherMediorMode", checked);
+  const handleSourceClick = (key) => {
+    setSourceStates((prev) => {
+      const current = prev[key] || "neutral";
+      const next =
+        current === "neutral"
+          ? "selected"
+          : current === "selected"
+          ? "excluded"
+          : "neutral";
+
+      const updated = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleInternToggle = (checked) => {
@@ -169,201 +195,272 @@ const JobWatcher = () => {
     }
   };
 
-  const handleSourceClick = (key) => {
-    setSourceStates((prev) => {
-      const current = prev[key] || "neutral";
-      const next =
-        current === "neutral"
-          ? "selected"
-          : current === "selected"
-          ? "excluded"
-          : "neutral";
-      const updated = { ...prev, [key]: next };
-      localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
-      return updated;
-    });
-  };
 
-  const toggleSources = () => {
-    setSourcesOpen((prev) => {
-      localStorage.setItem("jobWatcherSourcesOpen", !prev);
-      return !prev;
-    });
-  };
+/* =======================
+   MEDIOR LOGIKA
+======================= */
+const isMedior = (experience) => {
+  if (!experience) return false;
+
+  // Split multiple experience strings (1-3 years, 2+ év, stb.)
+  const parts = experience.split(",").map((s) => s.trim());
+
+  for (const part of parts) {
+    // Egyszerű range: "1-3 years" vagy "1-3 év"
+    const rangeMatch = part.match(/(\d+)\s*[-–]\s*(\d+)\s*(év|years?|yrs?)/i);
+    if (rangeMatch) {
+      const [, min, max] = rangeMatch.map(Number);
+      if (min >= 2 || max >= 2) return true; // ha bármelyik szám ≥2 év → medior
+    }
+
+    // Plus jel: "2+ év"
+    const plusMatch = part.match(/(\d+)\+\s*(év|years?)/i);
+    if (plusMatch) {
+      const n = Number(plusMatch[1]);
+      if (n >= 1) return true; // 1+ év már medior
+    }
+
+    // Egy szám: "3 years", "3 év"
+    const singleMatch = part.match(/(\d+)\s*(év|years?)/i);
+    if (singleMatch) {
+      const n = Number(singleMatch[1]);
+      if (n >= 2) return true;
+    }
+  }
+
+  return false;
+};
+
 
   /* =======================
      SZŰRT LISTA
   ======================= */
-  const visibleJobs = useMemo(() => {
-    let list = jobs;
+const visibleJobs = useMemo(() => {
+  let list = jobs;
 
-    if (onlyNew) {
-      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
-    }
+  if (onlyNew) {
+    list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
+  }
 
-    const nq = q.trim().toLowerCase();
-    if (nq) {
-      list = list.filter((j) => (j.title || "").toLowerCase().includes(nq));
-    }
+  const nq = q.trim().toLowerCase();
+  if (nq) {
+    list = list.filter((j) => (j.title || "").toLowerCase().includes(nq));
+  }
 
-    if (internMode) {
-      list = list.filter((j) => {
-        const t = (j.title || "").toLowerCase();
-        const source = (j.source || "").toLowerCase();
-        const isInternTitle = INTERN_KEYWORDS.some((k) => t.includes(k));
-        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
-        return (isInternTitle && !t.includes(JUNIOR_KEYWORD)) || isInternSource;
-      });
-    }
+  if (internMode) {
+    list = list.filter((j) => {
+      const source = (j.source || "").toLowerCase();
+      const t = (j.title || "").toLowerCase();
+      const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) =>
+        source.includes(s)
+      );
+      const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
+      return (internLike && !t.includes(JUNIOR_KEYWORD)) || isInternSource;
+    });
+  }
 
-    if (juniorMode) {
-      list = list.filter((j) => {
-        const t = (j.title || "").toLowerCase();
-        const source = (j.source || "").toLowerCase();
-        const isInternTitle = INTERN_KEYWORDS.some((k) => t.includes(k));
-        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
-        return !isInternTitle && !isInternSource && isJunior(j.experience);
-      });
-    } else if (mediorMode) {
-      list = list.filter((j) => isMedior(j.experience));
-    }
+  if (juniorMode) {
+    list = list.filter((j) => {
+      const t = (j.title || "").toLowerCase();
+      const source = (j.source || "").toLowerCase();
+      const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) =>
+        source.includes(s)
+      );
+      const isInternTitle = INTERN_KEYWORDS.some((k) => t.includes(k));
+      return !isInternSource && !isInternTitle;
+    });
+  }
 
-    // Apply source selection / exclusion
-    const selected = Object.keys(sourceStates).filter((k) => sourceStates[k] === "selected");
-    const excluded = Object.keys(sourceStates).filter((k) => sourceStates[k] === "excluded");
+  if (mediorMode) {
+  list = list.filter((j) => isMedior(j.experience));
+}
 
-    if (selected.length) list = list.filter((j) => selected.includes(j.source));
-    else if (excluded.length) list = list.filter((j) => !excluded.includes(j.source));
 
-    return [...list].sort(
-      (a, b) => new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
-    );
-  }, [jobs, q, onlyNew, internMode, juniorMode, mediorMode, sourceStates]);
+  // Apply source selection / exclusion
+  const selected = Object.keys(sourceStates).filter(
+    (k) => sourceStates[k] === "selected"
+  );
+  const excluded = Object.keys(sourceStates).filter(
+    (k) => sourceStates[k] === "excluded"
+  );
+
+  if (selected.length) list = list.filter((j) => selected.includes(j.source));
+  else if (excluded.length)
+    list = list.filter((j) => !excluded.includes(j.source));
+
+  return [...list].sort(
+    (a, b) => new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
+  );
+}, [jobs, q, onlyNew, internMode, juniorMode, mediorMode, sourceStates]);
+
 
   /* =======================
      RENDER
   ======================= */
   return (
-    <div className="job-watcher">
-      <div className="job-watcher-header">
-        <div>
+  <div className="job-watcher">
+    <div className="job-watcher-header">
+      <div>
           <h1>Automata scraper</h1>
-          <p>
-            Minden nap UTC szerint 4, 10, 14 órakor frissül. Kivéve ami nem, mivel néha kedve támad, a folyamatos fejlesztés miatt.
-            Szólj, ha vmit szeretnél itt látni.
-          </p>
-        </div>
-
-        <div className="job-actions">
-          <input
-            className="job-search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Keresés…"
-          />
-
-          <label className="job-checkbox">
-            <input type="checkbox" checked={internMode} onChange={(e) => handleInternToggle(e.target.checked)} />
-            Csak gyakornok
-          </label>
-
-          <label className="job-checkbox">
-            <input type="checkbox" checked={juniorMode} onChange={(e) => handleJuniorToggle(e.target.checked)} />
-            Csak junior
-          </label>
-
-          <label className="job-checkbox">
-            <input type="checkbox" checked={mediorMode} onChange={(e) => handleMediorToggle(e.target.checked)} />
-            Csak medior
-          </label>
-
-          <label className="job-checkbox">
-            <input
-              type="checkbox"
-              checked={onlyNew}
-              onChange={(e) => {
-                setOnlyNew(e.target.checked);
-                localStorage.setItem("jobWatcherOnlyNew", e.target.checked);
-              }}
-            />
-            Csak új (24h)
-          </label>
-
-          <button className="job-btn" onClick={fetchJobs}>Frissítés</button>
-        </div>
+          <p>Minden nap UTC szerint 4, 10, 14 órakor frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
       </div>
 
-      {/* ===== FORRÁS TAB TOGGLE ===== */}
-      <div className="job-tabs-header">
-        <button className="job-tabs-toggle" onClick={toggleSources}>
-          {sourcesOpen ? "▲ Források elrejtése" : "▼ Források kiválasztása"}
+      <div className="job-actions">
+        <input
+          className="job-search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Keresés…"
+        />
+
+        <label className="job-checkbox">
+          <input
+            type="checkbox"
+            checked={internMode}
+            onChange={(e) => handleInternToggle(e.target.checked)}
+          />
+          Csak gyakornok
+        </label>
+
+        <label className="job-checkbox">
+          <input
+            type="checkbox"
+            checked={juniorMode}
+            onChange={(e) => handleJuniorToggle(e.target.checked)}
+          />
+          Csak junior
+        </label>
+        <label className="job-checkbox">
+        <input
+          type="checkbox"
+          checked={mediorMode}
+          onChange={(e) => handleMediorToggle(e.target.checked)}
+          />
+          Csak medior
+        </label>
+
+
+        <label className="job-checkbox">
+          <input
+            type="checkbox"
+            checked={onlyNew}
+            onChange={(e) => {
+              setOnlyNew(e.target.checked);
+              localStorage.setItem("jobWatcherOnlyNew", e.target.checked);
+            }}
+          />
+          Csak új (24h)
+        </label>
+
+        <button className="job-btn" onClick={fetchJobs}>
+          Frissítés
         </button>
       </div>
+    </div>
 
-      {/* ===== FORRÁS TABOK ===== */}
-      <div className={`job-tabs-wrapper ${sourcesOpen ? "open" : ""}`}>
-        <div className="job-tabs">
-          {loadingSources ? (
-            <div className="job-status">Források betöltése…</div>
-          ) : (
-            sources.map((s) => {
-              const state = sourceStates[s.key] || "neutral";
-              let cls = "job-tab";
-              if (state === "selected") cls += " active";
-              if (state === "excluded") cls += " highlighted";
+    {/* ===== FORRÁS TAB TOGGLE ===== */}
+    <div className="job-tabs-header">
+      <button
+        className="job-tabs-toggle"
+        onClick={toggleSources}
+      >
+        {sourcesOpen ? "▲ Források elrejtése" : "▼ Források kiválasztása"}
+      </button>
+    </div>
 
-              return (
-                <button key={s.key} className={cls} onClick={() => handleSourceClick(s.key)}>
-                  {s.label}
-                  {typeof s.count === "number" && <span className="job-tab-count">{s.count}</span>}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ===== TALÁLATOK ===== */}
-      {loading ? (
-        <div className="job-status">Betöltés…</div>
-      ) : visibleJobs.length === 0 ? (
-        <div className="job-status">Nincs találat.</div>
-      ) : (
-        <ul className="job-list">
-          {visibleJobs.map((job) => {
-            const isNew = job.firstSeen && hoursSince(job.firstSeen) <= 10;
-            const notes = getKeywordNotesForJob(job);
+    {/* ===== FORRÁS TABOK ===== */}
+    <div className={`job-tabs-wrapper ${sourcesOpen ? "open" : ""}`}>
+      <div className="job-tabs">
+        {loadingSources ? (
+          <div className="job-status">Források betöltése…</div>
+        ) : (
+          sources.map((s) => {
+            const state = sourceStates[s.key] || "neutral";
+            let cls = "job-tab";
+            if (state === "selected") cls += " active";
+            if (state === "excluded") cls += " highlighted";
 
             return (
-              <li key={job.id} className="job-card">
-                <div className="job-row">
-                  <a className="job-title" href={job.url} target="_blank" rel="noopener noreferrer">
-                    {job.title}
-                  </a>
-                  <span className="job-source">{job.source}</span>
-                </div>
-
-                {job.description && <div className="job-desc">{job.description}</div>}
-
-                {notes.length > 0 && (
-                  <div className="job-note">
-                    💭 Megjegyzés:
-                    <ul>{notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
-                  </div>
+              <button
+                key={s.key}
+                className={cls}
+                onClick={() => handleSourceClick(s.key)}
+              >
+                {s.label}
+                {typeof s.count === "number" && (
+                  <span className="job-tab-count">{s.count}</span>
                 )}
-
-                <div className="job-meta">
-                  {isNew && <span className="job-badge">Új</span>}
-                  {job.experience && <div className="job-experience">{job.experience}</div>}
-                  <div>{job.firstSeen ? new Date(job.firstSeen).toLocaleString("hu-HU") : "—"}</div>
-                </div>
-              </li>
+              </button>
             );
-          })}
-        </ul>
-      )}
-    </div>
-  );
+          })
+        )}
+      </div>
+      </div>
+    
+
+    {/* ===== TALÁLATOK ===== */}
+    {loading ? (
+      <div className="job-status">Betöltés…</div>
+    ) : visibleJobs.length === 0 ? (
+      <div className="job-status">Nincs találat.</div>
+    ) : (
+      <ul className="job-list">
+        {visibleJobs.map((job) => {
+          const isNew =
+            job.firstSeen && hoursSince(job.firstSeen) <= 10;
+          const notes = getKeywordNotesForJob(job);
+
+          return (
+            <li key={job.id} className="job-card">
+              <div className="job-row">
+                <a
+                  className="job-title"
+                  href={job.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {job.title}
+                </a>
+                <span className="job-source">{job.source}</span>
+              </div>
+
+              {job.description && (
+                <div className="job-desc">{job.description}</div>
+              )}
+
+              {notes.length > 0 && (
+                <div className="job-note">
+                  💭 Megjegyzés:
+                  <ul>
+                    {notes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="job-meta">
+                {isNew && <span className="job-badge">Új</span>}
+                {job.experience && (
+                  <div className="job-experience">Exp: {job.experience}</div>                )}
+                <div>
+                  {job.firstSeen
+                    ? new Date(job.firstSeen).toLocaleString("hu-HU")
+                    : "—"}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </div>
+);
+
+
+
+
+
 };
 
 export default JobWatcher;

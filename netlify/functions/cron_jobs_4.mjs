@@ -148,7 +148,7 @@ function extractJobDetails(html) {
 export default async () => {
 
   console.log("=== ENRICHMENT WORKER STARTED ===");
-  console.log("Time:", new Date().toISOString());
+  //console.log("Time:", new Date().toISOString());
 
   const client = await pool.connect();
 
@@ -163,16 +163,16 @@ export default async () => {
     `);
 
 
-    console.log("Jobs to process:", rows.length);
+    //console.log("Jobs to process:", rows.length);
 
     let success = 0;
     let failed = 0;
 
     for (const row of rows) {
 
-      console.log("--------------------------------------");
-      console.log("Processing ID:", row.id);
-      console.log("URL:", row.url);
+      //console.log("--------------------------------------");
+      //console.log("Processing ID:", row.id);
+      //console.log("URL:", row.url);
 
       try {
 
