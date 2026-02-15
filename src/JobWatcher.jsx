@@ -443,11 +443,11 @@ const visibleJobs = useMemo(() => {
                 {isNew && <span className="job-badge">Új</span>}
                 {job.experience && (
                   <div className="job-experience">Tapasztalat: {job.experience}</div>                )}
-                <span>
+                <div>
                   {job.firstSeen
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")
                     : "—"}
-                </span>
+                </div>
               </div>
             </li>
           );
