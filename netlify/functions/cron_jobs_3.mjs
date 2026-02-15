@@ -289,26 +289,30 @@ function extractJobDetails(html) {
   let experience = null;
 
   if (description) {
-    // Match 1-2 digit numbers, optionally +, or ranges (1-3)
-    // Allow the number to be attached to letters (e.g., Requirements5+)
-    const match = description.match(
-      /(?:^|[^0-9])(\d{1,2}\+?|\d{1,2}\s*-\s*\d{1,2})\s*(?:years?|év)\b/i
-    );
+    // Extract experience using multiple robust patterns
+    const patterns = [
+      /(\d+\s?\+\s?(?:év|years?))/gi,
+      /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
+      /(minimum\s?\d+\s?(?:év|years?))/gi,
+      /(at least\s?\d+\s?(?:years?))/gi
+    ];
 
-    if (match) {
-      experience = match[1];
+    const matches = [];
 
-      // Optional: filter out absurdly high numbers
-      const maxReasonable = 20;
-      const nums = experience.split("-").map(s => parseInt(s, 10));
-      if (nums.some(n => isNaN(n) || n > maxReasonable)) {
-        experience = null;
-      }
+    for (const regex of patterns) {
+      const found = description.match(regex);
+      if (found) matches.push(...found);
+    }
+
+    if (matches.length) {
+      // Normalize spacing & lowercase, remove duplicates
+      experience = [...new Set(matches.map(m => m.replace(/\s+/g, ' ').trim().toLowerCase()))].join(", ");
     }
   }
 
   return { description, experience };
 }
+
 
 
 
