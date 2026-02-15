@@ -106,12 +106,16 @@ function normalizeUrl(raw) {
   }
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
 /* ---------------------
    Fetch helper
 --------------------- */
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
-    console.log(`Script started at ${new Date().toISOString()}`);
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
 
@@ -240,8 +244,10 @@ async function upsertJob(client, source, item) {
     `INSERT INTO job_posts
       (source, title, url, canonical_url, description, experience, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url)
+     ON CONFLICT (source, canonical_url)
      DO UPDATE SET
+       title = EXCLUDED.title,
+       url = EXCLUDED.url,
        description = EXCLUDED.description,
        experience = EXCLUDED.experience;
     `,
@@ -255,6 +261,7 @@ async function upsertJob(client, source, item) {
     ]
   );
 }
+
 
 
 function levelNotBlacklisted(title, desc) {
@@ -305,9 +312,17 @@ const BLACKLIST_URLS = [
   "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
 ];
 
+
+
+
  ---------------------
    Main (Netlify handler)
 --------------------- */
+
+
+const TOTAL_BUDGET_MS = 30000;
+const perItemDelay = Math.floor(TOTAL_BUDGET_MS / Math.max(items.length, 1));
+
 export default async () => {
   
 
@@ -365,6 +380,9 @@ export default async () => {
     try {
       const detailHtml = await fetchText(it.url);
       details = extractJobDetails(detailHtml);
+
+      // RANDOM WAIT 
+      await sleep(perItemDelay);
 
       console.log("--------------------------------------------------");
       console.log("SOURCE:", p.key);
