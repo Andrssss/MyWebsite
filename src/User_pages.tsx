@@ -52,7 +52,7 @@ const User_pages: React.FC = () => {
     <div className="others-ll__videoCard">
       <div className="video-wrapper">
         <iframe
-          src="https://youtu.be/tMzXkn4NEu4"
+          src="https://www.youtube.com/embed/tMzXkn4NEu4"
           title="YouTube video player"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
