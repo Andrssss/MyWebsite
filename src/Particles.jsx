@@ -8,7 +8,7 @@ const FireParticlesCanvas = ({ active }) => {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const maxParticles = 20000;
+    const maxParticles = 10000;
 
     const createParticle = () => {
       if (!active) return; // Ha inaktív, ne hozzon létre új részecskéket
@@ -71,7 +71,7 @@ const FireParticlesCanvas = ({ active }) => {
 
     const loop = () => {
       if (active) {
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 2; i++) {
           createParticle();
         }
       }
