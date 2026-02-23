@@ -1,6 +1,6 @@
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "10 4,10,16 * * *",
+  schedule: "7 4-23 * * *",
 };
 
 import { Pool } from "pg";
