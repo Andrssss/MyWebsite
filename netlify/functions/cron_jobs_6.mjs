@@ -601,10 +601,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       const BLACKLIST_SOURCES = ["profession"];
       const BLACKLIST_URLS = [
-
-        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
-        "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75",
-        "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
+        "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
+        "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23",
+        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
+       
 
       ];
 
