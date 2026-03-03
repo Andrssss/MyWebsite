@@ -12,7 +12,6 @@ const About = () => {
         <div className="header-row">
             <h2 className="about-title">Rövid Bemutatkozás</h2>
                 <div className="profile-image">
-            <img src="/IMG_0292.jpg" alt="András Bakó" />
           </div>
         </div>
 
