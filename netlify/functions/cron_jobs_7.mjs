@@ -351,7 +351,21 @@ async function getMinddiakApiToken() {
     return envToken;
   }
 
-  // 3) próbálkozás tipikus endpointokkal
+  // 3) elsőként bundle extraction (ez nálad tipikusan működik)
+  try {
+    const t = await getMinddiakApiTokenFromBundle("https://minddiak.hu/diakmunka-226/work_type/it-mernok-10");
+    if (t && isJwtStillValid(t)) {
+      cached.token = t;
+      const p = decodeJwtPayload(t);
+      cached.exp = Number(p?.exp || 0);
+      console.log("[minddiak token] SUCCESS: bundle extraction");
+      return t;
+    }
+  } catch {
+    // fallback a klasszikus endpoint próbákra
+  }
+
+  // 4) próbálkozás tipikus endpointokkal
   const candidates = [
     // GET
     { method: "GET", url: "https://api.humancentrum.hu/auth/guest" },
@@ -399,21 +413,6 @@ async function getMinddiakApiToken() {
     // Silently skip failed attempts (typically 404/401 errors)
   }
 }
-
-    // 4) fallback: token keresése a main bundle-ben
-    // 4) fallback: valós guest endpoint kinyerése a bundle-ből
-  try {
-    const t = await getMinddiakApiTokenFromBundle("https://minddiak.hu/diakmunka-226/work_type/it-mernok-10");
-    if (t && isJwtStillValid(t)) {
-      cached.token = t;
-      const p = decodeJwtPayload(t);
-      cached.exp = Number(p?.exp || 0);
-      console.log("[minddiak token] SUCCESS: bundle extraction");
-      return t;
-    }
-  } catch (e) {
-    // Silently skip bundle extraction failures
-  }
 
   throw new Error("Could not obtain MindDiák API token automatically ...");
 
@@ -591,9 +590,10 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
     Accept: "application/json, text/plain, */*",
   };
 
+  let lastError = null;
   for (const attempt of [
-    { method: "GET" },
     { method: "POST", body: {} },
+    { method: "GET" },
   ]) {
     try {
       const payload = await fetchJsonWithHeaders(
@@ -611,8 +611,12 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
       const token = pickTokenFromPayload(payload);
       if (token) return token;
     } catch (e) {
-      console.log("[minddiak token] bundle attempt failed:", attempt.method, e.message);
+      lastError = e;
     }
+  }
+
+  if (lastError) {
+    console.log("[minddiak token] bundle token request failed:", lastError.message);
   }
 
   return null;
