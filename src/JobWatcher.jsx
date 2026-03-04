@@ -118,11 +118,14 @@ const JobWatcher = () => {
     }
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (onlyNewFlag = onlyNew) => {
     setLoading(true);
     setStatus("");
     try {
-      const res = await fetch(`${API_BASE_URL}/jobs?limit=500`);
+      const params = new URLSearchParams({ limit: "5000" });
+      if (onlyNewFlag) params.set("onlyNew", "1");
+
+      const res = await fetch(`${API_BASE_URL}/jobs?${params.toString()}`);
       const txt = await res.text();
       if (!res.ok) throw new Error(txt);
       setJobs(JSON.parse(txt) || []);
@@ -136,8 +139,11 @@ const JobWatcher = () => {
 
   useEffect(() => {
     fetchSources();
-    fetchJobs();
   }, []);
+
+  useEffect(() => {
+    fetchJobs(onlyNew);
+  }, [onlyNew]);
 
   const toggleSources = () => {
     setSourcesOpen((prev) => {
@@ -302,7 +308,7 @@ const JobWatcher = () => {
           Csak új (24h)
         </label>
 
-        <button className="job-btn" onClick={fetchJobs}>
+        <button className="job-btn" onClick={() => fetchJobs(onlyNew)}>
           Frissítés
         </button>
       </div>

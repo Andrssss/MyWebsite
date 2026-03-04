@@ -67,7 +67,8 @@ exports.handler = async (event) => {
     if (method === "GET") {
       const qs = event.queryStringParameters || {};
       const source = qs.source || null;
-      const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 1000);
+      const onlyNew = qs.onlyNew === "1" || qs.onlyNew === "true";
+      const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 5000);
 
       // GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
@@ -108,29 +109,44 @@ exports.handler = async (event) => {
 
       // GET /jobs?source=...
       if (source) {
-        const { rows } = await client.query(
-          `SELECT id, source, title, url,
-                  first_seen AS "firstSeen",
-                  experience
-           FROM job_posts
-           WHERE source = $1
-           ORDER BY first_seen DESC, id DESC
-           LIMIT $2`,
-          [source, limit]
-        );
+        const sourceQuery = onlyNew
+          ? `SELECT id, source, title, url,
+                    first_seen AS "firstSeen",
+                    experience
+             FROM job_posts
+             WHERE source = $1
+               AND first_seen >= NOW() - INTERVAL '24 hours'
+             ORDER BY first_seen DESC, id DESC
+             LIMIT $2`
+          : `SELECT id, source, title, url,
+                    first_seen AS "firstSeen",
+                    experience
+             FROM job_posts
+             WHERE source = $1
+             ORDER BY first_seen DESC, id DESC
+             LIMIT $2`;
+
+        const { rows } = await client.query(sourceQuery, [source, limit]);
         return jsonResponse(200, rows);
       }
 
       // GET /jobs
-      const { rows } = await client.query(
-        `SELECT id, source, title, url,
-                first_seen AS "firstSeen",
-                experience
-         FROM job_posts
-         ORDER BY first_seen DESC, id DESC
-         LIMIT $1`,
-        [limit]
-      );
+      const allQuery = onlyNew
+        ? `SELECT id, source, title, url,
+                  first_seen AS "firstSeen",
+                  experience
+           FROM job_posts
+           WHERE first_seen >= NOW() - INTERVAL '24 hours'
+           ORDER BY first_seen DESC, id DESC
+           LIMIT $1`
+        : `SELECT id, source, title, url,
+                  first_seen AS "firstSeen",
+                  experience
+           FROM job_posts
+           ORDER BY first_seen DESC, id DESC
+           LIMIT $1`;
+
+      const { rows } = await client.query(allQuery, [limit]);
       return jsonResponse(200, rows);
     }
 
