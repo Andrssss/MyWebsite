@@ -36,7 +36,16 @@ async function runAllBatches() {
   console.log("[runAllBatches]", totalBatches, "batches");
 
   for (let batch = 0; batch < totalBatches; batch++) {
-    await runBatch({ batch, size, write: true, debug: false, bundleDebug: false });
+    const stats = await runBatch({ batch, size, write: true, debug: false, bundleDebug: false });
+
+    for (const p of stats.portals) {
+      if (p.ok) {
+        console.log(`[source:${p.source}] matched=${p.matched}`);
+      } else {
+        console.log(`[source:${p.source}] ERROR: ${p.error}`);
+      }
+    }
+
     await sleep(500);
   }
 }
