@@ -68,6 +68,15 @@ exports.handler = async (event) => {
       const qs = event.queryStringParameters || {};
       const source = qs.source || null;
       const onlyNew = qs.onlyNew === "1" || qs.onlyNew === "true";
+      const timeRangeRaw = String(qs.timeRange || "").toLowerCase();
+      const timeRange =
+        timeRangeRaw === "24h" || timeRangeRaw === "1d"
+          ? "24h"
+          : timeRangeRaw === "7d" || timeRangeRaw === "1w" || timeRangeRaw === "week"
+          ? "7d"
+          : onlyNew
+          ? "24h"
+          : null;
       const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 5000);
 
       // GET /jobs/sources
@@ -109,13 +118,22 @@ exports.handler = async (event) => {
 
       // GET /jobs?source=...
       if (source) {
-        const sourceQuery = onlyNew
+        const sourceQuery = timeRange === "24h"
           ? `SELECT id, source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
              WHERE source = $1
                AND first_seen >= NOW() - INTERVAL '24 hours'
+             ORDER BY first_seen DESC, id DESC
+             LIMIT $2`
+          : timeRange === "7d"
+          ? `SELECT id, source, title, url,
+                    first_seen AS "firstSeen",
+                    experience
+             FROM job_posts
+             WHERE source = $1
+               AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
           : `SELECT id, source, title, url,
@@ -131,7 +149,7 @@ exports.handler = async (event) => {
       }
 
       // GET /jobs
-      const allQuery = onlyNew
+            const allQuery = timeRange === "24h"
         ? `SELECT id, source, title, url,
                   first_seen AS "firstSeen",
                   experience
@@ -139,6 +157,14 @@ exports.handler = async (event) => {
            WHERE first_seen >= NOW() - INTERVAL '24 hours'
            ORDER BY first_seen DESC, id DESC
            LIMIT $1`
+         : timeRange === "7d"
+         ? `SELECT id, source, title, url,
+              first_seen AS "firstSeen",
+              experience
+            FROM job_posts
+            WHERE first_seen >= NOW() - INTERVAL '7 days'
+            ORDER BY first_seen DESC, id DESC
+            LIMIT $1`
         : `SELECT id, source, title, url,
                   first_seen AS "firstSeen",
                   experience

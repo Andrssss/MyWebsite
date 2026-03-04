@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
+const TIME_RANGE_24H = "24h";
+const TIME_RANGE_7D = "7d";
 
 const hoursSince = (iso) => {
   const ms = Date.now() - new Date(iso).getTime();
@@ -91,9 +93,12 @@ const JobWatcher = () => {
     () => localStorage.getItem("jobWatcherJuniorMode") === "true"
   );
 
-  const [onlyNew, setOnlyNew] = useState(
-    () => localStorage.getItem("jobWatcherOnlyNew") === "true"
-  );
+  const [timeRange, setTimeRange] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherTimeRange");
+    return saved === TIME_RANGE_24H || saved === TIME_RANGE_7D
+      ? saved
+      : TIME_RANGE_7D;
+  });
 
   const [sourcesOpen, setSourcesOpen] = useState(() => {
     const saved = localStorage.getItem("jobWatcherSourcesOpen");
@@ -118,12 +123,14 @@ const JobWatcher = () => {
     }
   };
 
-  const fetchJobs = async (onlyNewFlag = onlyNew) => {
+  const fetchJobs = async (timeRangeValue = timeRange) => {
     setLoading(true);
     setStatus("");
     try {
       const params = new URLSearchParams({ limit: "5000" });
-      if (onlyNewFlag) params.set("onlyNew", "1");
+      if (timeRangeValue === TIME_RANGE_24H || timeRangeValue === TIME_RANGE_7D) {
+        params.set("timeRange", timeRangeValue);
+      }
 
       const res = await fetch(`${API_BASE_URL}/jobs?${params.toString()}`);
       const txt = await res.text();
@@ -142,8 +149,8 @@ const JobWatcher = () => {
   }, []);
 
   useEffect(() => {
-    fetchJobs(onlyNew);
-  }, [onlyNew]);
+    fetchJobs(timeRange);
+  }, [timeRange]);
 
   const toggleSources = () => {
     setSourcesOpen((prev) => {
@@ -196,8 +203,10 @@ const JobWatcher = () => {
   const visibleJobs = useMemo(() => {
     let list = jobs;
 
-    if (onlyNew) {
+    if (timeRange === TIME_RANGE_24H) {
       list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
+    } else if (timeRange === TIME_RANGE_7D) {
+      list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24 * 7);
     }
 
     const nq = q.trim().toLowerCase();
@@ -257,7 +266,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, onlyNew, internMode, juniorMode, sourceStates]);
+  }, [jobs, q, timeRange, internMode, juniorMode, sourceStates]);
 
   /* =======================
      RENDER
@@ -298,17 +307,31 @@ const JobWatcher = () => {
 
         <label className="job-checkbox">
           <input
-            type="checkbox"
-            checked={onlyNew}
-            onChange={(e) => {
-              setOnlyNew(e.target.checked);
-              localStorage.setItem("jobWatcherOnlyNew", e.target.checked);
+            type="radio"
+            name="job-time-range"
+            checked={timeRange === TIME_RANGE_24H}
+            onChange={() => {
+              setTimeRange(TIME_RANGE_24H);
+              localStorage.setItem("jobWatcherTimeRange", TIME_RANGE_24H);
             }}
           />
           Csak új (24h)
         </label>
 
-        <button className="job-btn" onClick={() => fetchJobs(onlyNew)}>
+        <label className="job-checkbox">
+          <input
+            type="radio"
+            name="job-time-range"
+            checked={timeRange === TIME_RANGE_7D}
+            onChange={() => {
+              setTimeRange(TIME_RANGE_7D);
+              localStorage.setItem("jobWatcherTimeRange", TIME_RANGE_7D);
+            }}
+          />
+          Csak új (1 hét)
+        </label>
+
+        <button className="job-btn" onClick={() => fetchJobs(timeRange)}>
           Frissítés
         </button>
       </div>
