@@ -274,6 +274,12 @@ const JobWatcher = () => {
     );
   }, [jobs, q, time24h, time7d, internMode, juniorMode, sourceStates]);
 
+  const activeTimeLabel = time7d
+    ? "1 hét"
+    : time24h
+    ? "24h"
+    : "nincs";
+
   /* =======================
      RENDER
   ======================= */
@@ -382,6 +388,12 @@ const JobWatcher = () => {
     
 
     {/* ===== TALÁLATOK ===== */}
+    {!loading && (
+      <div className="job-status">
+        Aktív időszűrő: {activeTimeLabel} · Találatok: {visibleJobs.length}
+      </div>
+    )}
+
     {loading ? (
       <div className="job-status">Betöltés…</div>
     ) : visibleJobs.length === 0 ? (
