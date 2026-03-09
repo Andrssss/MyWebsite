@@ -252,6 +252,9 @@ function levelNotBlacklisted(title, desc) {
 }
 
 const YETTEL_JOB_PREFIX = "https://jobs.ceetelcogroup.com/yettel/job/";
+const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
+const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
+const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
 
 /* =========================
    BLACKLISTING
@@ -297,6 +300,9 @@ const SOURCES = [
 
       let items = rawItems.filter(it => {
         if (p.key === "yettel" && !it.url.startsWith(YETTEL_JOB_PREFIX)) return false;
+        if (p.key === "aam" && !it.url.startsWith(AAM_JOB_PREFIX)) return false;
+        if (p.key === "karrierhungaria" && !it.url.startsWith(KARRIERHUNGARIA_JOB_PREFIX)) return false;
+        if (p.key === "frissdiplomas" && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
         const needKeywords = p.key === "cvonline";
         if (needKeywords && !matchesKeywords(it.title, it.description)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
