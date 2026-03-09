@@ -165,6 +165,36 @@ function getDedupeKey(rawUrl) {
   return normalizeUrl(rawUrl);
 }
 
+function isBudapestJobFromDetail(html) {
+  const $ = cheerioLoad(html);
+
+  // Preferred path from the Frissdiplomas sidebar block.
+  const directLocation = normalizeText(
+    normalizeWhitespace(
+      $(".job-sidebar-content h4")
+        .filter((_, el) => normalizeText($(el).text()).includes("munkavegzes helye"))
+        .first()
+        .parent()
+        .find("span")
+        .first()
+        .text()
+    )
+  );
+
+  if (directLocation) {
+    return directLocation.includes("Budapest");
+  }
+
+  // Fallback if structure changes.
+  const pageText = normalizeText(normalizeWhitespace($("body").text()));
+  const marker = "munkavegzes helye";
+  const idx = pageText.indexOf(marker);
+  if (idx === -1) return false;
+
+  const aroundLocation = pageText.slice(idx, idx + 220);
+  return aroundLocation.includes("budapest");
+}
+
 
 /* ---------------------
    DB upsert
@@ -226,6 +256,14 @@ export default async () => {
 
       for (const it of items) {
         try {
+          let keep = true;
+
+          if (p.key === "frissdiplomas") {
+            const detailHtml = await fetchText(it.url);
+            keep = isBudapestJobFromDetail(detailHtml);
+          }
+
+          if (!keep) continue;
           await upsertJob(client, p.key, it);
         } catch (err) {
           console.error(err);
