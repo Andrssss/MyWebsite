@@ -165,10 +165,20 @@ function getDedupeKey(rawUrl) {
   return normalizeUrl(rawUrl);
 }
 
-function isBudapestJobFromDetail(html) {
+function isFrissdiplomasJobUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.toLowerCase();
+    return host.includes("frissdiplomas.hu") && u.pathname.startsWith("/allasok");
+  } catch {
+    return false;
+  }
+}
+
+function isMatchingFrissdiplomasDetail(html) {
   const $ = cheerioLoad(html);
 
-  // Preferred path from the Frissdiplomas sidebar block.
+  // Preferred path from Frissdiplomas sidebar blocks.
   const directLocation = normalizeText(
     normalizeWhitespace(
       $(".job-sidebar-content h4")
@@ -181,18 +191,36 @@ function isBudapestJobFromDetail(html) {
     )
   );
 
-  if (directLocation) {
-    return directLocation.includes("budapest");
+  const directArea = normalizeText(
+    normalizeWhitespace(
+      $(".job-sidebar-content h4")
+        .filter((_, el) => normalizeText($(el).text()).includes("allas terulete(i)"))
+        .first()
+        .parent()
+        .find("span")
+        .first()
+        .text()
+    )
+  );
+
+  if (directLocation || directArea) {
+    const isBudapest = directLocation.includes("budapest");
+    const isInformatikai = directArea.includes("informatikai");
+    return isBudapest && isInformatikai;
   }
 
   // Fallback if structure changes.
   const pageText = normalizeText(normalizeWhitespace($("body").text()));
-  const marker = "munkavegzes helye";
-  const idx = pageText.indexOf(marker);
-  if (idx === -1) return false;
+  const locationMarker = "munkavegzes helye";
+  const areaMarker = "allas terulete(i)";
 
-  const aroundLocation = pageText.slice(idx, idx + 220);
-  return aroundLocation.includes("budapest");
+  const idxLocation = pageText.indexOf(locationMarker);
+  const idxArea = pageText.indexOf(areaMarker);
+  if (idxLocation === -1 || idxArea === -1) return false;
+
+  const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
+  const aroundArea = pageText.slice(idxArea, idxArea + 220);
+  return aroundLocation.includes("budapest") && aroundArea.includes("informatikai");
 }
 
 
@@ -227,9 +255,16 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://www.frissdiplomas.hu/allasok"),
 ]);
 
+const FRISSDIPLOMAS_EXTRA_PAGES = [2, 3, 4, 5, 6];
+
 export default async () => {
   const SOURCES = [
     { key: "frissdiplomas", label: "frissdiplomas", url: "https://www.frissdiplomas.hu/allasok" },
+    ...FRISSDIPLOMAS_EXTRA_PAGES.map((page) => ({
+      key: "frissdiplomas",
+      label: `frissdiplomas page ${page}`,
+      url: `https://www.frissdiplomas.hu/kereses/page:${page}`,
+    })),
   ];
 
   const client = await pool.connect();
@@ -248,7 +283,7 @@ export default async () => {
 
       const items = rawItems.filter((it) => {
         if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (!it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
+        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
@@ -260,7 +295,7 @@ export default async () => {
 
           if (p.key === "frissdiplomas") {
             const detailHtml = await fetchText(it.url);
-            keep = isBudapestJobFromDetail(detailHtml);
+            keep = isMatchingFrissdiplomasDetail(detailHtml);
           }
 
           if (!keep) continue;
