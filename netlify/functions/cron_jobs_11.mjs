@@ -255,31 +255,12 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://www.frissdiplomas.hu/allasok"),
 ]);
 
-const FRISSDIPLOMAS_EXTRA_PAGES = [2, 3, 4, 5, 6];
-
 export default async () => {
-  const SOURCES = [
-    { key: "frissdiplomas", label: "frissdiplomas", url: "https://www.frissdiplomas.hu/allasok" },
-    ...FRISSDIPLOMAS_EXTRA_PAGES.map((page) => ({
-      key: "frissdiplomas",
-      label: `frissdiplomas page ${page}`,
-      url: `https://www.frissdiplomas.hu/kereses/page:${page}`,
-    })),
-  ];
-
   const client = await pool.connect();
 
   try {
-    for (const p of SOURCES) {
-      let html;
-      try {
-        html = await fetchText(p.url);
-      } catch (err) {
-        console.error(p.key, "fetch failed:", err.message);
-        continue;
-      }
-
-      const rawItems = extractCandidates(html, p.url);
+    async function processListingPage(html, sourceKey, baseUrl) {
+      const rawItems = extractCandidates(html, baseUrl);
 
       const items = rawItems.filter((it) => {
         if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
@@ -293,19 +274,48 @@ export default async () => {
         try {
           let keep = true;
 
-          if (p.key === "frissdiplomas") {
+          if (sourceKey === "frissdiplomas") {
             const detailHtml = await fetchText(it.url);
             keep = isMatchingFrissdiplomasDetail(detailHtml);
           }
 
           if (!keep) continue;
-          await upsertJob(client, p.key, it);
+          await upsertJob(client, sourceKey, it);
         } catch (err) {
           console.error(err);
         }
       }
 
-      console.log(`${p.key}: ${items.length} items processed.`);
+      return items.length;
+    }
+
+    // First page
+    try {
+      const firstHtml = await fetchText("https://www.frissdiplomas.hu/allasok");
+      const count = await processListingPage(firstHtml, "frissdiplomas", "https://www.frissdiplomas.hu/allasok");
+      console.log(`frissdiplomas page 1: ${count} items processed.`);
+    } catch (err) {
+      console.error("frissdiplomas fetch failed:", err.message);
+    }
+
+    // Dynamic pagination: page 2..x until first 404.
+    let page = 2;
+    while (true) {
+      const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
+      try {
+        const html = await fetchText(pageUrl);
+        const count = await processListingPage(html, "frissdiplomas", pageUrl);
+        console.log(`frissdiplomas page ${page}: ${count} items processed.`);
+        page += 1;
+      } catch (err) {
+        if (String(err?.message || "").includes("HTTP 404")) {
+          console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
+          break;
+        }
+
+        console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
+        break;
+      }
     }
 
   } finally {
