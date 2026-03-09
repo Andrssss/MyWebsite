@@ -16,7 +16,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const ENRICH_SOURCES = ["aam", "karrierhungaria", "frissdiplomas"];
+const ENRICH_SOURCES = ["aam", "karrierhungaria"];
 
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();

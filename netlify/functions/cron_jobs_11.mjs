@@ -182,7 +182,7 @@ function isBudapestJobFromDetail(html) {
   );
 
   if (directLocation) {
-    return directLocation.includes("Budapest");
+    return directLocation.includes("budapest");
   }
 
   // Fallback if structure changes.
