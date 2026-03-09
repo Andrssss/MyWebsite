@@ -221,6 +221,17 @@ const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
 const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
 const URL_BLACKLIST = new Set([
   normalizeUrl("https://aam.hu/allasajanlatok#content"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlat-kategoriak"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszerintegrator"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/kontrolling"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
 ]);
 
 /* =========================
@@ -245,6 +256,17 @@ export default async () => {
 const SOURCES = [
   { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
   { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
+
   { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
   { key: "aam", label: "aam", url: "https://aam.hu/allasajanlatok" },
 ];
