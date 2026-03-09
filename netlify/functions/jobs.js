@@ -26,6 +26,10 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
 
 // FIXED lista (key/label/url)
 const FIXED = [
+  { key: "yettel", label: "Yettel", url: "https://www.yettel.hu/karrier/it" },
+  { key: "karrierhungaria", label: "Karrier Hungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
+  { key: "aam", label: "AAM", url: "https://aam.hu/karrier" },
+  { key: "frissdiplomas", label: "Frissdiplomas", url: "https://www.frissdiplomas.hu/allasok" },
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/position?page=2" },
   { key: "muisz", label: "Muisz", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
