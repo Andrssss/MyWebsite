@@ -26,7 +26,6 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
 
 // FIXED lista (key/label/url)
 const FIXED = [
-  { key: "yettel", label: "Yettel", url: "https://www.yettel.hu/karrier/it" },
   { key: "karrierhungaria", label: "Karrier Hungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
   { key: "aam", label: "AAM", url: "https://aam.hu/karrier" },
   { key: "frissdiplomas", label: "Frissdiplomas", url: "https://www.frissdiplomas.hu/allasok" },

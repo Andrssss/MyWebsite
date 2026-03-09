@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "1 4-23 * * *",
+  schedule: "11 4-23 * * *",
 };
 
 import { Pool } from "pg";
@@ -37,24 +37,16 @@ function normalizeWhitespace(s) {
 
 function titleNotBlacklisted(title) {
   const TITLE_BLACKLIST = [
-    "marketing","sales","hr","finance","pénzügy","könyvelő",
-    "accountant","manager","vezető","director","adminisztráció",
-    "asszisztens","ügyfélszolgálat","customer service","call center",
-    "értékesítő","bizto sítás","tanácsadó","biztosítás",
-    "Adótanácsadó","Auditor","Accountant","Accounts","Tanácsadó",
-     "senior",
-    "szenior",
-    "medior", "Villamosmérnök ", "ipari","Építészmérnök",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead"
+    "marketing", "sales", "hr", "finance", "pénzügy", "könyvelő",
+    "accountant", "manager", "vezető", "director", "adminisztráció",
+    "asszisztens", "ügyfélszolgálat", "customer service", "call center",
+    "értékesítő", "bizto sítás", "tanácsadó", "biztosítás",
+    "Adótanácsadó", "Auditor", "Accountant", "Accounts", "Tanácsadó",
+    "senior", "szenior", "medior", "Villamosmérnök ", "ipari", "Építészmérnök",
+    "lead", "principal", "staff", "architect", "expert", "vezető fejlesztő", "tech lead"
   ];
   const t = normalizeText(title);
-  return !TITLE_BLACKLIST.some(word => t.includes(normalizeText(word)));
+  return !TITLE_BLACKLIST.some((word) => t.includes(normalizeText(word)));
 }
 
 function dedupeByUrl(items) {
@@ -68,21 +60,6 @@ function dedupeByUrl(items) {
   });
 }
 
-function matchesKeywords(title, desc) {
-  const KEYWORDS_STRONG = [
-    "gyakornok","intern","internship","trainee","junior","c++","java","python","web",
-    "developer","fejlesztő","fejleszto","data","analyst","tesztelő",
-    "support","operations","qa","tester","sysadmin","network","devops","automation","automatizalo"
-  ];
-  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
-  const itHit = /\bit\b/i.test(n);
-  return strongHit || (
-    itHit &&
-    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n)
-  );
-}
-
 /* =====================
    URL helpers
 ===================== */
@@ -92,9 +69,9 @@ function normalizeUrl(raw) {
 
     u.hash = "";
     [
-      "utm_source","utm_medium","utm_campaign","utm_term",
-      "utm_content","fbclid","gclid","trackingId","pageNum","position","refId"
-    ].forEach(p => u.searchParams.delete(p));
+      "utm_source", "utm_medium", "utm_campaign", "utm_term",
+      "utm_content", "fbclid", "gclid", "trackingId", "pageNum", "position", "refId"
+    ].forEach((p) => u.searchParams.delete(p));
 
     return u.toString().replace(/\?$/, "");
   } catch {
@@ -107,7 +84,6 @@ function normalizeUrl(raw) {
 --------------------- */
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
-    console.log(`Script started at ${new Date().toISOString()}`);
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
 
@@ -126,7 +102,7 @@ function fetchText(url, redirectLeft = 5) {
       (res) => {
         const code = res.statusCode || 0;
 
-        if ([301,302,303,307,308].includes(code)) {
+        if ([301, 302, 303, 307, 308].includes(code)) {
           const loc = res.headers.location;
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
@@ -143,7 +119,7 @@ function fetchText(url, redirectLeft = 5) {
 
         let data = "";
         stream.setEncoding("utf8");
-        stream.on("data", (chunk) => data += chunk);
+        stream.on("data", (chunk) => (data += chunk));
         stream.on("end", () => {
           if (code >= 200 && code < 300) resolve(data);
           else reject(new Error(`HTTP ${code} for ${url}`));
@@ -174,13 +150,13 @@ function extractCandidates(html, baseUrl) {
     let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
     if (!card.length) card = $(el).closest("div");
 
-    let title =
+    const title =
       normalizeWhitespace($(el).text()) ||
       normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
     if (!title || title.length < 4) return;
 
     const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0,300), url, description: desc ? desc.slice(0,800) : null });
+    items.push({ title: title.slice(0, 300), url, description: desc ? desc.slice(0, 800) : null });
   });
   return dedupeByUrl(items);
 }
@@ -201,8 +177,7 @@ async function upsertJob(client, source, item) {
       (source, title, url, canonical_url, first_seen)
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, canonical_url)
-        DO NOTHING;
-        `,
+        DO NOTHING;`,
     [source, item.title, item.url, canonicalUrl]
   );
 }
@@ -214,40 +189,18 @@ function levelNotBlacklisted(title, desc) {
     "experienced", "expertise"
   ];
   const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
+  return !LEVEL_BLACKLIST.some((w) => t.includes(normalizeText(w)));
 }
 
-const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
-const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
+const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
 const URL_BLACKLIST = new Set([
-  normalizeUrl("https://aam.hu/allasajanlatok#content"),
+  normalizeUrl("https://www.frissdiplomas.hu/allasok"),
 ]);
 
-/* =========================
-   BLACKLISTING
-========================= 
-const BLACKLIST_SOURCES = ["profession"];
-
-const BLACKLIST_URLS = [
-  "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
-];
-
- ---------------------
-   Main (Netlify handler)
---------------------- */
 export default async () => {
-  
-
-
-
-const SOURCES = [
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1" },
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
-  { key: "aam", label: "aam", url: "https://aam.hu/allasajanlatok" },
-];
+  const SOURCES = [
+    { key: "frissdiplomas", label: "frissdiplomas", url: "https://www.frissdiplomas.hu/allasok" },
+  ];
 
   const client = await pool.connect();
 
@@ -263,16 +216,13 @@ const SOURCES = [
 
       const rawItems = extractCandidates(html, p.url);
 
-      let items = rawItems.filter(it => {
+      const items = rawItems.filter((it) => {
         if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (p.key === "aam" && !it.url.startsWith(AAM_JOB_PREFIX)) return false;
-        if (p.key === "karrierhungaria" && !it.url.startsWith(KARRIERHUNGARIA_JOB_PREFIX)) return false;
+        if (!it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
-
-     // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
         try {
@@ -286,7 +236,6 @@ const SOURCES = [
     }
 
   } finally {
-    console.log(`Script started at ${new Date().toISOString()}`);
     client.release();
   }
 
