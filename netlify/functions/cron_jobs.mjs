@@ -14,6 +14,7 @@ import http from "node:http";
 import zlib from "node:zlib";
 import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
+import { KEYWORDS_STRONG, TITLE_BLACKLIST, SENIOR_KEYWORDS } from "./keywords.mjs";
 const { Pool } = pkg;
 
 // =====================
@@ -168,45 +169,6 @@ const SOURCES = [
 // =====================
 // Keywords
 // =====================
-const TITLE_BLACKLIST = [
-  "marketing",
-  "sales",
-  "hr",
-  "finance",
-  "pénzügy",
-  "könyvelő",
-  "accountant",
-  "manager",
-  "vezető",
-  "director",
-  "adminisztráció",
-  "asszisztens",
-  "ügyfélszolgálat",
-  "customer service",
-  "call center",
-  "értékesítő",
-  "biztosítás",
-  "tanácsadó",   
-  "Adótanácsadó" ,
-  "Auditor",
-  "Accountant",
-  "Accounts",
-  "Tanácsadó"
-];
-
-const SENIOR_KEYWORDS = [
-  "senior",
-  "szenior",
-  "medior",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead"
-];
-
 function hasWord(n, w) {
   // szóhatár: it ne találjon bele más szavakba
   const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
@@ -593,9 +555,13 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
 function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
-  // Blacklist alapú szűrés: ami tiltott szóval érkezik, kiesik.
-  const hasBlacklistedWord = TITLE_BLACKLIST.some((k) => n.includes(normalizeText(k)));
-  return !hasBlacklistedWord;
+  const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
+  const itHit = hasWord(n, "it"); // csak külön szóként
+
+  // szabály:
+  // - ha van strongHit -> ok
+  // - ha csak "it" van, az NEM elég (különben túl sok false positive)
+  return strongHit || (itHit && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n));
 }
 
 function isSeniorLike(title = "", desc = "") {
@@ -761,9 +727,10 @@ function keywordHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
   const hits = [];
-  for (const k of TITLE_BLACKLIST) {
+  if (hasWord(n, "it")) hits.push("it"); // szóhatáros
+  for (const k of KEYWORDS_STRONG) {
     const nk = normalizeText(k);
-    if (n.includes(nk)) hits.push(k);
+    if (nk !== "it" && n.includes(nk)) hits.push(k);
   }
   return hits;
 }
@@ -1297,7 +1264,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
               hits: keywordHit(c.title, c.description),
               normPreview: norm.slice(0, 220),
               itWord: hasWord(norm, "it"),
-              hasBlacklisted: TITLE_BLACKLIST.some((k) => norm.includes(normalizeText(k))),
+              hasStrong: KEYWORDS_STRONG.some((k) => norm.includes(normalizeText(k))),
             };
           });
       }
