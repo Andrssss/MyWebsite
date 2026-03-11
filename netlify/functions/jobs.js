@@ -97,7 +97,7 @@ exports.handler = async (event) => {
         label: s.label,
         url:
           s.key === "minddiak"
-            ? "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10"
+            ? "https://minddiak.hu/position?page=2"
             : s.url,
         count: map.get(s.key)?.count ?? 0,
       }));

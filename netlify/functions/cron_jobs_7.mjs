@@ -91,27 +91,27 @@ async function fetchJson(url, redirectLeft = 5) {
 }
 
 
-async function fetchAllZynternJobs({ fields = 16, limit = 50, maxPages = 5 }) {
-  let page = 1;
-  let all = [];
+async function fetchAllZynternJobs({ fields = "16,15", maxPages = 10 }) {
+  const all = [];
 
-  while (page <= maxPages) {
-    const url = `https://zyntern.com/api/jobs?fields=${fields}&page=${page}&limit=${limit}`;
-    const payload = await fetchJson(url);
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `https://zyntern.com/jobs?fields=${fields}&page=${page}`;
 
-    const items = extractZynternFromApiPayload(payload);
-    if (!items.length) break;
+    let html;
+    try {
+      html = await fetchText(url);
+    } catch (err) {
+      const msg = String(err?.message || "");
+      if (/HTTP\s+404\b/i.test(msg)) break;
+      throw err;
+    }
 
-    all.push(...items);
+    const pageItems = mergeCandidates(
+      extractCandidates(html, url).filter((c) => looksLikeJobUrl("zyntern", c.url)),
+      extractSSR(html, url).filter((c) => looksLikeJobUrl("zyntern", c.url))
+    );
 
-    // meta alapján is tudsz megállni
-    const lastPage = Number(payload?.meta?.last_page || 0);
-    if (lastPage && page >= lastPage) break;
-
-    // ha nincs meta, fallback
-    if (items.length < limit) break;
-
-    page++;
+    all.push(...pageItems);
   }
 
   return dedupeByUrl(all);
@@ -168,7 +168,7 @@ function dedupeByUrl(items) {
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
   { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
-  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=16" },
+  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=16,15" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
 
@@ -1251,7 +1251,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
       if (source === "zyntern") {
         try {
-          merged = await fetchAllZynternJobs({ fields: 16, limit: 50, maxPages: 5 });
+          merged = await fetchAllZynternJobs({ fields: "16,15", maxPages: 10 });
         } catch (e) {
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
           continue;
