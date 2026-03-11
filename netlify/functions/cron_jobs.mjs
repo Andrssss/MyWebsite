@@ -168,27 +168,6 @@ const SOURCES = [
 // =====================
 // Keywords
 // =====================
-const KEYWORDS_STRONG = [
-  "gyakornok",
-  "intern",
-  "internship",
-  "trainee",
-  "junior",
-  "developer",
-  "fejlesztő",
-  "fejleszto",
-  "data",
-  "analyst",
-  "support",
-  "operations",
-  "qa",
-  "tester",
-  "sysadmin",
-  "network",
-  "jog",
-  "jogi"
-];
-
 const TITLE_BLACKLIST = [
   "marketing",
   "sales",
@@ -614,13 +593,9 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
 function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
-  const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
-  const itHit = hasWord(n, "it"); // csak külön szóként
-
-  // szabály:
-  // - ha van strongHit → ok
-  // - ha csak "it" van, az NEM elég (különben túl sok false positive)
-  return strongHit || (itHit && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n));
+  // Blacklist alapú szűrés: ami tiltott szóval érkezik, kiesik.
+  const hasBlacklistedWord = TITLE_BLACKLIST.some((k) => n.includes(normalizeText(k)));
+  return !hasBlacklistedWord;
 }
 
 function isSeniorLike(title = "", desc = "") {
@@ -786,10 +761,9 @@ function keywordHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
   const hits = [];
-  if (hasWord(n, "it")) hits.push("it"); // szóhatáros
-  for (const k of KEYWORDS_STRONG) {
+  for (const k of TITLE_BLACKLIST) {
     const nk = normalizeText(k);
-    if (nk !== "it" && n.includes(nk)) hits.push(k);
+    if (n.includes(nk)) hits.push(k);
   }
   return hits;
 }
@@ -1323,7 +1297,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
               hits: keywordHit(c.title, c.description),
               normPreview: norm.slice(0, 220),
               itWord: hasWord(norm, "it"),
-              hasStrong: KEYWORDS_STRONG.some((k) => norm.includes(normalizeText(k))),
+              hasBlacklisted: TITLE_BLACKLIST.some((k) => norm.includes(normalizeText(k))),
             };
           });
       }
