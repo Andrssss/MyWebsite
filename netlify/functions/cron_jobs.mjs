@@ -27,136 +27,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-export const KEYWORDS_STRONG = [
-  "gyakornok",
-  "intern",
-  "internship",
-  "trainee",
-  "junior",
-  "developer",
-  "fejlesztő",
-  "fejleszto",
-  "szoftverfejleszto",
-  "engineer",
-  "software",
-  "data",
-  "analyst",
-  "scientist",
-  "automation",
-  "java",
-  "python",
-  "javascript",
-  "php",
-  "c++",
-  "nodejs",
-  "database",
-  "test",
-  "teszt",
-  "testing",
-  "teszteles",
-  "tesztelés",
-  "web",
-  "weboldal",
-  "net",
-  "node",
-  "typescript",
-  "sql",
-  "frontend",
-  "backend",
-  "fullstack",
-  "full-stack",
-  "webfejleszto",
-  "webfejlesztő",
-  "react",
-  "angular",
-  "devops",
-  "cloud",
-  "infrastructure",
-  "platform",
-  "platforms",
-  "service",
-  "services",
-  "helpdesk",
-  "security",
-  "biztonsag",
-  "biztonsagi",
-  "biztonsági",
-  "biztonsagtechnikai",
-  "biztonságtechnikai",
-  "kiberbiztonsag",
-  "kiberbiztonsági",
-  "kiberbiztonság",
-  "rendszermernok",
-  "rendszermérnök",
-  "uzemeltetes",
-  "uzemeltetesi",
-  "üzemeltetés",
-  "üzemeltetési",
-  "penzugy",
-  "pénzügy",
-  "penzugyi",
-  "pénzügyi",
-  "digitalis",
-  "digitális",
-  "power",
-  "application",
-  "system",
-  "systems",
-  "engineering",
-  "development",
-  "program",
-  "programozo",
-  "integration",
-  "technical",
-  "quality",
-  "servicenow",
-  "linux",
-  "android",
-  "databricks",
-  "abap",
-  "sap",
-  "informatikai",
-  "informatika",
-  "rendszer",
-  "rendszergazda",
-  "rendszeruzemelteto",
-  "rendszeruzemeltető",
-  "uzemelteto",
-  "üzemeltető",
-  "szoftvertesztelo",
-  "szoftvertesztelő",
-  "manual",
-  "embedded",
-  "systemtest",
-  "tesztrendszer",
-  "applications",
-  "graduate",
-  "graduates",
-  "tesztelo",
-  "support",
-  "operations",
-  "qa",
-  "tester",
-  "sysadmin",
-  "network",
-  "jog",
-  "jogi",
-];
 
-
-
-const SENIOR_KEYWORDS = [
-  "senior",
-    "szenior",
-    "medior",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead"
-];
  
 async function runAllBatches() {
   const size = 4;
@@ -297,6 +168,45 @@ const SOURCES = [
 // =====================
 // Keywords
 // =====================
+const TITLE_BLACKLIST = [
+  "marketing",
+  "sales",
+  "hr",
+  "finance",
+  "pénzügy",
+  "könyvelő",
+  "accountant",
+  "manager",
+  "vezető",
+  "director",
+  "adminisztráció",
+  "asszisztens",
+  "ügyfélszolgálat",
+  "customer service",
+  "call center",
+  "értékesítő",
+  "biztosítás",
+  "tanácsadó",   
+  "Adótanácsadó" ,
+  "Auditor",
+  "Accountant",
+  "Accounts",
+  "Tanácsadó"
+];
+
+const SENIOR_KEYWORDS = [
+  "senior",
+  "szenior",
+  "medior",
+  "lead",
+  "principal",
+  "staff",
+  "architect",
+  "expert",
+  "vezető fejlesztő",
+  "tech lead"
+];
+
 function hasWord(n, w) {
   // szóhatár: it ne találjon bele más szavakba
   const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
@@ -683,13 +593,9 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
 function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
-  const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
-  const itHit = hasWord(n, "it"); // csak külön szóként
-
-  // szabály:
-  // - ha van strongHit -> ok
-  // - ha csak "it" van, az NEM elég (különben túl sok false positive)
-  return strongHit || (itHit && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n));
+  // Blacklist alapú szűrés: ami tiltott szóval érkezik, kiesik.
+  const hasBlacklistedWord = TITLE_BLACKLIST.some((k) => n.includes(normalizeText(k)));
+  return !hasBlacklistedWord;
 }
 
 function isSeniorLike(title = "", desc = "") {
@@ -855,10 +761,9 @@ function keywordHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
   const hits = [];
-  if (hasWord(n, "it")) hits.push("it"); // szóhatáros
-  for (const k of KEYWORDS_STRONG) {
+  for (const k of TITLE_BLACKLIST) {
     const nk = normalizeText(k);
-    if (nk !== "it" && n.includes(nk)) hits.push(k);
+    if (n.includes(nk)) hits.push(k);
   }
   return hits;
 }
@@ -1392,7 +1297,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
               hits: keywordHit(c.title, c.description),
               normPreview: norm.slice(0, 220),
               itWord: hasWord(norm, "it"),
-              hasStrong: KEYWORDS_STRONG.some((k) => norm.includes(normalizeText(k))),
+              hasBlacklisted: TITLE_BLACKLIST.some((k) => norm.includes(normalizeText(k))),
             };
           });
       }
