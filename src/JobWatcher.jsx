@@ -61,6 +61,12 @@ const JOB_KEYWORD_NOTES = {
 const normalizeExperience = (experience) =>
   String(experience || "").trim().toLowerCase();
 
+const hasJuniorYearToken = (experience) => {
+  const normalized = normalizeExperience(experience);
+  // Csak az onallo 0 vagy 1 szamot kezeljuk junior jelzesnek.
+  return /(^|\D)(0|1)(\D|$)/.test(normalized);
+};
+
 const isUnknownExperience = (experience) => {
   const normalized = normalizeExperience(experience);
   return (
@@ -73,14 +79,12 @@ const isUnknownExperience = (experience) => {
 
 const isJuniorExperience = (experience) => {
   if (isUnknownExperience(experience)) return true;
-  const normalized = normalizeExperience(experience);
-  return normalized.includes("0") || normalized.includes("1");
+  return hasJuniorYearToken(experience);
 };
 
 const isMediorExperience = (experience) => {
   if (isUnknownExperience(experience)) return true;
-  const normalized = normalizeExperience(experience);
-  return !normalized.includes("0") && !normalized.includes("1");
+  return !hasJuniorYearToken(experience);
 };
 
 const getKeywordNotesForJob = (job) => {
