@@ -73,12 +73,14 @@ const isUnknownExperience = (experience) => {
 
 const isJuniorExperience = (experience) => {
   if (isUnknownExperience(experience)) return true;
-  return normalizeExperience(experience).includes("1");
+  const normalized = normalizeExperience(experience);
+  return normalized.includes("0") || normalized.includes("1");
 };
 
 const isMediorExperience = (experience) => {
   if (isUnknownExperience(experience)) return true;
-  return !normalizeExperience(experience).includes("1");
+  const normalized = normalizeExperience(experience);
+  return !normalized.includes("0") && !normalized.includes("1");
 };
 
 const getKeywordNotesForJob = (job) => {
