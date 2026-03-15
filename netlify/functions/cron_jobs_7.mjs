@@ -845,6 +845,14 @@ function looksLikeJobUrl(sourceKey, url) {
     if (!/^\/job\/\d+/.test(u.pathname)) return false;
   }
 
+  if (sourceKey === "muisz") {
+    if (!normalizeUrl(url).startsWith("https://muisz.hu/hu/diakmunkaink/")) return false;
+  }
+
+  if (sourceKey === "tudasdiak") {
+    if (!normalizeUrl(url).startsWith("https://tudatosdiak.anyway.hu/hu/jobs/")) return false;
+  }
+
   return true;
 }
 
@@ -1277,7 +1285,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
         "https://muisz.hu/hu/regisztracio",
         "https://muisz.hu/hu/diakmunkaink",
-
       ];
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
