@@ -236,8 +236,6 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
-      setMediorMode(false);
-      localStorage.setItem("jobWatcherMediorMode", false);
     }
   };
 
@@ -247,8 +245,6 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
-      setJuniorMode(false);
-      localStorage.setItem("jobWatcherJuniorMode", false);
     }
   };
 
