@@ -58,6 +58,29 @@ const JOB_KEYWORD_NOTES = {
   L1: "Helpdesk belépőszint.",
 };
 
+const normalizeExperience = (experience) =>
+  String(experience || "").trim().toLowerCase();
+
+const isUnknownExperience = (experience) => {
+  const normalized = normalizeExperience(experience);
+  return (
+    normalized === "" ||
+    normalized === "-" ||
+    normalized === "–" ||
+    normalized === "—"
+  );
+};
+
+const isJuniorExperience = (experience) => {
+  if (isUnknownExperience(experience)) return true;
+  return normalizeExperience(experience).includes("1");
+};
+
+const isMediorExperience = (experience) => {
+  if (isUnknownExperience(experience)) return true;
+  return !normalizeExperience(experience).includes("1");
+};
+
 const getKeywordNotesForJob = (job) => {
   if (!job.title) return [];
   const title = job.title.toLowerCase();
@@ -93,12 +116,17 @@ const JobWatcher = () => {
     () => localStorage.getItem("jobWatcherJuniorMode") === "true"
   );
 
-  const [time24h, setTime24h] = useState(
-    () => localStorage.getItem("jobWatcherTime24h") === "true"
+  const [mediorMode, setMediorMode] = useState(
+    () => localStorage.getItem("jobWatcherMediorMode") === "true"
   );
+
+  const [time24h, setTime24h] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherTime24h");
+    return saved === null ? true : saved === "true";
+  });
   const [time7d, setTime7d] = useState(() => {
     const saved = localStorage.getItem("jobWatcherTime7d");
-    return saved === null ? true : saved === "true";
+    return saved === null ? false : saved === "true";
   });
 
   const [sourcesOpen, setSourcesOpen] = useState(() => {
@@ -191,6 +219,8 @@ const JobWatcher = () => {
     if (checked) {
       setJuniorMode(false);
       localStorage.setItem("jobWatcherJuniorMode", false);
+      setMediorMode(false);
+      localStorage.setItem("jobWatcherMediorMode", false);
     }
   };
 
@@ -200,6 +230,19 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
+      setMediorMode(false);
+      localStorage.setItem("jobWatcherMediorMode", false);
+    }
+  };
+
+  const handleMediorToggle = (checked) => {
+    setMediorMode(checked);
+    localStorage.setItem("jobWatcherMediorMode", checked);
+    if (checked) {
+      setInternMode(false);
+      localStorage.setItem("jobWatcherInternMode", false);
+      setJuniorMode(false);
+      localStorage.setItem("jobWatcherJuniorMode", false);
     }
   };
 
@@ -208,6 +251,22 @@ const JobWatcher = () => {
   ======================= */
   const visibleJobs = useMemo(() => {
     let list = jobs;
+
+    const isJuniorTrackCandidate = (job) => {
+      const t = (job.title || "").toLowerCase();
+      const title = (job.title || "").toLowerCase();
+      const source = (job.source || "").toLowerCase();
+
+      const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
+
+      // Ha a forrás diákszövetkezet, akkor NE legyen junior/medior
+      const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
+
+      // Ha a cím tipikusan gyakornok/diák, akkor sem junior/medior
+      const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k));
+
+      return !isInternSource && !isInternTitle && !internLike;
+    };
 
     if (time24h && !time7d) {
       list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
@@ -238,21 +297,11 @@ const JobWatcher = () => {
     }
 
     if (juniorMode) {
-      list = list.filter((j) => {
-        const t = (j.title || "").toLowerCase();
-        const title = (j.title || "").toLowerCase();
-        const source = (j.source || "").toLowerCase();
+      list = list.filter((j) => isJuniorTrackCandidate(j) && isJuniorExperience(j.experience));
+    }
 
-        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k)); 
-
-        // Ha a forrás diákszövetkezet, akkor NE legyen junior
-        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s) );
-
-        // Ha a cím tipikusan gyakornok/diák, akkor sem junior
-        const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k) );
-
-        return !isInternSource && !isInternTitle && !internLike;
-      });
+    if (mediorMode) {
+      list = list.filter((j) => isJuniorTrackCandidate(j) && isMediorExperience(j.experience));
     }
 
     const selected = Object.keys(sourceStates).filter(
@@ -272,7 +321,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, sourceStates]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
@@ -315,6 +364,15 @@ const JobWatcher = () => {
             onChange={(e) => handleJuniorToggle(e.target.checked)}
           />
           Csak junior
+        </label>
+
+        <label className="job-checkbox">
+          <input
+            type="checkbox"
+            checked={mediorMode}
+            onChange={(e) => handleMediorToggle(e.target.checked)}
+          />
+          Csak medior
         </label>
 
         <label className="job-checkbox">
