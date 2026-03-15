@@ -298,12 +298,16 @@ const JobWatcher = () => {
       });
     }
 
-    if (juniorMode) {
-      list = list.filter((j) => isJuniorTrackCandidate(j) && isJuniorExperience(j.experience));
-    }
+    if (juniorMode || mediorMode) {
+      list = list.filter((j) => {
+        if (!isJuniorTrackCandidate(j)) return false;
 
-    if (mediorMode) {
-      list = list.filter((j) => isJuniorTrackCandidate(j) && isMediorExperience(j.experience));
+        const matchesJunior = juniorMode && isJuniorExperience(j.experience);
+        const matchesMedior = mediorMode && isMediorExperience(j.experience);
+
+        // Ha mindketto aktív, akkor unio legyen (junior VAGY medior).
+        return matchesJunior || matchesMedior;
+      });
     }
 
     const selected = Object.keys(sourceStates).filter(
