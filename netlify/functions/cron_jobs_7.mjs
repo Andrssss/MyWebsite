@@ -853,6 +853,10 @@ function looksLikeJobUrl(sourceKey, url) {
     if (!normalizeUrl(url).startsWith("https://tudatosdiak.anyway.hu/hu/jobs/")) return false;
   }
 
+  if (sourceKey === "schonherz") {
+    if (!normalizeUrl(url).startsWith("https://schonherz.hu/diakmunka/budapest/fejleszto---tesztelo/")) return false;
+  }
+
   return true;
 }
 
