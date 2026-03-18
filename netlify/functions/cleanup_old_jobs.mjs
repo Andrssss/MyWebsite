@@ -20,7 +20,7 @@ export default async () => {
     // 30 napnál régebbiek törlése first_seen alapján
     const { rowCount } = await client.query(`
       DELETE FROM job_posts
-      WHERE first_seen < (NOW() - INTERVAL '60 days')
+      WHERE first_seen < (NOW() - INTERVAL '30 days')
     `);
 
     return new Response(`cleanup OK: deleted ${rowCount}`, { status: 200 });
