@@ -137,8 +137,8 @@ function dedupeByUrl(items) {
 const SOURCES = [
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
   { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
-  
-  ];
+  { key: "pwc-gyakornok-it", label: "PwC", url: "https://jobs-cee.pwc.com/hu/hu/search-results?userId=6aticokfos2tku87micmnps62i&utm_source=phenom&utm_medium=email&utm_campaign=69bd4640190adb69e8b86e05-1774011968-Hu_career_news_technology_2603&utm_term=6aticokfos2tku87micmnps62i" }
+];
 
 // =====================
 // Keywords
