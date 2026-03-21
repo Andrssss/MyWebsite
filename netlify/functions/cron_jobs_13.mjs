@@ -1,7 +1,7 @@
 // netlify/functions/cron_jobs_2.mjs
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "12 4-23 * * *",
+  schedule: "17 4-23 * * *",
 };
 
 globalThis.File ??= class File {};
@@ -135,7 +135,7 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
-  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
 ];
 
 // =====================
@@ -688,11 +688,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       const BLACKLIST_SOURCES = ["profession"];
       const BLACKLIST_URLS = [
-
         "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
-        "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75",
-        "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
-
       ];
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {

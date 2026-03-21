@@ -141,8 +141,6 @@ const SOURCES = [
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
-  { key: "pwc-gyakornok-it", label: "PwC", url: "https://jobs-cee.pwc.com/hu/hu/search-results?userId=6aticokfos2tku87micmnps62i&utm_source=phenom&utm_medium=email&utm_campaign=69bd4640190adb69e8b86e05-1774011968-Hu_career_news_technology_2603&utm_term=6aticokfos2tku87micmnps62i" }
-
 ];
 
 // =====================
