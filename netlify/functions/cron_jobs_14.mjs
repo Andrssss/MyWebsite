@@ -38,12 +38,8 @@ function normalizeWhitespace(s) {
 function titleNotBlacklisted(title) {
   const TITLE_BLACKLIST = [
     "marketing", "sales", "hr", "finance", "pénzügy", "könyvelő",
-    "accountant", "manager", "vezető", "director", "adminisztráció",
-    "asszisztens", "ügyfélszolgálat", "customer service", "call center",
-    "értékesítő", "bizto sítás", "tanácsadó", "biztosítás",
-    "Adótanácsadó", "Auditor", "Accountant", "Accounts", "Tanácsadó",
     "senior", "szenior", "medior", "Villamosmérnök ", "ipari", "Építészmérnök",
-    "lead", "principal", "staff", "architect", "expert", "vezető fejlesztő", "tech lead"
+    "lead", "expert", "vezető fejlesztő", "tech lead"
   ];
   const t = normalizeText(title);
   return !TITLE_BLACKLIST.some((word) => t.includes(normalizeText(word)));
@@ -249,8 +245,8 @@ export default async () => {
       }
       return items.length;
     }
-    // Skip pages 1-4, start from page 5
-    let page = 5;
+    // Skip pages 1-4, start from page 4
+    let page = 7;
     while (true) {
       const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
       try {

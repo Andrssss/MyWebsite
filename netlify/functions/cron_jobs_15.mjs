@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "2 4-23 * * *",
+  schedule: "19 4-23 * * *",
 };
 
 import { Pool } from "pg";
@@ -285,17 +285,9 @@ export default async () => {
       return items.length;
     }
 
-    // Only process pages 1-4
-    try {
-      const firstHtml = await fetchText("https://www.frissdiplomas.hu/allasok");
-      const count = await processListingPage(firstHtml, "frissdiplomas", "https://www.frissdiplomas.hu/allasok");
-      console.log(`frissdiplomas page 1: ${count} items processed.`);
-    } catch (err) {
-      console.error("frissdiplomas fetch failed:", err.message);
-    }
 
     // Pages 2-4 only
-    for (let page = 2; page <= 3; page++) {
+    for (let page = 4; page <= 6; page++) {
       const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
       try {
         const html = await fetchText(pageUrl);
