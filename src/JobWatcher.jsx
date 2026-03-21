@@ -19,7 +19,6 @@ const JUNIOR_KEYWORD = "junior";
 const JUNIOR_EXCLUDED_SOURCES = [
   "minddiak",
   "muisz",
-  "cvcentrum",
   "zyntern",
   "schonherz",
   "prodiak",
