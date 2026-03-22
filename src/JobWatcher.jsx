@@ -26,7 +26,7 @@ const JUNIOR_EXCLUDED_SOURCES = [
   "otp",
   "vizmuvek",
   "tudatosdiak",
-  "onejob"
+  "f"
 ];
 
 /* =======================
