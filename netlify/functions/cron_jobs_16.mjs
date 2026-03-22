@@ -6,7 +6,7 @@ import { Pool } from "pg";
 import https from "https";
 import http from "http";
 import zlib from "zlib";
-import { load as cheerioLoad } from "cheerio";
+import { XMLParser } from "fast-xml-parser";
 
 /* ---------------------
    DB connection
@@ -197,91 +197,64 @@ function levelNotBlacklisted(title, desc) {
   const LEVEL_BLACKLIST = [
     "medior", "senior", "szenior", "szernior", "lead", "principal", "expert",
     "staff", "architect", "sr.", "sr ", "sen.",
-    "experienced", "expertise"
+    "experienced", "expertise", "head"
   ];
   const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
 
-const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
-const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
-const URL_BLACKLIST = new Set([
-  normalizeUrl("https://aam.hu/allasajanlatok#content"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlat-kategoriak"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszerintegrator"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/kontrolling"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
-]);
+
+// Bluebird RSS feldolgozó
+async function fetchRssJobs(url) {
+  const xml = await fetchText(url);
+  const parser = new XMLParser({ ignoreAttributes: false });
+  const feed = parser.parse(xml);
+  // Az RSS feed szerkezete: feed.rss.channel.item vagy feed.channel.item
+  const items =
+    (feed.rss && feed.rss.channel && feed.rss.channel.item) ||
+    (feed.channel && feed.channel.item) ||
+    [];
+  // Ha csak egy item van, akkor nem tömb, hanem objektum
+  const arr = Array.isArray(items) ? items : [items];
+  // Minden itemből: csak title, link
+  return arr.map(it => ({
+    title: it.title || null,
+    url: it.link || null,
+  }));
+}
 
 /* =========================
    BLACKLISTING
 ========================= 
-const BLACKLIST_SOURCES = ["profession"];
 
-const BLACKLIST_URLS = [
-  "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
-];
 
  ---------------------
    Main (Netlify handler)
 --------------------- */
+
 export default async () => {
-  
-
-
-
-const SOURCES = [
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
-
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
-  { key: "aam", label: "aam", url: "https://aam.hu/allasajanlatok" },
-];
-
+  const SOURCES = [
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=szoftverfejleszto-szoftvermernok" },
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=tesztelo" },
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=it-architekt" },
+  ];
   const client = await pool.connect();
-
   try {
     for (const p of SOURCES) {
-      let html;
+      let jobs = [];
       try {
-        html = await fetchText(p.url);
+        jobs = await fetchRssJobs(p.url);
+        console.log(`${p.key}: ${jobs.length} jobs found in RSS.`);
       } catch (err) {
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }
-
-      const rawItems = extractCandidates(html, p.url);
-
-      let items = rawItems.filter(it => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (p.key === "aam" && !it.url.startsWith(AAM_JOB_PREFIX)) return false;
-        if (p.key === "karrierhungaria" && !it.url.startsWith(KARRIERHUNGARIA_JOB_PREFIX)) return false;
-        if (!levelNotBlacklisted(it.title, it.description)) return false;
-        if (!titleNotBlacklisted(it.title)) return false;
-        return true;
-      });
-
-     // items = applyBlacklist(items, p.key);
-
+      // Csak valós állások, senior/medior kizárás
+      let items = jobs
+        .filter(it => it.title && it.url)
+        .filter(it => !levelNotBlacklisted(it.title, it.description))
+        .filter(it => titleNotBlacklisted(it.title));
       for (const it of items) {
         try {
           await upsertJob(client, p.key, it);
@@ -289,14 +262,10 @@ const SOURCES = [
           console.error(err);
         }
       }
-
       console.log(`${p.key}: ${items.length} items processed.`);
     }
-
   } finally {
-    console.log(`Script started at ${new Date().toISOString()}`);
     client.release();
   }
-
   return new Response("OK");
-};
+}

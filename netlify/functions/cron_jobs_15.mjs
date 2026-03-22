@@ -1,6 +1,3 @@
-export const config = {
-  schedule: "19 4-23 * * *",
-};
 
 import { Pool } from "pg";
 import https from "https";
@@ -8,9 +5,9 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 
-/* ---------------------
-   DB connection
---------------------- */
+// =====================
+// DB
+// =====================
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
@@ -19,293 +16,362 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-/* ---------------------
-   Helper functions
---------------------- */
+async function runAllBatches() {
+  const size = 4;
+  const totalBatches = Math.ceil(SOURCES.length / size);
+
+  console.log("[runAllBatches]", totalBatches, "batches");
+
+  for (let batch = 0; batch < totalBatches; batch++) {
+    await runBatch({ batch, size, write: true, debug: false, bundleDebug: false });
+    await sleep(50);
+  }
+}
+
+// =====================
+// HELPERS
+// =====================
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function stripAccents(s) {
+  return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function normalizeText(s) {
-  return String(s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  return stripAccents(s).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
-function titleNotBlacklisted(title) {
-  const TITLE_BLACKLIST = [
-    "marketing", "sales", "hr", "finance", "pénzügy", "könyvelő",
-    "senior", "szenior", "medior", "Villamosmérnök ", "ipari", "Építészmérnök",
-    "lead", "expert", "vezető fejlesztő", "tech lead"
-  ];
-  const t = normalizeText(title);
-  return !TITLE_BLACKLIST.some((word) => t.includes(normalizeText(word)));
-}
-
-function dedupeByUrl(items) {
-  const seen = new Set();
-  return items.filter((x) => {
-    if (!x.url) return false;
-    const key = getDedupeKey(x.url);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-/* =====================
-   URL helpers
-===================== */
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
-
     u.hash = "";
     [
-      "utm_source", "utm_medium", "utm_campaign", "utm_term",
-      "utm_content", "fbclid", "gclid", "trackingId", "pageNum", "position", "refId"
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "fbclid",
+      "gclid",
+      "sessionId",
+      "hash",
+      "keyword"
     ].forEach((p) => u.searchParams.delete(p));
-
     return u.toString().replace(/\?$/, "");
   } catch {
     return raw;
   }
 }
 
-/* ---------------------
-   Fetch helper
---------------------- */
-function fetchText(url, redirectLeft = 5) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const lib = u.protocol === "https:" ? https : http;
+function absolutize(href, base) {
+  try {
+    return new URL(href, base).toString();
+  } catch {
+    return null;
+  }
+}
 
-    const req = lib.request(
-      u,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip,deflate,br",
-        },
-        timeout: 50000,
-      },
-      (res) => {
-        const code = res.statusCode || 0;
+function mergeCandidates(...lists) {
+  const merged = [];
+  for (const arr of lists) {
+    if (Array.isArray(arr)) merged.push(...arr);
+  }
+  return dedupeByUrl(merged);
+}
 
-        if ([301, 302, 303, 307, 308].includes(code)) {
-          const loc = res.headers.location;
-          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
-          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          const nextUrl = new URL(loc, url).toString();
-          res.resume();
-          return resolve(fetchText(nextUrl, redirectLeft - 1));
-        }
-
-        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
-        let stream = res;
-        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
-        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
-        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
-
-        let data = "";
-        stream.setEncoding("utf8");
-        stream.on("data", (chunk) => (data += chunk));
-        stream.on("end", () => {
-          if (code >= 200 && code < 300) resolve(data);
-          else reject(new Error(`HTTP ${code} for ${url}`));
-        });
-        stream.on("error", reject);
-      }
-    );
-
-    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
-    req.on("error", reject);
-    req.end();
+function dedupeByUrl(items) {
+  const seen = new Set();
+  return items.filter((x) => {
+    if (!x.url) return false;
+    const u = normalizeUrl(x.url);
+    if (seen.has(u)) return false;
+    seen.add(u);
+    x.url = u;
+    return true;
   });
 }
 
-/* ---------------------
-   HTML extraction
---------------------- */
-function extractCandidates(html, baseUrl) {
+const SOURCES = [
+  { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/it-allasok-es-it-projektek/" }
+];
+
+function hasWord(n, w) {
+  const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`, "i");
+  return re.test(n);
+}
+
+const SENIOR_KEYWORDS = [
+  "senior",
+  "szenior",
+  "medior",
+  "lead",
+  "principal",
+  "staff",
+  "architect",
+  "expert",
+  "vezető fejlesztő",
+  "tech lead"
+];
+
+function matchesKeywords(title, desc) {
+  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  const strongHit = [
+    "gyakornok", "intern", "internship", "trainee", "junior", "developer", "fejlesztő", "fejleszto", "szoftverfejleszto", "engineer", "software", "data", "analyst", "scientist", "automation", "java", "python", "javascript", "php", "c++", "nodejs", "database", "test", "teszt", "testing", "teszteles", "tesztelés", "web", "weboldal", "net", "node", "typescript", "sql", "frontend", "backend", "fullstack", "full-stack", "webfejleszto", "webfejlesztő", "react", "angular", "devops", "cloud", "infrastructure", "platform", "platforms", "service", "services", "helpdesk", "security", "biztonsag", "biztonsagi", "biztonsági", "biztonsagtechnikai", "biztonságtechnikai", "kiberbiztonsag", "kiberbiztonsági", "kiberbiztonság", "rendszermernok", "rendszermérnök", "uzemeltetes", "uzemeltetesi", "üzemeltetés", "üzemeltetési", "penzugy", "pénzügy", "penzugyi", "pénzügyi", "digitalis", "digitális", "power", "application", "system", "systems", "engineering", "development", "program", "programozo", "integration", "technical", "quality", "servicenow", "linux", "android", "databricks", "abap", "sap", "informatikai", "informatika", "rendszer", "rendszergazda", "rendszeruzemelteto", "rendszeruzemeltető", "uzemelteto", "üzemeltető", "szoftvertesztelo", "szoftvertesztelő", "manual", "embedded", "systemtest", "tesztrendszer", "applications", "graduate", "graduates", "tesztelo", "support", "operations", "qa", "tester", "sysadmin", "network", "jog", "jogi"
+  ].some(k => n.includes(normalizeText(k)));
+  const itHit = hasWord(n, "it");
+  return strongHit || (itHit && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n));
+}
+
+function isSeniorLike(title = "", desc = "") {
+  const n = normalizeText(`${title} ${desc}`);
+  return SENIOR_KEYWORDS.some(k => n.includes(normalizeText(k)));
+}
+
+function extractSSR(html, baseUrl) {
   const $ = cheerioLoad(html);
-
   const items = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    const url = new URL(href, baseUrl).toString();
+  const CARD_SELECTORS = [
+    "app-job-list-item",
+    "article",
+    "li",
+    ".job",
+    ".job-list-item",
+    ".position",
+    ".listing",
+    ".card",
+    ".item",
+    ".vacancy",
+    ".vacancies__item",
+    "[data-href]",
+    "[data-url]",
+    "[onclick]",
+    "[role='link']",
+    "[routerlink]",
+  ].join(",");
+  $(CARD_SELECTORS).each((_, el) => {
+    const $card = $(el);
+    let href =
+      $card.attr("data-href") ||
+      $card.attr("data-url") ||
+      $card.attr("routerlink") ||
+      null;
+    if (!href) {
+      const oc = $card.attr("onclick") || "";
+      const m = oc.match(/(?:location\.href|window\.location)\s*=\s*['"]([^'"]+)['"]/i)
+        || oc.match(/['"]([^'"]+)['"]/);
+      if (m && m[1]) href = m[1];
+    }
+    if (!href) {
+      const a = $card.find("a[href]").first();
+      href = a.attr("href") || null;
+    }
+    const url = href ? absolutize(href, baseUrl) : null;
+    if (!url) return;
     if (!/^https?:\/\//i.test(url)) return;
-
-    let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
-    if (!card.length) card = $(el).closest("div");
-
-    const title =
-      normalizeWhitespace($(el).text()) ||
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
+    if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
+    let title =
+      normalizeWhitespace($card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
+      normalizeWhitespace($card.find(".title,.job-title,.position-title,.name").first().text()) ||
+      normalizeWhitespace($card.find("strong").first().text()) ||
+      null;
+    if (!title || title.length < 4) {
+      const aText = normalizeWhitespace($card.find("a[href]").first().text());
+      if (aText && !isCtaTitle(aText)) title = aText;
+    }
+    title = normalizeWhitespace(title);
     if (!title || title.length < 4) return;
-
-    const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0, 300), url, description: desc ? desc.slice(0, 800) : null });
+    if (isCtaTitle(title)) return;
+    const desc =
+      normalizeWhitespace($card.find("p").first().text()) ||
+      normalizeWhitespace($card.find(".description,.job-desc,.job-description").first().text()) ||
+      null;
+    items.push({
+      title: title.slice(0, 300),
+      url,
+      description: desc ? desc.slice(0, 800) : null,
+    });
   });
   return dedupeByUrl(items);
 }
 
-function getDedupeKey(rawUrl) {
-  return normalizeUrl(rawUrl);
+const CTA_TITLES = new Set([
+  "megnézem",
+  "megnezem",
+  "részletek",
+  "reszletek",
+  "tovább",
+  "tovabb",
+  "bővebben",
+  "bovebben",
+  "jelentkezem",
+  "jelentkezés",
+  "jelentkezes",
+  "apply",
+  "details",
+  "view",
+  "open",
+  "more",
+]);
+function isCtaTitle(s) {
+  const n = normalizeText(s);
+  return !n || n.length < 4 || CTA_TITLES.has(n);
 }
 
-function isFrissdiplomasJobUrl(rawUrl) {
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    return host.includes("frissdiplomas.hu") && u.pathname.startsWith("/allasok");
-  } catch {
-    return false;
-  }
-}
-
-function isMatchingFrissdiplomasDetail(html) {
+function extractCandidates(html, baseUrl) {
   const $ = cheerioLoad(html);
-
-  // Preferred path from Frissdiplomas sidebar blocks.
-  const directLocation = normalizeText(
-    normalizeWhitespace(
-      $(".job-sidebar-content h4")
-        .filter((_, el) => normalizeText($(el).text()).includes("munkavegzes helye"))
-        .first()
-        .parent()
-        .find("span")
-        .first()
-        .text()
-    )
-  );
-
-  const directArea = normalizeText(
-    normalizeWhitespace(
-      $(".job-sidebar-content h4")
-        .filter((_, el) => normalizeText($(el).text()).includes("allas terulete(i)"))
-        .first()
-        .parent()
-        .find("span")
-        .first()
-        .text()
-    )
-  );
-
-  if (directLocation || directArea) {
-    const isBudapest = directLocation.includes("budapest");
-    const isInformatikai = directArea.includes("informatikai");
-    return isBudapest && isInformatikai;
-  }
-
-  // Fallback if structure changes.
-  const pageText = normalizeText(normalizeWhitespace($("body").text()));
-  const locationMarker = "munkavegzes helye";
-  const areaMarker = "allas terulete(i)";
-
-  const idxLocation = pageText.indexOf(locationMarker);
-  const idxArea = pageText.indexOf(areaMarker);
-  if (idxLocation === -1 || idxArea === -1) return false;
-
-  const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
-  const aroundArea = pageText.slice(idxArea, idxArea + 220);
-  return aroundLocation.includes("budapest") && aroundArea.includes("informatikai");
+  const items = [];
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href");
+    if (!href) return;
+    const url = absolutize(href, baseUrl);
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) return;
+    if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
+    let card = $(el).closest("app-job-list-item, article, li, .job-list-item, .job, .position, .listing, .card, .item");
+    if (!card.length) card = $(el).closest("div");
+    const linkText = normalizeWhitespace($(el).text());
+    const headingText =
+      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
+      normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
+    let title = linkText;
+    if (headingText && (isCtaTitle(linkText) || headingText.length > linkText.length + 3)) {
+      title = headingText;
+    }
+    title = normalizeWhitespace(title);
+    if (!title || title.length < 4) return;
+    const desc =
+      normalizeWhitespace(card.find("p").first().text()) ||
+      normalizeWhitespace(card.find(".description, .job-desc, .job-description").first().text()) ||
+      null;
+    items.push({
+      title: title.slice(0, 300),
+      url,
+      description: desc ? desc.slice(0, 800) : null,
+    });
+  });
+  return dedupeByUrl(items);
 }
 
-
-/* ---------------------
-   DB upsert
---------------------- */
 async function upsertJob(client, source, item) {
-  const canonicalUrl = item.url;
-
+  const canonicalUrl = normalizeUrl(item.url);
+  const experience = extractExperience(item.description);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, first_seen)
+      (source, title, url, experience, first_seen)
      VALUES ($1,$2,$3,$4,NOW())
-     ON CONFLICT (source, canonical_url)
-        DO NOTHING;`,
-    [source, item.title, item.url, canonicalUrl]
+     ON CONFLICT (source, url)
+     DO NOTHING;
+    `,
+    [
+      source,
+      item.title,
+      canonicalUrl,
+      experience
+    ]
   );
 }
 
-function levelNotBlacklisted(title, desc) {
-  const LEVEL_BLACKLIST = [
-    "medior", "senior", "szenior", "szernior", "lead", "principal", "expert",
-    "staff", "architect", "sr.", "sr ", "sen.",
-    "experienced", "expertise"
+function extractExperience(description) {
+  if (!description) return null;
+  const patterns = [
+    /(\d+\s?\+\s?(?:év|years?))/gi,
+    /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
+    /(minimum\s?\d+\s?(?:év|years?))/gi,
+    /(at least\s?\d+\s?(?:years?))/gi
   ];
-  const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return !LEVEL_BLACKLIST.some((w) => t.includes(normalizeText(w)));
+  const matches = [];
+  for (const regex of patterns) {
+    const found = description.match(regex);
+    if (found) matches.push(...found);
+  }
+  return matches.length ? [...new Set(matches)].join(", ") : null;
 }
 
-const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
-const URL_BLACKLIST = new Set([
-  normalizeUrl("https://www.frissdiplomas.hu/allasok"),
-]);
-
-export default async () => {
-  const client = await pool.connect();
-
+async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
+  const listToProcess = SOURCES.slice(batch * size, batch * size + size);
+  const client = write ? await pool.connect() : null;
+  const stats = {
+    ok: true,
+    node: process.version,
+    ranAt: new Date().toISOString(),
+    debug: !!debug,
+    bundleDebug: !!bundleDebug,
+    write: !!write,
+    batch,
+    size,
+    processedThisRun: listToProcess.length,
+    totalSources: SOURCES.length,
+    portals: [],
+  };
   try {
-    async function processListingPage(html, sourceKey, baseUrl) {
-      const rawItems = extractCandidates(html, baseUrl);
-
-      const items = rawItems.filter((it) => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
-        if (!levelNotBlacklisted(it.title, it.description)) return false;
-        if (!titleNotBlacklisted(it.title)) return false;
-        return true;
-      });
-
-      for (const it of items) {
-        try {
-          let keep = true;
-
-          if (sourceKey === "frissdiplomas") {
-            const detailHtml = await fetchText(it.url);
-            keep = isMatchingFrissdiplomasDetail(detailHtml);
-          }
-
-          if (!keep) continue;
-          await upsertJob(client, sourceKey, it);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-
-      return items.length;
-    }
-
-
-    // Pages 2-4 only
-    for (let page = 4; page <= 6; page++) {
-      const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
+    for (const p of listToProcess) {
+      const source = p.key;
+      let html = null;
       try {
-        const html = await fetchText(pageUrl);
-        const count = await processListingPage(html, "frissdiplomas", pageUrl);
-        console.log(`frissdiplomas page ${page}: ${count} items processed.`);
+        html = await fetchText(p.url);
       } catch (err) {
-        if (String(err?.message || "").includes("HTTP 404")) {
-          console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
-          break;
+        stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
+        continue;
+      }
+      let merged = [];
+      let generic = extractCandidates(html, p.url).filter((c) => true);
+      let ssr = extractSSR(html, p.url).filter((c) => true);
+      merged = mergeCandidates(generic, ssr);
+      let matchedList = merged
+        .filter((c) => matchesKeywords(c.title, c.description))
+        .filter((c) => !isSeniorLike(c.title, c.description));
+      let rejected = [];
+      if (debug) {
+        rejected = merged
+          .filter((c) => !matchesKeywords(c.title, c.description))
+          .slice(0, 30)
+          .map((c) => {
+            const norm = normalizeText(`${c.title ?? ""} ${c.description ?? ""}`);
+            return {
+              title: c.title,
+              url: c.url,
+            };
+          });
+      }
+      stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length, rejected });
+      if (write && client) {
+        for (const item of matchedList) {
+          await upsertJob(client, source, item);
         }
-        console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
-        break;
       }
     }
-
   } finally {
-    client.release();
+    if (client) client.release();
   }
+  return stats;
+}
 
-  return new Response("OK");
+export default async (request) => {
+  const url = new URL(request.url);
+  const debug = url.searchParams.get("debug") === "1";
+  const bundleDebug = url.searchParams.get("bundledebug") === "1";
+  const write = url.searchParams.get("write") === "1";
+  if (!debug) {
+    await runAllBatches();
+    return new Response("Cron jobs done", { status: 200 });
+  }
+  const batch = Number(url.searchParams.get("batch") || 0);
+  const size = Number(url.searchParams.get("size") || 4);
+  const stats = await runBatch({
+    batch,
+    size,
+    write,
+    debug: true,
+    bundleDebug,
+  });
+  return new Response(JSON.stringify(stats), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 };
