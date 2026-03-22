@@ -173,7 +173,7 @@ async function upsertJob(client, source, item) {
 
 function levelNotBlacklisted(title, desc) {
   const LEVEL_BLACKLIST = [
-    "medior", "senior", "szenior", "szernior", "lead", "principal", "expert",
+     "senior", "szenior", "szernior", "lead", "principal", "expert",
     "staff", "architect", "sr.", "sr ", "sen.",
     "experienced", "expertise", "head"
   ];
