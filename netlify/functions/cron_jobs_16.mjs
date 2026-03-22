@@ -6,7 +6,7 @@ import { Pool } from "pg";
 import https from "https";
 import http from "http";
 import zlib from "zlib";
-import { XMLParser } from "fast-xml-parser";
+const { XMLParser } = require("fast-xml-parser");
 
 /* ---------------------
    DB connection
