@@ -227,10 +227,26 @@ export default async () => {
         continue;
       }
       // Csak valós állások, senior/medior kizárás
-      let items = jobs
-        .filter(it => it.title && it.url)
-        .filter(it => !levelNotBlacklisted(it.title, it.description))
-        .filter(it => titleNotBlacklisted(it.title));
+      let items = [];
+      for (const it of jobs) {
+        if (!it.title || !it.url) {
+          console.log(`SKIP: missing title or url:`, it);
+          continue;
+        }
+        let blacklisted = false;
+        if (!titleNotBlacklisted(it.title)) {
+          blacklisted = true;
+          console.log(`BLACKLISTED (title): ${it.title}`);
+        }
+        // description mező már nincs, de a levelNotBlacklisted még hívja, ezért átadunk üres stringet
+        if (!levelNotBlacklisted(it.title, "")) {
+          blacklisted = true;
+          console.log(`BLACKLISTED (level): ${it.title}`);
+        }
+        if (!blacklisted) {
+          items.push(it);
+        }
+      }
       for (const it of items) {
         try {
           await upsertJob(client, p.key, it);
