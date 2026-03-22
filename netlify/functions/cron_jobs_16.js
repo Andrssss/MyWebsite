@@ -44,7 +44,7 @@ function titleNotBlacklisted(title) {
     "Adótanácsadó","Auditor","Accountant","Accounts","Tanácsadó",
      "senior",
     "szenior",
-    "medior", "Villamosmérnök ", "ipari","Építészmérnök",
+  "Villamosmérnök ", "ipari","Építészmérnök",
   "lead",
   "principal",
   "staff",
@@ -233,15 +233,17 @@ export default async () => {
           console.log(`SKIP: missing title or url:`, it);
           continue;
         }
+        if (!it.url.startsWith("https://bluebird.hu/it-allasok-es-it-projektek/")) {
+          console.log(`SKIP: url not bluebird projektek:`, it.url);
+          continue;
+        }
         let blacklisted = false;
         if (!titleNotBlacklisted(it.title)) {
           blacklisted = true;
-          console.log(`BLACKLISTED (title): ${it.title}`);
         }
         // description mező már nincs, de a levelNotBlacklisted még hívja, ezért átadunk üres stringet
         if (!levelNotBlacklisted(it.title, "")) {
           blacklisted = true;
-          console.log(`BLACKLISTED (level): ${it.title}`);
         }
         if (!blacklisted) {
           items.push(it);

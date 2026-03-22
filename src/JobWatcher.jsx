@@ -288,9 +288,8 @@ const JobWatcher = () => {
       list = list.filter((j) => {
         const source = (j.source || "").toLowerCase();
         const t = (j.title || "").toLowerCase();
-        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s) );
-        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k)); 
-
+        const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
+        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
         return (
           (internLike && !t.includes(JUNIOR_KEYWORD)) || isInternSource
         );
@@ -301,10 +300,16 @@ const JobWatcher = () => {
       list = list.filter((j) => {
         if (!isJuniorTrackCandidate(j)) return false;
 
+        const mediorInText = (j.title && j.title.toLowerCase().includes("medior")) || (j.description && j.description.toLowerCase().includes("medior"));
+
+        // Ha medior szót tartalmaz, CSAK medior szűrővel jelenjen meg
+        if (mediorInText) {
+          return mediorMode;
+        }
+
+        // Egyébként a szokásos junior/medior logika
         const matchesJunior = juniorMode && isJuniorExperience(j.experience);
         const matchesMedior = mediorMode && isMediorExperience(j.experience);
-
-        // Ha mindketto aktív, akkor unio legyen (junior VAGY medior).
         return matchesJunior || matchesMedior;
       });
     }
