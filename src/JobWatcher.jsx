@@ -25,8 +25,7 @@ const JUNIOR_EXCLUDED_SOURCES = [
   "tudasdiak",
   "otp",
   "vizmuvek",
-  "tudatosdiak",
-  "f"
+  "tudatosdiak"
 ];
 
 /* =======================
