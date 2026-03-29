@@ -379,7 +379,7 @@ const JobWatcher = () => {
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 4-23 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
           <div className="job-last-commit">
-            <span>Elmúlt 1 hét frissítései:</span>
+            <span>Elmúlt 1 hét git commitok:</span>
             {lastUpdates.length > 0 ? (
               <ul>
                 {lastUpdates.map((u, i) => (
