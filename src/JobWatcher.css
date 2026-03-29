@@ -32,14 +32,20 @@
 }
 
 .job-last-commit {
-  font-size: 0.78rem;
-  opacity: 0.6;
-  margin-top: 4px;
+  display: inline-block;
+  font-size: 0.85rem;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border-left: 3px solid #7c8cf8;
+  background: rgba(124, 140, 248, 0.08);
+  border-radius: 0 6px 6px 0;
+  color: #c9d1ff;
 }
 
 .job-last-commit span {
-  font-weight: 600;
-  opacity: 1;
+  font-weight: 700;
+  color: #7c8cf8;
+  margin-right: 4px;
 }
 
 @media (max-width: 700px) {

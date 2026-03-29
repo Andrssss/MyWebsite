@@ -154,14 +154,13 @@ const JobWatcher = () => {
   const [lastCommit, setLastCommit] = useState(null);
 
   useEffect(() => {
-    fetch("https://api.github.com/repos/Andrssss/MyWebsite/commits?per_page=1")
+    fetch("/.netlify/functions/last-commit")
       .then((r) => r.json())
       .then((data) => {
-        const c = data?.[0];
-        if (!c) return;
+        if (!data.message) return;
         setLastCommit({
-          message: c.commit.message.split("\n")[0],
-          date: new Date(c.commit.author.date),
+          message: data.message,
+          date: new Date(data.date),
         });
       })
       .catch(() => {});

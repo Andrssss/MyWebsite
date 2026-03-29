@@ -24,32 +24,31 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
   };
 }
 
-// FIXED lista (key/label/url)
+// FIXED lista (key/label)
 const FIXED = [
-  { key: "karrierhungaria", label: "Karrier Hungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
-  { key: "aam", label: "AAM", url: "https://aam.hu/karrier" },
-  { key: "frissdiplomas", label: "Frissdiplomas", url: "https://www.frissdiplomas.hu/allasok" },
-  { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/position?page=2" },
-  { key: "muisz", label: "Muisz", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
-  { key: "cvcentrum-gyakornok-it", label: "CV Centrum", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
-
-  { key: "zyntern", label: "Zyntern", url: "https://zyntern.com/jobs?fields=16" },
-  { key: "profession-intern", label: "Profession", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
-  { key: "schonherz", label: "Schönherz – Budapest", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
-  { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
-  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=" },
-  { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
-  { key: "LinkedIn",label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?currentJobId=4194029806&f_E=1%2C2&f_TPR=r86400&geoId=100288700&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=R" },
-  { key: "cvonline",  label:  "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships?search=&job_geo_location=&radius=25&%C3%81ll%C3%A1skeres%C3%A9s=%C3%81ll%C3%A1skeres%C3%A9s&lat=&lon=&country=&administrative_area_level_1=" },
-  { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
-  { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?utm_source=facebook&utm_medium=social_cpc&utm_campaign=hbp&utm_content=Instagram_Reels&utm_id=120239436336450697&utm_term=120239436336520697&fbclid=PAdGRleAP9v2xleHRuA2FlbQEwAGFkaWQBqy0hd5G9WXNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp-R_SE_c9O6KU5EqFghpD-ajuuKDtviyfnC4ISpI22VXvxQFO3UL-hd8sdBG_aem_9-6Oig3Ju0SERNEIrcg6kw&criteria=seniority%3Dtrainee,junior" },
-  { key: "dreamjobs", label: "DreamJobs", url: "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50" },
-  { key: "melonjobs", label: "MelonJobs", url: "https://melonjobs.hu/allasok-keresese/" },
-  { key: "kuka", label: "KUKA", url: "https://jobs.kuka.com/search/?q=&locationsearch=HU&optionsFacetsDD_department=IT" },
-  { key: "tesco", label: "Tesco", url: "https://careers.tesco.com/en_GB/careersmarketplace/SearchJobs/?748_location_place=Budapest,%20Central%20Hungary,%20Hungary&748_location_radius=20&748_location_coordinates=[47.5,19.04]&listFilterMode=1&jobRecordsPerPage=50" },
-  { key: "talent", label: "Talent", url: "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU" },
-  { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
+  { key: "karrierhungaria", label: "Karrier Hungaria" },
+  { key: "aam", label: "AAM" },
+  { key: "frissdiplomas", label: "Frissdiplomas" },
+  { key: "minddiak", label: "Minddiák" },
+  { key: "muisz", label: "Muisz" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum" },
+  { key: "zyntern", label: "Zyntern" },
+  { key: "profession-intern", label: "Profession" },
+  { key: "schonherz", label: "Schönherz – Budapest" },
+  { key: "tudasdiak", label: "Tudasdiak" },
+  { key: "otp", label: "OTP" },
+  { key: "vizmuvek", label: "vizmuvek" },
+  { key: "LinkedIn", label: "LinkedIn PAST 24H" },
+  { key: "cvonline", label: "cvonline" },
+  { key: "wherewework", label: "wherewework" },
+  { key: "onejob", label: "onejob" },
+  { key: "nofluffjobs", label: "nofluffjobs" },
+  { key: "dreamjobs", label: "DreamJobs" },
+  { key: "melonjobs", label: "MelonJobs" },
+  { key: "kuka", label: "KUKA" },
+  { key: "tesco", label: "Tesco" },
+  { key: "talent", label: "Talent" },
+  { key: "bluebird", label: "bluebird" },
 
 ];
 
@@ -100,14 +99,10 @@ exports.handler = async (event) => {
 
         const map = new Map(rows.map((r) => [r.key, r]));
         const out = FIXED.map((s) => ({
-        key: s.key,
-        label: s.label,
-        url:
-          s.key === "minddiak"
-            ? "https://minddiak.hu/position?page=2"
-            : s.url,
-        count: map.get(s.key)?.count ?? 0,
-      }));
+          key: s.key,
+          label: s.label,
+          count: map.get(s.key)?.count ?? 0,
+        }));
 
         return jsonResponse(200, out);
       }
