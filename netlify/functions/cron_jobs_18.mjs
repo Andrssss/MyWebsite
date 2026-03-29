@@ -228,8 +228,12 @@ function extractTalentYearExperience(html) {
 
   if (filtered.length === 0) return null;
 
+  const dedupe = filtered.filter((m) => m.replace(/\s+/g, " ").trim().toLowerCase() !== "1 év");
+
+  if (dedupe.length === 0) return "-";
+
   return [...new Set(
-    filtered.map((m) => m.replace(/\s+/g, " ").trim().toLowerCase())
+    dedupe.map((m) => m.replace(/\s+/g, " ").trim().toLowerCase())
   )].join(", ");
 }
 
