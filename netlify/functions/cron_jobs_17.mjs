@@ -55,6 +55,10 @@ function normalizeUrl(raw) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
@@ -295,9 +299,63 @@ function extractKukaJobs(html) {
   return jobs;
 }
 
+function extractKukaYearExperience(html) {
+  const idx = html.indexOf("What you need to succeed");
+  if (idx === -1) return null;
+
+  const section = html.substring(idx, idx + 3000);
+  const $ = cheerioLoad(section);
+  const text = $.text();
+
+  const patterns = [
+    /\b\d+\s?\+?\s?(?:év|years?|éves|yrs?)\b/gi,
+    /\b\d+\s?[-–]\s?\d+\s?(?:év|years?|éves|yrs?)\b/gi,
+    /\bseveral\s+years?\b/gi,
+    /\bminimum\s?\d+\s?(?:év|years?)\b/gi,
+    /\bat\s+least\s+\d+\s?(?:years?|év)\b/gi,
+  ];
+
+  const matches = [];
+  for (const regex of patterns) {
+    const found = text.match(regex);
+    if (found) matches.push(...found);
+  }
+
+  if (matches.length === 0) return null;
+
+  const maxReasonable = 15;
+  const filtered = matches.filter((m) => {
+    const nums = m.match(/\d+/g)?.map((n) => parseInt(n, 10)) || [];
+    return nums.length === 0 || nums.every((n) => n <= maxReasonable);
+  });
+
+  if (filtered.length === 0) return null;
+
+  return [...new Set(
+    filtered.map((m) => m.replace(/\s+/g, " ").trim().toLowerCase())
+  )].join(", ");
+}
+
 async function fetchAllKukaJobs() {
   const html = await fetchText(KUKA_API_URL);
-  return extractKukaJobs(html);
+  const jobs = extractKukaJobs(html);
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
+    try {
+      const jobHtml = await fetchText(job.url);
+      const yearExp = extractKukaYearExperience(jobHtml);
+      if (yearExp) {
+        console.log(`kuka: ${job.title} → experience from page: ${yearExp}`);
+        job.experience = yearExp;
+      }
+    } catch (err) {
+      console.log(`kuka: failed to fetch detail for ${job.title}: ${err.message}`);
+    }
+    if (i < jobs.length - 1) await sleep(500);
+  }
+
+  return jobs;
 }
 
 /* ── handler ────────────────────────────────────────────────── */
