@@ -193,7 +193,7 @@ function extractTalentJobs(html) {
     jobs.push({
       title,
       url,
-      experience: inferTalentExperience(title),
+      experience: inferTalentExperience(title) ?? "-",
     });
   });
 

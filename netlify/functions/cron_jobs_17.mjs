@@ -139,7 +139,7 @@ async function upsertJob(client, sourceKey, item) {
        title = EXCLUDED.title,
        url = EXCLUDED.url,
        experience = COALESCE(EXCLUDED.experience, job_posts.experience);`,
-    [sourceKey, item.title, item.url, canonicalUrl, item.experience]
+    [sourceKey, item.title, item.url, canonicalUrl, item.experience ?? "-"]
   );
 }
 
