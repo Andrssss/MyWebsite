@@ -16,11 +16,13 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const SOURCE_KEY = "indeed";
-const MAX_PAGES = 4;
-const PAGE_SIZE = 15;
-const BASE_SEARCH_URL =
-  "https://hu.indeed.com/jobs?q=fejleszt%C5%91&l=budapest&radius=25&limit=15";
+const SOURCE_KEY = "jooble";
+
+/* Two search queries: programozó + tesztelő, both Budapest */
+const SEARCH_URLS = [
+  "https://hu.jooble.org/SearchResult?rgns=Budapest&ukw=programoz%C3%B3",
+  "https://hu.jooble.org/SearchResult?date=8&rgns=Budapest&ukw=tesztel%C5%91",
+];
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -51,6 +53,19 @@ function normalizeUrl(raw) {
   }
 }
 
+/**
+ * Strip Jooble tracking params from job URL, keep only the base path.
+ * e.g. /jdp/-755823920645225761?ckey=...&pos=1&... → /jdp/-755823920645225761
+ */
+function canonicalJoobleUrl(href) {
+  try {
+    const url = new URL(href, "https://hu.jooble.org");
+    return `https://hu.jooble.org${url.pathname}`;
+  } catch {
+    return href;
+  }
+}
+
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
@@ -62,7 +77,7 @@ function fetchText(url, redirectLeft = 5) {
         method: "GET",
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
           Accept:
             "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
@@ -132,132 +147,95 @@ function inferExperience(title) {
   return null;
 }
 
-/* ── parse Indeed search results HTML ────────────────────────── */
+function isBlocked(code, body) {
+  if (code === 403) return true;
+  if (body.includes("Just a moment") || body.includes("Security Check"))
+    return true;
+  return false;
+}
+
+/* ── parse Jooble search results HTML ────────────────────────── */
 
 function parseSearchPage(html) {
   const $ = cheerioLoad(html);
   const jobs = [];
 
-  // Strategy 1: data-jk attributes on card elements
-  $("[data-jk]").each((_i, el) => {
-    const $el = $(el);
-    const jk = $el.attr("data-jk");
-    if (!jk) return;
+  // Jooble job links: /jdp/{id} (external redirect) or /desc/{id} (internal)
+  $('a[href*="/jdp/"], a[href*="/desc/"]').each((_i, el) => {
+    const $a = $(el);
+    const href = $a.attr("href") || "";
 
-    const title = normalizeWhitespace(
-      $el.find("h2.jobTitle span").last().text() ||
-        $el.find("h2 span[id]").text() ||
-        $el.find("h2").text()
-    );
+    // Only match actual job detail links
+    if (!/\/(jdp|desc)\/[-\d]+/.test(href)) return;
+
+    const title = normalizeWhitespace($a.text());
+    if (!title || title.length < 3) return;
+
+    // Try to find company from nearby elements
+    const $card = $a.closest("article, li, div").first();
     const company = normalizeWhitespace(
-      $el.find('[data-testid="company-name"]').text() ||
-        $el.find(".companyName").text() ||
-        $el.find(".company_location .css-92r8pb-companyName").text()
+      $card.find("[class*='company'], [class*='employer']").first().text()
     );
 
-    if (!title) return;
+    const fullUrl = new URL(href, "https://hu.jooble.org").toString();
+    const canonical = canonicalJoobleUrl(href);
 
     jobs.push({
-      jk,
       title,
       company,
-      url: normalizeUrl(`https://hu.indeed.com/viewjob?jk=${jk}`),
+      url: fullUrl,
+      canonical,
       experience: inferExperience(title),
     });
   });
 
-  // Strategy 2 fallback: extract fromjk from salary links if no data-jk found
-  if (jobs.length === 0) {
-    const seenJks = new Set();
-    $("a[href*='fromjk=']").each((_i, el) => {
-      const href = $(el).attr("href") || "";
-      const match = href.match(/fromjk=([a-f0-9]+)/);
-      if (!match) return;
-      const jk = match[1];
-      if (seenJks.has(jk)) return;
-      seenJks.add(jk);
-
-      // Walk up to find the job card container
-      const $card = $(el).closest("li, .job_seen_beacon, .resultContent, [class*='Result']");
-      const title = normalizeWhitespace(
-        $card.find("h2").first().text() || $(el).text()
-      );
-
-      if (!title) return;
-
-      const company = normalizeWhitespace(
-        $card.find('[data-testid="company-name"]').text() ||
-          $card.find(".companyName").text()
-      );
-
-      jobs.push({
-        jk,
-        title,
-        company,
-        url: normalizeUrl(`https://hu.indeed.com/viewjob?jk=${jk}`),
-        experience: inferExperience(title),
-      });
-    });
-  }
-
   return jobs;
 }
 
-function isBlocked(code, body) {
-  if (code === 403) return true;
-  if (body.includes("Security Check") || body.includes("Just a moment"))
-    return true;
-  return false;
-}
+/* ── fetch all jobs from both searches ───────────────────────── */
 
-/* ── fetch all pages ─────────────────────────────────────────── */
-
-async function fetchAllIndeedJobs() {
+async function fetchAllJoobleJobs() {
   const allJobs = [];
-  const seenJks = new Set();
+  const seenCanonicals = new Set();
 
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const start = page * PAGE_SIZE;
-    const url = `${BASE_SEARCH_URL}&start=${start}`;
+  for (let i = 0; i < SEARCH_URLS.length; i++) {
+    const searchUrl = SEARCH_URLS[i];
+    const label = i === 0 ? "programozó" : "tesztelő";
 
     let result;
     try {
-      result = await fetchText(url);
+      result = await fetchText(searchUrl);
     } catch (err) {
-      console.log(`${SOURCE_KEY}: page ${page} fetch error: ${err.message}`);
-      break;
+      console.log(`${SOURCE_KEY} [${label}]: fetch error: ${err.message}`);
+      continue;
     }
 
     if (isBlocked(result.code, result.body)) {
       console.log(
-        `${SOURCE_KEY}: blocked (HTTP ${result.code}) on page ${page} — stopping`
+        `${SOURCE_KEY} [${label}]: blocked (HTTP ${result.code}) — skipping`
       );
-      break;
+      continue;
     }
 
     if (result.code < 200 || result.code >= 300) {
       console.log(
-        `${SOURCE_KEY}: HTTP ${result.code} on page ${page} — stopping`
+        `${SOURCE_KEY} [${label}]: HTTP ${result.code} — skipping`
       );
-      break;
+      continue;
     }
 
     const pageJobs = parseSearchPage(result.body);
-    console.log(`${SOURCE_KEY}: page ${page} found ${pageJobs.length} jobs`);
-
-    if (pageJobs.length === 0) break;
+    console.log(`${SOURCE_KEY} [${label}]: found ${pageJobs.length} jobs`);
 
     for (const job of pageJobs) {
-      if (!seenJks.has(job.jk)) {
-        seenJks.add(job.jk);
+      if (!seenCanonicals.has(job.canonical)) {
+        seenCanonicals.add(job.canonical);
         allJobs.push(job);
       }
     }
 
-    if (pageJobs.length < PAGE_SIZE) break;
-
-    // polite delay between pages
-    if (page < MAX_PAGES - 1) await sleep(2000);
+    // polite delay between searches
+    if (i < SEARCH_URLS.length - 1) await sleep(2000);
   }
 
   return allJobs;
@@ -266,8 +244,6 @@ async function fetchAllIndeedJobs() {
 /* ── upsert ──────────────────────────────────────────────────── */
 
 async function upsertJob(client, item) {
-  const canonicalUrl = normalizeUrl(item.url);
-
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, canonical_url, experience, first_seen)
@@ -277,7 +253,7 @@ async function upsertJob(client, item) {
        title = EXCLUDED.title,
        url = EXCLUDED.url,
        experience = COALESCE(EXCLUDED.experience, job_posts.experience);`,
-    [SOURCE_KEY, item.title, item.url, canonicalUrl, item.experience]
+    [SOURCE_KEY, item.title, item.url, item.canonical, item.experience]
   );
 }
 
@@ -287,8 +263,8 @@ export default async () => {
   const client = await pool.connect();
 
   try {
-    const jobs = await fetchAllIndeedJobs();
-    console.log(`${SOURCE_KEY}: ${jobs.length} jobs found`);
+    const jobs = await fetchAllJoobleJobs();
+    console.log(`${SOURCE_KEY}: ${jobs.length} unique jobs found total`);
 
     for (const job of jobs) {
       await upsertJob(client, job);

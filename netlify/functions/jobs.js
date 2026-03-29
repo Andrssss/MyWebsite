@@ -46,9 +46,9 @@ const FIXED = [
   { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?utm_source=facebook&utm_medium=social_cpc&utm_campaign=hbp&utm_content=Instagram_Reels&utm_id=120239436336450697&utm_term=120239436336520697&fbclid=PAdGRleAP9v2xleHRuA2FlbQEwAGFkaWQBqy0hd5G9WXNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp-R_SE_c9O6KU5EqFghpD-ajuuKDtviyfnC4ISpI22VXvxQFO3UL-hd8sdBG_aem_9-6Oig3Ju0SERNEIrcg6kw&criteria=seniority%3Dtrainee,junior" },
   { key: "dreamjobs", label: "DreamJobs", url: "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50" },
   { key: "melonjobs", label: "MelonJobs", url: "https://melonjobs.hu/allasok-keresese/" },
-  { key: "indeed", label: "Indeed", url: "https://hu.indeed.com/q-fejleszt%C5%91-l-budapest-%C3%A1ll%C3%A1sok.html" },
   { key: "kuka", label: "KUKA", url: "https://jobs.kuka.com/search/?q=&locationsearch=HU&optionsFacetsDD_department=IT" },
-    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
+  { key: "jooble", label: "Jooble", url: "https://hu.jooble.org/SearchResult?rgns=Budapest&ukw=programoz%C3%B3" },
+  { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
 
 ];
 
