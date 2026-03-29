@@ -17,9 +17,9 @@ const pool = new Pool({
 });
 
 const TALENT_SEARCH_URLS = [
-  "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU",
-  "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU",
-  "https://hu.talent.com/jobs?k=tesztel%C5%91&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU&date=1",
+  "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU&date=1",
+  "https://hu.talent.com/jobs?k=tesztel%C5%91&l=Budapest%2C+HU&date=1",
 ];
 
 /* ── shared helpers ─────────────────────────────────────────── */
@@ -127,9 +127,27 @@ async function upsertJob(client, sourceKey, item) {
 
 /* ── talent.com ─────────────────────────────────────────────── */
 
+const SENIOR_KEYWORDS = [
+  "senior",
+  "szenior",
+  "lead",
+  "principal",
+  "staff",
+  "architect",
+  "expert",
+  "vezető fejlesztő",
+  "tech lead",
+  "CNC"
+];
+
+function isSeniorLike(title) {
+  const normalized = normalizeText(title);
+  return SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw)));
+}
+
 function inferTalentExperience(title) {
   const normalized = normalizeText(title);
-  if (/\bsenior\b|\bszenior\b|\blead\b|\bprincipal\b|\barchitect\b|\bstaff\b|\bhead\b/.test(normalized))
+  if (SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw))))
     return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b|\btrainee\b|\bintern\b|\bgyakornok\b/.test(normalized))
@@ -212,8 +230,8 @@ export default async () => {
 
   try {
     /* talent.com */
-    const talentJobs = await fetchAllTalentJobs();
-    console.log(`talent: ${talentJobs.length} unique jobs found`);
+    const talentJobs = (await fetchAllTalentJobs()).filter((job) => !isSeniorLike(job.title));
+    console.log(`talent: ${talentJobs.length} unique jobs found (after senior + 24h filter)`);
 
     for (const job of talentJobs) {
       await upsertJob(client, "talent", job);

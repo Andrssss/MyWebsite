@@ -27,6 +27,9 @@ const MELONJOBS_API_URL =
 const KUKA_API_URL =
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
 
+const TESCO_URL =
+  "https://careers.tesco.com/en_GB/careersmarketplace/SearchJobs/?748_location_place=Budapest,%20Central%20Hungary,%20Hungary&748_location_radius=20&748_location_coordinates=[47.5,19.04]&listFilterMode=1&jobRecordsPerPage=50";
+
 /* ── shared helpers ─────────────────────────────────────────── */
 
 function normalizeWhitespace(value) {
@@ -370,7 +373,40 @@ async function fetchAllKukaJobs() {
 
   return jobs;
 }
+/* ── Tesco ─────────────────────────────────────────────── */
 
+function extractTescoJobs(html) {
+  const $ = cheerioLoad(html);
+  const jobs = [];
+  const seen = new Set();
+
+  $("article").each((_i, el) => {
+    const $art = $(el);
+    const $link = $art.find("h3 a.link").first();
+    const title = normalizeWhitespace($link.text());
+    const href = $link.attr("href");
+    if (!title || !href) return;
+
+    const url = normalizeUrl(
+      href.startsWith("http") ? href : `https://careers.tesco.com${href}`
+    );
+    if (seen.has(url)) return;
+    seen.add(url);
+
+    jobs.push({
+      title,
+      url,
+      experience: inferExperience(title, ""),
+    });
+  });
+
+  return jobs;
+}
+
+async function fetchAllTescoJobs() {
+  const html = await fetchText(TESCO_URL);
+  return extractTescoJobs(html);
+}
 /* ── handler ────────────────────────────────────────────────── */
 
 export default async () => {
@@ -378,7 +414,7 @@ export default async () => {
 
   try {
     /* DreamJobs */
-    const dreamJobs = await fetchAllDreamJobs();
+    const dreamJobs = (await fetchAllDreamJobs()).filter((job) => !isSeniorLike(job.title, ""));
     console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
 
     for (const job of dreamJobs) {
@@ -396,13 +432,22 @@ export default async () => {
     console.log(`melonjobs: ${melonJobs.length} jobs processed`);
 
     /* KUKA */
-    const kukaJobs = await fetchAllKukaJobs();
+    const kukaJobs = (await fetchAllKukaJobs()).filter((job) => !isSeniorLike(job.title, ""));
     console.log(`kuka: ${kukaJobs.length} jobs found`);
 
     for (const job of kukaJobs) {
       await upsertJob(client, "kuka", job);
     }
     console.log(`kuka: ${kukaJobs.length} jobs processed`);
+
+    /* Tesco */
+    const tescoJobs = (await fetchAllTescoJobs()).filter((job) => !isSeniorLike(job.title, ""));
+    console.log(`tesco: ${tescoJobs.length} jobs found`);
+
+    for (const job of tescoJobs) {
+      await upsertJob(client, "tesco", job);
+    }
+    console.log(`tesco: ${tescoJobs.length} jobs processed`);
 
     return new Response("OK");
   } finally {
