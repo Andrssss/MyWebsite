@@ -47,6 +47,7 @@ const FIXED = [
   { key: "dreamjobs", label: "DreamJobs", url: "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50" },
   { key: "melonjobs", label: "MelonJobs", url: "https://melonjobs.hu/allasok-keresese/" },
   { key: "indeed", label: "Indeed", url: "https://hu.indeed.com/q-fejleszt%C5%91-l-budapest-%C3%A1ll%C3%A1sok.html" },
+  { key: "kuka", label: "KUKA", url: "https://jobs.kuka.com/search/?q=&locationsearch=HU&optionsFacetsDD_department=IT" },
     { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
 
 ];

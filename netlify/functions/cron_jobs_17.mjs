@@ -24,6 +24,9 @@ const DREAMJOBS_API_URL =
 const MELONJOBS_API_URL =
   "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
 
+const KUKA_API_URL =
+  "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
+
 /* ── shared helpers ─────────────────────────────────────────── */
 
 function normalizeWhitespace(value) {
@@ -249,6 +252,54 @@ async function fetchAllMelonJobs() {
   return jobs;
 }
 
+/* ── KUKA ───────────────────────────────────────────────────── */
+
+function inferKukaExperience(title) {
+  const normalized = normalizeText(title);
+  if (/\bsenior\b|\bszenior\b|\blead\b|\bprincipal\b|\barchitect\b|\bstaff\b|\bhead\b/.test(normalized))
+    return "senior";
+  if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
+  if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b|\btrainee\b|\bintern\b|\bgyakornok\b/.test(normalized))
+    return "junior";
+  return null;
+}
+
+function extractKukaJobs(html) {
+  const $ = cheerioLoad(html);
+  const jobs = [];
+  const seen = new Set();
+
+  $("li[data-url]").each((_i, el) => {
+    const $el = $(el);
+    const path = $el.attr("data-url");
+    if (!path) return;
+
+    const url = normalizeUrl(`https://jobs.kuka.com${path.replace(/&amp;/g, "&")}`);
+    if (seen.has(url)) return;
+    seen.add(url);
+
+    const title = normalizeWhitespace(
+      $el.find(".jobTitle-link").first().text() ||
+        $el.find(".title a").first().text() ||
+        $el.find("a[href]").first().text()
+    );
+    if (!title) return;
+
+    jobs.push({
+      title,
+      url,
+      experience: inferKukaExperience(title),
+    });
+  });
+
+  return jobs;
+}
+
+async function fetchAllKukaJobs() {
+  const html = await fetchText(KUKA_API_URL);
+  return extractKukaJobs(html);
+}
+
 /* ── handler ────────────────────────────────────────────────── */
 
 export default async () => {
@@ -272,6 +323,15 @@ export default async () => {
       await upsertJob(client, "melonjobs", job);
     }
     console.log(`melonjobs: ${melonJobs.length} jobs processed`);
+
+    /* KUKA */
+    const kukaJobs = await fetchAllKukaJobs();
+    console.log(`kuka: ${kukaJobs.length} jobs found`);
+
+    for (const job of kukaJobs) {
+      await upsertJob(client, "kuka", job);
+    }
+    console.log(`kuka: ${kukaJobs.length} jobs processed`);
 
     return new Response("OK");
   } finally {
