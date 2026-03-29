@@ -151,6 +151,21 @@ const JobWatcher = () => {
     return saved !== null ? saved === "true" : true;
   });
 
+  const [lastCommit, setLastCommit] = useState(null);
+
+  useEffect(() => {
+    fetch("https://api.github.com/repos/Andrssss/MyWebsite/commits?per_page=1")
+      .then((r) => r.json())
+      .then((data) => {
+        const c = data?.[0];
+        if (!c) return;
+        setLastCommit({
+          message: c.commit.message.split("\n")[0],
+          date: new Date(c.commit.author.date),
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   /* =======================
      FETCH
@@ -360,6 +375,12 @@ const JobWatcher = () => {
       <div>
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 4-23 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
+          <p className="job-last-commit">
+            <span>Update: </span>
+            {lastCommit
+              ? `${lastCommit.message} – ${lastCommit.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`
+              : "…"}
+          </p>
       </div>
 
       <div className="job-actions">
