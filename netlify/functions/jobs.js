@@ -66,7 +66,7 @@ exports.handler = async (event) => {
         statusCode: 204,
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET,DELETE,OPTIONS",
+          "Access-Control-Allow-Methods": "GET,OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
         body: "",
@@ -181,18 +181,10 @@ exports.handler = async (event) => {
       return jsonResponse(200, rows);
     }
 
-    if (method === "DELETE" && id) {
-      const { rowCount } = await client.query(`DELETE FROM job_posts WHERE id = $1`, [id]);
-      if (rowCount === 0) return jsonResponse(404, { error: "Nincs ilyen id." });
-
-      return {
-        statusCode: 204,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Access-Control-Allow-Origin": "*",
-        },
-        body: "",
-      };
+    if (method === "DELETE") {
+      return jsonResponse(403, {
+        error: "A törlés API-ból tiltva van.",
+      });
     }
 
     return jsonResponse(405, { error: "Nem támogatott HTTP metódus." });

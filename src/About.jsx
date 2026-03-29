@@ -12,7 +12,7 @@ const About = () => {
         <div className="header-row">
             <h2 className="about-title">Rövid Bemutatkozás</h2>
                 <div className="profile-image">
-          <img src="/public/Untitled.png"  />
+          <img src="/Untitled.png" alt="Profilkép" />
           
           </div>
         </div>

@@ -1,10 +1,13 @@
 const https = require("https");
 
 exports.handler = async () => {
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const since = Date.now() - ONE_WEEK_MS;
+
   const data = await new Promise((resolve, reject) => {
     const options = {
       hostname: "api.github.com",
-      path: "/repos/Andrssss/MyWebsite/commits?per_page=3",
+      path: "/repos/Andrssss/MyWebsite/commits?per_page=100",
       method: "GET",
       headers: {
         "User-Agent": "netlify-function",
@@ -31,10 +34,13 @@ exports.handler = async () => {
     return { statusCode: 404, body: JSON.stringify({ error: "No commits found" }) };
   }
 
-  const updates = commits.slice(0, 3).map((commit) => ({
-    message: String(commit?.commit?.message || "").split("\n")[0].trim(),
-    date: commit?.commit?.author?.date || null,
-  }));
+  const updates = commits
+    .map((commit) => ({
+      message: String(commit?.commit?.message || "").split("\n")[0].trim(),
+      date: commit?.commit?.author?.date || null,
+    }))
+    .filter((u) => u.message && u.date && new Date(u.date).getTime() >= since)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return {
     statusCode: 200,

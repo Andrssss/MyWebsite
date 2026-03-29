@@ -161,7 +161,6 @@ const JobWatcher = () => {
         setLastUpdates(
           data.updates
             .filter((u) => u?.message && u?.date)
-            .slice(0, 3)
             .map((u) => ({
               message: u.message,
               date: new Date(u.date),
@@ -380,7 +379,7 @@ const JobWatcher = () => {
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 4-23 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
           <div className="job-last-commit">
-            <span>Last 3 updates:</span>
+            <span>Elmúlt 1 hét frissítései:</span>
             {lastUpdates.length > 0 ? (
               <ul>
                 {lastUpdates.map((u, i) => (
@@ -390,7 +389,7 @@ const JobWatcher = () => {
                 ))}
               </ul>
             ) : (
-              <div>...</div>
+              <div>Nincs frissítés az elmúlt 7 napban.</div>
             )}
           </div>
       </div>
