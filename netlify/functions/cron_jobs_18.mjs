@@ -19,7 +19,12 @@ const pool = new Pool({
 const TALENT_SEARCH_URLS = [
   "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU&date=1",
   "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU&date=1",
-  "https://hu.talent.com/jobs?k=tesztel%C5%91&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=tesztel%C5%91&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=tester&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=programmer&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=developer&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=qa&l=Budapest%2C+HU&date=1",
+
 ];
 
 /* ── shared helpers ─────────────────────────────────────────── */
