@@ -194,6 +194,18 @@ async function fetchAllDreamJobs() {
 
 /* ── MelonJobs ──────────────────────────────────────────────── */
 
+const SENIOR_KEYWORDS = [
+  "senior",
+  "szenior",
+  "lead",
+  "principal",
+  "staff",
+  "architect",
+  "expert",
+  "vezető fejlesztő",
+  "tech lead"
+];
+
 function isBudapestLocation(location) {
   const normalized = normalizeText(location);
   return normalized.includes("budapest") || /\b1\d{3}\b/.test(normalized);
@@ -202,6 +214,7 @@ function isBudapestLocation(location) {
 function inferExperience(title, description) {
   const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
 
+  if (SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw)))) return "senior";
   if (/\bmedior\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(normalized)) return "junior";
 
@@ -210,7 +223,7 @@ function inferExperience(title, description) {
 
 function isSeniorLike(title, description) {
   const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
-  return /\bsenior\b|\bszenior\b|\blead\b|\bprincipal\b|\barchitect\b|\bstaff\b|\bhead\b|\bexpert\b/.test(normalized);
+  return SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw)));
 }
 
 function extractMelonJobs(payload) {
@@ -260,7 +273,7 @@ async function fetchAllMelonJobs() {
 
 function inferKukaExperience(title) {
   const normalized = normalizeText(title);
-  if (/\bsenior\b|\bszenior\b|\blead\b|\bprincipal\b|\barchitect\b|\bstaff\b|\bhead\b/.test(normalized))
+  if (SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw))))
     return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b|\btrainee\b|\bintern\b|\bgyakornok\b/.test(normalized))
