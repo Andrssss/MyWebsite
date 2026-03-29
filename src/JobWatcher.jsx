@@ -59,6 +59,16 @@ const JOB_KEYWORD_NOTES = {
 const normalizeExperience = (experience) =>
   String(experience || "").trim().toLowerCase();
 
+const hasJuniorLevelToken = (experience) => {
+  const normalized = normalizeExperience(experience);
+  return /\b(junior|palyakezdo|pályakezdő|entry\s*level|trainee|intern)\b/.test(normalized);
+};
+
+const hasMediorLevelToken = (experience) => {
+  const normalized = normalizeExperience(experience);
+  return /\b(medior|mid|middle)\b/.test(normalized);
+};
+
 const hasJuniorYearToken = (experience) => {
   const normalized = normalizeExperience(experience);
   // Csak az onallo 0 vagy 1 szamot kezeljuk junior jelzesnek.
@@ -77,11 +87,14 @@ const isUnknownExperience = (experience) => {
 
 const isJuniorExperience = (experience) => {
   if (isUnknownExperience(experience)) return true;
-  return hasJuniorYearToken(experience);
+  if (hasMediorLevelToken(experience)) return false;
+  return hasJuniorLevelToken(experience) || hasJuniorYearToken(experience);
 };
 
 const isMediorExperience = (experience) => {
   if (isUnknownExperience(experience)) return true;
+  if (hasMediorLevelToken(experience)) return true;
+  if (hasJuniorLevelToken(experience)) return false;
   return !hasJuniorYearToken(experience);
 };
 
