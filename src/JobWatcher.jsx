@@ -482,7 +482,7 @@ const JobWatcher = () => {
       <ul className="job-list">
         {visibleJobs.map((job) => {
           const isNew =
-            job.firstSeen && hoursSince(job.firstSeen) <= 10;
+            job.firstSeen && hoursSince(job.firstSeen) <= 1;
           const notes = getKeywordNotesForJob(job);
 
           return (
