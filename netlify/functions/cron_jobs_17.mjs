@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import https from "https";
 import http from "http";
 import zlib from "zlib";
+import { load as cheerioLoad } from "cheerio";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -15,13 +16,27 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+const MAX_PAGES = 20;
+
 const DREAMJOBS_API_URL =
   "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50";
-const SOURCE_KEY = "dreamjobs";
-const MAX_PAGES = 20;
+
+const MELONJOBS_API_URL =
+  "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
+
+/* ── shared helpers ─────────────────────────────────────────── */
 
 function normalizeWhitespace(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeUrl(raw) {
@@ -97,6 +112,29 @@ async function fetchJson(url) {
   return JSON.parse(text);
 }
 
+function htmlToText(html) {
+  const $ = cheerioLoad(`<div>${html ?? ""}</div>`);
+  return normalizeWhitespace($.text());
+}
+
+async function upsertJob(client, sourceKey, item) {
+  const canonicalUrl = normalizeUrl(item.url);
+
+  await client.query(
+    `INSERT INTO job_posts
+      (source, title, url, canonical_url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
+     ON CONFLICT (source, canonical_url)
+     DO UPDATE SET
+       title = EXCLUDED.title,
+       url = EXCLUDED.url,
+       experience = COALESCE(EXCLUDED.experience, job_posts.experience);`,
+    [sourceKey, item.title, item.url, canonicalUrl, item.experience]
+  );
+}
+
+/* ── DreamJobs ──────────────────────────────────────────────── */
+
 function buildDreamJobsUrl(job) {
   const lang = /^[a-z]{2}$/i.test(String(job?.primary_lang || "")) ? String(job.primary_lang).toLowerCase() : "hu";
   const companySlug = normalizeWhitespace(job?.company?.slug);
@@ -115,7 +153,7 @@ function pickJobTitle(job) {
   return normalizeWhitespace(job?.name?.[lang]) || normalizeWhitespace(job?.name?.hu) || normalizeWhitespace(job?.name?.en) || null;
 }
 
-function extractJobs(payload) {
+function extractDreamJobs(payload) {
   const rows = Array.isArray(payload?.data) ? payload.data : [];
 
   return rows
@@ -135,7 +173,7 @@ async function fetchAllDreamJobs() {
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     baseUrl.searchParams.set("page", String(page));
     const payload = await fetchJson(baseUrl.toString());
-    const pageJobs = extractJobs(payload);
+    const pageJobs = extractDreamJobs(payload);
 
     if (pageJobs.length === 0) break;
 
@@ -147,33 +185,94 @@ async function fetchAllDreamJobs() {
   return jobs;
 }
 
-async function upsertJob(client, item) {
-  const canonicalUrl = normalizeUrl(item.url);
+/* ── MelonJobs ──────────────────────────────────────────────── */
 
-  await client.query(
-    `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
-     ON CONFLICT (source, canonical_url)
-     DO UPDATE SET
-       title = EXCLUDED.title,
-       url = EXCLUDED.url,
-       experience = COALESCE(EXCLUDED.experience, job_posts.experience);`,
-    [SOURCE_KEY, item.title, item.url, canonicalUrl, item.experience]
-  );
+function isBudapestLocation(location) {
+  const normalized = normalizeText(location);
+  return normalized.includes("budapest") || /\b1\d{3}\b/.test(normalized);
 }
+
+function inferExperience(title, description) {
+  const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
+
+  if (/\bmedior\b/.test(normalized)) return "medior";
+  if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(normalized)) return "junior";
+
+  return null;
+}
+
+function isSeniorLike(title, description) {
+  const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
+  return /\bsenior\b|\bszenior\b|\blead\b|\bprincipal\b|\barchitect\b|\bstaff\b|\bhead\b|\bexpert\b/.test(normalized);
+}
+
+function extractMelonJobs(payload) {
+  const rows = Array.isArray(payload) ? payload : [];
+
+  return rows
+    .map((job) => {
+      const title = htmlToText(job?.title?.rendered);
+      const description = htmlToText(job?.content?.rendered);
+      const url = normalizeUrl(job?.link || "");
+      const location = normalizeWhitespace(job?.meta?._job_location);
+
+      return {
+        title,
+        description,
+        url,
+        location,
+        experience: inferExperience(title, description),
+      };
+    })
+    .filter((job) => job.title && job.url)
+    .filter((job) => isBudapestLocation(job.location))
+    .filter((job) => !isSeniorLike(job.title, job.description));
+}
+
+async function fetchAllMelonJobs() {
+  const jobs = [];
+  const baseUrl = new URL(MELONJOBS_API_URL);
+  const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "100", 10) || 100;
+
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    baseUrl.searchParams.set("page", String(page));
+    const payload = await fetchJson(baseUrl.toString());
+    const pageJobs = extractMelonJobs(payload);
+
+    if (pageJobs.length === 0 && (!Array.isArray(payload) || payload.length === 0)) break;
+
+    jobs.push(...pageJobs);
+
+    if (!Array.isArray(payload) || payload.length < perPage) break;
+  }
+
+  return jobs;
+}
+
+/* ── handler ────────────────────────────────────────────────── */
 
 export default async () => {
   const client = await pool.connect();
 
   try {
-    const jobs = await fetchAllDreamJobs();
+    /* DreamJobs */
+    const dreamJobs = await fetchAllDreamJobs();
+    console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
 
-    for (const job of jobs) {
-      await upsertJob(client, job);
+    for (const job of dreamJobs) {
+      await upsertJob(client, "dreamjobs", job);
     }
+    console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
 
-    console.log(`${SOURCE_KEY}: ${jobs.length} jobs processed.`);
+    /* MelonJobs */
+    const melonJobs = await fetchAllMelonJobs();
+    console.log(`melonjobs: ${melonJobs.length} jobs found`);
+
+    for (const job of melonJobs) {
+      await upsertJob(client, "melonjobs", job);
+    }
+    console.log(`melonjobs: ${melonJobs.length} jobs processed`);
+
     return new Response("OK");
   } finally {
     client.release();
