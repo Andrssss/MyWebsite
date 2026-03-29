@@ -477,16 +477,16 @@ const JobWatcher = () => {
           <div className="job-status">Források betöltése…</div>
         ) : (
           sources.map((s) => {
-            const state = sourceStates[s.key] || "neutral";
+            const state = sourceStates[s.source] || "neutral";
             let cls = "job-tab";
             if (state === "selected") cls += " active";
             if (state === "excluded") cls += " highlighted";
 
             return (
               <button
-                key={s.key}
+                key={s.source}
                 className={cls}
-                onClick={() => handleSourceClick(s.key)}
+                onClick={() => handleSourceClick(s.source)}
               >
                 {s.label}
                 {typeof s.count === "number" && (
@@ -517,9 +517,10 @@ const JobWatcher = () => {
           const isNew =
             job.firstSeen && hoursSince(job.firstSeen) <= 1;
           const notes = getKeywordNotesForJob(job);
+          const rowKey = `${job.source || "src"}-${job.url || job.title}-${job.firstSeen || "ts"}`;
 
           return (
-            <li key={job.id} className="job-card">
+            <li key={rowKey} className="job-card">
               <div className="job-row">
                 <a
                   className="job-title"

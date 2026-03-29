@@ -91,15 +91,15 @@ exports.handler = async (event) => {
       // GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
         const { rows } = await client.query(`
-          SELECT source AS key,
+          SELECT source,
                  COUNT(*)::int AS count
           FROM job_posts
           GROUP BY source
         `);
 
-        const map = new Map(rows.map((r) => [r.key, r]));
+        const map = new Map(rows.map((r) => [r.source, r]));
         const out = FIXED.map((s) => ({
-          key: s.key,
+          source: s.key,
           label: s.label,
           count: map.get(s.key)?.count ?? 0,
         }));
@@ -110,7 +110,7 @@ exports.handler = async (event) => {
       // GET /jobs/:id
       if (id) {
         const { rows } = await client.query(
-          `SELECT id, source, title, url,
+          `SELECT source, title, url,
                   first_seen AS "firstSeen",
                   experience
            FROM job_posts
@@ -124,7 +124,7 @@ exports.handler = async (event) => {
       // GET /jobs?source=...
       if (source) {
         const sourceQuery = timeRange === "24h"
-          ? `SELECT id, source, title, url,
+          ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
@@ -133,7 +133,7 @@ exports.handler = async (event) => {
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
           : timeRange === "7d"
-          ? `SELECT id, source, title, url,
+          ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
@@ -141,7 +141,7 @@ exports.handler = async (event) => {
                AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
-          : `SELECT id, source, title, url,
+          : `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
@@ -155,7 +155,7 @@ exports.handler = async (event) => {
 
       // GET /jobs
             const allQuery = timeRange === "24h"
-        ? `SELECT id, source, title, url,
+        ? `SELECT source, title, url,
                   first_seen AS "firstSeen",
                   experience
            FROM job_posts
@@ -163,14 +163,14 @@ exports.handler = async (event) => {
            ORDER BY first_seen DESC, id DESC
            LIMIT $1`
          : timeRange === "7d"
-         ? `SELECT id, source, title, url,
+         ? `SELECT source, title, url,
               first_seen AS "firstSeen",
               experience
             FROM job_posts
             WHERE first_seen >= NOW() - INTERVAL '7 days'
             ORDER BY first_seen DESC, id DESC
             LIMIT $1`
-        : `SELECT id, source, title, url,
+        : `SELECT source, title, url,
                   first_seen AS "firstSeen",
                   experience
            FROM job_posts
