@@ -151,17 +151,22 @@ const JobWatcher = () => {
     return saved !== null ? saved === "true" : true;
   });
 
-  const [lastCommit, setLastCommit] = useState(null);
+  const [lastUpdates, setLastUpdates] = useState([]);
 
   useEffect(() => {
     fetch("/.netlify/functions/last-commit")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.message) return;
-        setLastCommit({
-          message: data.message,
-          date: new Date(data.date),
-        });
+        if (!Array.isArray(data?.updates)) return;
+        setLastUpdates(
+          data.updates
+            .filter((u) => u?.message && u?.date)
+            .slice(0, 3)
+            .map((u) => ({
+              message: u.message,
+              date: new Date(u.date),
+            }))
+        );
       })
       .catch(() => {});
   }, []);
@@ -374,12 +379,20 @@ const JobWatcher = () => {
       <div>
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 4-23 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
-          <p className="job-last-commit">
-            <span>Update: </span>
-            {lastCommit
-              ? `${lastCommit.message} – ${lastCommit.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`
-              : "…"}
-          </p>
+          <div className="job-last-commit">
+            <span>Last 3 updates:</span>
+            {lastUpdates.length > 0 ? (
+              <ul>
+                {lastUpdates.map((u, i) => (
+                  <li key={`${u.date.toISOString()}-${i}`}>
+                    {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div>...</div>
+            )}
+          </div>
       </div>
 
       <div className="job-actions">
