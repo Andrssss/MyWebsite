@@ -65,7 +65,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": "https://bakan7.netlify.app/allasfigyelo",
           "Access-Control-Allow-Methods": "GET,OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
