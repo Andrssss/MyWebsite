@@ -57,6 +57,20 @@
   margin: 3px 0;
 }
 
+.job-commits-toggle {
+  background: none;
+  border: none;
+  color: #7c8cf8;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+.job-commits-toggle:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 700px) {
   .job-watcher-header {
     flex-direction: column;

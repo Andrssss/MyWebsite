@@ -152,6 +152,7 @@ const JobWatcher = () => {
   });
 
   const [lastUpdates, setLastUpdates] = useState([]);
+  const [commitsOpen, setCommitsOpen] = useState(false);
 
   useEffect(() => {
     fetch("/.netlify/functions/last-commit")
@@ -381,13 +382,36 @@ const JobWatcher = () => {
           <div className="job-last-commit">
             <span>Elmúlt 1 hét git commitok:</span>
             {lastUpdates.length > 0 ? (
-              <ul>
-                {lastUpdates.map((u, i) => (
-                  <li key={`${u.date.toISOString()}-${i}`}>
-                    {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul>
+                  {lastUpdates.slice(0, 3).map((u, i) => (
+                    <li key={`${u.date.toISOString()}-${i}`}>
+                      {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
+                    </li>
+                  ))}
+                </ul>
+                {lastUpdates.length > 3 && (
+                  <>
+                    <button
+                      className="job-commits-toggle"
+                      onClick={() => setCommitsOpen((prev) => !prev)}
+                    >
+                      {commitsOpen
+                        ? "▲ Régebbiek elrejtése"
+                        : `▼ Még ${lastUpdates.length - 3} commit megjelenítése`}
+                    </button>
+                    {commitsOpen && (
+                      <ul>
+                        {lastUpdates.slice(3).map((u, i) => (
+                          <li key={`${u.date.toISOString()}-${i + 3}`}>
+                            {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </>
             ) : (
               <div>Nincs frissítés az elmúlt 7 napban.</div>
             )}
