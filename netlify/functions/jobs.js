@@ -17,7 +17,7 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": "https://bakan7.netlify.app",
       ...extraHeaders,
     },
     body: JSON.stringify(body),
