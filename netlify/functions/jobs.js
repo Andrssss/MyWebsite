@@ -49,6 +49,8 @@ const FIXED = [
   { key: "tesco", label: "Tesco" },
   { key: "talent", label: "Talent" },
   { key: "bluebird", label: "bluebird" },
+  { key: "ydiak", label: "Y Diák" },
+  { key: "qdiak", label: "Q Diák" },
 
 ];
 
