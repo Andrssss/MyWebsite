@@ -1097,16 +1097,17 @@ function buildMinddiakWhere_UI() {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
+  const canonicalUrl = normalizeUrl(item.url);
   await client.query(
-    `
-    INSERT INTO job_posts
-      (source, title, url, first_seen)
-    VALUES
-      ($1, $2, $3, NOW())
-    ON CONFLICT (source, url)
-    DO NOTHING;
-    `,
-    [source, item.title, item.url]
+    `INSERT INTO job_posts
+      (source, title, url, canonical_url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
+     ON CONFLICT (source, canonical_url)
+     DO UPDATE SET
+       title = EXCLUDED.title,
+       url = EXCLUDED.url,
+       experience = COALESCE(EXCLUDED.experience, job_posts.experience);`,
+    [source, item.title, item.url, canonicalUrl, item.experience ?? "-"]
   );
 }
 
@@ -1333,6 +1334,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       if (write && client) {
         for (const item of matchedList) {
+          item.experience = "diákmunka";
           await upsertJob(client, source, item);
         }
       }
