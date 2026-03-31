@@ -63,51 +63,10 @@ function normalizeWhitespace(s) {
 }
 
 
-
-function extractZynternFromApiPayload(payload) {
-  const arr = Array.isArray(payload?.data) ? payload.data : [];
-
-  return arr
-    .map((j) => ({
-      title: j?.title ? String(j.title).slice(0, 300) : null,
-      url: j?.url ? normalizeUrl(String(j.url)) : null,
-      description: j?.description ? String(j.description).slice(0, 800) : null,
-    }))
-    .filter((x) => x.title && x.url);
-}
-
 async function fetchJson(url, redirectLeft = 5) {
   const txt = await fetchText(url, redirectLeft);
   return JSON.parse(txt);
 }
-
-
-async function fetchAllZynternJobs({ fields = "16,15", maxPages = 10 }) {
-  const all = [];
-
-  for (let page = 1; page <= maxPages; page++) {
-    const url = `https://zyntern.com/jobs?fields=${fields}&page=${page}`;
-
-    let html;
-    try {
-      html = await fetchText(url);
-    } catch (err) {
-      const msg = String(err?.message || "");
-      if (/HTTP\s+404\b/i.test(msg)) break;
-      throw err;
-    }
-
-    const pageItems = mergeCandidates(
-      extractCandidates(html, url).filter((c) => looksLikeJobUrl("zyntern", c.url)),
-      extractSSR(html, url).filter((c) => looksLikeJobUrl("zyntern", c.url))
-    );
-
-    all.push(...pageItems);
-  }
-
-  return dedupeByUrl(all);
-}
-
 
 
 function normalizeUrl(raw) {
@@ -951,10 +910,6 @@ function looksLikeJobUrl(sourceKey, url) {
 
 
 
-  if (sourceKey === "zyntern") {
-    if (!/^\/job\/\d+/.test(u.pathname)) return false;
-  }
-
   return true;
 }
 
@@ -1333,14 +1288,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       let merged = [];
 
-      if (source === "zyntern") {
-        try {
-          merged = await fetchAllZynternJobs({ fields: "16,15", maxPages: 10 });
-        } catch (e) {
-          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
-          continue;
-        }
-      } else if (source === "minddiak") {
+      if (source === "minddiak") {
         try {
           merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 6, debug });
         } catch (e) {

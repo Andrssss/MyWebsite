@@ -91,27 +91,28 @@ async function fetchJson(url, redirectLeft = 5) {
 }
 
 
-async function fetchAllZynternJobs({ fields = "16,15", maxPages = 10 }) {
+async function fetchAllZynternJobs({ fields = "80,15,16", maxPages = 10 }) {
   const all = [];
 
   for (let page = 1; page <= maxPages; page++) {
-    const url = `https://zyntern.com/jobs?fields=${fields}&page=${page}`;
+    const url = `https://zyntern.com/api/jobs?fields=${fields}&page=${page}`;
 
-    let html;
+    let payload;
     try {
-      html = await fetchText(url);
+      payload = await fetchJson(url);
     } catch (err) {
       const msg = String(err?.message || "");
       if (/HTTP\s+404\b/i.test(msg)) break;
       throw err;
     }
 
-    const pageItems = mergeCandidates(
-      extractCandidates(html, url).filter((c) => looksLikeJobUrl("zyntern", c.url)),
-      extractSSR(html, url).filter((c) => looksLikeJobUrl("zyntern", c.url))
-    );
-
+    const pageItems = extractZynternFromApiPayload(payload);
     all.push(...pageItems);
+
+    // stop if we reached the last page
+    const meta = payload?.meta;
+    if (meta && page >= (meta.last_page || page)) break;
+    if (!pageItems.length) break;
   }
 
   return dedupeByUrl(all);
@@ -1236,7 +1237,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
       if (source === "zyntern") {
         try {
-          merged = await fetchAllZynternJobs({ fields: "16,15", maxPages: 10 });
+          merged = await fetchAllZynternJobs({ fields: "80,15,16", maxPages: 10 });
         } catch (e) {
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
           continue;
