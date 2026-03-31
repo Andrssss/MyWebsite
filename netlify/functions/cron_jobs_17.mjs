@@ -18,8 +18,10 @@ const pool = new Pool({
 
 const MAX_PAGES = 20;
 
-const DREAMJOBS_API_URL =
-  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50";
+const DREAMJOBS_API_URLS = [
+  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
+  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=22381&tags%5Boffice-location%5D%5B%5D=2925&tags%5Boffice-location%5D%5B%5D=15990&scope%5B%5D=isNotBlue&per_page=50",
+];
 
 const MELONJOBS_API_URL =
   "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
@@ -177,19 +179,29 @@ function extractDreamJobs(payload) {
 
 async function fetchAllDreamJobs() {
   const jobs = [];
-  const baseUrl = new URL(DREAMJOBS_API_URL);
-  const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "50", 10) || 50;
+  const seen = new Set();
 
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    baseUrl.searchParams.set("page", String(page));
-    const payload = await fetchJson(baseUrl.toString());
-    const pageJobs = extractDreamJobs(payload);
+  for (const apiUrl of DREAMJOBS_API_URLS) {
+    const baseUrl = new URL(apiUrl);
+    const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "50", 10) || 50;
 
-    if (pageJobs.length === 0) break;
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      baseUrl.searchParams.set("page", String(page));
+      const payload = await fetchJson(baseUrl.toString());
+      const pageJobs = extractDreamJobs(payload);
 
-    jobs.push(...pageJobs);
+      if (pageJobs.length === 0) break;
 
-    if (pageJobs.length < perPage) break;
+      for (const job of pageJobs) {
+        const key = normalizeUrl(job.url);
+        if (!seen.has(key)) {
+          seen.add(key);
+          jobs.push(job);
+        }
+      }
+
+      if (pageJobs.length < perPage) break;
+    }
   }
 
   return jobs;
