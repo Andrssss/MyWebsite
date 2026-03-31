@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "23 4-24 * * *",
+  schedule: "24 4-23 * * *",
 };
 
 import { Pool } from "pg";
