@@ -1,12 +1,8 @@
-// netlify/functions/cron_jobs_2.mjs
-console.log("CRON_JOBS LOADED");
+// netlify/functions/cron_jobs_13.mjs
+console.log("CRON_JOBS_13 LOADED");
 export const config = {
-  schedule: "17 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
-
-globalThis.File ??= class File {};
-globalThis.Blob ??= class Blob {};
-globalThis.FormData ??= class FormData {};
 
 import https from "node:https";
 import http from "node:http";
@@ -26,28 +22,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-
- 
-async function runAllBatches() {
-  const size = 4;
-  const totalBatches = Math.ceil(SOURCES.length / size);
-
-  console.log("[runAllBatches]", totalBatches, "batches");
-
-  for (let batch = 0; batch < totalBatches; batch++) {
-    await runBatch({ batch, size, write: true, debug: false, bundleDebug: false });
-    await sleep(50);
-  }
-}
-
-
-
 // =====================
 // HELPERS
 // =====================
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 function stripAccents(s) {
   return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -60,11 +37,6 @@ function normalizeText(s) {
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
-
-
-
-
-
 
 function normalizeUrl(raw) {
   try {
@@ -108,16 +80,6 @@ function absolutize(href, base) {
     return null;
   }
 }
-
-function mergeCandidates(...lists) {
-  // flatten + dedupe URL alapján
-  const merged = [];
-  for (const arr of lists) {
-    if (Array.isArray(arr)) merged.push(...arr);
-  }
-  return dedupeByUrl(merged);
-}
-
 
 function dedupeByUrl(items) {
   const seen = new Set();
@@ -301,95 +263,6 @@ function isSeniorLike(title = "", desc = "") {
 }
 
 
-function extractSSR(html, baseUrl) {
-  const $ = cheerioLoad(html);
-  const items = [];
-
-  // Tipikus "kártya" konténerek / list item-ek
-  const CARD_SELECTORS = [
-    "app-job-list-item",
-    "article",
-    "li",
-    ".job",
-    ".job-list-item",
-    ".position",
-    ".listing",
-    ".card",
-    ".item",
-    ".vacancy",
-    ".vacancies__item",
-    "[data-href]",
-    "[data-url]",
-    "[onclick]",
-    "[role='link']",
-    "[routerlink]",
-  ].join(",");
-
-  $(CARD_SELECTORS).each((_, el) => {
-    const $card = $(el);
-
-    // 1) link kinyerés: data-href/data-url/routerlink/onclick/benne lévő a[href]
-    let href =
-      $card.attr("data-href") ||
-      $card.attr("data-url") ||
-      $card.attr("routerlink") ||
-      null;
-
-    if (!href) {
-      // onclick="location.href='...'" / window.location='...'
-      const oc = $card.attr("onclick") || "";
-      const m = oc.match(/(?:location\.href|window\.location)\s*=\s*['"]([^'"]+)['"]/i)
-        || oc.match(/['"]([^'"]+)['"]/); // fallback: első string
-      if (m && m[1]) href = m[1];
-    }
-
-    if (!href) {
-      // ha nincs "kártya link", akkor nézzük a kártyán belüli legjobb linket
-      const a = $card.find("a[href]").first();
-      href = a.attr("href") || null;
-    }
-
-    const url = href ? absolutize(href, baseUrl) : null;
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) return;
-    if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
-
-    // 2) cím kinyerés: heading > erős szöveg > valami rövidebb text
-    let title =
-      normalizeWhitespace($card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
-      normalizeWhitespace($card.find(".title,.job-title,.position-title,.name").first().text()) ||
-      normalizeWhitespace($card.find("strong").first().text()) ||
-      null;
-
-    if (!title || title.length < 4) {
-      // ha nincs jó title, próbáljuk a link szövegét (de CTA-nál ez rossz, ezért CTA szűrés)
-      const aText = normalizeWhitespace($card.find("a[href]").first().text());
-      if (aText && !isCtaTitle(aText)) title = aText;
-    }
-
-    title = normalizeWhitespace(title);
-    if (!title || title.length < 4) return;
-    if (isCtaTitle(title)) return; // “Megnézem / Részletek” ne legyen cím
-
-    // 3) leírás (opcionális)
-    const desc =
-      normalizeWhitespace($card.find("p").first().text()) ||
-      normalizeWhitespace($card.find(".description,.job-desc,.job-description").first().text()) ||
-      null;
-
-    items.push({
-      title: title.slice(0, 300),
-      url,
-      description: desc ? desc.slice(0, 800) : null,
-    });
-  });
-
-  return dedupeByUrl(items);
-}
-
-
-
-
 function keywordHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
@@ -407,7 +280,6 @@ function looksLikeJobUrl(sourceKey, url) {
   if (!url) return false;
   const u = new URL(url);
 
-  // általános szemét
   const bad = [
     "/fiokom",
     "/csomagok",
@@ -418,19 +290,6 @@ function looksLikeJobUrl(sourceKey, url) {
     "/category",
   ];
   if (bad.some(p => u.pathname.startsWith(p))) return false;
-
-  // =========================
-  // PROFESSION – CSAK VALÓDI ÁLLÁS
-  // =========================
-  if (sourceKey.startsWith("profession")) {
-    /**
-     * Elfogadott minták:
-     * /allas/<slug>-<szam>
-     * /allas/<slug>-<szam>/pro
-     */
-    const ok = /^\/allas\/[^\/]+-\d+(\/pro)?\/?$/.test(u.pathname);
-    return ok;
-  }
 
   // CVCentrum
   if (sourceKey.startsWith("cvcentrum")) {
@@ -657,25 +516,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
     
 
       // =========================
-      // MERGE JOBS
+      // EXTRACT & FILTER
       // =========================
-      let merged = [];
-
-       
-        let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-        let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-
-        let melodiakSSR = [];
-        let schonherz = [];
-
-        merged =
-          source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-            : mergeCandidates(generic, ssr, melodiakSSR);
-      
+      const merged = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
 
       // =========================
-      // FILTER & KEYWORD MATCH
+      // KEYWORD MATCH
       // =========================
       let matchedList = merged
         .filter((c) => matchesKeywords(c.title, c.description))
@@ -686,19 +532,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // BLACKLISTING
       // =========================
-      const BLACKLIST_SOURCES = ["profession"];
-      const BLACKLIST_URLS = [
-        "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship",
-      ];
-
-      if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
-        matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
-      }
-
-      if (source === "cvonline") {
-        matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
-      }
-
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
       matchedList = matchedList.filter(item => {
         const text = `${item.title ?? ""} ${item.description ?? ""}`.toLowerCase();
@@ -753,12 +586,12 @@ export default async (request) => {
   const write = url.searchParams.get("write") === "1";
 
   if (!debug) {
-    await runAllBatches();
+    await runBatch({ batch: 0, size: SOURCES.length, write: true, debug: false, bundleDebug: false });
     return new Response("Cron jobs done", { status: 200 });
   }
 
   const batch = Number(url.searchParams.get("batch") || 0);
-  const size = Number(url.searchParams.get("size") || 4);
+  const size = Number(url.searchParams.get("size") || SOURCES.length);
 
   const stats = await runBatch({
     batch,

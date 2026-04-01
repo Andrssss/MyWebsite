@@ -1,8 +1,13 @@
 // netlify/functions/cron_jobs_2.mjs
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "11 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
+
+/* ========================= it-programozas-fejlesztes - CATH : 1,10,23
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
+*/
+
 
 globalThis.File ??= class File {};
 globalThis.Blob ??= class Blob {};
@@ -135,7 +140,6 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
-  // { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/hu/allashirdetesek/data-platform-tester/165430" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },

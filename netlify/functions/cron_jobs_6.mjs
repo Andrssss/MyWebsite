@@ -1,8 +1,16 @@
 // netlify/functions/cron_jobs_2.mjs
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "12 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
+
+/* =========================
+const SOURCES = [
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+];
+*/
+
+
 
 globalThis.File ??= class File {};
 globalThis.Blob ??= class Blob {};

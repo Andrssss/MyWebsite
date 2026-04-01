@@ -1,6 +1,12 @@
 export const config = {
-  schedule: "24 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
+
+/* =========================
+  "https://ydiak.hu/aktualis-diakmunkaink/it-munka?region=budapest";
+  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
+*/
+
 
 import { Pool } from "pg";
 import https from "https";

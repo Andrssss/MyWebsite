@@ -1,6 +1,15 @@
 export const config = {
-  schedule: "20 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
+
+
+/* =========================
+const SOURCES = [
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=szoftverfejleszto-szoftvermernok" },
+    { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=tesztelo" },
+  ];
+--------------------- */
 
 import { Pool } from "pg";
 import https from "https";

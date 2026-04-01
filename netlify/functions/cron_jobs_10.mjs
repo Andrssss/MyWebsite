@@ -2,6 +2,15 @@ export const config = {
   schedule: "1 4-23 * * *",
 };
 
+/* =========================
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
+
+  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
+*/
+
+
+
+
 import { Pool } from "pg";
 import https from "https";
 import http from "http";

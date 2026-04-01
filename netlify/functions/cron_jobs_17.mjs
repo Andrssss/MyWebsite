@@ -1,6 +1,14 @@
 export const config = {
-  schedule: "21 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
+
+/* =========================
+  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
+  "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
+  "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
+  "https://careers.tesco.com/en_GB/careersmarketplace/SearchJobs/?748_location_place=Budapest,%20Central%20Hungary,%20Hungary&748_location_radius=20&748_location_coordinates=[47.5,19.04]&listFilterMode=1&jobRecordsPerPage=50";
+*/
+
 
 import { Pool } from "pg";
 import https from "https";

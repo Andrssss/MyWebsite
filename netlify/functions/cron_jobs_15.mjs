@@ -1,6 +1,11 @@
 export const config = {
-  schedule: "19 4-23 * * *",
+  schedule: "2 4-23 * * *",
 };
+
+/* ========================= PAGE 4-6 ONLY
+const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
+*/
+
 
 import { Pool } from "pg";
 import https from "https";

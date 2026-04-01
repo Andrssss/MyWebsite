@@ -1,6 +1,10 @@
 export const config = {
-  schedule: "4 4-23 * * *",
+  schedule: "2 4-23 * * *",
 };
+
+/* ========================= GETTING EXPERIENCE LEVEL
+const ENRICH_SOURCES = ["aam", "karrierhungaria"];
+--------------------- */
 
 import { Pool } from "pg";
 import https from "https";

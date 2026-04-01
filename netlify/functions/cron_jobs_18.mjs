@@ -1,6 +1,12 @@
 export const config = {
-  schedule: "22 4-23 * * *",
+  schedule: "1 4-23 * * *",
 };
+
+/* =========================
+  "https://hu.talent.com,
+*/
+
+
 
 import { Pool } from "pg";
 import https from "https";

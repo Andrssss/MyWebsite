@@ -537,14 +537,8 @@ async function run() {
 
   { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
   
-  //{ key: "kpmg", label: "kpmg", url: "https://kpmg.hrfelho.hu/" },
   //{ key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
 
-  // { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
-  //{ key: "profession-gyakornok", label: "Profession – Gyakornok", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
-  //{ key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
-  //{ key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
-  //{ key: "profession-junior", label: "Profession – junior", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
 ];
 
   const client = await pool.connect();

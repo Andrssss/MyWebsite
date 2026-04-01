@@ -1,6 +1,13 @@
 export const config = {
-  schedule: "16 4-23 * * *",
+  schedule: "6 4-23 * * *",
 };
+
+/* ========================= GETTING EXPERIENCE LEVEL
+      AND source = 'LinkedIn'
+--------------------- */
+            
+
+
 
 import { Pool } from "pg";
 import https from "https";
