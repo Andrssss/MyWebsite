@@ -36,6 +36,15 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
+const INTERNSHIP_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+];
+function isInternshipTitle(title) {
+  const t = normalizeText(title);
+  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
+}
+
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
@@ -198,13 +207,15 @@ function isMatchingFrissdiplomasDetail(html) {
 
 async function upsertJob(client, source, item) {
   const canonicalUrl = item.url;
+  const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
+
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, canonical_url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, canonical_url)
         DO NOTHING;`,
-    [source, item.title, item.url, canonicalUrl]
+    [source, item.title, item.url, canonicalUrl, experience]
   );
 }
 
@@ -250,7 +261,7 @@ export default async () => {
       }
       return items.length;
     }
-    // Skip pages 1-4, start from page 4
+    // Skip pages 1-6, start from page 7
     let page = 7;
     while (true) {
       const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;

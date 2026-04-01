@@ -35,6 +35,24 @@ function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeText(s) {
+  return String(s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const INTERNSHIP_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+];
+function isInternshipTitle(title) {
+  const t = normalizeText(title);
+  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
+}
+
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
@@ -162,7 +180,7 @@ export default async () => {
   try {
 
     const { rows } = await client.query(`
-        SELECT id, url
+        SELECT id, url, title
         FROM job_posts
         WHERE first_seen >= NOW() - INTERVAL '30 minutes'
             AND (experience IS NULL OR experience = '-')
@@ -187,6 +205,7 @@ export default async () => {
 
         const html = await fetchText(row.url);
         const details = extractJobDetails(html);
+        const experience = isInternshipTitle(row.title) ? "diákmunka" : (details.experience ?? "-");
 
         await client.query(
             `
@@ -195,7 +214,7 @@ export default async () => {
             WHERE id = $2
             `,
             [
-                details.experience ?? "-",
+                experience,
                 row.id
             ]
             );

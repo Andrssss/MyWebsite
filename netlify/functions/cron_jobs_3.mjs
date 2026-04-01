@@ -34,6 +34,15 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
+const INTERNSHIP_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+];
+function isInternshipTitle(title) {
+  const t = normalizeText(title);
+  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
+}
+
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
@@ -356,15 +365,16 @@ async function upsertJob(client, source, item) {
     source === "LinkedIn"
       ? canonicalizeLinkedInJobUrl(item.url)
       : item.url;
+  const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, canonical_url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, canonical_url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl]
+    [source, item.title, item.url, canonicalUrl, experience]
   );
 }
 

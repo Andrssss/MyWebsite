@@ -156,12 +156,23 @@ function isSeniorLike(title) {
   return SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw)));
 }
 
+const INTERNSHIP_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+];
+
+function isInternshipTitle(title) {
+  const n = normalizeText(title ?? "");
+  return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
+}
+
 function inferTalentExperience(title) {
   const normalized = normalizeText(title);
+  if (INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))) return "diákmunka";
   if (SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw))))
     return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
-  if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b|\btrainee\b|\bintern\b|\bgyakornok\b/.test(normalized))
+  if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b/.test(normalized))
     return "junior";
   return null;
 }

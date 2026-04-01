@@ -294,6 +294,16 @@ const SENIOR_KEYWORDS = [
   "tech lead"
 ];
 
+const INTERNSHIP_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+];
+
+function isInternshipTitle(title) {
+  const n = normalizeText(title ?? "");
+  return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
+}
+
 function hasWord(n, w) {
   // szóhatár: it ne találjon bele más szavakba
   const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
@@ -760,7 +770,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (write && client) {
         const DIAKMUNKA_SOURCES = ["otp", "vizmuvek"];
         for (const item of matchedList) {
-          if (DIAKMUNKA_SOURCES.includes(source)) item.experience = "diákmunka";
+          if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) item.experience = "diákmunka";
           await upsertJob(client, source, item);
         }
       }

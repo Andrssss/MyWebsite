@@ -234,9 +234,20 @@ function isBudapestLocation(location) {
   return normalized.includes("budapest") || /\b1\d{3}\b/.test(normalized);
 }
 
+const INTERNSHIP_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+];
+
+function isInternshipTitle(title) {
+  const n = normalizeText(title ?? "");
+  return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
+}
+
 function inferExperience(title, description) {
   const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
 
+  if (INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))) return "diákmunka";
   if (SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw)))) return "senior";
   if (/\bmedior\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(normalized)) return "junior";

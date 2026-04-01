@@ -56,9 +56,6 @@ function normalizeUrl(raw) {
   }
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
