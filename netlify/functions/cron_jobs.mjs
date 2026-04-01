@@ -1,4 +1,4 @@
-
+// netlify/functions/cron_jobs.mjs
 // netlify/functions/cron_jobs.js
 console.log("CRON_JOBS LOADED");
 export const config = {
@@ -21,9 +21,6 @@ const SOURCES = [
 
 
 
-globalThis.File ??= class File {};
-globalThis.Blob ??= class Blob {};
-globalThis.FormData ??= class FormData {};
 
 import https from "node:https";
 import http from "node:http";
@@ -79,10 +76,6 @@ function normalizeWhitespace(s) {
 }
 
 
-async function fetchJson(url, redirectLeft = 5) {
-  const txt = await fetchText(url, redirectLeft);
-  return JSON.parse(txt);
-}
 
 
 function normalizeUrl(raw) {
@@ -310,377 +303,22 @@ function hasWord(n, w) {
 
 
 
-function base64urlDecode(str) {
-  const pad = str.length % 4 ? "=".repeat(4 - (str.length % 4)) : "";
-  const b64 = str.replace(/-/g, "+").replace(/_/g, "/") + pad;
-  return Buffer.from(b64, "base64").toString("utf8");
-}
-
-function decodeJwtPayload(token) {
-  try {
-    const parts = String(token || "").split(".");
-    if (parts.length < 2) return null;
-    return JSON.parse(base64urlDecode(parts[1]));
-  } catch {
-    return null;
-  }
-}
-function fetchJsonWithHeaders(url, { method = "GET", headers = {}, body = null } = {}, redirectLeft = 5) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const lib = u.protocol === "https:" ? https : http;
-
-    const req = lib.request(
-      u,
-      {
-        method,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip,deflate,br",
-          Accept: "application/json, text/plain, */*",
-          ...headers,
-        },
-        timeout: 50000,
-      },
-      (res) => {
-        const code = res.statusCode || 0;
-
-        if ([301, 302, 303, 307, 308].includes(code)) {
-          const loc = res.headers.location;
-          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
-          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          const nextUrl = new URL(loc, url).toString();
-          res.resume();
-          return resolve(fetchJsonWithHeaders(nextUrl, { method, headers, body }, redirectLeft - 1));
-        }
-
-        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
-        let stream = res;
-        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
-        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
-        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
-
-        let data = "";
-        stream.setEncoding("utf8");
-        stream.on("data", (chunk) => (data += chunk));
-        stream.on("end", () => {
-          if (code < 200 || code >= 300) return reject(new Error(`HTTP ${code} for ${url}. Body: ${data.slice(0, 200)}`));
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(new Error(`JSON parse failed for ${url}: ${e.message}. Preview: ${data.slice(0, 200)}`));
-          }
-        });
-        stream.on("error", reject);
-      }
-    );
-
-    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
-    req.on("error", reject);
-
-    if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
-    req.end();
-  });
-}
-function pickTokenFromPayload(payload) {
-  if (!payload) return null;
-  // gyakori mezőnevek
-  return (
-    payload.token ||
-    payload.accessToken ||
-    payload.access_token ||
-    payload.jwt ||
-    payload.data?.token ||
-    payload.data?.accessToken ||
-    payload.data?.access_token ||
-    null
-  );
-}
-
-async function getMinddiakApiToken() {
-  
-  // 1) cache
-  const cached = globalThis.__minddiakTokenCache;
-  if (cached?.token && isJwtStillValid(cached.token)) {
-    const p = decodeJwtPayload(cached.token);
-    return cached.token;
-  }
 
 
-  const envToken = process.env.MINDDIAK_API_BEARER;
-  if (envToken && isJwtStillValid(envToken)) {
-    cached.token = envToken;
-    return envToken;
-  }
-
-  // 3) próbálkozás tipikus endpointokkal
-  const candidates = [
-    // GET
-    { method: "GET", url: "https://api.humancentrum.hu/auth/guest" },
-    { method: "GET", url: "https://api.humancentrum.hu/auth/token" },
-    { method: "GET", url: "https://api.humancentrum.hu/session" },
-    { method: "GET", url: "https://api.humancentrum.hu/users/guest" },
-
-    // POST (néha kell)
-    { method: "POST", url: "https://api.humancentrum.hu/auth/guest", body: {} },
-    { method: "POST", url: "https://api.humancentrum.hu/auth/token", body: {} },
-    { method: "POST", url: "https://api.humancentrum.hu/auth/login", body: { guest: true } },
-  ];
-
-  const commonHeaders = {
-    Origin: "https://minddiak.hu",
-    Referer: "https://minddiak.hu/",
-  };
-
-  for (const c of candidates) {
-  try {
-    const headers = { ...commonHeaders };
-
-    if (c.method === "POST") {
-      headers["Content-Type"] = "application/json";
-    }
-
-    const payload = await fetchJsonWithHeaders(
-      c.url,
-      {
-        method: c.method,
-        headers,
-        body: c.body || null,
-      }
-    );
-
-    const token = pickTokenFromPayload(payload);
-    if (token && isJwtStillValid(token)) {
-      cached.token = token;
-      const p = decodeJwtPayload(token);
-      cached.exp = Number(p?.exp || 0);
-      console.log("[minddiak token] SUCCESS:", c.method, c.url);
-      return token;
-    }
-  } catch (e) {
-    // Silently skip failed attempts (typically 404/401 errors)
-  }
-}
-
-    // 4) fallback: token keresése a main bundle-ben
-    // 4) fallback: valós guest endpoint kinyerése a bundle-ből
-  try {
-    const t = await getMinddiakApiTokenFromBundle("https://minddiak.hu/diakmunka-226/work_type/it-mernok-10");
-    if (t && isJwtStillValid(t)) {
-      cached.token = t;
-      const p = decodeJwtPayload(t);
-      cached.exp = Number(p?.exp || 0);
-      console.log("[minddiak token] SUCCESS: bundle extraction");
-      return t;
-    }
-  } catch (e) {
-    // Silently skip bundle extraction failures
-  }
-
-  throw new Error("Could not obtain MindDiák API token automatically ...");
-
-}
-
-function isJwtStillValid(token, skewSeconds = 60) {
-  const p = decodeJwtPayload(token);
-  const exp = Number(p?.exp || 0);
-  if (!exp) return false;
-  const now = Math.floor(Date.now() / 1000);
-  return exp > (now + skewSeconds);
-}
-
-function extractGuestEndpointFromBundle(jsText) {
-  const idx = jsText.indexOf('key:"guest"');
-  if (idx < 0) return null;
-
-  const snippet = jsText.slice(idx, Math.min(jsText.length, idx + 8000));
-
-  // key:"guest",value:function(){var Z="".concat(this.API_URL,"SOME_PATH");
-  let m = snippet.match(/concat\(this\.API_URL,\s*"([^"]+)"\)/i);
-  if (m?.[1]) return m[1];
-
-  // this.API_URL+"SOME_PATH"
-  m = snippet.match(/this\.API_URL\+\s*"([^"]+)"/i);
-  if (m?.[1]) return m[1];
-
-  // fallback: "/...guest..."
-  m = snippet.match(/"\/[^"]*guest[^"]*"/i);
-  if (m?.[0]) return JSON.parse(m[0]);
-
-  return null;
-}
 
 
-function extractApiBaseFromBundle(jsText) {
-  // keressünk konkrét humancentrum URL-t
-  const m = jsText.match(/https?:\/\/api\.humancentrum\.hu\/[a-z0-9_\-\/]*/i);
-  if (m?.[0]) {
-    // biztos legyen / a végén
-    return m[0].endsWith("/") ? m[0] : (m[0] + "/");
-  }
 
-  // fallback: sima domain
-  return "https://api.humancentrum.hu/";
-}
 
 // Netlify warm instance cache
-globalThis.__minddiakTokenCache ??= { token: null, exp: 0 };
-
-
-async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = false }) {
-  const token = await getMinddiakApiToken();
-  if (!token) throw new Error("MindDiák token missing");
-
-  const where = buildMinddiakWhere_UI();
-
-  // COUNT ha van, ha nincs, akkor lapozunk amíg elfogy
-  const total = await minddiakCount(where, token);
-  const pages = total == null ? maxPages : Math.min(Math.ceil(total / limit), maxPages);
-
-  if (debug) console.log("[minddiak] count:", total, "pages:", pages);
-
-  const all = [];
-  for (let page = 0; page < pages; page++) {
-    const offset = page * limit;
-
-    const u = new URL("https://api.humancentrum.hu/positions");
-    u.searchParams.set("order", "id DESC");
-    u.searchParams.set("offset", String(offset));
-    u.searchParams.set("limit", String(limit));
-    u.searchParams.set("where", JSON.stringify(where));
-    u.searchParams.set(
-      "include",
-      JSON.stringify([{ relation: "positionMd" }, { relation: "positionFrontend" }, { relation: "ownerUser" }])
-    );
-
-    const txt = await fetchTextWithHeaders(u.toString(), {
-      Accept: "application/json, text/plain, */*",
-      Authorization: `Bearer ${token}`,
-      Referer: "https://minddiak.hu/",
-      Origin: "https://minddiak.hu",
-    });
-
-    const payload = JSON.parse(txt);
-    const arr = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-
-    const items = arr
-      .map((j) => {
-        const title = j?.positionFrontend?.title || j?.title || j?.name || null;
-        const url = buildMinddiakDetailUrl(j);
-
-
-        const description =
-          j?.positionFrontend?.short_description ||
-          j?.positionFrontend?.description ||
-          j?.description ||
-          j?.companyDescription ||
-          null;
-
-        return {
-          title: title ? String(title).slice(0, 300) : null,
-          url: url || null,
-          description: description ? String(description).slice(0, 800) : null,
-        };
-      })
-      .filter((x) => x.title && x.url);
-
-    if (!items.length) break;
-    all.push(...items);
-
-    // ha nincs count, ez állítja meg
-    if (items.length < limit) break;
-  }
-
-  return dedupeByUrl(all);
-}
-
-
-
-async function minddiakCount(where, token) {
-  const candidates = [
-    "https://api.humancentrum.hu/count",           // amit a DevTools mutat
-    "https://api.humancentrum.hu/positions/count", // LoopBack klasszikus
-  ];
-
-  for (const base of candidates) {
-    const u  = new URL("https://api.humancentrum.hu/positions/count");
-    u.searchParams.set("where", JSON.stringify(where));
-    try {
-      const txt = await fetchTextWithHeaders(u.toString(), {
-        Accept: "application/json, text/plain, */*",
-        Authorization: `Bearer ${token}`,
-        Referer: "https://minddiak.hu/",
-        Origin: "https://minddiak.hu",
-      });
-      const obj = JSON.parse(txt);
-      const c = Number(obj?.count);
-      if (Number.isFinite(c)) return c;
-    } catch (e) {
-      // csak log, megyünk tovább
-      console.log("[minddiak count] failed:", u.toString(), e.message);
-    }
-  }
-
-  return null; // nincs count endpoint -> lapozós fallback
-}
 
 
 
 
-async function getMinddiakApiTokenFromBundle(pageUrl) {
-  const html = await fetchText(pageUrl);
-  const scriptSrcs = extractScriptSrcs(html, pageUrl);
 
-  const mainLike =
-    scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
-    scriptSrcs.find((s) => /index\..*\.js(\?|$)/i.test(s)) ||
-    null;
 
-  if (!mainLike) return null;
 
-  const jsText = await fetchText(mainLike);
 
-  const guestPath = extractGuestEndpointFromBundle(jsText);
-  if (!guestPath) return null;
 
-  const apiBase = extractApiBaseFromBundle(jsText);
-
-  const guestUrl = new URL(guestPath, apiBase).toString();
-
-  const common = {
-    Origin: "https://minddiak.hu",
-    Referer: "https://minddiak.hu/",
-    Accept: "application/json, text/plain, */*",
-  };
-
-  for (const attempt of [
-    { method: "GET" },
-    { method: "POST", body: {} },
-  ]) {
-    try {
-      const payload = await fetchJsonWithHeaders(
-        guestUrl,
-        {
-          method: attempt.method,
-          headers: {
-            ...common,
-            ...(attempt.method === "POST" ? { "Content-Type": "application/json" } : {}),
-          },
-          body: attempt.body || null,
-        }
-      );
-
-      const token = pickTokenFromPayload(payload);
-      if (token) return token;
-    } catch (e) {
-      console.log("[minddiak token] bundle attempt failed:", attempt.method, e.message);
-    }
-  }
-
-  return null;
-}
 
 
 
@@ -800,58 +438,6 @@ function json(statusCode, obj) {
 
 
 
-function fetchTextWithHeaders(url, extraHeaders = {}, redirectLeft = 5) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const lib = u.protocol === "https:" ? https : http;
-
-    const req = lib.request(
-      u,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip,deflate,br",
-          ...extraHeaders,
-        },
-        timeout: 50000,
-      },
-      (res) => {
-        const code = res.statusCode || 0;
-
-        if ([301, 302, 303, 307, 308].includes(code)) {
-          const loc = res.headers.location;
-          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
-          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          const nextUrl = new URL(loc, url).toString();
-          res.resume();
-          return resolve(fetchTextWithHeaders(nextUrl, extraHeaders, redirectLeft - 1));
-        }
-
-        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
-        let stream = res;
-        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
-        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
-        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
-
-        let data = "";
-        stream.setEncoding("utf8");
-        stream.on("data", (chunk) => (data += chunk));
-        stream.on("end", () => {
-          if (code >= 200 && code < 300) resolve(data);
-          else reject(new Error(`HTTP ${code} for ${url}`));
-        });
-        stream.on("error", reject);
-      }
-    );
-
-    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
-    req.on("error", reject);
-    req.end();
-  });
-}
 
 
 function keywordHit(title, desc) {
@@ -865,47 +451,6 @@ function keywordHit(title, desc) {
   return hits;
 }
 
-function extractMelodiakDetail(html, baseUrl) {
-  const $ = cheerioLoad(html);
-
-  const title =
-    normalizeWhitespace($("h1,h2").first().text()) ||
-    normalizeWhitespace($(".job-title,.title").first().text()) ||
-    null;
-
-  // próbálunk “nagy” szöveget találni (leírás / elvárások / feladatok)
-  const desc =
-    normalizeWhitespace($(".job-description, .description, .content, .entry-content").text()) ||
-    normalizeWhitespace($("main").text()) ||
-    normalizeWhitespace($("body").text());
-
-  return {
-    title: title ? title.slice(0, 300) : null,
-    description: desc ? desc.slice(0, 800) : null,
-    url: normalizeUrl(baseUrl),
-  };
-}
-
-async function enrichMelodiakItems(items, limit = 12) {
-  // egyszerű soros futás (14 elemnél bőven ok, Netlify-n is biztonságos)
-  const out = [];
-  for (const it of items.slice(0, limit)) {
-    try {
-      const html = await fetchText(it.url);
-      const d = extractMelodiakDetail(html, it.url);
-      out.push({
-        title: d.title || it.title,
-        url: it.url,
-        description: d.description || it.description || null,
-      });
-    } catch {
-      out.push(it); // fallback
-    }
-  }
-  // ha több mint limit, a maradékot változatlanul hozzáadjuk
-  if (items.length > limit) out.push(...items.slice(limit));
-  return out;
-}
 
 function looksLikeJobUrl(sourceKey, url) {
   if (!url) return false;
@@ -929,37 +474,6 @@ function looksLikeJobUrl(sourceKey, url) {
 }
 
 
-function buildMinddiakDetailUrl(j) {
-  const id = j?.id ?? null;
-  const pf = j?.positionFrontend || {};
-
-  // MindDiák jellemző mezők
-  const raw = (pf.url ?? pf.path ?? pf.link ?? pf.slug ?? "").toString().trim();
-
-  // 1) ha már teljes URL
-  if (/^https?:\/\//i.test(raw)) return normalizeUrl(raw);
-
-  // 2) ha relatív útvonal (tipikusan "/diakmunka/...." vagy "diakmunka/....")
-  if (raw) {
-    let p = raw.split(/[?#]/)[0].trim();
-
-    // rakjunk elé slash-t
-    if (!p.startsWith("/")) p = "/" + p;
-
-    // ha valamiért csak slug jönne "logisztikus-...-52079", akkor tegyük elé a /diakmunka/-t
-    if (!p.startsWith("/diakmunka/") && !p.startsWith("/diakmunka-")) {
-      // ha már tartalmaz id-t vagy slug-id formát, akkor is jó így
-      p = "/diakmunka/" + p.replace(/^\/+/, "");
-    }
-
-    return normalizeUrl("https://minddiak.hu" + p);
-  }
-
-  // 3) fallback, ha nincs frontend path/url (utolsó mentsvár)
-  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-${id}`);
-
-  return null;
-}
 
 
 // =====================
@@ -1095,71 +609,12 @@ function extractCandidates(html, baseUrl) {
 // =====================
 // Melódiák SSR extraction
 // =====================
-function extractMelodiakCards(html) {
-  const $ = cheerioLoad(html);
-
-  const items = [];
-
-  $(".job-list-item").each((_, el) => {
-    const $el = $(el);
-
-    const title =
-      normalizeWhitespace($el.find(".job-title").first().text()) ||
-      normalizeWhitespace($el.find("h1,h2,h3,h4,h5,h6").first().text());
-    if (!title || title.length < 4) return;
-
-    const cls = $el.attr("class") || "";
-    const tokens = cls.split(/\s+/).filter(Boolean);
-
-    const rawSlug =
-      tokens.find((t) => t.startsWith("job-list-component-")) ||
-      tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) ||
-      null;
-
-    if (!rawSlug) return;
-
-    const slug = rawSlug.replace(/^job-list-component-/, "");
-    const url = `https://www.melodiak.hu/diakmunkak/${slug}/`;
-
-    items.push({ title: title.slice(0, 300), url, description: null });
-  });
-
-  return dedupeByUrl(items);
-}
 
 // =====================
 // Bundle debug for Melódiák API discovery
 // =====================
-function extractScriptSrcs(html, baseUrl) {
-  const $ = cheerioLoad(html);
 
 
-  // ✅ Minddiák: base mindig root legyen
-  let base = baseUrl;
-  try {
-    const u = new URL(baseUrl);
-    base = u.origin + "/"; // https://minddiak.hu/
-  } catch {}
-
-  return $("script[src]")
-    .map((_, s) => absolutize($(s).attr("src"), base))
-    .get()
-    .filter(Boolean);
-}
-
-
-function buildMinddiakWhere_UI() {
-  const today = new Date().toISOString().slice(0, 10) + " 00:00:00";
-
-  return {
-    type: 20,
-    status: 30,                 // ez nálad a probe-ban is 30
-    date: today,                // UI is küld date-et
-    work_type_md_id: [null, 10],// IT mérnök (a képed alapján)
-    distance: 20,               // UI szerint
-    county: [null, 13],         // Budapest (a képed alapján)
-  };
-}
 
 // =====================
 // DB upsert (csak write=1 esetén)
@@ -1179,46 +634,6 @@ async function upsertJob(client, source, item) {
   );
 }
 
-function extractSchonherz(html, baseUrl) {
-  const $ = cheerioLoad(html);
-
-  const items = [];
-
-  // 1 hirdetés = 1 darab .col-md-8 a #ads alatt
-  $("#ads .row.ad-list .col-md-8").each((_, el) => {
-    const $card = $(el);
-
-    // URL: az első diakmunka link a kártyában
-    const href = $card.find("a[href*='/diakmunka/']").first().attr("href");
-    const url = href ? absolutize(href, baseUrl) : null;
-    if (!url) return;
-
-    // TITLE: preferáltan a h4-ben lévő link szövege (ez a valódi pozíció név)
-    let title = normalizeWhitespace($card.find("h4 a[href*='/diakmunka/']").first().text());
-
-    // fallback: ha nincs h4, akkor a leghosszabb nem-CTA link szöveg a kártyában
-    if (!title || title.length < 4) {
-      const candidates = $card
-        .find("a[href*='/diakmunka/']")
-        .map((_, a) => normalizeWhitespace($(a).text()))
-        .get()
-        .filter((t) => t && t.length >= 4 && !isCtaTitle(t));
-
-      candidates.sort((a, b) => b.length - a.length);
-      title = candidates[0] || null;
-    }
-
-    if (!title || title.length < 4) return;
-
-    items.push({
-      title: title.slice(0, 300),
-      url: normalizeUrl(url),
-      description: null,
-    });
-  });
-
-  return dedupeByUrl(items);
-}
 
 function cleanJobTitle(rawTitle) {
   if (!rawTitle) return null;
@@ -1237,10 +652,6 @@ function cleanJobTitle(rawTitle) {
 }
 
 // Example:
-const raw = "German Speaking Junior Project Manager – Public Transport ÚJ 650k – 1.1M HUF Project Manager Communication skills Completed studies Decision-making skills Deutsche Telekom TSI Hungary Kft. Budapest +3";
-console.log(cleanJobTitle(raw));
-// Output: "German Speaking Junior Project Manager – Public Transport"
-
 
 // ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
@@ -1274,60 +685,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         continue;
       }
 
-      // -------- bundle debug -------
-      if (source === "minddiak" && debug && bundleDebug) {
-        try {
-          const scriptSrcs = extractScriptSrcs(html, p.url);
-          const mainLike =
-            scriptSrcs.find((s) => /main\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /index\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /runtime\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /app\..*\.js(\?|$)/i.test(s)) ||
-            scriptSrcs.find((s) => /\.js(\?|$)/i.test(s)) ||
-            null;
-
-          if (mainLike) {
-            const jsText = await fetchText(mainLike);
-            const guestPath2 = extractGuestEndpointFromBundle(jsText);
-            const apiBase2 = extractApiBaseFromBundle(jsText);
-            console.log("[minddiak bundledebug] apiBase:", apiBase2, "guestPath:", guestPath2);
-          }
-        } catch (e) {
-          console.log("minddiak bundledebug error:", e.message);
-        }
-      }
-
-
-
       // =========================
       // MERGE JOBS
       // =========================
-      let merged = [];
-
-      if (source === "minddiak") {
-        try {
-          merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 6, debug });
-        } catch (e) {
-          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
-          continue;
-        }
-      } else {
-        let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-        let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-
-        let melodiakSSR = [];
-        if (source === "melodiak") melodiakSSR = extractMelodiakCards(html).filter((c) => looksLikeJobUrl(source, c.url));
-
-        let schonherz = [];
-        if (source === "schonherz") schonherz = extractSchonherz(html, p.url);
-
-        merged =
-          source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-            : mergeCandidates(generic, ssr, melodiakSSR);
-
-        if (source === "melodiak") merged = await enrichMelodiakItems(merged, 20);
-      }
+      let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
+      let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
+      let merged = mergeCandidates(generic, ssr);
 
       // =========================
       // FILTER & KEYWORD MATCH

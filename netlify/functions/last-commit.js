@@ -39,7 +39,7 @@ exports.handler = async () => {
       message: String(commit?.commit?.message || "").split("\n")[0].trim(),
       date: commit?.commit?.author?.date || null,
     }))
-    .filter((u) => u.message && u.date && new Date(u.date).getTime() >= since)
+    .filter((u) => u.message && u.date && new Date(u.date).getTime() >= since && u.message.startsWith("[jobs]"))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return {

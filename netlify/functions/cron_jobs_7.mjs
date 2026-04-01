@@ -1,8 +1,7 @@
-
-// netlify/functions/cron_jobs.js
-console.log("CRON_JOBS LOADED");
+// netlify/functions/cron_jobs_7.mjs
+console.log("CRON_JOBS_7 LOADED");
 export const config = {
-  schedule: "1 4-23 * * *",
+  schedule: "5 4-23 * * *",
 };
 
 /* =========================
@@ -12,13 +11,9 @@ const SOURCES = [
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
-
 ];
 */
 
-globalThis.File ??= class File {};
-globalThis.Blob ??= class Blob {};
-globalThis.FormData ??= class FormData {};
 
 import https from "node:https";
 import http from "node:http";
@@ -713,14 +708,6 @@ function extractSSR(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
-function json(statusCode, obj) {
-  return {
-    statusCode,
-    headers: { "content-type": "application/json; charset=utf-8" },
-    body: JSON.stringify(obj),
-  };
-}
-
 
 
 
@@ -789,48 +776,6 @@ function keywordHit(title, desc) {
     if (n.includes(nk)) hits.push(k);
   }
   return hits;
-}
-
-function extractMelodiakDetail(html, baseUrl) {
-  const $ = cheerioLoad(html);
-
-  const title =
-    normalizeWhitespace($("h1,h2").first().text()) ||
-    normalizeWhitespace($(".job-title,.title").first().text()) ||
-    null;
-
-  // próbálunk “nagy” szöveget találni (leírás / elvárások / feladatok)
-  const desc =
-    normalizeWhitespace($(".job-description, .description, .content, .entry-content").text()) ||
-    normalizeWhitespace($("main").text()) ||
-    normalizeWhitespace($("body").text());
-
-  return {
-    title: title ? title.slice(0, 300) : null,
-    description: desc ? desc.slice(0, 800) : null,
-    url: normalizeUrl(baseUrl),
-  };
-}
-
-async function enrichMelodiakItems(items, limit = 12) {
-  // egyszerű soros futás (14 elemnél bőven ok, Netlify-n is biztonságos)
-  const out = [];
-  for (const it of items.slice(0, limit)) {
-    try {
-      const html = await fetchText(it.url);
-      const d = extractMelodiakDetail(html, it.url);
-      out.push({
-        title: d.title || it.title,
-        url: it.url,
-        description: d.description || it.description || null,
-      });
-    } catch {
-      out.push(it); // fallback
-    }
-  }
-  // ha több mint limit, a maradékot változatlanul hozzáadjuk
-  if (items.length > limit) out.push(...items.slice(limit));
-  return out;
 }
 
 function looksLikeJobUrl(sourceKey, url) {
@@ -1035,43 +980,6 @@ function extractCandidates(html, baseUrl) {
 }
 
 // =====================
-// Melódiák SSR extraction
-// =====================
-function extractMelodiakCards(html) {
-  const $ = cheerioLoad(html);
-
-  const items = [];
-
-  $(".job-list-item").each((_, el) => {
-    const $el = $(el);
-
-    const title =
-      normalizeWhitespace($el.find(".job-title").first().text()) ||
-      normalizeWhitespace($el.find("h1,h2,h3,h4,h5,h6").first().text());
-    if (!title || title.length < 4) return;
-
-    const cls = $el.attr("class") || "";
-    const tokens = cls.split(/\s+/).filter(Boolean);
-
-    const rawSlug =
-      tokens.find((t) => t.startsWith("job-list-component-")) ||
-      tokens.find((t) => /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/i.test(t)) ||
-      null;
-
-    if (!rawSlug) return;
-
-    const slug = rawSlug.replace(/^job-list-component-/, "");
-    const url = `https://www.melodiak.hu/diakmunkak/${slug}/`;
-
-    items.push({ title: title.slice(0, 300), url, description: null });
-  });
-
-  return dedupeByUrl(items);
-}
-
-// =====================
-// Bundle debug for Melódiák API discovery
-// =====================
 function extractScriptSrcs(html, baseUrl) {
   const $ = cheerioLoad(html);
 
@@ -1162,27 +1070,6 @@ function extractSchonherz(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
-function cleanJobTitle(rawTitle) {
-  if (!rawTitle) return null;
-  // Cut at 'ÚJ' or similar markers
-  const cutMarkers = ["ÚJ", "NEW", "FRISS"]; // extend if needed
-  let title = rawTitle;
-  for (const marker of cutMarkers) {
-    const idx = title.indexOf(marker);
-    if (idx >= 0) {
-      title = title.slice(0, idx);
-      break;
-    }
-  }
-  // Trim extra spaces and punctuation at the end
-  return title.trim().replace(/[-–:]+$/g, "").trim();
-}
-
-// Example:
-const raw = "German Speaking Junior Project Manager – Public Transport ÚJ 650k – 1.1M HUF Project Manager Communication skills Completed studies Decision-making skills Deutsche Telekom TSI Hungary Kft. Budapest +3";
-console.log(cleanJobTitle(raw));
-// Output: "German Speaking Junior Project Manager – Public Transport"
-
 
 // ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
@@ -1264,28 +1151,19 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
         let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
 
-        let melodiakSSR = [];
-        if (source === "melodiak") melodiakSSR = extractMelodiakCards(html).filter((c) => looksLikeJobUrl(source, c.url));
-
         let schonherz = [];
         if (source === "schonherz") schonherz = extractSchonherz(html, p.url);
 
         merged =
           source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-            : mergeCandidates(generic, ssr, melodiakSSR);
-
-        if (source === "melodiak") merged = await enrichMelodiakItems(merged, 20);
+            ? mergeCandidates(schonherz, generic, ssr)
+            : mergeCandidates(generic, ssr);
       }
 
       // =========================
       // FILTER & KEYWORD MATCH
       // =========================
       let matchedList = merged
-        .map((c) => {
-          if (source === "nofluffjobs") c.title = cleanJobTitle(c.title);
-          return c;
-        })
         .filter((c) => matchesKeywords(c.title, c.description))
         .filter((c) => !isSeniorLike(c.title, c.description));
 
@@ -1294,20 +1172,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // BLACKLISTING
       // =========================
-      const BLACKLIST_SOURCES = [ "jobline", "otp","muisz"];
+      const BLACKLIST_SOURCES = ["muisz"];
       const BLACKLIST_URLS = [
-        "https://jobline.hu/allasok/25,200307,162",
-        "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
         "https://muisz.hu/hu/regisztracio",
         "https://muisz.hu/hu/diakmunkaink",
       ];
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
-      }
-
-      if (source === "cvonline") {
-        matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
       }
 
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];

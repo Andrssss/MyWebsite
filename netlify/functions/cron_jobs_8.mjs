@@ -1,17 +1,10 @@
-// netlify/functions/cron_jobs_2.mjs
-console.log("CRON_JOBS LOADED");
+// netlify/functions/cron_jobs_8.mjs
+console.log("CRON_JOBS_8 LOADED");
 export const config = {
-  schedule: "1 4-23 * * *",
+  schedule: "6 4-23 * * *",
 };
 
-/* ========================= it-programozas-fejlesztes - CATH : 1,10,23
-  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
-*/
 
-
-globalThis.File ??= class File {};
-globalThis.Blob ??= class Blob {};
-globalThis.FormData ??= class FormData {};
 
 import https from "node:https";
 import http from "node:http";
@@ -92,12 +85,6 @@ function normalizeUrl(raw) {
   "keyword"
 ].forEach((p) => u.searchParams.delete(p));
 
-    // =========================
-    // CV Centrum: strip numeric suffix like -2-2 and -3 at the end
-    // =========================
-    if (u.hostname.includes("cvcentrum.hu") && /^\/allasok\/.*-\d+-\d+\/?$/.test(u.pathname)) {
-      u.pathname = u.pathname.replace(/-\d+(-\d+)?\/?$/, "");    
-    }
 
     return u.toString().replace(/\?$/, "");
   } catch {
@@ -112,15 +99,6 @@ function absolutize(href, base) {
   } catch {
     return null;
   }
-}
-
-function mergeCandidates(...lists) {
-  // flatten + dedupe URL alapján
-  const merged = [];
-  for (const arr of lists) {
-    if (Array.isArray(arr)) merged.push(...arr);
-  }
-  return dedupeByUrl(merged);
 }
 
 
@@ -307,97 +285,6 @@ function isSeniorLike(title = "", desc = "") {
   const n = normalizeText(`${title} ${desc}`);
   return SENIOR_KEYWORDS.some(k => n.includes(normalizeText(k)));
 }
-
-
-function extractSSR(html, baseUrl) {
-  const $ = cheerioLoad(html);
-  const items = [];
-
-  // Tipikus "kártya" konténerek / list item-ek
-  const CARD_SELECTORS = [
-    "app-job-list-item",
-    "article",
-    "li",
-    ".job",
-    ".job-list-item",
-    ".position",
-    ".listing",
-    ".card",
-    ".item",
-    ".vacancy",
-    ".vacancies__item",
-    "[data-href]",
-    "[data-url]",
-    "[onclick]",
-    "[role='link']",
-    "[routerlink]",
-  ].join(",");
-
-  $(CARD_SELECTORS).each((_, el) => {
-    const $card = $(el);
-
-    // 1) link kinyerés: data-href/data-url/routerlink/onclick/benne lévő a[href]
-    let href =
-      $card.attr("data-href") ||
-      $card.attr("data-url") ||
-      $card.attr("routerlink") ||
-      null;
-
-    if (!href) {
-      // onclick="location.href='...'" / window.location='...'
-      const oc = $card.attr("onclick") || "";
-      const m = oc.match(/(?:location\.href|window\.location)\s*=\s*['"]([^'"]+)['"]/i)
-        || oc.match(/['"]([^'"]+)['"]/); // fallback: első string
-      if (m && m[1]) href = m[1];
-    }
-
-    if (!href) {
-      // ha nincs "kártya link", akkor nézzük a kártyán belüli legjobb linket
-      const a = $card.find("a[href]").first();
-      href = a.attr("href") || null;
-    }
-
-    const url = href ? absolutize(href, baseUrl) : null;
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) return;
-    if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|rar|7z)(\?|#|$)/i.test(url)) return;
-
-    // 2) cím kinyerés: heading > erős szöveg > valami rövidebb text
-    let title =
-      normalizeWhitespace($card.find("h1,h2,h3,h4,h5,h6").first().text()) ||
-      normalizeWhitespace($card.find(".title,.job-title,.position-title,.name").first().text()) ||
-      normalizeWhitespace($card.find("strong").first().text()) ||
-      null;
-
-    if (!title || title.length < 4) {
-      // ha nincs jó title, próbáljuk a link szövegét (de CTA-nál ez rossz, ezért CTA szűrés)
-      const aText = normalizeWhitespace($card.find("a[href]").first().text());
-      if (aText && !isCtaTitle(aText)) title = aText;
-    }
-
-    title = normalizeWhitespace(title);
-    if (!title || title.length < 4) return;
-    if (isCtaTitle(title)) return; // “Megnézem / Részletek” ne legyen cím
-
-    // 3) leírás (opcionális)
-    const desc =
-      normalizeWhitespace($card.find("p").first().text()) ||
-      normalizeWhitespace($card.find(".description,.job-desc,.job-description").first().text()) ||
-      null;
-
-    items.push({
-      title: title.slice(0, 300),
-      url,
-      description: desc ? desc.slice(0, 800) : null,
-    });
-  });
-
-  return dedupeByUrl(items);
-}
-
-
-
-
 function keywordHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
@@ -440,11 +327,6 @@ function looksLikeJobUrl(sourceKey, url) {
     return ok;
   }
 
-  // CVCentrum
-  if (sourceKey.startsWith("cvcentrum")) {
-    if (!/^\/allasok\/[^\/]+\/?$/.test(u.pathname)) return false;
-  }
-  return true;
 }
 
 // =====================
@@ -667,20 +549,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // MERGE JOBS
       // =========================
-      let merged = [];
 
-       
-        let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-        let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
+      let merged = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
 
-        let melodiakSSR = [];
-        let schonherz = [];
-
-        merged =
-          source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-            : mergeCandidates(generic, ssr, melodiakSSR);
-      
 
       // =========================
       // FILTER & KEYWORD MATCH
@@ -705,10 +576,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
-      }
-
-      if (source === "cvonline") {
-        matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
       }
 
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];

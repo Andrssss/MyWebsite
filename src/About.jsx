@@ -27,8 +27,7 @@ const About = () => {
 
              Ami elég fun munka. Jó kis kreatív. Meg végre azt csinálom amit gyerekként is szerettem volna, mert lényegében 
              nyomozó lettem. Mivel az IT munka nagyrésze kitalálni 3-4 emberen keresztűl, hogy akkor mit is szeretnének pontosan.
-              Szóval social skillek sok esetben fontosabbak, mint az IT-sok. ( Ezt azért mondom, mert sok IT-s kollégám van, akiknek minősíthetetlenül szar 
-              kódjai vannak, de viccesek, szóval 2 éve itt dolgoznak. Ha belegondolsz amúgy logikus. )
+              Szóval social skillek sok esetben fontosabbak, mint az IT-sok. Hiába vagy jó programozó, ha nem tudod kideríteni, hogy mi a feladatod.
           </p>
 
           <p>

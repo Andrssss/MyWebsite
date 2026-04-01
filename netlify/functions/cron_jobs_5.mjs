@@ -1,6 +1,6 @@
 console.log("CRON_JOBS LOADED");
 export const config = {
-  schedule: "3 4-23 * * *",
+  schedule: "18 4-23 * * *",
 };
 
 /* ========================= GETTING EXPERIENCE LEVEL
