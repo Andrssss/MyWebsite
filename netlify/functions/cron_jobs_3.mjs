@@ -2,9 +2,6 @@ export const config = {
   schedule: "3 4-23 * * *",
 };
 
-/* ========================= keywords=developer
-      { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=teszt&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-*/
 
 
 
@@ -381,20 +378,6 @@ function levelNotBlacklisted(title, desc) {
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
 
-/* =========================
-   BLACKLISTING
-========================= 
-const BLACKLIST_SOURCES = ["profession"];
-
-const BLACKLIST_URLS = [
-  "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
-];
-
- ---------------------
-   Main (Netlify handler)
---------------------- */
 export default async () => {
   
 
@@ -448,7 +431,6 @@ export default async () => {
         return true;
       });
 
-     // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
         try {

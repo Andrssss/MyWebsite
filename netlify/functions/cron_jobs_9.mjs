@@ -6,7 +6,6 @@ export const config = {
       { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=teszt&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 */
 
-
 import { Pool } from "pg";
 import https from "https";
 import http from "http";
@@ -36,9 +35,6 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
-function normalizeWhitespace(s) {
-  return String(s ?? "").replace(/\s+/g, " ").trim();
-}
 
 function titleNotBlacklisted(title) {
   const TITLE_BLACKLIST = [
@@ -288,29 +284,6 @@ function fetchText(url, redirectLeft = 5) {
 /* ---------------------
    HTML extraction
 --------------------- */
-function extractCandidates(html, baseUrl) {
-  const $ = cheerioLoad(html);
-
-  const items = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    const url = new URL(href, baseUrl).toString();
-    if (!/^https?:\/\//i.test(url)) return;
-
-    let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
-    if (!card.length) card = $(el).closest("div");
-
-    let title =
-      normalizeWhitespace($(el).text()) ||
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
-    if (!title || title.length < 4) return;
-
-    const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0,300), url, description: desc ? desc.slice(0,800) : null });
-  });
-  return dedupeByUrl(items);
-}
 
 /* ---------------------
    LinkedIn extraction
@@ -380,20 +353,6 @@ function levelNotBlacklisted(title, desc) {
   return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
 }
 
-/* =========================
-   BLACKLISTING
-========================= 
-const BLACKLIST_SOURCES = ["profession"];
-
-const BLACKLIST_URLS = [
-  "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
-];
-
- ---------------------
-   Main (Netlify handler)
---------------------- */
 export default async () => {
   
 
@@ -447,20 +406,16 @@ const SOURCES = [
         continue;
       }
 
-      const rawItems =
-        p.key === "LinkedIn"
-          ? extractLinkedInJobs(html)
-          : extractCandidates(html, p.url);
+      const rawItems = extractLinkedInJobs(html);
 
       let items = rawItems.filter(it => {
-        const needKeywords = p.key === "LinkedIn" || p.key === "cvonline";
+        const needKeywords = p.key === "LinkedIn";
         if (needKeywords && !matchesKeywords(it.title, it.description)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
 
-     // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
         try {

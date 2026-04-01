@@ -15,7 +15,6 @@ import OthersLinks from './OthersLinks.tsx';
 import About from './About.jsx';
 import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
-import LinksLauncher from './LinksLauncher.jsx';
 import User_pages from './User_pages.tsx';
 import JobWatcher from "./JobWatcher.jsx";
 
@@ -130,16 +129,6 @@ useEffect(() => {
           <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
           <Route path="/User_oldalak" element={<User_pages />} />
           <Route path="/rolam" element={<About />} />
-
-          {/* Gyakornoki linkek */}
-          <Route
-            path="/gyakornoki_poziciok"
-            element={
-              <div className={`${isMobile ? 'content' : 'main-content'} re-page`}>
-                <LinksLauncher />
-              </div>
-            }
-          />
 
           {/* Állásfigyelő */}
           <Route

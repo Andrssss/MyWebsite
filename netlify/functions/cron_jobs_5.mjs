@@ -3,9 +3,6 @@ export const config = {
   schedule: "18 4-23 * * *",
 };
 
-/* ========================= GETTING EXPERIENCE LEVEL
-      AND source = 'profession-intern'
---------------------- */
 
 
 import { Pool } from "pg";
@@ -85,21 +82,6 @@ function fetchText(url) {
   });
 }
 
-function extractRequirements(html) {
-  const $ = cheerioLoad(html);
-
-  // A box, ahol az elvárások vannak
-  const requirementsBox = $("#box_az-allashoz-tartozo-elvarasok");
-
-  // Kinyerjük az összes <li> elemet
-  const requirements = requirementsBox.find("ul > li")
-    .map((i, el) => normalizeWhitespace($(el).text()))
-    .get(); // .get() visszaadja arrayként
-
-  console.log("Requirements found:", requirements.length ? requirements : "NOT FOUND");
-
-  return { requirements };
-}
 
 
 function extractJobDetails(html) {

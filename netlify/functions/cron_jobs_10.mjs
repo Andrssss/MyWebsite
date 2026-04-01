@@ -2,11 +2,6 @@ export const config = {
   schedule: "8 4-23 * * *",
 };
 
-/* =========================
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
-
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
-*/
 
 
 
@@ -228,20 +223,6 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
 ]);
 
-/* =========================
-   BLACKLISTING
-========================= 
-const BLACKLIST_SOURCES = ["profession"];
-
-const BLACKLIST_URLS = [
-  "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,internship",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok,0,0,0,0,0,0,0,0,0,10",
-  "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,internship"
-];
-
- ---------------------
-   Main (Netlify handler)
---------------------- */
 export default async () => {
   
 
@@ -288,7 +269,6 @@ const SOURCES = [
         return true;
       });
 
-     // items = applyBlacklist(items, p.key);
 
       for (const it of items) {
         try {

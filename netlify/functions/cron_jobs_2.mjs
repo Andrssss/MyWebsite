@@ -12,10 +12,6 @@ const SOURCES = [
 */
 
 
-globalThis.File ??= class File {};
-globalThis.Blob ??= class Blob {};
-globalThis.FormData ??= class FormData {};
-
 import https from "node:https";
 import http from "node:http";
 import zlib from "node:zlib";
@@ -673,13 +669,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
         let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
 
-        let melodiakSSR = [];
-        let schonherz = [];
+        merged = mergeCandidates(generic, ssr);
 
-        merged =
-          source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr, melodiakSSR)
-            : mergeCandidates(generic, ssr, melodiakSSR);
       
 
       // =========================
@@ -707,9 +698,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
-      if (source === "cvonline") {
-        matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
-      }
 
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
       matchedList = matchedList.filter(item => {
