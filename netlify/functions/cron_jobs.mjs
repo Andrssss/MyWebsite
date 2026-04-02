@@ -733,9 +733,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
-      if (source === "cvonline") {
-        matchedList = matchedList.filter(c => !c.url.startsWith("https://www.cvonline.hu/hu/company/"));
-      }
 
       const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
       matchedList = matchedList.filter(item => {

@@ -418,7 +418,6 @@ export default async () => {
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=5&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&geoId=104291169&keywords=evosoft%20software%20developer&origin=JOBS_HOME_KEYWORD_HISTORY&refresh=true" },
     
-    { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
   ];
 
   const client = await pool.connect();

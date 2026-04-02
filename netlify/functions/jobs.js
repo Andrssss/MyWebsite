@@ -39,7 +39,6 @@ const FIXED = [
   { key: "otp", label: "OTP" },
   { key: "vizmuvek", label: "vizmuvek" },
   { key: "LinkedIn", label: "LinkedIn PAST 24H" },
-  { key: "cvonline", label: "cvonline" },
   { key: "wherewework", label: "wherewework" },
   { key: "onejob", label: "onejob" },
   { key: "nofluffjobs", label: "nofluffjobs" },

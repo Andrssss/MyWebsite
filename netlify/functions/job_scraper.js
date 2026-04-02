@@ -533,11 +533,8 @@ async function run() {
   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=5&f_E=2&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 
-
-
-  { key: "cvonline", label: "cvonline", url: "https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0/budapest/apprenticeships" },
   
-  //{ key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/adverts/it-5980e4975de0fe1b308b460a/budapest/kulfold" },
+  { key: "prodiak", label: "Prodiák – IT állások", url: "https://www.prodiak.hu/api/adverts/related/269891?page=1", api: true },
 
 ];
 
@@ -545,30 +542,43 @@ async function run() {
 
   try {
     for (const p of SOURCES) {
-      let html;
-      try { html = await fetchText(p.url); } 
+      let text;
+      try { text = await fetchText(p.url); } 
       catch (err) { console.error(p.key, "fetch failed:", err.message); continue; }
 
       let items = [];
-      const rawItems =
-        p.key === "LinkedIn"
-          ? extractLinkedInJobs(html)
-          : extractCandidates(html, p.url);
 
-      items = rawItems.filter(it => {
-        const needKeywords = p.key === "LinkedIn" || p.key === "cvonline";
+      if (p.api) {
+        // Prodiák JSON API
+        try {
+          const json = JSON.parse(text);
+          const data = json.items?.data ?? [];
+          items = data.map(d => ({
+            title: d.name,
+            url: `https://www.prodiak.hu/allas/${d.slug}/${d.index_id}`,
+            description: d.description || null,
+            experience: "diákmunka",
+          }));
+        } catch (err) { console.error(p.key, "JSON parse failed:", err.message); continue; }
+      } else {
+        const rawItems =
+          p.key === "LinkedIn"
+            ? extractLinkedInJobs(text)
+            : extractCandidates(text, p.url);
 
-        if (needKeywords && !matchesKeywords(it.title, it.description)) {
-          return false;
-        }
+        items = rawItems.filter(it => {
+          const needKeywords = p.key === "LinkedIn" || p.key === "cvonline";
 
-        if (!levelNotBlacklisted(it.title, it.description)) return false;
-        if (!titleNotBlacklisted(it.title)) return false;
+          if (needKeywords && !matchesKeywords(it.title, it.description)) {
+            return false;
+          }
 
-        return true;
-      });
+          if (!levelNotBlacklisted(it.title, it.description)) return false;
+          if (!titleNotBlacklisted(it.title)) return false;
 
-
+          return true;
+        });
+      }
 
       items = applyBlacklist(items, p.key);
 
