@@ -337,10 +337,12 @@ function matchesKeywords(title, desc) {
 
   // Legalabb egy eros, szakmai kulcsszo legyen benne.
   const hasStrongKeyword = KEYWORDS_STRONG.some((k) => n.includes(normalizeText(k)));
+  const aiHit = hasWord(n, "ai"); // csak külön szóként
 
   // Blacklist alapú szűrés: ami tiltott szóval érkezik, kiesik.
   const hasBlacklistedWord = TITLE_BLACKLIST.some((k) => n.includes(normalizeText(k)));
-  return hasStrongKeyword && !hasBlacklistedWord;
+  const matched = hasStrongKeyword || (aiHit && /engineer|developer|fejleszto|fejlesztő|analyst|scientist|consultant|support/.test(n));
+  return matched && !hasBlacklistedWord;
 }
 
 function isSeniorLike(title = "", desc = "") {

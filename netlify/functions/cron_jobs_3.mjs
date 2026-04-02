@@ -1,7 +1,9 @@
 export const config = {
   schedule: "3 4-23 * * *",
 };
-
+/* =========================
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+*/
 
 
 
@@ -199,9 +201,10 @@ function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
   const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
   const itHit = /\bit\b/i.test(n);
+  const aiHit = /\bai\b/i.test(n);
   return strongHit || (
-    itHit &&
-    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n)
+    (itHit || aiHit) &&
+    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant|engineer|fejleszto|fejlesztő/.test(n)
   );
 }
 

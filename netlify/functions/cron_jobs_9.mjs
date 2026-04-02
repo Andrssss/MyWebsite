@@ -193,13 +193,15 @@ function matchesKeywords(title, desc) {
   "network",
   "jog",
   "jogi",
+
 ];
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
   const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
   const itHit = /\bit\b/i.test(n);
+  const aiHit = /\bai\b/i.test(n);
   return strongHit || (
-    itHit &&
-    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n)
+    (itHit || aiHit) &&
+    /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant|engineer|fejleszto|fejlesztő/.test(n)
   );
 }
 

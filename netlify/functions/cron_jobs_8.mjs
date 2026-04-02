@@ -4,6 +4,9 @@ export const config = {
   schedule: "6 4-23 * * *",
 };
 
+/* ========================= keywords=teszt
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
+*/
 
 
 import https from "node:https";
@@ -284,11 +287,12 @@ function matchesKeywords(title, desc) {
 
   const strongHit = KEYWORDS_STRONG.some(k => n.includes(normalizeText(k)));
   const itHit = hasWord(n, "it"); // csak külön szóként
+  const aiHit = hasWord(n, "ai"); // csak külön szóként
 
   // szabály:
   // - ha van strongHit → ok
-  // - ha csak "it" van, az NEM elég (különben túl sok false positive)
-  return strongHit || (itHit && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant/.test(n));
+  // - ha csak "it" vagy "ai" van, az NEM elég (különben túl sok false positive)
+  return strongHit || ((itHit || aiHit) && /support|sysadmin|network|qa|tester|developer|data|analyst|operations|security|biztonsag|tanacsado|consultant|engineer|fejleszto|fejlesztő/.test(n));
 }
 
 function isSeniorLike(title = "", desc = "") {

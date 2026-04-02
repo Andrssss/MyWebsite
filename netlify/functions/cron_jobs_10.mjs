@@ -2,7 +2,10 @@ export const config = {
   schedule: "8 4-23 * * *",
 };
 
-
+/* ========================= keywords=teszt
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
+  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
+*/
 
 
 
