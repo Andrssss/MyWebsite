@@ -3,7 +3,11 @@ export const config = {
   schedule: "18 4-23 * * *",
 };
 
-
+/* ========================= GETTING EXPERIENCE LEVEL
+      AND source = 'profession-intern'
+--------------------- */
+ 
+      
 
 import { Pool } from "pg";
 import https from "https";
@@ -214,14 +218,13 @@ const { rows } = await client.query(`
         const details = { ...professionDetails, ...jobDetails };
 
         // Use the extracted experience
-        const experience = isInternshipTitle(row.title) ? "diákmunka" : (details.experience || "-");
         await client.query(
         `
         UPDATE job_posts
         SET experience = $1
         WHERE id = $2
         `,
-        [experience, row.id]
+        [details.experience || "-", row.id]
         );
 
 
