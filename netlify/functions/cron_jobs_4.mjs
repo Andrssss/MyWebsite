@@ -1,6 +1,6 @@
-export const config = {
-  schedule: "19 4-23 * * *",
-};
+// export const config = {
+//   schedule: "19 4-23 * * *",
+// };
 
 /* ========================= GETTING EXPERIENCE LEVEL
       AND source = 'LinkedIn'

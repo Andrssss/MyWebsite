@@ -1,6 +1,6 @@
-export const config = {
-  schedule: "17 4-23 * * *",
-};
+// export const config = {
+//   schedule: "17 4-23 * * *",
+// };
 
 /* ========================= GETTING EXPERIENCE LEVEL
 const ENRICH_SOURCES = ["aam", "karrierhungaria"];

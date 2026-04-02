@@ -373,7 +373,10 @@ async function upsertJob(client, source, item) {
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+     SELECT $1,$2,$3,$4,$5,NOW()
+     WHERE NOT EXISTS (
+       SELECT 1 FROM job_posts WHERE source = $1 AND canonical_url = $4
+     )
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
