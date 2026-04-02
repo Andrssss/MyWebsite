@@ -17,13 +17,20 @@ const pool = new Pool({
 export default async () => {
   const client = await pool.connect();
   try {
-    // 30 napnál régebbiek törlése first_seen alapján
-    const { rowCount } = await client.query(`
+    // LinkedIn: 60 nap, többi: 30 nap
+    const { rowCount: linkedinCount } = await client.query(`
       DELETE FROM job_posts
-      WHERE first_seen < (NOW() - INTERVAL '30 days')
+      WHERE source = 'LinkedIn'
+        AND first_seen < (NOW() - INTERVAL '60 days')
     `);
 
-    return new Response(`cleanup OK: deleted ${rowCount}`, { status: 200 });
+    const { rowCount: otherCount } = await client.query(`
+      DELETE FROM job_posts
+      WHERE source != 'LinkedIn'
+        AND first_seen < (NOW() - INTERVAL '30 days')
+    `);
+
+    return new Response(`cleanup OK: deleted ${linkedinCount + otherCount} (LinkedIn: ${linkedinCount}, other: ${otherCount})`, { status: 200 });
   } catch (err) {
     console.error(err);
     return new Response("cleanup failed", { status: 500 });
