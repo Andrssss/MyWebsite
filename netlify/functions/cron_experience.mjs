@@ -192,19 +192,19 @@ const PIPELINES = [
   {
     label: "LinkedIn",
     sourceFilter: "source = 'LinkedIn'",
-    interval: "10 minutes",
+    interval: "20 minutes",
     extract: extractLinkedInExperience,
   },
   {
     label: "profession-intern",
     sourceFilter: "source = 'profession-intern'",
-    interval: "10 minutes",
+    interval: "20 minutes",
     extract: extractProfessionExperience,
   },
   {
     label: "aam / karrierhungaria",
     sourceFilter: "source IN ('aam','karrierhungaria')",
-    interval: "10 minutes",
+    interval: "20 minutes",
     extract: extractBodyExperience,
   },
 ];
