@@ -12,18 +12,17 @@ const OTHERS_LINKS = [
 
 function getDomain(u) {
     try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; }
+}
 
+export default function OthersLinks() {
     return (
         <div className="others-ll">
-            {/* Szigorúan scope-olt stílusok, hogy a formázás ne "folyjon szét" */}
-           
-
             <div className="others-ll__container">
-                {/* Fő szekció, felül a További linkek gombbal */}
-                <Section
-                    title="Titkos linkek"
-                    links={OTHERS_LINKS}
-                />
+                {OTHERS_LINKS.map(({ label, url }) => (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                        {label}
+                    </a>
+                ))}
             </div>
         </div>
     );
