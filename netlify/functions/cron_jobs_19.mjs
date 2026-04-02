@@ -28,6 +28,9 @@ const YDIAK_URL =
 const QDIAK_API_URL =
   "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
 
+const PRODIAK_API_URL =
+  "https://www.prodiak.hu/api/adverts/related/269891?page=1";
+
 /* ── shared helpers ─────────────────────────────────────────── */
 
 function normalizeWhitespace(value) {
@@ -207,6 +210,30 @@ async function fetchAllQdiakJobs() {
   }
 }
 
+/* ── Prodiák ────────────────────────────────────────────────── */
+
+function extractProdiakJobs(payload) {
+  const rows = Array.isArray(payload?.items?.data) ? payload.items.data : [];
+  return rows.map((d) => ({
+    title: normalizeWhitespace(d.name),
+    url: `https://www.prodiak.hu/allas/${d.slug}/${d.index_id}`,
+    experience: "diákmunka",
+  })).filter((job) => job.title && job.url);
+}
+
+async function fetchAllProdiakJobs() {
+  try {
+    const text = await fetchText(PRODIAK_API_URL);
+    const payload = JSON.parse(text);
+    const jobs = extractProdiakJobs(payload);
+    console.log(`prodiak: ${jobs.length} IT jobs found`);
+    return jobs;
+  } catch (err) {
+    console.log(`prodiak: failed: ${err.message}`);
+    return [];
+  }
+}
+
 /* ── handler ────────────────────────────────────────────────── */
 
 export default async () => {
@@ -226,6 +253,13 @@ export default async () => {
       await upsertJob(client, "qdiak", job);
     }
     console.log(`qdiak: ${qdiakJobs.length} jobs processed`);
+
+    /* Prodiák */
+    const prodiakJobs = await fetchAllProdiakJobs();
+    for (const job of prodiakJobs) {
+      await upsertJob(client, "prodiak", job);
+    }
+    console.log(`prodiak: ${prodiakJobs.length} jobs processed`);
 
     return new Response("OK");
   } finally {
