@@ -1029,24 +1029,19 @@ async function upsertJob(client, source, item) {
   );
 }
 
-function extractSchonherz(html, baseUrl) {
+function extractSchonherzFromHtml(html, baseUrl) {
   const $ = cheerioLoad(html);
-
   const items = [];
 
-  // 1 hirdetés = 1 darab .col-md-8 a #ads alatt
-  $("#ads .row.ad-list .col-md-8").each((_, el) => {
+  $(".col-md-8").each((_, el) => {
     const $card = $(el);
 
-    // URL: az első diakmunka link a kártyában
     const href = $card.find("a[href*='/diakmunka/']").first().attr("href");
     const url = href ? absolutize(href, baseUrl) : null;
     if (!url) return;
 
-    // TITLE: preferáltan a h4-ben lévő link szövege (ez a valódi pozíció név)
     let title = normalizeWhitespace($card.find("h4 a[href*='/diakmunka/']").first().text());
 
-    // fallback: ha nincs h4, akkor a leghosszabb nem-CTA link szöveg a kártyában
     if (!title || title.length < 4) {
       const candidates = $card
         .find("a[href*='/diakmunka/']")
@@ -1067,7 +1062,90 @@ function extractSchonherz(html, baseUrl) {
     });
   });
 
-  return dedupeByUrl(items);
+  return items;
+}
+
+function extractSchonherz(html, baseUrl) {
+  return dedupeByUrl(extractSchonherzFromHtml(html, baseUrl));
+}
+
+async function fetchAllSchonherzJobs(initialHtml, baseUrl, { maxPages = 5 } = {}) {
+  const all = extractSchonherzFromHtml(initialHtml, baseUrl);
+  console.log(`[schonherz] page 0: ${all.length} items`);
+
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const body = JSON.stringify({
+        office: "budapest",
+        type: "fejleszto---tesztelo",
+        text: "",
+        current: page,
+      });
+
+      const ajaxHtml = await fetchSchonherzPage(
+        "https://schonherz.hu/tobbdiakmunka/budapest/fejleszto---tesztelo",
+        body
+      );
+
+      if (!ajaxHtml || ajaxHtml.trim().length === 0) break;
+
+      const pageItems = extractSchonherzFromHtml(ajaxHtml, baseUrl);
+      console.log(`[schonherz] page ${page}: ${pageItems.length} items`);
+
+      if (!pageItems.length) break;
+      all.push(...pageItems);
+    } catch (err) {
+      console.error(`[schonherz] page ${page} failed:`, err.message);
+      break;
+    }
+  }
+
+  return dedupeByUrl(all);
+}
+
+function fetchSchonherzPage(url, body) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const lib = u.protocol === "https:" ? https : http;
+
+    const req = lib.request(
+      u,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          "Content-Type": "application/json; charset=UTF-8",
+          Accept: "text/html, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept-Encoding": "gzip,deflate,br",
+          Referer: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo",
+        },
+        timeout: 30000,
+      },
+      (res) => {
+        const code = res.statusCode || 0;
+        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
+        let stream = res;
+        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
+        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
+        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
+
+        let data = "";
+        stream.setEncoding("utf8");
+        stream.on("data", (chunk) => (data += chunk));
+        stream.on("end", () => {
+          if (code >= 200 && code < 300) resolve(data);
+          else reject(new Error(`HTTP ${code} for ${url}`));
+        });
+        stream.on("error", reject);
+      }
+    );
+
+    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 
@@ -1147,17 +1225,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
           continue;
         }
+      } else if (source === "schonherz") {
+        try {
+          merged = await fetchAllSchonherzJobs(html, p.url);
+        } catch (e) {
+          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Schönherz pagination error: ${e.message}` });
+          continue;
+        }
       } else {
         let generic = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
         let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-
-        let schonherz = [];
-        if (source === "schonherz") schonherz = extractSchonherz(html, p.url);
-
-        merged =
-          source === "schonherz"
-            ? mergeCandidates(schonherz, generic, ssr)
-            : mergeCandidates(generic, ssr);
+        merged = mergeCandidates(generic, ssr);
       }
 
       // =========================

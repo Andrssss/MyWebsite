@@ -549,7 +549,7 @@ const JobWatcher = () => {
               <div className="job-row">
                 <a
                   className="job-title"
-                  href={job.url}
+                  href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
