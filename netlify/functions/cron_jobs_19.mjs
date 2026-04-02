@@ -28,8 +28,12 @@ const YDIAK_URL =
 const QDIAK_API_URL =
   "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
 
-const PRODIAK_API_URL =
-  "https://www.prodiak.hu/api/adverts/related/269891?page=1";
+const PRODIAK_API_URL = "https://www.prodiak.hu/api/adverts?page=1";
+const PRODIAK_POST_BODY = JSON.stringify({
+  categories: "5980e5825de0fe6b408b45a2",
+  locations: "54f4eeaf3cc4952d2c8b459f,5b17bddf5de0fe30018b4705",
+  territorials: "",
+});
 
 /* ── shared helpers ─────────────────────────────────────────── */
 
@@ -213,7 +217,7 @@ async function fetchAllQdiakJobs() {
 /* ── Prodiák ────────────────────────────────────────────────── */
 
 function extractProdiakJobs(payload) {
-  const rows = Array.isArray(payload?.items?.data) ? payload.items.data : [];
+  const rows = Array.isArray(payload?.adverts?.data) ? payload.adverts.data : [];
   return rows.map((d) => ({
     title: normalizeWhitespace(d.name),
     url: `https://www.prodiak.hu/allas/${d.slug}/${d.index_id}`,
@@ -221,16 +225,62 @@ function extractProdiakJobs(payload) {
   })).filter((job) => job.title && job.url);
 }
 
+function fetchProdiakApi(pageUrl) {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(pageUrl);
+    const req = https.request(
+      parsedUrl,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "X-Requested-With": "XMLHttpRequest",
+          "Content-Length": Buffer.byteLength(PRODIAK_POST_BODY),
+        },
+        timeout: 50000,
+      },
+      (res) => {
+        const encoding = String(res.headers["content-encoding"] || "").toLowerCase();
+        let stream = res;
+        if (encoding.includes("gzip")) stream = res.pipe(zlib.createGunzip());
+        else if (encoding.includes("deflate")) stream = res.pipe(zlib.createInflate());
+        else if (encoding.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
+
+        let body = "";
+        stream.setEncoding("utf8");
+        stream.on("data", (chunk) => { body += chunk; });
+        stream.on("end", () => resolve(body));
+        stream.on("error", reject);
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error(`Timeout for ${pageUrl}`)));
+    req.on("error", reject);
+    req.write(PRODIAK_POST_BODY);
+    req.end();
+  });
+}
+
 async function fetchAllProdiakJobs() {
+  const allJobs = [];
+  let page = 1;
   try {
-    const text = await fetchText(PRODIAK_API_URL);
-    const payload = JSON.parse(text);
-    const jobs = extractProdiakJobs(payload);
-    console.log(`prodiak: ${jobs.length} IT jobs found`);
-    return jobs;
+    while (true) {
+      const url = `${PRODIAK_API_URL.replace(/page=\d+/, `page=${page}`)}`;
+      const text = await fetchProdiakApi(url);
+      const payload = JSON.parse(text);
+      const jobs = extractProdiakJobs(payload);
+      allJobs.push(...jobs);
+      const lastPage = payload?.adverts?.last_page ?? 1;
+      if (page >= lastPage) break;
+      page++;
+    }
+    console.log(`prodiak: ${allJobs.length} IT Budapest jobs found (${page} pages)`);
+    return allJobs;
   } catch (err) {
-    console.log(`prodiak: failed: ${err.message}`);
-    return [];
+    console.log(`prodiak: failed on page ${page}: ${err.message}`);
+    return allJobs;
   }
 }
 
