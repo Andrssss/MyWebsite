@@ -1,29 +1,32 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import './styles/others-ll.css';
 
 const OTHERS_LINKS = [
-    { label: 'hakkeltamas 🖤', url: 'https://itk.hakkeltamas.hu/' },
-    { label: 'hudes ☁️', url: 'https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO' },
-    { label: 'vecha ☁️', url: 'https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ' },
-    { label: 'PPKE WIKI 🅦', url: 'https://users.itk.ppke.hu/~marri1/' },
+    { name: 'hakkeltamas 🖤', url: 'https://itk.hakkeltamas.hu/' },
+    { name: 'hudes ☁️', url: 'https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO' },
+    { name: 'vecha ☁️', url: 'https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ' },
+    { name: 'PPKE WIKI 🅦', url: 'https://users.itk.ppke.hu/~marri1/' },
 ];
-
-
-
-function getDomain(u) {
-    try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; }
-}
 
 export default function OthersLinks() {
     return (
-        <div className="others-ll">
-            <div className="others-ll__container">
-                {OTHERS_LINKS.map(({ label, url }) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                        {label}
-                    </a>
+        <div className="university-links">
+            <ul className="university-links-list">
+                {OTHERS_LINKS.map((link, index) => (
+                    <li key={index}>
+                        <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="university-link-button-wrapper"
+                        >
+                            <button className="university-link-button">
+                                {link.name}
+                            </button>
+                        </a>
+                    </li>
                 ))}
-            </div>
+            </ul>
         </div>
     );
 }
