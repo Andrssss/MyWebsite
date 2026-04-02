@@ -25,7 +25,6 @@ function getDomain(u) {
                     links={OTHERS_LINKS}
                 />
             </div>
-            )}
         </div>
     );
 }
