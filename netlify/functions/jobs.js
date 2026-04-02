@@ -51,6 +51,8 @@ const FIXED = [
   { key: "ydiak", label: "Y Diák" },
   { key: "qdiak", label: "Q Diák" },
   { key: "cvonline", label: "cvonline" },
+  { key: "prodiak", label: "Prodiák" },
+
 ];
 
 exports.handler = async (event) => {
