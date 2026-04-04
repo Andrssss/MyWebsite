@@ -12,6 +12,9 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { loadFilters } from "./load_filters.mjs";
+
+let _filters = [];
 
 /* ---------------------
    DB connection
@@ -50,13 +53,8 @@ function normalizeWhitespace(s) {
 }
 
 function titleNotBlacklisted(title) {
-  const TITLE_BLACKLIST = [
-    "marketing", "sales", "hr", "finance", "pénzügy", "könyvelő",
-    "senior", "szenior", "medior", "Villamosmérnök ", "ipari", "Építészmérnök",
-    "lead", "expert", "vezető fejlesztő", "tech lead"
-  ];
   const t = normalizeText(title);
-  return !TITLE_BLACKLIST.some((word) => t.includes(normalizeText(word)));
+  return !_filters.some((word) => t.includes(normalizeText(word)));
 }
 
 function dedupeByUrl(items) {
@@ -252,13 +250,8 @@ async function upsertJob(client, source, item) {
 }
 
 function levelNotBlacklisted(title, desc) {
-  const LEVEL_BLACKLIST = [
-    "medior", "senior", "szenior", "szernior", "lead", "principal", "expert",
-    "staff", "architect", "sr.", "sr ", "sen.",
-    "experienced", "expertise"
-  ];
   const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return !LEVEL_BLACKLIST.some((w) => t.includes(normalizeText(w)));
+  return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
 const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
@@ -267,6 +260,7 @@ const URL_BLACKLIST = new Set([
 ]);
 
 export default async () => {
+  _filters = await loadFilters();
   const client = await pool.connect();
 
   try {

@@ -11,6 +11,9 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { loadFilters } from "./load_filters.mjs";
+
+let _filters = [];
 
 /* ---------------------
    DB connection
@@ -46,25 +49,8 @@ function isInternshipTitle(title) {
 
 
 function titleNotBlacklisted(title) {
-  const TITLE_BLACKLIST = [
-    "marketing","sales","hr","finance","pénzügy","könyvelő",
-    "accountant","manager","vezető","director","adminisztráció",
-    "asszisztens","ügyfélszolgálat","customer service","call center",
-    "értékesítő","bizto sítás","tanácsadó","biztosítás",
-    "Adótanácsadó","Auditor","Accountant","Accounts","Tanácsadó",
-     "senior",
-    "szenior",
-    "medior",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead"
-  ];
   const t = normalizeText(title);
-  return !TITLE_BLACKLIST.some(word => t.includes(normalizeText(word)));
+  return !_filters.some(word => t.includes(normalizeText(word)));
 }
 
 function dedupeByUrl(items) {
@@ -359,17 +345,12 @@ async function upsertJob(client, source, item) {
 }
 
 function levelNotBlacklisted(title, desc) {
-  const LEVEL_BLACKLIST = [
-    "medior", "senior", "lead", "principal", "expert",
-    "staff", "architect", "sr.", "sr ", "sen.",
-    "experienced", "expertise"
-  ];
   const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
+  return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
 export default async () => {
-  
+  _filters = await loadFilters();
 
 
 

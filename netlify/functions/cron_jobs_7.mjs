@@ -21,6 +21,9 @@ import zlib from "node:zlib";
 import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
+import { loadFilters } from "./load_filters.mjs";
+
+let _filters = [];
 
 // =====================
 // DB
@@ -183,43 +186,6 @@ const SOURCES = [
 // =====================
 // Keywords
 // =====================
-const TITLE_BLACKLIST = [
-  "marketing",
-  "sales",
-  "hr",
-  "finance",
-  "pénzügy",
-  "könyvelő",
-  "accountant",
-  "manager",
-  "vezető",
-  "director",
-  "adminisztráció",
-  "asszisztens",
-  "ügyfélszolgálat",
-  "customer service",
-  "call center",
-  "értékesítő",
-  "biztosítás",
-  "tanácsadó",   
-  "Adótanácsadó" ,
-  "Auditor",
-  "Accountant",
-  "Accounts",
-  "Tanácsadó"
-];
-
-const SENIOR_KEYWORDS = [
-  "senior",
-  "szenior",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead"
-];
 
 function hasWord(n, w) {
   // szóhatár: it ne találjon bele más szavakba
@@ -612,13 +578,13 @@ function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
   // Blacklist alapú szűrés: ami tiltott szóval érkezik, kiesik.
-  const hasBlacklistedWord = TITLE_BLACKLIST.some((k) => n.includes(normalizeText(k)));
+  const hasBlacklistedWord = _filters.some((k) => n.includes(normalizeText(k)));
   return !hasBlacklistedWord;
 }
 
 function isSeniorLike(title = "", desc = "") {
   const n = normalizeText(`${title} ${desc}`);
-  return SENIOR_KEYWORDS.some(k => n.includes(normalizeText(k)));
+  return _filters.some(k => n.includes(normalizeText(k)));
 }
 
 
@@ -771,7 +737,7 @@ function keywordHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
 
   const hits = [];
-  for (const k of TITLE_BLACKLIST) {
+  for (const k of _filters) {
     const nk = normalizeText(k);
     if (n.includes(nk)) hits.push(k);
   }
@@ -1260,12 +1226,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
-      const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
-      matchedList = matchedList.filter(item => {
-        const text = `${item.title ?? ""} ${item.description ?? ""}`.toLowerCase();
-        return !BLACKLIST_WORDS.some(word => text.includes(word.toLowerCase()));
-      });
-
       // =========================
       // DEBUG REJECTED
       // =========================
@@ -1282,7 +1242,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
               hits: keywordHit(c.title, c.description),
               normPreview: norm.slice(0, 220),
               itWord: hasWord(norm, "it"),
-              hasBlacklisted: TITLE_BLACKLIST.some((k) => norm.includes(normalizeText(k))),
+              hasBlacklisted: _filters.some((k) => norm.includes(normalizeText(k))),
             };
           });
       }
@@ -1308,6 +1268,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
 
 export default async (request) => {
+  _filters = await loadFilters();
   const url = new URL(request.url);
 
   const debug = url.searchParams.get("debug") === "1";

@@ -17,6 +17,7 @@ import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
 import User_pages from './User_pages.tsx';
 import JobWatcher from "./JobWatcher.jsx";
+import Filters from "./Filters.jsx";
 
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,7 +31,7 @@ const AppContent = () => {
 
 
   useEffect(() => {
-    setParticlesActive(!['/targy_info', '/allasfigyelo'].includes(location.pathname));
+    setParticlesActive(!['/targy_info', '/allasfigyelo', '/allasok/filters'].includes(location.pathname));
   }, [location]);
 
 
@@ -134,8 +135,18 @@ useEffect(() => {
           <Route
             path="/allasfigyelo"
             element={
-              <div className={`${isMobile ? 'content' : 'main-content'} re-page`}>
+              <div className="re-page">
                 <JobWatcher />
+              </div>
+            }
+          />
+
+          {/* Filters – rejtett, nincs rá gomb */}
+          <Route
+            path="/allasfigyelo/filters"
+            element={
+              <div className="re-page">
+                <Filters />
               </div>
             }
           />

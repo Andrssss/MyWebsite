@@ -17,6 +17,9 @@ import zlib from "node:zlib";
 import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
+import { loadFilters } from "./load_filters.mjs";
+
+let _filters = [];
 
 // =====================
 // DB
@@ -229,19 +232,6 @@ const KEYWORDS_STRONG = [
 ];
 
 
-const SENIOR_KEYWORDS = [
-  "senior",
-    "szenior",
-    "medior",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead"
-];
-
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
@@ -277,7 +267,7 @@ function matchesKeywords(title, desc) {
 
 function isSeniorLike(title = "", desc = "") {
   const n = normalizeText(`${title} ${desc}`);
-  return SENIOR_KEYWORDS.some(k => n.includes(normalizeText(k)));
+  return _filters.some(k => n.includes(normalizeText(k)));
 }
 
 
@@ -550,11 +540,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // BLACKLISTING
       // =========================
-      const BLACKLIST_WORDS = ["marketing", "sales", "oktatásfejlesztő", "support"];
-      matchedList = matchedList.filter(item => {
-        const text = `${item.title ?? ""} ${item.description ?? ""}`.toLowerCase();
-        return !BLACKLIST_WORDS.some(word => text.includes(word.toLowerCase()));
-      });
 
       // =========================
       // DEBUG REJECTED
@@ -598,6 +583,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
 
 export default async (request) => {
+  _filters = await loadFilters();
   const url = new URL(request.url);
 
   const debug = url.searchParams.get("debug") === "1";

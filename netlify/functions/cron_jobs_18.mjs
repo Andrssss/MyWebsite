@@ -13,6 +13,9 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { loadFilters } from "./load_filters.mjs";
+
+let _filters = [];
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -138,22 +141,9 @@ async function upsertJob(client, sourceKey, item) {
 
 /* ── talent.com ─────────────────────────────────────────────── */
 
-const SENIOR_KEYWORDS = [
-  "senior",
-  "szenior",
-  "lead",
-  "principal",
-  "staff",
-  "architect",
-  "expert",
-  "vezető fejlesztő",
-  "tech lead",
-  "CNC"
-];
-
 function isSeniorLike(title) {
   const normalized = normalizeText(title);
-  return SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw)));
+  return _filters.some((kw) => normalized.includes(normalizeText(kw)));
 }
 
 const INTERNSHIP_KEYWORDS = [
@@ -169,7 +159,7 @@ function isInternshipTitle(title) {
 function inferTalentExperience(title) {
   const normalized = normalizeText(title);
   if (INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))) return "diákmunka";
-  if (SENIOR_KEYWORDS.some((kw) => normalized.includes(normalizeText(kw))))
+  if (_filters.some((kw) => normalized.includes(normalizeText(kw))))
     return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b/.test(normalized))
@@ -303,6 +293,7 @@ async function enrichTalentJobs(jobs) {
 /* ── handler ────────────────────────────────────────────────── */
 
 export default async () => {
+  _filters = await loadFilters();
   const client = await pool.connect();
 
   try {

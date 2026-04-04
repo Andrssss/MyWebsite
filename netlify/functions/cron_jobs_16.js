@@ -16,6 +16,9 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
+import { loadFilters } from "./load_filters.mjs";
+
+let _filters = [];
 
 /* ---------------------
    DB connection
@@ -54,16 +57,8 @@ function normalizeWhitespace(s) {
 }
 
 function titleNotBlacklisted(title) {
-  const TITLE_BLACKLIST = [
-    "marketing","sales","hr","finance","pénzügy","könyvelő",
-    "accountant","manager","vezető","director","adminisztráció",
-    "asszisztens","ügyfélszolgálat","customer service","call center",
-    "értékesítő","bizto sítás","tanácsadó","biztosítás",
-    "Adótanácsadó","Auditor","Accountant","Accounts","Tanácsadó",
-  "Villamosmérnök ", "ipari","Építészmérnök"
-  ];
   const t = normalizeText(title);
-  return !TITLE_BLACKLIST.some(word => t.includes(normalizeText(word)));
+  return !_filters.some(word => t.includes(normalizeText(word)));
 }
 
 function dedupeByUrl(items) {
@@ -182,13 +177,8 @@ async function upsertJob(client, source, item) {
 }
 
 function levelNotBlacklisted(title, desc) {
-  const LEVEL_BLACKLIST = [
-     "senior", "szenior", "szernior", "lead", "principal", "expert",
-    "staff", "architect", "sr.", "sr ", "sen.",
-    "experienced", "expertise", "head"
-  ];
   const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return !LEVEL_BLACKLIST.some(w => t.includes(normalizeText(w)));
+  return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
 // Bluebird RSS feldolgozó
@@ -220,6 +210,7 @@ async function fetchRssJobs(url) {
 --------------------- */
 
 export default async () => {
+  _filters = await loadFilters();
   const SOURCES = [
     { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
     { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=szoftverfejleszto-szoftvermernok" },
