@@ -98,7 +98,7 @@ exports.handler = async (event) => {
       }
 
       const whereClause = `WHERE LOWER(title) LIKE '%' || LOWER($1) || '%'
-           AND created_at >= NOW() - INTERVAL '1 day'`;
+           AND first_seen >= NOW() - INTERVAL '1 day'`;
 
       if (action === "count") {
         const { rows } = await client.query(
