@@ -6,7 +6,6 @@ export const config = {
   "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
   "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
-  "https://careers.tesco.com/en_GB/careersmarketplace/SearchJobs/?748_location_place=Budapest,%20Central%20Hungary,%20Hungary&748_location_radius=20&748_location_coordinates=[47.5,19.04]&listFilterMode=1&jobRecordsPerPage=50";
 */
 
 
@@ -41,8 +40,6 @@ const MELONJOBS_API_URL =
 const KUKA_API_URL =
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
 
-const TESCO_URL =
-  "https://careers.tesco.com/en_GB/careersmarketplace/SearchJobs/?748_location_place=Budapest,%20Central%20Hungary,%20Hungary&748_location_radius=20&748_location_coordinates=[47.5,19.04]&listFilterMode=1&jobRecordsPerPage=50";
 
 /* ── shared helpers ─────────────────────────────────────────── */
 
@@ -91,7 +88,7 @@ function fetchText(url, redirectLeft = 5) {
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
         },
-        timeout: 50000,
+        timeout: 30000,
       },
       (res) => {
         const code = res.statusCode || 0;
@@ -339,40 +336,6 @@ async function fetchAllKukaJobs() {
   const html = await fetchText(KUKA_API_URL);
   return extractKukaJobs(html);
 }
-/* ── Tesco ─────────────────────────────────────────────── */
-
-function extractTescoJobs(html) {
-  const $ = cheerioLoad(html);
-  const jobs = [];
-  const seen = new Set();
-
-  $("article").each((_i, el) => {
-    const $art = $(el);
-    const $link = $art.find("h3 a.link").first();
-    const title = normalizeWhitespace($link.text());
-    const href = $link.attr("href");
-    if (!title || !href) return;
-
-    const url = normalizeUrl(
-      href.startsWith("http") ? href : `https://careers.tesco.com${href}`
-    );
-    if (seen.has(url)) return;
-    seen.add(url);
-
-    jobs.push({
-      title,
-      url,
-      experience: inferExperience(title, ""),
-    });
-  });
-
-  return jobs;
-}
-
-async function fetchAllTescoJobs() {
-  const html = await fetchText(TESCO_URL);
-  return extractTescoJobs(html);
-}
 /* ── handler ────────────────────────────────────────────────── */
 
 export default withTimeout("cron_jobs_17", async () => {
@@ -406,15 +369,6 @@ export default withTimeout("cron_jobs_17", async () => {
       await upsertJob(client, "kuka", job);
     }
     console.log(`kuka: ${kukaJobs.length} jobs processed`);
-
-    /* Tesco */
-    const tescoJobs = (await fetchAllTescoJobs()).filter((job) => !isSeniorLike(job.title, ""));
-    console.log(`tesco: ${tescoJobs.length} jobs found`);
-
-    for (const job of tescoJobs) {
-      await upsertJob(client, "tesco", job);
-    }
-    console.log(`tesco: ${tescoJobs.length} jobs processed`);
 
     return new Response("OK");
   } finally {
