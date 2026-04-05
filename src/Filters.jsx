@@ -15,7 +15,7 @@ const Filters = () => {
     try {
       const res = await fetch(API);
       const data = await res.json();
-      if (Array.isArray(data)) setFilters(data);
+      if (Array.isArray(data)) setFilters(data.sort((a, b) => b.id - a.id));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -37,7 +37,7 @@ const Filters = () => {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
-      setFilters(prev => [...prev, data].sort((a, b) => a.word.localeCompare(b.word)));
+      setFilters(prev => [...prev, data].sort((a, b) => b.id - a.id));
       setNewWord("");
     } catch (e) {
       setError(e.message);
@@ -78,7 +78,7 @@ const Filters = () => {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
-      setFilters(prev => [...prev, data].sort((a, b) => a.word.localeCompare(b.word)));
+      setFilters(prev => [...prev, data].sort((a, b) => b.id - a.id));
     } catch (e) {
       setError(e.message);
     }
