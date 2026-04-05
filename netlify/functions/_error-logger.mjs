@@ -40,29 +40,24 @@ export async function flushErrors(cronJob) {
   const errors = pendingErrors.get(cronJob);
   if (!errors || errors.length === 0) return;
 
-  const store = getStore(STORE_NAME);
-  const now = new Date();
-  const ts = now.toISOString().replace(/[:.]/g, "-");
-  const key = `${cronJob}/${ts}.json`;
+  try {
+    const store = getStore(STORE_NAME);
+    const now = new Date();
+    const ts = now.toISOString().replace(/[:.]/g, "-");
+    const key = `${cronJob}/${ts}.json`;
 
-  const entry = {
-    cronJob,
-    date: now.toISOString(),
-    errorCount: errors.length,
-    errors,
-  };
+    const entry = {
+      cronJob,
+      date: now.toISOString(),
+      errorCount: errors.length,
+      errors,
+    };
 
-  const payload = JSON.stringify(entry, null, 2);
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await store.set(key, payload);
-      pendingErrors.delete(cronJob);
-      console.log(`[error-logger] ${cronJob}: flushed ${errors.length} error(s)`);
-      return;
-    } catch (logErr) {
-      console.error(`[error-logger] flush attempt ${attempt}/3 failed: ${logErr.message}`);
-      if (attempt < 3) await new Promise((r) => setTimeout(r, 500 * attempt));
-    }
+    await store.set(key, JSON.stringify(entry, null, 2));
+    pendingErrors.delete(cronJob);
+    console.log(`[error-logger] ${cronJob}: flushed ${errors.length} error(s)`);
+  } catch (logErr) {
+    console.error(`[error-logger] flush failed: ${logErr.message}`);
   }
 }
 
