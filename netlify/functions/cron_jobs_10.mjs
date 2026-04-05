@@ -15,7 +15,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -219,7 +219,7 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
 ]);
 
-export default async () => {
+export default withTimeout("cron_jobs_10", async () => {
   _filters = await loadFilters();
 
 
@@ -284,4 +284,4 @@ const SOURCES = [
   }
 
   return new Response("OK");
-};
+});

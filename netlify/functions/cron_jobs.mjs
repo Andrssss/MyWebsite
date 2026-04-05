@@ -29,7 +29,7 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -579,7 +579,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 }
 
 
-export default async (request) => {
+export default withTimeout("cron_jobs", async (request) => {
   _filters = await loadFilters();
   const url = new URL(request.url);
 
@@ -607,6 +607,6 @@ export default async (request) => {
     status: 200,
     headers: { "content-type": "application/json" },
   });
-};
+});
 
 

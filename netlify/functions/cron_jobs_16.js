@@ -17,7 +17,7 @@ import http from "http";
 import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -210,7 +210,7 @@ async function fetchRssJobs(url) {
    Main (Netlify handler)
 --------------------- */
 
-export default async () => {
+export default withTimeout("cron_jobs_16", async () => {
   _filters = await loadFilters();
   const SOURCES = [
     { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
@@ -265,4 +265,4 @@ export default async () => {
     client.release();
   }
   return new Response("OK");
-}
+});

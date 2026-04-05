@@ -14,7 +14,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -239,7 +239,7 @@ async function fetchAllTalentJobs() {
 
 /* ── handler ────────────────────────────────────────────────── */
 
-export default async () => {
+export default withTimeout("cron_jobs_18", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
 
@@ -257,4 +257,4 @@ export default async () => {
   } finally {
     client.release();
   }
-};
+});

@@ -12,7 +12,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -225,7 +225,7 @@ function levelNotBlacklisted(title, desc) {
   return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
-export default async () => {
+export default withTimeout("cron_jobs_9", async () => {
   _filters = await loadFilters();
 
 
@@ -291,4 +291,4 @@ const SOURCES = [
   }
 
   return new Response("OK");
-};
+});

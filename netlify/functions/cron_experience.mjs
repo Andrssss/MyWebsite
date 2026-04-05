@@ -15,7 +15,7 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL missing");
@@ -248,7 +248,7 @@ const PIPELINES = [
 /* ======================
    MAIN
 ====================== */
-export default async () => {
+export default withTimeout("cron_experience", async () => {
   console.log("=== EXPERIENCE ENRICHMENT STARTED ===");
   const client = await pool.connect();
 
@@ -298,4 +298,4 @@ export default async () => {
 
   console.log("=== EXPERIENCE ENRICHMENT FINISHED ===");
   return new Response("OK");
-};
+});

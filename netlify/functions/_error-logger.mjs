@@ -47,10 +47,10 @@ export async function logFetchError(cronJob, { url, message, extra } = {}) {
  *
  * @param {string} cronJob  – cron job identifier, e.g. "cron_experience"
  * @param {Function} handler – the original async handler
- * @param {number} [limitMs=25000] – timeout threshold in ms (default 25s, safe margin before Netlify's 26s limit)
+ * @param {number} [limitMs=29000] – timeout threshold in ms (default 29s)
  * @returns {Function} wrapped handler
  */
-export function withTimeout(cronJob, handler, limitMs = 25000) {
+export function withTimeout(cronJob, handler, limitMs = 29000) {
   return async (...args) => {
     const start = Date.now();
     let logged = false;

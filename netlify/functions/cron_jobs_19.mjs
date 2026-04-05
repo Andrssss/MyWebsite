@@ -13,7 +13,7 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
-import { logFetchError } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -290,7 +290,7 @@ async function fetchAllProdiakJobs() {
 
 /* ── handler ────────────────────────────────────────────────── */
 
-export default async () => {
+export default withTimeout("cron_jobs_19", async () => {
   const client = await pool.connect();
 
   try {
@@ -319,4 +319,4 @@ export default async () => {
   } finally {
     client.release();
   }
-};
+});
