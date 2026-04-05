@@ -17,6 +17,7 @@ import http from "http";
 import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
+import { logFetchError } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -224,6 +225,7 @@ export default async () => {
         jobs = await fetchRssJobs(p.url);
         console.log(`${p.key}: ${jobs.length} jobs found in RSS.`);
       } catch (err) {
+        await logFetchError("cron_jobs_16", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }

@@ -13,6 +13,7 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { logFetchError } from "./_error-logger.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -176,6 +177,7 @@ async function fetchAllYdiakJobs() {
     console.log(`ydiak: ${jobs.length} IT jobs found`);
     return jobs;
   } catch (err) {
+    await logFetchError("cron_jobs_19", { url: YDIAK_URL, message: err.message, extra: { source: "ydiak" } });
     console.log(`ydiak: failed: ${err.message}`);
     return [];
   }
@@ -209,6 +211,7 @@ async function fetchAllQdiakJobs() {
     console.log(`qdiak: ${jobs.length} IT Budapest jobs found (from ${payload?.data?.length ?? 0} total IT)`);
     return jobs;
   } catch (err) {
+    await logFetchError("cron_jobs_19", { url: QDIAK_API_URL, message: err.message, extra: { source: "qdiak" } });
     console.log(`qdiak: failed: ${err.message}`);
     return [];
   }
@@ -279,6 +282,7 @@ async function fetchAllProdiakJobs() {
     console.log(`prodiak: ${allJobs.length} IT Budapest jobs found (${page} pages)`);
     return allJobs;
   } catch (err) {
+    await logFetchError("cron_jobs_19", { url: PRODIAK_API_URL, message: err.message, extra: { source: "prodiak", page } });
     console.log(`prodiak: failed on page ${page}: ${err.message}`);
     return allJobs;
   }

@@ -16,6 +16,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
+import { logFetchError } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -389,6 +390,7 @@ async function fetchAllKukaJobs() {
         job.experience = yearExp;
       }
     } catch (err) {
+      await logFetchError("cron_jobs_17", { url: job.url, message: err.message, extra: { source: "kuka", title: job.title } });
       console.log(`kuka: failed to fetch detail for ${job.title}: ${err.message}`);
     }
     if (i < jobs.length - 1) await sleep(500);

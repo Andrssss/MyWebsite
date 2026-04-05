@@ -14,6 +14,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
+import { logFetchError } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -263,6 +264,7 @@ async function fetchAllTalentJobs() {
 
       console.log(`talent: ${searchUrl.match(/k=([^&]+)/)?.[1]} → ${jobs.length} jobs`);
     } catch (err) {
+      await logFetchError("cron_jobs_18", { url: searchUrl, message: err.message, extra: { source: "talent" } });
       console.log(`talent: failed ${searchUrl}: ${err.message}`);
     }
 
@@ -283,6 +285,7 @@ async function enrichTalentJobs(jobs) {
         job.experience = yearExp;
       }
     } catch (err) {
+      await logFetchError("cron_jobs_18", { url: job.url, message: err.message, extra: { source: "talent", title: job.title } });
       console.log(`talent: failed detail for ${job.title}: ${err.message}`);
     }
     if (i < jobs.length - 1) await sleep(500);

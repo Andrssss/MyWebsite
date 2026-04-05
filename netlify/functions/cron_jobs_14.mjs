@@ -13,6 +13,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
+import { logFetchError } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -269,6 +270,7 @@ export default async () => {
           console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
           break;
         }
+        await logFetchError("cron_jobs_14", { url: pageUrl, message: err.message });
         console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
         break;
       }

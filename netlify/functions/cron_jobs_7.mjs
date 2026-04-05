@@ -22,6 +22,7 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
+import { logFetchError } from "./_error-logger.mjs";
 
 let _filters = [];
 
@@ -1143,6 +1144,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       try {
         html = await fetchText(p.url);
       } catch (err) {
+        await logFetchError("cron_jobs_7", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
@@ -1181,6 +1183,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllZynternJobs({ fields: "80,15,16", maxPages: 10 });
         } catch (e) {
+          await logFetchError("cron_jobs_7", { url: p.url, message: `Zyntern API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
           continue;
         }
@@ -1188,6 +1191,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 6, debug });
         } catch (e) {
+          await logFetchError("cron_jobs_7", { url: p.url, message: `MindDiák API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
           continue;
         }
@@ -1195,6 +1199,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllSchonherzJobs(html, p.url);
         } catch (e) {
+          await logFetchError("cron_jobs_7", { url: p.url, message: `Schönherz pagination error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Schönherz pagination error: ${e.message}` });
           continue;
         }
