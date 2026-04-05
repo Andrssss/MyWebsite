@@ -76,8 +76,32 @@ export function withTimeout(cronJob, handler, limitMs = 29000) {
   return async (...args) => {
     const start = Date.now();
 
-    // Fire a safety timer BEFORE Netlify kills the process
-    const timer = setTimeout(async () => {
+    const TIMED_OUT = Symbol("TIMED_OUT");
+
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => resolve(TIMED_OUT), limitMs);
+    });
+
+    const handlerPromise = (async () => {
+      try {
+        const result = await handler(...args);
+        await flushErrors(cronJob);
+        return result;
+      } catch (err) {
+        const elapsed = Date.now() - start;
+        logFetchError(cronJob, {
+          url: null,
+          message: `Handler crashed after ${(elapsed / 1000).toFixed(1)}s: ${err.message}`,
+          extra: { elapsedMs: elapsed, stack: err.stack },
+        });
+        await flushErrors(cronJob);
+        throw err;
+      }
+    })();
+
+    const result = await Promise.race([handlerPromise, timeoutPromise]);
+
+    if (result === TIMED_OUT) {
       const elapsed = Date.now() - start;
       logFetchError(cronJob, {
         url: null,
@@ -86,23 +110,9 @@ export function withTimeout(cronJob, handler, limitMs = 29000) {
       });
       console.error(`[${cronJob}] TIMEOUT after ${(elapsed / 1000).toFixed(1)}s`);
       await flushErrors(cronJob);
-    }, limitMs);
-
-    try {
-      const result = await handler(...args);
-      clearTimeout(timer);
-      await flushErrors(cronJob);
-      return result;
-    } catch (err) {
-      clearTimeout(timer);
-      const elapsed = Date.now() - start;
-      logFetchError(cronJob, {
-        url: null,
-        message: `Handler crashed after ${(elapsed / 1000).toFixed(1)}s: ${err.message}`,
-        extra: { elapsedMs: elapsed, stack: err.stack },
-      });
-      await flushErrors(cronJob);
-      throw err;
+      return new Response(`[${cronJob}] timed out`, { status: 200 });
     }
+
+    return result;
   };
 }
