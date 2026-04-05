@@ -1,8 +1,11 @@
 export const config = {
-  schedule: "9 4-23 * * *",
+  schedule: "12 4-23 * * *",
 };
 /* =========================
-  keywords=python, Software%20Engineer
+  // python
+  // Software Engineer
+
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 */
 
 import { Pool } from "pg";
