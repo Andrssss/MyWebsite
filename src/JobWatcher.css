@@ -132,13 +132,19 @@
   flex-wrap: wrap;
 }
 
+@media (min-width: 900px) {
+  .job-actions {
+    flex-wrap: nowrap;
+  }
+}
+
 .job-search {
   padding: 10px 14px;
   border-radius: 10px;
   border: 1.5px solid #4f8cff;
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  min-width: 200px;
+  min-width: 120px;
 }
 
 .job-search:focus {
@@ -164,6 +170,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .job-checkbox:has(input:checked) {
@@ -186,6 +193,7 @@
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
