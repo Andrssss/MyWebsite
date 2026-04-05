@@ -355,6 +355,7 @@ const JobWatcher = () => {
       const t = (job.title || "").toLowerCase();
       const title = (job.title || "").toLowerCase();
       const source = (job.source || "").toLowerCase();
+      const exp = (job.experience || "").toLowerCase();
 
       const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
 
@@ -364,7 +365,10 @@ const JobWatcher = () => {
       // Ha a cím tipikusan gyakornok/diák, akkor sem junior/medior
       const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k));
 
-      return !isInternSource && !isInternTitle && !internLike;
+      // Ha az experience gyakornok/diák jellegű, akkor sem junior/medior
+      const isInternExp = INTERN_KEYWORDS.some((k) => exp.includes(k));
+
+      return !isInternSource && !isInternTitle && !internLike && !isInternExp;
     };
 
     if (time24h && !time7d) {
@@ -386,10 +390,12 @@ const JobWatcher = () => {
       list = list.filter((j) => {
         const source = (j.source || "").toLowerCase();
         const t = (j.title || "").toLowerCase();
+        const exp = (j.experience || "").toLowerCase();
         const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
         const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
+        const internExp = INTERN_KEYWORDS.some((k) => exp.includes(k));
         return (
-          (internLike && !t.includes(JUNIOR_KEYWORD)) || isInternSource
+          ((internLike || internExp) && !t.includes(JUNIOR_KEYWORD)) || isInternSource
         );
       });
     }
