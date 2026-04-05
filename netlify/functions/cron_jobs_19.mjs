@@ -80,7 +80,7 @@ function fetchText(url, redirectLeft = 5) {
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
         },
-        timeout: 50000,
+        timeout: 25000,
       },
       (res) => {
         const code = res.statusCode || 0;
@@ -242,7 +242,7 @@ function fetchProdiakApi(pageUrl) {
           "X-Requested-With": "XMLHttpRequest",
           "Content-Length": Buffer.byteLength(PRODIAK_POST_BODY),
         },
-        timeout: 50000,
+        timeout: 25000,
       },
       (res) => {
         const encoding = String(res.headers["content-encoding"] || "").toLowerCase();

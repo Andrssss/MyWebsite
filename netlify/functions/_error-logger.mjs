@@ -110,6 +110,10 @@ export function withTimeout(cronJob, handler, limitMs = 29000) {
       });
       console.error(`[${cronJob}] TIMEOUT after ${(elapsed / 1000).toFixed(1)}s`);
       await flushErrors(cronJob);
+
+      // Kill the process so the zombie handler doesn't keep running
+      setTimeout(() => process.exit(0), 500);
+
       return new Response(`[${cronJob}] timed out`, { status: 200 });
     }
 

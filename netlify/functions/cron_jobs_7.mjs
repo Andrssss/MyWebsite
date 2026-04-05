@@ -229,7 +229,7 @@ function fetchJsonWithHeaders(url, { method = "GET", headers = {}, body = null }
           Accept: "application/json, text/plain, */*",
           ...headers,
         },
-        timeout: 50000,
+        timeout: 25000,
       },
       (res) => {
         const code = res.statusCode || 0;
@@ -696,7 +696,7 @@ function fetchTextWithHeaders(url, extraHeaders = {}, redirectLeft = 5) {
           "Accept-Encoding": "gzip,deflate,br",
           ...extraHeaders,
         },
-        timeout: 50000,
+        timeout: 25000,
       },
       (res) => {
         const code = res.statusCode || 0;
@@ -834,7 +834,7 @@ function fetchText(url, redirectLeft = 5) {
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
         },
-        timeout: 50000,
+        timeout: 25000,
       },
       (res) => {
         const code = res.statusCode || 0;
@@ -1087,7 +1087,7 @@ function fetchSchonherzPage(url, body) {
           "Accept-Encoding": "gzip,deflate,br",
           Referer: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo",
         },
-        timeout: 30000,
+        timeout: 25000,
       },
       (res) => {
         const code = res.statusCode || 0;
