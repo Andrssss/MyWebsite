@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "12 4-23 * * *",
+  schedule: "9 4-23 * * *",
 };
 /* =========================
   keywords=Software%20developer, qa
