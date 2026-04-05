@@ -280,7 +280,30 @@ function looksLikeJobUrl(sourceKey, url) {
   ];
   if (bad.some(p => u.pathname.startsWith(p))) return false;
 
+  if (sourceKey === "nofluffjobs") {
+    if (!url.startsWith("https://nofluffjobs.com/hu/job/")) return false;
+    // szponzorált hirdetések más városokból is megjelenhetnek — csak budapest-i URL-eket engedünk
+    const slug = u.pathname.replace("/hu/job/", "");
+    if (!slug.includes("budapest")) return false;
+  }
 
+  if (sourceKey === "otp") {
+    // csak a pozíció-oldalak kellenek, pl. /otp/job/Budapest-.../1234/
+    if (!u.pathname.startsWith("/otp/job/")) return false;
+  }
+
+  if (sourceKey === "vizmuvek") {
+    // csak a pozíció-aloldalak kellenek, pl. /hu/karrier/gyakornoki-dualis-kepzes/hr-gyakornok
+    const base = "/hu/karrier/gyakornoki-dualis-kepzes/";
+    if (!u.pathname.startsWith(base) || u.pathname === "/hu/karrier/gyakornoki-dualis-kepzes" || u.pathname === base) return false;
+  }
+
+  if (sourceKey === "onejob") {
+    // csak a pozíció-oldalak kellenek, pl. /munka/szoftverfejleszto-gyakornok/
+    if (!u.pathname.startsWith("/munka/") || u.pathname === "/munka/" || u.pathname === "/munka") return false;
+  }
+
+  if (sourceKey === "wherewework" && !(url.startsWith("https://www.wherewework.hu/en/jobs/") && /\/\d+$/.test(u.pathname))) return false;
 
   return true;
 }
