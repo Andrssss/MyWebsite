@@ -53,25 +53,34 @@ export async function logFetchError(cronJob, { url, message, extra } = {}) {
 export function withTimeout(cronJob, handler, limitMs = 25000) {
   return async (...args) => {
     const start = Date.now();
-    try {
-      const result = await handler(...args);
-      const elapsed = Date.now() - start;
-      if (elapsed > limitMs) {
-        await logFetchError(cronJob, {
-          url: null,
-          message: `Slow execution: ${(elapsed / 1000).toFixed(1)}s (limit: ${(limitMs / 1000).toFixed(0)}s)`,
-          extra: { elapsedMs: elapsed, limitMs },
-        });
-        console.warn(`[${cronJob}] slow: ${(elapsed / 1000).toFixed(1)}s`);
-      }
-      return result;
-    } catch (err) {
+    let logged = false;
+
+    // Fire a safety timer BEFORE Netlify kills the process
+    const timer = setTimeout(async () => {
+      logged = true;
       const elapsed = Date.now() - start;
       await logFetchError(cronJob, {
         url: null,
-        message: `Handler crashed after ${(elapsed / 1000).toFixed(1)}s: ${err.message}`,
-        extra: { elapsedMs: elapsed, stack: err.stack },
+        message: `Timeout: still running after ${(elapsed / 1000).toFixed(1)}s (limit: ${(limitMs / 1000).toFixed(0)}s)`,
+        extra: { elapsedMs: elapsed, limitMs },
       });
+      console.error(`[${cronJob}] TIMEOUT after ${(elapsed / 1000).toFixed(1)}s`);
+    }, limitMs);
+
+    try {
+      const result = await handler(...args);
+      clearTimeout(timer);
+      return result;
+    } catch (err) {
+      clearTimeout(timer);
+      if (!logged) {
+        const elapsed = Date.now() - start;
+        await logFetchError(cronJob, {
+          url: null,
+          message: `Handler crashed after ${(elapsed / 1000).toFixed(1)}s: ${err.message}`,
+          extra: { elapsedMs: elapsed, stack: err.stack },
+        });
+      }
       throw err;
     }
   };
