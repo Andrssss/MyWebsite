@@ -1226,28 +1226,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
-      // =========================
-      // DEBUG REJECTED
-      // =========================
-      let rejected = [];
-      if (debug) {
-        rejected = merged
-          .filter((c) => !matchesKeywords(c.title, c.description))
-          .slice(0, 30)
-          .map((c) => {
-            const norm = normalizeText(`${c.title ?? ""} ${c.description ?? ""}`);
-            return {
-              title: c.title,
-              url: c.url,
-              hits: keywordHit(c.title, c.description),
-              normPreview: norm.slice(0, 220),
-              itWord: hasWord(norm, "it"),
-              hasBlacklisted: _filters.some((k) => norm.includes(normalizeText(k))),
-            };
-          });
-      }
-
-      stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length, rejected });
+      stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length });
 
       // =========================
       // DB UPSERT

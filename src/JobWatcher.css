@@ -79,21 +79,36 @@
   }
 
   .job-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .job-search {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
     width: 100%;
   }
 
+  .job-search {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .job-btn {
+    grid-column: 1 / -1;
     width: 100%;
   }
 
   .job-checkbox {
-    justify-content: flex-start;
+    justify-content: center;
+    font-size: 14px;
+    padding: 10px 8px;
+    width: 100%;
+  }
+
+  .job-tabs-toggle {
+    width: 100%;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 14px;
   }
 }
 
@@ -120,26 +135,47 @@
 .job-search {
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid rgb(255, 255, 255);
+  border: 1.5px solid #4f8cff;
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
   min-width: 200px;
 }
 
+.job-search:focus {
+  outline: none;
+  border-color: #6aa9ff;
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.3);
+}
+
 .job-search::placeholder {
-  color: #888;
+  color: #666;
 }
 
 .job-checkbox {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
   color: #ccc;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  transition: all 0.15s ease;
+}
+
+.job-checkbox:has(input:checked) {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border-color: transparent;
 }
 
 .job-checkbox input {
-  accent-color: #4f8cff;
+  accent-color: #22c55e;
+  width: 18px;
+  height: 18px;
 }
 
 .job-btn {
@@ -301,19 +337,15 @@
 }
 
 .job-tab.highlighted {
-  background-color: #ff4d4f;
-  color: white;
-}
-
-.job-tab.active {
-  background-color: #4caf50; /* zöld = selected */
-  color: white;
+  background: #ef4444;
+  color: #fff;
   border-color: transparent;
 }
 
-.job-tab.highlighted {
-  background-color: #ff4d4f; /* piros = excluded */
-  color: white;
+.job-tab.active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border-color: transparent;
 }
 
 
@@ -425,7 +457,7 @@ html, body {
 
 /* ===== TOGGLE GOMB ===== */
 .job-tabs-toggle {
-  background: #2563eb;            /* szép kék */
+  background: #4f8cff;
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -433,18 +465,13 @@ html, body {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-
-  transition:
-    background-color 0.2s ease,
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 /* hover */
 .job-tabs-toggle:hover {
-  background: #1d4ed8;
+  background: #3b7ae0;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
 }
 
 /* kattintás */

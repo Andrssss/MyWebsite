@@ -108,6 +108,31 @@ const getKeywordNotesForJob = (job) => {
     .map(([, v]) => v);
 };
 
+/* =======================
+   KATEGÓRIÁK
+======================= */
+const JOB_CATEGORIES = {
+  "Fejlesztő": ["developer", "fejlesztő", "fejleszto", "programozó", "software engineer"],
+  "QA / Tesztelő": ["tester", "tesztelő", "qa", "quality", "test"],
+  "DevOps": ["devops", "sre", "site reliability"],
+  "Helpdesk": ["helpdesk", "help desk", "service desk", "servicenow"],
+  "Business Analyst": ["business analyst"],
+  "Data / AI": ["data engineer", "data analyst", "data scientist", "machine learning", "big data"],
+  "SAP": ["sap", "abap"],
+  "Webfejlesztés": ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "html", "css", "javascript"],
+  "Security": ["security", "cybersecurity"],
+  "Hálózat / Infra": ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök"],
+  "Hardware": ["hardware", "embedded", "hw verification"],
+};
+
+const getCategoriesForJob = (job) => {
+  if (!job.title) return [];
+  const title = job.title.toLowerCase();
+  return Object.entries(JOB_CATEGORIES)
+    .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
+    .map(([cat]) => cat);
+};
+
 const JobWatcher = () => {
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -150,6 +175,16 @@ const JobWatcher = () => {
 
   const [sourcesOpen, setSourcesOpen] = useState(() => {
     const saved = localStorage.getItem("jobWatcherSourcesOpen");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const [categoryStates, setCategoryStates] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherCategoryStates");
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [categoriesOpen, setCategoriesOpen] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherCategoriesOpen");
     return saved !== null ? saved === "true" : true;
   });
 
@@ -230,6 +265,36 @@ const JobWatcher = () => {
       return !prev;
     });
   };
+
+  /* Category toggle (3-state) */
+  const handleCategoryClick = (key) => {
+    setCategoryStates((prev) => {
+      const current = prev[key] || "neutral";
+      const next =
+        current === "neutral" ? "selected"
+          : current === "selected" ? "excluded"
+          : "neutral";
+      const updated = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherCategoryStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Category counts */
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    for (const cat of Object.keys(JOB_CATEGORIES)) counts[cat] = 0;
+    counts["Egyéb"] = 0;
+    for (const job of jobs) {
+      const cats = getCategoriesForJob(job);
+      if (cats.length === 0) {
+        counts["Egyéb"]++;
+      } else {
+        for (const cat of cats) counts[cat]++;
+      }
+    }
+    return counts;
+  }, [jobs]);
 
 
   /* =======================
@@ -360,11 +425,28 @@ const JobWatcher = () => {
       list = list.filter((j) => !excluded.includes(j.source));
     }
 
+    const selectedCats = Object.keys(categoryStates).filter((k) => categoryStates[k] === "selected");
+    const excludedCats = Object.keys(categoryStates).filter((k) => categoryStates[k] === "excluded");
+
+    if (selectedCats.length) {
+      list = list.filter((j) => {
+        const cats = getCategoriesForJob(j);
+        if (cats.length === 0) return selectedCats.includes("Egyéb");
+        return cats.some((c) => selectedCats.includes(c));
+      });
+    } else if (excludedCats.length) {
+      list = list.filter((j) => {
+        const cats = getCategoriesForJob(j);
+        if (cats.length === 0) return !excludedCats.includes("Egyéb");
+        return !cats.some((c) => excludedCats.includes(c));
+      });
+    }
+
     return [...list].sort(
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
@@ -523,7 +605,38 @@ const JobWatcher = () => {
         )}
       </div>
       </div>
-    
+
+    {/* ===== KATEGÓRIÁK ===== */}
+    <div className="job-tabs-header">
+      <button
+        className="job-tabs-toggle"
+        onClick={() =>
+          setCategoriesOpen((prev) => {
+            localStorage.setItem("jobWatcherCategoriesOpen", !prev);
+            return !prev;
+          })
+        }
+      >
+        {categoriesOpen ? "▲ Kategóriák elrejtése" : "▼ Kategóriák kiválasztása"}
+      </button>
+    </div>
+
+    <div className={`job-tabs-wrapper ${categoriesOpen ? "open" : ""}`}>
+      <div className="job-tabs">
+        {Object.keys(JOB_CATEGORIES).concat("Egyéb").map((cat) => {
+          const state = categoryStates[cat] || "neutral";
+          let cls = "job-tab";
+          if (state === "selected") cls += " active";
+          if (state === "excluded") cls += " highlighted";
+          return (
+            <button key={cat} className={cls} onClick={() => handleCategoryClick(cat)}>
+              {cat}
+              <span className="job-tab-count">{categoryCounts[cat]}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
 
     {/* ===== TALÁLATOK ===== */}
     {!loading && (
