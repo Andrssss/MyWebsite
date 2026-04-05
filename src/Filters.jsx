@@ -9,7 +9,10 @@ const Filters = () => {
   const [newWord, setNewWord] = useState("");
   const [error, setError] = useState(null);
   const [undoStack, setUndoStack] = useState([]);
+  const [recentlyAdded, setRecentlyAdded] = useState([]);
+  const [purging, setPurging] = useState({});
   const undoTimers = React.useRef({});
+  const addedTimers = React.useRef({});
 
   const load = async () => {
     try {
@@ -39,6 +42,12 @@ const Filters = () => {
       if (!res.ok) { setError(data.error); return; }
       setFilters(prev => [...prev, data].sort((a, b) => b.id - a.id));
       setNewWord("");
+      const uid = Date.now() + "-" + data.id;
+      setRecentlyAdded(prev => [...prev, { word: data.word, uid }]);
+      addedTimers.current[uid] = setTimeout(() => {
+        setRecentlyAdded(prev => prev.filter(r => r.uid !== uid));
+        delete addedTimers.current[uid];
+      }, 15000);
     } catch (e) {
       setError(e.message);
     }
@@ -63,6 +72,55 @@ const Filters = () => {
     } catch (e) {
       setError(e.message);
     }
+  };
+
+  const countJobs = async (item) => {
+    setPurging(prev => ({ ...prev, [item.uid]: "counting" }));
+    setError(null);
+    try {
+      const res = await fetch(API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: item.word, action: "count" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); setPurging(prev => { const n = { ...prev }; delete n[item.uid]; return n; }); return; }
+      setPurging(prev => ({ ...prev, [item.uid]: { counted: true, count: data.count } }));
+    } catch (e) {
+      setError(e.message);
+      setPurging(prev => { const n = { ...prev }; delete n[item.uid]; return n; });
+    }
+  };
+
+  const confirmPurge = async (item) => {
+    const prev = purging[item.uid];
+    setPurging(p => ({ ...p, [item.uid]: "deleting" }));
+    setError(null);
+    try {
+      const res = await fetch(API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: item.word, action: "delete" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); setPurging(p => ({ ...p, [item.uid]: prev })); return; }
+      setPurging(p => ({ ...p, [item.uid]: { done: true, count: data.deleted } }));
+      setTimeout(() => {
+        setRecentlyAdded(r => r.filter(x => x.uid !== item.uid));
+        clearTimeout(addedTimers.current[item.uid]);
+        delete addedTimers.current[item.uid];
+        setPurging(p => { const n = { ...p }; delete n[item.uid]; return n; });
+      }, 3000);
+    } catch (e) {
+      setError(e.message);
+      setPurging(p => ({ ...p, [item.uid]: prev }));
+    }
+  };
+
+  const dismissAdded = (item) => {
+    clearTimeout(addedTimers.current[item.uid]);
+    delete addedTimers.current[item.uid];
+    setRecentlyAdded(prev => prev.filter(r => r.uid !== item.uid));
   };
 
   const undo = async (item) => {
@@ -126,6 +184,44 @@ const Filters = () => {
               <span style={{ color: "#666", fontSize: 14 }}>Nincs szó a listában.</span>
             )}
           </div>
+        </div>
+      )}
+
+      {recentlyAdded.length > 0 && (
+        <div className="undo-stack purge-stack">
+          {recentlyAdded.map(item => (
+            <div key={item.uid} className="undo-toast purge-toast">
+              <span className="undo-toast-text">
+                Hozzáadva: <strong>{item.word}</strong>
+              </span>
+              {purging[item.uid]?.done ? (
+                <span className="purge-done">✓ {purging[item.uid].count} hirdetés törölve</span>
+              ) : purging[item.uid]?.counted ? (
+                purging[item.uid].count > 0 ? (
+                  <>
+                    <span className="purge-count">{purging[item.uid].count} találat</span>
+                    <button
+                      className="undo-toast-btn purge-btn"
+                      onClick={() => confirmPurge(item)}
+                    >
+                      Törlés megerősítése
+                    </button>
+                  </>
+                ) : (
+                  <span className="purge-count">0 találat</span>
+                )
+              ) : (
+                <button
+                  className="undo-toast-btn purge-btn"
+                  onClick={() => countJobs(item)}
+                  disabled={purging[item.uid] === "counting" || purging[item.uid] === "deleting"}
+                >
+                  {purging[item.uid] === "counting" ? "Keresés…" : purging[item.uid] === "deleting" ? "Törlés…" : "🗑 Hirdetések törlése"}
+                </button>
+              )}
+              <button className="undo-toast-close" onClick={() => dismissAdded(item)}>×</button>
+            </div>
+          ))}
         </div>
       )}
 
