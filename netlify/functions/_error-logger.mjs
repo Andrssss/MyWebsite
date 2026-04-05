@@ -39,3 +39,40 @@ export async function logFetchError(cronJob, { url, message, extra } = {}) {
     console.error("[error-logger] failed to write log:", logErr.message);
   }
 }
+
+/**
+ * Wrap a Netlify scheduled function handler with a timeout guard.
+ * If the handler takes longer than `limitMs`, the timeout is logged
+ * as an error via logFetchError before returning.
+ *
+ * @param {string} cronJob  – cron job identifier, e.g. "cron_experience"
+ * @param {Function} handler – the original async handler
+ * @param {number} [limitMs=25000] – timeout threshold in ms (default 25s, safe margin before Netlify's 26s limit)
+ * @returns {Function} wrapped handler
+ */
+export function withTimeout(cronJob, handler, limitMs = 25000) {
+  return async (...args) => {
+    const start = Date.now();
+    try {
+      const result = await handler(...args);
+      const elapsed = Date.now() - start;
+      if (elapsed > limitMs) {
+        await logFetchError(cronJob, {
+          url: null,
+          message: `Slow execution: ${(elapsed / 1000).toFixed(1)}s (limit: ${(limitMs / 1000).toFixed(0)}s)`,
+          extra: { elapsedMs: elapsed, limitMs },
+        });
+        console.warn(`[${cronJob}] slow: ${(elapsed / 1000).toFixed(1)}s`);
+      }
+      return result;
+    } catch (err) {
+      const elapsed = Date.now() - start;
+      await logFetchError(cronJob, {
+        url: null,
+        message: `Handler crashed after ${(elapsed / 1000).toFixed(1)}s: ${err.message}`,
+        extra: { elapsedMs: elapsed, stack: err.stack },
+      });
+      throw err;
+    }
+  };
+}

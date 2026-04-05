@@ -208,43 +208,6 @@ function extractTalentJobs(html) {
   return jobs;
 }
 
-function extractTalentYearExperience(html) {
-  const text = cheerioLoad(html)("body").text();
-
-  const patterns = [
-    /\b\d+\s?\+?\s?(?:év|years?|éves|yrs?)\b/gi,
-    /\b\d+\s?[-–]\s?\d+\s?(?:év|years?|éves|yrs?)\b/gi,
-    /\bseveral\s+years?\b/gi,
-    /\bminimum\s?\d+\s?(?:év|years?)\b/gi,
-    /\bat\s+least\s+\d+\s?(?:years?|év)\b/gi,
-    /\blegalabb\s+\d+\s?(?:ev|eves|year)\b/gi,
-  ];
-
-  const matches = [];
-  for (const regex of patterns) {
-    const found = text.match(regex);
-    if (found) matches.push(...found);
-  }
-
-  if (matches.length === 0) return null;
-
-  const maxReasonable = 15;
-  const filtered = matches.filter((m) => {
-    const nums = m.match(/\d+/g)?.map((n) => parseInt(n, 10)) || [];
-    return nums.length === 0 || nums.every((n) => n <= maxReasonable);
-  });
-
-  if (filtered.length === 0) return null;
-
-  const dedupe = filtered.filter((m) => m.replace(/\s+/g, " ").trim().toLowerCase() !== "1 év");
-
-  if (dedupe.length === 0) return "-";
-
-  return [...new Set(
-    dedupe.map((m) => m.replace(/\s+/g, " ").trim().toLowerCase())
-  )].join(", ");
-}
-
 async function fetchAllTalentJobs() {
   const allJobs = [];
   const seen = new Set();
@@ -274,25 +237,6 @@ async function fetchAllTalentJobs() {
   return allJobs;
 }
 
-async function enrichTalentJobs(jobs) {
-  for (let i = 0; i < jobs.length; i++) {
-    const job = jobs[i];
-    try {
-      const html = await fetchText(job.url);
-      const yearExp = extractTalentYearExperience(html);
-      if (yearExp) {
-        console.log(`talent: ${job.title} → ${yearExp}`);
-        job.experience = yearExp;
-      }
-    } catch (err) {
-      await logFetchError("cron_jobs_18", { url: job.url, message: err.message, extra: { source: "talent", title: job.title } });
-      console.log(`talent: failed detail for ${job.title}: ${err.message}`);
-    }
-    if (i < jobs.length - 1) await sleep(500);
-  }
-  return jobs;
-}
-
 /* ── handler ────────────────────────────────────────────────── */
 
 export default async () => {
@@ -301,9 +245,8 @@ export default async () => {
 
   try {
     /* talent.com */
-    const rawJobs = (await fetchAllTalentJobs()).filter((job) => !isSeniorLike(job.title));
-    const talentJobs = await enrichTalentJobs(rawJobs);
-    console.log(`talent: ${talentJobs.length} unique jobs found (after senior + 24h filter)`);
+    const talentJobs = (await fetchAllTalentJobs()).filter((job) => !isSeniorLike(job.title));
+    console.log(`talent: ${talentJobs.length} unique jobs found (after senior filter)`);
 
     for (const job of talentJobs) {
       await upsertJob(client, "talent", job);

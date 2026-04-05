@@ -232,10 +232,6 @@ const INTERNSHIP_KEYWORDS = [
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
 ];
 
-function isInternshipTitle(title) {
-  const n = normalizeText(title ?? "");
-  return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
-}
 
 function inferExperience(title, description) {
   const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
@@ -339,64 +335,9 @@ function extractKukaJobs(html) {
   return jobs;
 }
 
-function extractKukaYearExperience(html) {
-  const idx = html.indexOf("What you need to succeed");
-  if (idx === -1) return null;
-
-  const section = html.substring(idx, idx + 3000);
-  const $ = cheerioLoad(section);
-  const text = $.text();
-
-  const patterns = [
-    /\b\d+\s?\+?\s?(?:év|years?|éves|yrs?)\b/gi,
-    /\b\d+\s?[-–]\s?\d+\s?(?:év|years?|éves|yrs?)\b/gi,
-    /\bseveral\s+years?\b/gi,
-    /\bminimum\s?\d+\s?(?:év|years?)\b/gi,
-    /\bat\s+least\s+\d+\s?(?:years?|év)\b/gi,
-  ];
-
-  const matches = [];
-  for (const regex of patterns) {
-    const found = text.match(regex);
-    if (found) matches.push(...found);
-  }
-
-  if (matches.length === 0) return null;
-
-  const maxReasonable = 15;
-  const filtered = matches.filter((m) => {
-    const nums = m.match(/\d+/g)?.map((n) => parseInt(n, 10)) || [];
-    return nums.length === 0 || nums.every((n) => n <= maxReasonable);
-  });
-
-  if (filtered.length === 0) return null;
-
-  return [...new Set(
-    filtered.map((m) => m.replace(/\s+/g, " ").trim().toLowerCase())
-  )].join(", ");
-}
-
 async function fetchAllKukaJobs() {
   const html = await fetchText(KUKA_API_URL);
-  const jobs = extractKukaJobs(html);
-
-  for (let i = 0; i < jobs.length; i++) {
-    const job = jobs[i];
-    try {
-      const jobHtml = await fetchText(job.url);
-      const yearExp = extractKukaYearExperience(jobHtml);
-      if (yearExp) {
-        console.log(`kuka: ${job.title} → experience from page: ${yearExp}`);
-        job.experience = yearExp;
-      }
-    } catch (err) {
-      await logFetchError("cron_jobs_17", { url: job.url, message: err.message, extra: { source: "kuka", title: job.title } });
-      console.log(`kuka: failed to fetch detail for ${job.title}: ${err.message}`);
-    }
-    if (i < jobs.length - 1) await sleep(500);
-  }
-
-  return jobs;
+  return extractKukaJobs(html);
 }
 /* ── Tesco ─────────────────────────────────────────────── */
 

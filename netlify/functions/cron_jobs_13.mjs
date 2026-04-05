@@ -293,7 +293,6 @@ function extractCandidates(html, baseUrl) {
 // =====================
 async function upsertJob(client, source, item) {
   const canonicalUrl = normalizeUrl(item.url);
-  const experience = item.experience ?? extractExperience(item.description);
 
   await client.query(
     `INSERT INTO job_posts
@@ -306,34 +305,9 @@ async function upsertJob(client, source, item) {
       source,
       item.title,
       canonicalUrl,
-      experience
+      item.experience || null
     ]
   );
-}
-
-
-
-// ---------------------
-// Experience extractor
-// ---------------------
-function extractExperience(description) {
-  if (!description) return null;
-
-  const patterns = [
-    /(\d+\s?\+\s?(?:év|years?))/gi,
-    /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
-    /(minimum\s?\d+\s?(?:év|years?))/gi,
-    /(at least\s?\d+\s?(?:years?))/gi
-  ];
-
-  const matches = [];
-
-  for (const regex of patterns) {
-    const found = description.match(regex);
-    if (found) matches.push(...found);
-  }
-
-  return matches.length ? [...new Set(matches)].join(", ") : null;
 }
 
 

@@ -130,6 +130,7 @@ const SOURCES = [
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
   { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
+  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
 ];
 
 // =====================
@@ -322,7 +323,6 @@ function extractCandidates(html, baseUrl) {
 // =====================
 async function upsertJob(client, source, item) {
   const canonicalUrl = normalizeUrl(item.url);
-  const experience = item.experience ?? extractExperience(item.description);
 
   await client.query(
     `INSERT INTO job_posts
@@ -335,34 +335,9 @@ async function upsertJob(client, source, item) {
       source,
       item.title,
       canonicalUrl,
-      experience
+      item.experience || null
     ]
   );
-}
-
-
-
-// ---------------------
-// Experience extractor
-// ---------------------
-function extractExperience(description) {
-  if (!description) return null;
-
-  const patterns = [
-    /(\d+\s?\+\s?(?:év|years?))/gi,
-    /(\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|years?|yrs?))/gi,
-    /(minimum\s?\d+\s?(?:év|years?))/gi,
-    /(at least\s?\d+\s?(?:years?))/gi
-  ];
-
-  const matches = [];
-
-  for (const regex of patterns) {
-    const found = description.match(regex);
-    if (found) matches.push(...found);
-  }
-
-  return matches.length ? [...new Set(matches)].join(", ") : null;
 }
 
 

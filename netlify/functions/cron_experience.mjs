@@ -125,6 +125,8 @@ function extractYearsFromText(text) {
     /\b\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|eves|years?|yrs?)\b/gi,
     /\bminimum\s?\d+\s?(?:év|eves|years?|yrs?)\b/gi,
     /\bat least\s?\d+\s?(?:years?)\b/gi,
+    /\btöbb\s?éves\b/gi,
+    /\bseveral\s?years?\b/gi,
   ];
 
   const matches = [];
@@ -179,11 +181,20 @@ function extractProfessionExperience(html) {
   return extractYearsFromText(description);
 }
 
-// aam, karrierhungaria: full body text
+// aam, karrierhungaria, etc.: full body text
 function extractBodyExperience(html) {
   const $ = cheerioLoad(html);
   const pageText = normalizeWhitespace($("body").text());
   return extractYearsFromText(pageText);
+}
+
+// kuka: "What you need to succeed" section
+function extractKukaExperience(html) {
+  const idx = html.indexOf("What you need to succeed");
+  if (idx === -1) return extractBodyExperience(html);
+  const section = html.substring(idx, idx + 3000);
+  const $ = cheerioLoad(section);
+  return extractYearsFromText($.text());
 }
 
 /* ======================
@@ -205,6 +216,30 @@ const PIPELINES = [
   {
     label: "aam / karrierhungaria",
     sourceFilter: "source IN ('aam','karrierhungaria')",
+    interval: "20 minutes",
+    extract: extractBodyExperience,
+  },
+  {
+    label: "cvcentrum",
+    sourceFilter: "source = 'cvcentrum-gyakornok-it'",
+    interval: "20 minutes",
+    extract: extractBodyExperience,
+  },
+  {
+    label: "kuka",
+    sourceFilter: "source = 'kuka'",
+    interval: "20 minutes",
+    extract: extractKukaExperience,
+  },
+  {
+    label: "dreamjobs / melonjobs / tesco",
+    sourceFilter: "source IN ('dreamjobs','melonjobs','tesco')",
+    interval: "20 minutes",
+    extract: extractBodyExperience,
+  },
+  {
+    label: "talent",
+    sourceFilter: "source = 'talent'",
     interval: "20 minutes",
     extract: extractBodyExperience,
   },
