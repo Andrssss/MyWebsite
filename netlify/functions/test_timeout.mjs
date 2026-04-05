@@ -1,11 +1,11 @@
 // netlify/functions/test_timeout.mjs
 // A test cron job that sleeps 40s to verify withTimeout logging
 
-import { withTimeout } from "./_error-logger.mjs";
+// import { withTimeout } from "./_error-logger.mjs";
 
-export const config = {
-  schedule: "0 0 31 2 *", // never runs automatically (Feb 31)
-};
+// export const config = {
+//   schedule: "0 0 31 2 *", // never runs automatically (Feb 31)
+// };
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
