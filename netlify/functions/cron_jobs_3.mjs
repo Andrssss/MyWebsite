@@ -67,6 +67,10 @@ function dedupeByUrl(items) {
   });
 }
 
+function randomDelay(minMs = 600, maxMs = 1400) {
+  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 
 /* =====================
@@ -272,6 +276,7 @@ export default withTimeout("cron_jobs_3", async () => {
 
   try {
     for (const p of SOURCES) {
+      await randomDelay();
       let html;
       try {
         html = await fetchText(p.url);
