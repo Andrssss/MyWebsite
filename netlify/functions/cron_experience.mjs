@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "15 4-23 * * *",
+  schedule: "16 4-23 * * *",
 };
 
 /* =========================
@@ -125,7 +125,8 @@ function extractYearsFromText(text) {
     /\b\d+\s?(?:[-–]\s?\d+)?\s?(?:év|éves|eves|years?|yrs?)\b/gi,
     /\bminimum\s?\d+\s?(?:év|eves|years?|yrs?)\b/gi,
     /\bat least\s?\d+\s?(?:years?)\b/gi,
-    /\btöbb\s?éves\b/gi,
+    /\blegalabb\s+\d+\s?(?:ev|eves|year)\b/gi,
+    /\btobb\s?eves\b/gi,
     /\bseveral\s?years?\b/gi,
   ];
 
@@ -286,6 +287,12 @@ export default withTimeout("cron_experience", async () => {
         } catch (err) {
           await logFetchError("cron_experience", { url: row.url, message: err.message, extra: { source: pipe.label, jobId: row.id } });
           console.error(`[${pipe.label}] FAILED ID:`, row.id, "|", err.message);
+
+          await client.query(
+            `UPDATE job_posts SET experience = '-' WHERE id = $1`,
+            [row.id]
+          );
+
           failed++;
         }
       }
