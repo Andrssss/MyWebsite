@@ -39,6 +39,13 @@ const pool = new Pool({
 
 
  
+const _runStart = Date.now();
+const TIME_BUDGET_MS = 26000; // stop starting new sources after 26s to avoid 29s timeout
+
+function timeLeft() {
+  return TIME_BUDGET_MS - (Date.now() - _runStart);
+}
+
 async function runAllBatches() {
   const size = 4;
   const totalBatches = Math.ceil(SOURCES.length / size);
@@ -46,6 +53,11 @@ async function runAllBatches() {
   console.log("[runAllBatches]", totalBatches, "batches");
 
   for (let batch = 0; batch < totalBatches; batch++) {
+    if (timeLeft() < 3000) {
+      console.log(`[runAllBatches] skipping batch ${batch} – only ${(timeLeft() / 1000).toFixed(1)}s left`);
+      break;
+    }
+
     const stats = await runBatch({ batch, size, write: true, debug: false, bundleDebug: false });
 
     for (const p of stats.portals) {
@@ -1140,6 +1152,15 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
     for (const p of listToProcess) {
       const source = p.key;
 
+      if (timeLeft() < 3000) {
+        console.log(`[runBatch] skipping ${source} – only ${(timeLeft() / 1000).toFixed(1)}s left`);
+        stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: "skipped: time budget exhausted" });
+        continue;
+      }
+
+      const sourceStart = Date.now();
+      console.log(`[source:${source}] START (${(timeLeft() / 1000).toFixed(1)}s left)`);
+
       let html = null;
       try {
         html = await fetchText(p.url);
@@ -1231,7 +1252,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
       }
 
-      stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length });
+      const sourceDur = ((Date.now() - sourceStart) / 1000).toFixed(1);
+      stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length, durationS: sourceDur });
+      console.log(`[source:${source}] DONE in ${sourceDur}s – matched=${matchedList.length}`);
 
       // =========================
       // DB UPSERT
