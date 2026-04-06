@@ -1,8 +1,11 @@
 export const config = {
-  schedule: "0 4-23 * * *",
+  schedule: "6 4-23 * * *",
 };
 /* =========================
-  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  // python
+  // Software Engineer
+
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 */
 
 import { Pool } from "pg";
@@ -72,7 +75,6 @@ function randomDelay(minMs = 600, maxMs = 1400) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
 /* =====================
    URL helpers
 ===================== */
@@ -81,7 +83,7 @@ function normalizeUrl(raw) {
     const u = new URL(raw);
 
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
-      return `https://${u.hostname}${u.pathname}`; // teljesen eldobjuk a query stringet
+      return `https://${u.hostname}${u.pathname}`;
     }
 
     u.hash = "";
@@ -246,30 +248,26 @@ function levelNotBlacklisted(title, desc) {
   return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
-export default withTimeout("cron_jobs_3", async () => {
+export default withTimeout("cron_jobs_20", async () => {
   _filters = await loadFilters();
 
   const SOURCES = [
-    // developer
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    
-    // fejleszto
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=fejleszto&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    
+    // python
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=python&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+
+    // Software Engineer
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=Software%20Engineer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=Software%20Engineer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=Software%20Engineer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=Software%20Engineer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=Software%20Engineer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
   ];
 
   const client = await pool.connect();
@@ -281,7 +279,7 @@ export default withTimeout("cron_jobs_3", async () => {
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_3", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_20", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }

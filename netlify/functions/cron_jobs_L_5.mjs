@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "12 4-23 * * *",
+  schedule: "8 4-23 * * *",
 };
 /* =========================
   keywords=Software%20developer, qa
@@ -268,10 +268,6 @@ export default withTimeout("cron_jobs_21", async () => {
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=qa&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=qa&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
     { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=qa&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=qa&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=qa&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=qa&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    
   ];
 
   const client = await pool.connect();

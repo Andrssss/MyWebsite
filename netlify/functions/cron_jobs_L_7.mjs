@@ -1,12 +1,9 @@
 export const config = {
-  schedule: "8 4-23 * * *",
+  schedule: "12 4-23 * * *",
 };
-
-/* ========================= keywords=teszt
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
+/* =========================
+  { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=developer&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 */
-
 
 
 import { Pool } from "pg";
@@ -51,10 +48,6 @@ function isInternshipTitle(title) {
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
 }
 
-function normalizeWhitespace(s) {
-  return String(s ?? "").replace(/\s+/g, " ").trim();
-}
-
 function titleNotBlacklisted(title) {
   const t = normalizeText(title);
   return !_filters.some(word => t.includes(normalizeText(word)));
@@ -71,6 +64,10 @@ function dedupeByUrl(items) {
   });
 }
 
+function randomDelay(minMs = 600, maxMs = 1400) {
+  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /* =====================
    URL helpers
@@ -78,6 +75,10 @@ function dedupeByUrl(items) {
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
+
+    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
+      return `https://${u.hostname}${u.pathname}`;
+    }
 
     u.hash = "";
     [
@@ -148,48 +149,60 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 /* ---------------------
-   HTML extraction
+   LinkedIn extraction
 --------------------- */
-function extractCandidates(html, baseUrl) {
+function extractLinkedInJobs(html) {
   const $ = cheerioLoad(html);
+  const jobs = [];
 
-  const items = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    const url = new URL(href, baseUrl).toString();
-    if (!/^https?:\/\//i.test(url)) return;
-
-    let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
-    if (!card.length) card = $(el).closest("div");
-
-    let title =
-      normalizeWhitespace($(el).text()) ||
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
-    if (!title || title.length < 4) return;
-
-    const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0,300), url, description: desc ? desc.slice(0,800) : null });
+  $("ul.jobs-search__results-list li").each((_, el) => {
+    const title = normalizeText($(el).find("h3.base-search-card__title").text());
+    const company = normalizeText($(el).find("h4.base-search-card__subtitle").text());
+    const location = normalizeText($(el).find("span.job-search-card__location").text());
+    const url = $(el).find("a.base-card__full-link").attr("href");
+    if (title && url) jobs.push({ title, url, company, location });
   });
-  return dedupeByUrl(items);
+
+  return dedupeByUrl(jobs);
+}
+
+function canonicalizeLinkedInJobUrl(raw) {
+  try {
+    const u = new URL(raw);
+    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
+      const lastPart = u.pathname.split("/jobs/view/")[1];
+      const canonicalSlug = lastPart.replace(/-\d+$/, "");
+      return `https://www.linkedin.com/jobs/view/${canonicalSlug}`;
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
 }
 
 function getDedupeKey(rawUrl) {
-  return normalizeUrl(rawUrl);
+  const u = normalizeUrl(rawUrl);
+  if (u.includes("linkedin.com/jobs/view/")) return canonicalizeLinkedInJobUrl(u);
+  return u;
 }
-
 
 /* ---------------------
    DB upsert
 --------------------- */
 async function upsertJob(client, source, item) {
-  const canonicalUrl = item.url;
+  const canonicalUrl =
+    source === "LinkedIn"
+      ? canonicalizeLinkedInJobUrl(item.url)
+      : item.url;
   const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
 
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+     SELECT $1,$2,$3,$4,$5,NOW()
+     WHERE NOT EXISTS (
+       SELECT 1 FROM job_posts WHERE source = $1 AND canonical_url = $4
+     )
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
@@ -202,70 +215,36 @@ function levelNotBlacklisted(title, desc) {
   return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
-const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
-const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
-const URL_BLACKLIST = new Set([
-  normalizeUrl("https://aam.hu/allasajanlatok#content"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlat-kategoriak"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszerintegrator"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/kontrolling"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
-]);
-
-export default withTimeout("cron_jobs_10", async () => {
+export default withTimeout("cron_jobs_4", async () => {
   _filters = await loadFilters();
 
-
-
-const SOURCES = [
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
-
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
-  { key: "aam", label: "aam", url: "https://aam.hu/allasajanlatok" },
-];
+  const SOURCES = [
+    // tester (overflow from cron_jobs_22)
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+  ];
 
   const client = await pool.connect();
 
   try {
     for (const p of SOURCES) {
+      await randomDelay();
       let html;
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_10", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_4", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }
 
-      const rawItems = extractCandidates(html, p.url);
+      const rawItems = extractLinkedInJobs(html);
 
       let items = rawItems.filter(it => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (p.key === "aam" && !it.url.startsWith(AAM_JOB_PREFIX)) return false;
-        if (p.key === "karrierhungaria" && !it.url.startsWith(KARRIERHUNGARIA_JOB_PREFIX)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
-
 
       for (const it of items) {
         try {
@@ -277,7 +256,6 @@ const SOURCES = [
 
       console.log(`${p.key}: ${items.length} items processed.`);
     }
-
   } finally {
     console.log(`Script started at ${new Date().toISOString()}`);
     client.release();

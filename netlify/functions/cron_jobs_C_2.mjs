@@ -1,12 +1,12 @@
-// netlify/functions/cron_jobs_6.mjs
-console.log("CRON_JOBS_6 LOADED");
+// netlify/functions/cron_jobs_13.mjs
+console.log("CRON_JOBS_13 LOADED");
 export const config = {
-  schedule: "2 4-23 * * *",
+  schedule: "11 4-23 * * *",
 };
 
 /* =========================
 const SOURCES = [
-  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/allasok/?s=gyakornok&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
 ];
 */
 
@@ -33,9 +33,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-
-
-
 // =====================
 // HELPERS
 // =====================
@@ -51,11 +48,6 @@ function normalizeText(s) {
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
-
-
-
-
-
 
 function normalizeUrl(raw) {
   try {
@@ -116,7 +108,7 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
-  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s=&category%5B%5D=it&category%5B%5D=it-programozas&category%5B%5D=it-uzemeltetes&type=&location%5B%5D=budapest&_noo_job_field_year_experience=&post_type=noo_job" },
+  { key: "cvcentrum-gyakornok-it", label: "CV Centrum – gyakornok IT", url: "https://cvcentrum.hu/?s&category%5B0%5D=information-technology&category%5B1%5D=it&category%5B2%5D=it-programozas&category%5B3%5D=it-uzemeltetes&category%5B4%5D=networking&type&_noo_job_field_year_experience&post_type=noo_job&paged=2" },
 ];
 
 // =====================
@@ -146,7 +138,6 @@ function looksLikeJobUrl(sourceKey, url) {
   if (!url) return false;
   const u = new URL(url);
 
-  // általános szemét
   const bad = [
     "/fiokom",
     "/csomagok",
@@ -350,7 +341,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_6", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_13", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
@@ -361,19 +352,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // EXTRACT & FILTER
       // =========================
       const merged = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
-      
 
       // =========================
-      // FILTER & KEYWORD MATCH
+      // KEYWORD MATCH
       // =========================
       let matchedList = merged
         .filter((c) => !isSeniorLike(c.title, c.description));
 
 
-
-      // =========================
-      // BLACKLISTING
-      // =========================
 
       stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length });
 
@@ -395,7 +381,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 }
 
 
-export default withTimeout("cron_jobs_6", async (request) => {
+export default withTimeout("cron_jobs_13", async (request) => {
   _filters = await loadFilters();
   const url = new URL(request.url);
 

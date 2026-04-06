@@ -1,8 +1,8 @@
 export const config = {
-  schedule: "13 4-23 * * *",
+  schedule: "16 4-23 * * *",
 };
 
-/* ========================= PAGE 7-INF ONLY
+/* ========================= PAGE 4-6 ONLY
 const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
 */
 
@@ -17,9 +17,9 @@ import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
 
-// ---------------------
-//   DB connection
-// ---------------------
+/* ---------------------
+   DB connection
+--------------------- */
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
@@ -28,9 +28,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// ---------------------
-//   Helper functions
-// ---------------------
+/* ---------------------
+   Helper functions
+--------------------- */
 function normalizeText(s) {
   return String(s ?? "")
     .normalize("NFD")
@@ -69,24 +69,33 @@ function dedupeByUrl(items) {
   });
 }
 
+/* =====================
+   URL helpers
+===================== */
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
+
     u.hash = "";
     [
       "utm_source", "utm_medium", "utm_campaign", "utm_term",
       "utm_content", "fbclid", "gclid", "trackingId", "pageNum", "position", "refId"
     ].forEach((p) => u.searchParams.delete(p));
+
     return u.toString().replace(/\?$/, "");
   } catch {
     return raw;
   }
 }
 
+/* ---------------------
+   Fetch helper
+--------------------- */
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
+
     const req = lib.request(
       u,
       {
@@ -101,6 +110,7 @@ function fetchText(url, redirectLeft = 5) {
       },
       (res) => {
         const code = res.statusCode || 0;
+
         if ([301, 302, 303, 307, 308].includes(code)) {
           const loc = res.headers.location;
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
@@ -109,11 +119,13 @@ function fetchText(url, redirectLeft = 5) {
           res.resume();
           return resolve(fetchText(nextUrl, redirectLeft - 1));
         }
+
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
         let stream = res;
         if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
         else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
         else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
+
         let data = "";
         stream.setEncoding("utf8");
         stream.on("data", (chunk) => (data += chunk));
@@ -124,26 +136,34 @@ function fetchText(url, redirectLeft = 5) {
         stream.on("error", reject);
       }
     );
+
     req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
     req.on("error", reject);
     req.end();
   });
 }
 
+/* ---------------------
+   HTML extraction
+--------------------- */
 function extractCandidates(html, baseUrl) {
   const $ = cheerioLoad(html);
+
   const items = [];
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
     if (!href) return;
     const url = new URL(href, baseUrl).toString();
     if (!/^https?:\/\//i.test(url)) return;
+
     let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
     if (!card.length) card = $(el).closest("div");
+
     const title =
       normalizeWhitespace($(el).text()) ||
       normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
     if (!title || title.length < 4) return;
+
     const desc = normalizeWhitespace(card.find("p").first().text()) || null;
     items.push({ title: title.slice(0, 300), url, description: desc ? desc.slice(0, 800) : null });
   });
@@ -166,6 +186,8 @@ function isFrissdiplomasJobUrl(rawUrl) {
 
 function isMatchingFrissdiplomasDetail(html) {
   const $ = cheerioLoad(html);
+
+  // Preferred path from Frissdiplomas sidebar blocks.
   const directLocation = normalizeText(
     normalizeWhitespace(
       $(".job-sidebar-content h4")
@@ -177,6 +199,7 @@ function isMatchingFrissdiplomasDetail(html) {
         .text()
     )
   );
+
   const directArea = normalizeText(
     normalizeWhitespace(
       $(".job-sidebar-content h4")
@@ -188,22 +211,31 @@ function isMatchingFrissdiplomasDetail(html) {
         .text()
     )
   );
+
   if (directLocation || directArea) {
     const isBudapest = directLocation.includes("budapest");
     const isInformatikai = directArea.includes("informatikai");
     return isBudapest && isInformatikai;
   }
+
+  // Fallback if structure changes.
   const pageText = normalizeText(normalizeWhitespace($("body").text()));
   const locationMarker = "munkavegzes helye";
   const areaMarker = "allas terulete(i)";
+
   const idxLocation = pageText.indexOf(locationMarker);
   const idxArea = pageText.indexOf(areaMarker);
   if (idxLocation === -1 || idxArea === -1) return false;
+
   const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
   const aroundArea = pageText.slice(idxArea, idxArea + 220);
   return aroundLocation.includes("budapest") && aroundArea.includes("informatikai");
 }
 
+
+/* ---------------------
+   DB upsert
+--------------------- */
 async function upsertJob(client, source, item) {
   const canonicalUrl = item.url;
   const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
@@ -228,12 +260,14 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://www.frissdiplomas.hu/allasok"),
 ]);
 
-export default withTimeout("cron_jobs_14", async () => {
+export default withTimeout("cron_jobs_15", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
+
   try {
     async function processListingPage(html, sourceKey, baseUrl) {
       const rawItems = extractCandidates(html, baseUrl);
+
       const items = rawItems.filter((it) => {
         if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
         if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
@@ -241,42 +275,48 @@ export default withTimeout("cron_jobs_14", async () => {
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
+
       for (const it of items) {
         try {
           let keep = true;
+
           if (sourceKey === "frissdiplomas") {
             const detailHtml = await fetchText(it.url);
             keep = isMatchingFrissdiplomasDetail(detailHtml);
           }
+
           if (!keep) continue;
           await upsertJob(client, sourceKey, it);
         } catch (err) {
           console.error(err);
         }
       }
+
       return items.length;
     }
-    // Skip pages 1-6, start from page 7
-    let page = 7;
-    while (true) {
+
+
+    // Pages 4-6 only
+    for (let page = 4; page <= 6; page++) {
       const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
       try {
         const html = await fetchText(pageUrl);
         const count = await processListingPage(html, "frissdiplomas", pageUrl);
         console.log(`frissdiplomas page ${page}: ${count} items processed.`);
-        page += 1;
       } catch (err) {
         if (String(err?.message || "").includes("HTTP 404")) {
           console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
           break;
         }
-        await logFetchError("cron_jobs_14", { url: pageUrl, message: err.message });
+        await logFetchError("cron_jobs_15", { url: pageUrl, message: err.message });
         console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
         break;
       }
     }
+
   } finally {
     client.release();
   }
+
   return new Response("OK");
 });

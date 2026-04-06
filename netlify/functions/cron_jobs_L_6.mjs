@@ -1,9 +1,11 @@
 export const config = {
-  schedule: "3 4-23 * * *",
+  schedule: "10 4-23 * * *",
 };
+/* =========================
+// tesztelo
+// tester
+{ key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 
-/* ========================= keywords=teszt
-      { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=teszt&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 */
 
 import { Pool } from "pg";
@@ -48,6 +50,9 @@ function isInternshipTitle(title) {
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
 }
 
+function normalizeWhitespace(s) {
+  return String(s ?? "").replace(/\s+/g, " ").trim();
+}
 
 function titleNotBlacklisted(title) {
   const t = normalizeText(title);
@@ -70,7 +75,6 @@ function randomDelay(minMs = 600, maxMs = 1400) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
 /* =====================
    URL helpers
 ===================== */
@@ -78,16 +82,8 @@ function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
-    /*
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
-      u.search = "";
-      u.hash = "";
-      return u.toString();
-    }
-      */
-
-    if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
-      return `https://${u.hostname}${u.pathname}`; // teljesen eldobjuk a query stringet
+      return `https://${u.hostname}${u.pathname}`;
     }
 
     u.hash = "";
@@ -161,6 +157,29 @@ function fetchText(url, redirectLeft = 5) {
 /* ---------------------
    HTML extraction
 --------------------- */
+function extractCandidates(html, baseUrl) {
+  const $ = cheerioLoad(html);
+
+  const items = [];
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href");
+    if (!href) return;
+    const url = new URL(href, baseUrl).toString();
+    if (!/^https?:\/\//i.test(url)) return;
+
+    let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
+    if (!card.length) card = $(el).closest("div");
+
+    let title =
+      normalizeWhitespace($(el).text()) ||
+      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
+    if (!title || title.length < 4) return;
+
+    const desc = normalizeWhitespace(card.find("p").first().text()) || null;
+    items.push({ title: title.slice(0,300), url, description: desc ? desc.slice(0,800) : null });
+  });
+  return dedupeByUrl(items);
+}
 
 /* ---------------------
    LinkedIn extraction
@@ -229,32 +248,26 @@ function levelNotBlacklisted(title, desc) {
   return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
-export default withTimeout("cron_jobs_9", async () => {
+export default withTimeout("cron_jobs_22", async () => {
   _filters = await loadFilters();
 
+  const SOURCES = [
+    // tesztelo
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=tesztelo&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 
-
-const SOURCES = [
-    // TEST
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=test&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-
-    // Test Automation
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r86400&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r604800&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&keywords=Test%20Automation&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
-    
+    // tester
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r86400&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r86400&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=2&f_TPR=r604800&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=0&f_E=1&f_TPR=r604800&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
+    { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&keywords=tester&location=Budapest&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
   ];
 
   const client = await pool.connect();
@@ -266,12 +279,15 @@ const SOURCES = [
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_9", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_22", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }
 
-      const rawItems = extractLinkedInJobs(html);
+      const rawItems =
+        p.key === "LinkedIn"
+          ? extractLinkedInJobs(html)
+          : extractCandidates(html, p.url);
 
       let items = rawItems.filter(it => {
         if (!levelNotBlacklisted(it.title, it.description)) return false;

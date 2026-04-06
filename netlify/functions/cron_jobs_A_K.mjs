@@ -1,10 +1,12 @@
 export const config = {
-  schedule: "11 4-23 * * *",
+  schedule: "3 4-23 * * *",
 };
 
-/* ========================= PAGE 4-6 ONLY
-const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
+/* ========================= keywords=teszt
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
+  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
 */
+
 
 
 import { Pool } from "pg";
@@ -55,7 +57,7 @@ function normalizeWhitespace(s) {
 
 function titleNotBlacklisted(title) {
   const t = normalizeText(title);
-  return !_filters.some((word) => t.includes(normalizeText(word)));
+  return !_filters.some(word => t.includes(normalizeText(word)));
 }
 
 function dedupeByUrl(items) {
@@ -69,6 +71,7 @@ function dedupeByUrl(items) {
   });
 }
 
+
 /* =====================
    URL helpers
 ===================== */
@@ -78,9 +81,9 @@ function normalizeUrl(raw) {
 
     u.hash = "";
     [
-      "utm_source", "utm_medium", "utm_campaign", "utm_term",
-      "utm_content", "fbclid", "gclid", "trackingId", "pageNum", "position", "refId"
-    ].forEach((p) => u.searchParams.delete(p));
+      "utm_source","utm_medium","utm_campaign","utm_term",
+      "utm_content","fbclid","gclid","trackingId","pageNum","position","refId"
+    ].forEach(p => u.searchParams.delete(p));
 
     return u.toString().replace(/\?$/, "");
   } catch {
@@ -93,6 +96,7 @@ function normalizeUrl(raw) {
 --------------------- */
 function fetchText(url, redirectLeft = 5) {
   return new Promise((resolve, reject) => {
+    console.log(`Script started at ${new Date().toISOString()}`);
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
 
@@ -111,7 +115,7 @@ function fetchText(url, redirectLeft = 5) {
       (res) => {
         const code = res.statusCode || 0;
 
-        if ([301, 302, 303, 307, 308].includes(code)) {
+        if ([301,302,303,307,308].includes(code)) {
           const loc = res.headers.location;
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
@@ -128,7 +132,7 @@ function fetchText(url, redirectLeft = 5) {
 
         let data = "";
         stream.setEncoding("utf8");
-        stream.on("data", (chunk) => (data += chunk));
+        stream.on("data", (chunk) => data += chunk);
         stream.on("end", () => {
           if (code >= 200 && code < 300) resolve(data);
           else reject(new Error(`HTTP ${code} for ${url}`));
@@ -159,77 +163,19 @@ function extractCandidates(html, baseUrl) {
     let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
     if (!card.length) card = $(el).closest("div");
 
-    const title =
+    let title =
       normalizeWhitespace($(el).text()) ||
       normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
     if (!title || title.length < 4) return;
 
     const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0, 300), url, description: desc ? desc.slice(0, 800) : null });
+    items.push({ title: title.slice(0,300), url, description: desc ? desc.slice(0,800) : null });
   });
   return dedupeByUrl(items);
 }
 
 function getDedupeKey(rawUrl) {
   return normalizeUrl(rawUrl);
-}
-
-function isFrissdiplomasJobUrl(rawUrl) {
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    return host.includes("frissdiplomas.hu") && u.pathname.startsWith("/allasok");
-  } catch {
-    return false;
-  }
-}
-
-function isMatchingFrissdiplomasDetail(html) {
-  const $ = cheerioLoad(html);
-
-  // Preferred path from Frissdiplomas sidebar blocks.
-  const directLocation = normalizeText(
-    normalizeWhitespace(
-      $(".job-sidebar-content h4")
-        .filter((_, el) => normalizeText($(el).text()).includes("munkavegzes helye"))
-        .first()
-        .parent()
-        .find("span")
-        .first()
-        .text()
-    )
-  );
-
-  const directArea = normalizeText(
-    normalizeWhitespace(
-      $(".job-sidebar-content h4")
-        .filter((_, el) => normalizeText($(el).text()).includes("allas terulete(i)"))
-        .first()
-        .parent()
-        .find("span")
-        .first()
-        .text()
-    )
-  );
-
-  if (directLocation || directArea) {
-    const isBudapest = directLocation.includes("budapest");
-    const isInformatikai = directArea.includes("informatikai");
-    return isBudapest && isInformatikai;
-  }
-
-  // Fallback if structure changes.
-  const pageText = normalizeText(normalizeWhitespace($("body").text()));
-  const locationMarker = "munkavegzes helye";
-  const areaMarker = "allas terulete(i)";
-
-  const idxLocation = pageText.indexOf(locationMarker);
-  const idxArea = pageText.indexOf(areaMarker);
-  if (idxLocation === -1 || idxArea === -1) return false;
-
-  const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
-  const aroundArea = pageText.slice(idxArea, idxArea + 220);
-  return aroundLocation.includes("budapest") && aroundArea.includes("informatikai");
 }
 
 
@@ -245,7 +191,8 @@ async function upsertJob(client, source, item) {
       (source, title, url, canonical_url, experience, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;`,
+        DO NOTHING;
+        `,
     [source, item.title, item.url, canonicalUrl, experience]
   );
 }
@@ -255,66 +202,84 @@ function levelNotBlacklisted(title, desc) {
   return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
-const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
+const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
+const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
 const URL_BLACKLIST = new Set([
-  normalizeUrl("https://www.frissdiplomas.hu/allasok"),
+  normalizeUrl("https://aam.hu/allasajanlatok#content"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlat-kategoriak"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszerintegrator"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/kontrolling"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto"),
+  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
 ]);
 
-export default withTimeout("cron_jobs_15", async () => {
+export default withTimeout("cron_jobs_10", async () => {
   _filters = await loadFilters();
+
+
+
+const SOURCES = [
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1" },
+  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
+
+  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
+  { key: "aam", label: "aam", url: "https://aam.hu/allasajanlatok" },
+];
+
   const client = await pool.connect();
 
   try {
-    async function processListingPage(html, sourceKey, baseUrl) {
-      const rawItems = extractCandidates(html, baseUrl);
+    for (const p of SOURCES) {
+      let html;
+      try {
+        html = await fetchText(p.url);
+      } catch (err) {
+        await logFetchError("cron_jobs_10", { url: p.url, message: err.message });
+        console.error(p.key, "fetch failed:", err.message);
+        continue;
+      }
 
-      const items = rawItems.filter((it) => {
+      const rawItems = extractCandidates(html, p.url);
+
+      let items = rawItems.filter(it => {
         if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
+        if (p.key === "aam" && !it.url.startsWith(AAM_JOB_PREFIX)) return false;
+        if (p.key === "karrierhungaria" && !it.url.startsWith(KARRIERHUNGARIA_JOB_PREFIX)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
 
+
       for (const it of items) {
         try {
-          let keep = true;
-
-          if (sourceKey === "frissdiplomas") {
-            const detailHtml = await fetchText(it.url);
-            keep = isMatchingFrissdiplomasDetail(detailHtml);
-          }
-
-          if (!keep) continue;
-          await upsertJob(client, sourceKey, it);
+          await upsertJob(client, p.key, it);
         } catch (err) {
           console.error(err);
         }
       }
 
-      return items.length;
-    }
-
-
-    // Pages 4-6 only
-    for (let page = 4; page <= 6; page++) {
-      const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
-      try {
-        const html = await fetchText(pageUrl);
-        const count = await processListingPage(html, "frissdiplomas", pageUrl);
-        console.log(`frissdiplomas page ${page}: ${count} items processed.`);
-      } catch (err) {
-        if (String(err?.message || "").includes("HTTP 404")) {
-          console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
-          break;
-        }
-        await logFetchError("cron_jobs_15", { url: pageUrl, message: err.message });
-        console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
-        break;
-      }
+      console.log(`${p.key}: ${items.length} items processed.`);
     }
 
   } finally {
+    console.log(`Script started at ${new Date().toISOString()}`);
     client.release();
   }
 
