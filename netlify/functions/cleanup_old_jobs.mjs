@@ -21,13 +21,13 @@ export default async () => {
     const { rowCount: linkedinCount } = await client.query(`
       DELETE FROM job_posts
       WHERE source = 'LinkedIn'
-        AND first_seen < (NOW() - INTERVAL '60 days')
+        AND first_seen < (NOW() - INTERVAL '20 days')
     `);
 
     const { rowCount: otherCount } = await client.query(`
       DELETE FROM job_posts
       WHERE source != 'LinkedIn'
-        AND first_seen < (NOW() - INTERVAL '30 days')
+        AND first_seen < (NOW() - INTERVAL '20 days')
     `);
 
     return new Response(`cleanup OK: deleted ${linkedinCount + otherCount} (LinkedIn: ${linkedinCount}, other: ${otherCount})`, { status: 200 });
