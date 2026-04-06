@@ -63,7 +63,7 @@ useEffect(() => {
         : ''
      }`}>
       <div className="particles-wrapper">
-        <div className="background-image"></div> {/* Háttérkép */}
+        {particlesActive && <div className="background-image"></div>} {/* Háttérkép */}
         <Particles active={particlesActive} />
       </div>
 
