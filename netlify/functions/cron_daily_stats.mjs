@@ -36,8 +36,7 @@ const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diák
 // Specifikusabb kategóriák ELŐRE, általános "Fejlesztő" HÁTRA
 // Minden job csak 1 kategóriába kerül (az első illeszkedő)
 const JOB_CATEGORIES = [
-  ["UI/UX", ["ui", "ux", "ui/ux", "user interface", "user experience", "figma", "design system", "interaction design", "product designer"]],
-  ["Webfejlesztés", ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript"]],
+  ["Webfejlesztés", ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "user interface", "user experience", "figma", "design system", "interaction design", "product designer"]],
   ["Data / AI", ["data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning", "nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform"]],
   ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
   ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
