@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
@@ -134,6 +135,7 @@ const getCategoriesForJob = (job) => {
 };
 
 const JobWatcher = () => {
+  const navigate = useNavigate();
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -567,6 +569,9 @@ const JobWatcher = () => {
           Csak új (1 hét)
         </label>
 
+        <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
+          📊 Statisztikák
+        </button>
         <button className="job-btn" onClick={() => fetchJobs(time24h, time7d)}>
           Frissítés
         </button>

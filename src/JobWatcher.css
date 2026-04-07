@@ -207,6 +207,14 @@
   cursor: not-allowed;
 }
 
+.job-btn-stats {
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+}
+
+.job-btn-stats:hover {
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
 /* ====== TABS ====== */
 .job-tabs {
   display: flex;

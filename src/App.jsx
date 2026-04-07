@@ -18,6 +18,7 @@ import Particles from './Particles.jsx';
 import User_pages from './User_pages.tsx';
 import JobWatcher from "./JobWatcher.jsx";
 import Filters from "./Filters.jsx";
+import JobStats from "./JobStats.jsx";
 
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -31,7 +32,7 @@ const AppContent = () => {
 
 
   useEffect(() => {
-    setParticlesActive(!['/targy_info', '/allasfigyelo', '/allasok/filters'].includes(location.pathname));
+    setParticlesActive(!['/targy_info', '/allasfigyelo', '/allasok/filters', '/allasfigyelo/stats'].includes(location.pathname));
   }, [location]);
 
 
@@ -147,6 +148,16 @@ useEffect(() => {
             element={
               <div className="re-page">
                 <Filters />
+              </div>
+            }
+          />
+
+          {/* Statisztikák */}
+          <Route
+            path="/allasfigyelo/stats"
+            element={
+              <div className="re-page">
+                <JobStats />
               </div>
             }
           />
