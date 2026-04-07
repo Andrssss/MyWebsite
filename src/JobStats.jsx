@@ -2,6 +2,57 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./JobStats.css";
 
+const PIE_COLORS = [
+  "#6366f1", "#4f8cff", "#f59e0b", "#10b981", "#ef4444",
+  "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b",
+  "#a855f7", "#06b6d4",
+];
+
+const PieChart = ({ data, title }) => {
+  const total = data.reduce((s, d) => s + d.count, 0);
+  if (!total) return <div className="stats-pie-empty">Nincs adat</div>;
+
+  const size = 200;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 80;
+
+  let cumAngle = -Math.PI / 2;
+  const slices = data.map((d, i) => {
+    const angle = (d.count / total) * 2 * Math.PI;
+    const startX = cx + r * Math.cos(cumAngle);
+    const startY = cy + r * Math.sin(cumAngle);
+    cumAngle += angle;
+    const endX = cx + r * Math.cos(cumAngle);
+    const endY = cy + r * Math.sin(cumAngle);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const path = `M${cx},${cy} L${startX},${startY} A${r},${r} 0 ${largeArc},1 ${endX},${endY} Z`;
+    return { ...d, path, color: PIE_COLORS[i % PIE_COLORS.length], pct: ((d.count / total) * 100).toFixed(1) };
+  });
+
+  return (
+    <div className="stats-pie-section">
+      <h2>{title}</h2>
+      <div className="stats-pie-row">
+        <svg viewBox={`0 0 ${size} ${size}`} className="stats-pie-svg">
+          {slices.map((s, i) => (
+            <path key={i} d={s.path} fill={s.color} stroke="rgba(0,0,0,0.3)" strokeWidth="1" />
+          ))}
+        </svg>
+        <div className="stats-pie-legend">
+          {slices.map((s, i) => (
+            <div key={i} className="stats-pie-legend-item">
+              <span className="stats-pie-color" style={{ background: s.color }} />
+              <span className="stats-pie-label">{s.category}</span>
+              <span className="stats-pie-count">{s.count} ({s.pct}%)</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const API = "/.netlify/functions/job-stats";
 
 const JobStats = () => {
@@ -21,7 +72,7 @@ const JobStats = () => {
   if (!data || (!data.month?.length && !data.last10?.length))
     return <div className="stats-page"><p className="stats-loading">Nincs még adat.</p></div>;
 
-  const { month = [], last10 = [] } = data;
+  const { month = [], last10 = [], monthCategories = [], yesterdayCategories = [] } = data;
 
   /* ===== HAVI ÁTLAGOK ===== */
   const monthTotal = month.reduce((s, d) => s + d.total_jobs, 0);
@@ -79,6 +130,7 @@ const JobStats = () => {
             return (
               <div key={d.date} className="stats-bar-col">
                 <span className="stats-bar-value">{d.total_jobs}</span>
+                <span className="stats-bar-value intern">{d.intern_jobs}</span>
                 <div className="stats-bar-track">
                   <div className="stats-bar-fill" style={{ height: `${totalPct}%` }}>
                     <div className="stats-bar-intern" style={{ height: `${d.total_jobs ? (d.intern_jobs / d.total_jobs) * 100 : 0}%` }} />
@@ -161,6 +213,12 @@ const JobStats = () => {
           <span className="stats-legend-item"><span className="stats-dot regular" /> Összes</span>
           <span className="stats-legend-item"><span className="stats-dot intern" /> Diák/Intern</span>
         </div>
+      </div>
+
+      {/* ===== PIE CHARTS ===== */}
+      <div className="stats-pies-row">
+        <PieChart data={monthCategories} title="Havi kategória bontás" />
+        <PieChart data={yesterdayCategories} title="Tegnapi kategória bontás" />
       </div>
     </div>
   );

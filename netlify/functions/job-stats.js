@@ -47,9 +47,36 @@ exports.handler = async () => {
        LIMIT 10`
     );
 
+    // Havi kategória bontás (mentett adatból)
+    const { rows: monthCatRows } = await client.query(
+      `SELECT category, SUM(count)::int AS count
+       FROM job_daily_categories
+       WHERE date >= $1
+       GROUP BY category
+       ORDER BY count DESC`,
+      [monthStart]
+    );
+    const monthCategories = monthCatRows.map((r) => ({ category: r.category, count: r.count }));
+
+    // Tegnapi kategória bontás (mentett adatból)
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+
+    const { rows: yesterdayCatRows } = await client.query(
+      `SELECT category, count
+       FROM job_daily_categories
+       WHERE date = $1
+       ORDER BY count DESC`,
+      [yesterdayStr]
+    );
+    const yesterdayCategories = yesterdayCatRows.map((r) => ({ category: r.category, count: r.count }));
+
     return jsonResponse(200, {
       month: monthRows,
-      last10: last10Rows.reverse(), // legrégebbi elöl
+      last10: last10Rows.reverse(),
+      monthCategories,
+      yesterdayCategories,
     });
   } catch (err) {
     console.error("[job-stats] Error:", err);
