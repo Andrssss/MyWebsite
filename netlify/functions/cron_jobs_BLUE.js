@@ -210,7 +210,7 @@ async function fetchRssJobs(url) {
    Main (Netlify handler)
 --------------------- */
 
-export default withTimeout("cron_jobs_16", async () => {
+export default withTimeout("cron_jobs_BLUE", async () => {
   _filters = await loadFilters();
   const SOURCES = [
     { key: "bluebird", label: "bluebird", url: "https://bluebird.hu/?feed=job_feed&search_location=Budapest&job_categories=devops-engineer" },
@@ -225,7 +225,7 @@ export default withTimeout("cron_jobs_16", async () => {
         jobs = await fetchRssJobs(p.url);
         console.log(`${p.key}: ${jobs.length} jobs found in RSS.`);
       } catch (err) {
-        await logFetchError("cron_jobs_16", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_BLUE", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }

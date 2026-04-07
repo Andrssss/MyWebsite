@@ -1,5 +1,5 @@
-// netlify/functions/cron_jobs_7.mjs
-console.log("CRON_JOBS_7 LOADED");
+// netlify/functions/cron_jobs_DIAK_1.mjs
+console.log("CRON_JOBS_DIAK_1 LOADED");
 export const config = {
   schedule: "19 4-23 * * *",
 };
@@ -1165,7 +1165,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_7", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
@@ -1204,7 +1204,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllZynternJobs({ fields: "80,15,16", maxPages: 10 });
         } catch (e) {
-          await logFetchError("cron_jobs_7", { url: p.url, message: `Zyntern API error: ${e.message}` });
+          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Zyntern API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
           continue;
         }
@@ -1212,7 +1212,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 6, debug });
         } catch (e) {
-          await logFetchError("cron_jobs_7", { url: p.url, message: `MindDiák API error: ${e.message}` });
+          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `MindDiák API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
           continue;
         }
@@ -1220,7 +1220,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllSchonherzJobs(html, p.url);
         } catch (e) {
-          await logFetchError("cron_jobs_7", { url: p.url, message: `Schönherz pagination error: ${e.message}` });
+          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Schönherz pagination error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Schönherz pagination error: ${e.message}` });
           continue;
         }
@@ -1274,7 +1274,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 }
 
 
-export default withTimeout("cron_jobs_7", async (request) => {
+export default withTimeout("cron_jobs_DIAK_1", async (request) => {
   _filters = await loadFilters();
   const url = new URL(request.url);
 

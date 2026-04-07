@@ -227,7 +227,7 @@ async function fetchAllTalentJobs() {
 
       console.log(`talent: ${searchUrl.match(/k=([^&]+)/)?.[1]} → ${jobs.length} jobs`);
     } catch (err) {
-      await logFetchError("cron_jobs_18", { url: searchUrl, message: err.message, extra: { source: "talent" } });
+      await logFetchError("cron_jobs_T", { url: searchUrl, message: err.message, extra: { source: "talent" } });
       console.log(`talent: failed ${searchUrl}: ${err.message}`);
     }
 
@@ -239,7 +239,7 @@ async function fetchAllTalentJobs() {
 
 /* ── handler ────────────────────────────────────────────────── */
 
-export default withTimeout("cron_jobs_18", async () => {
+export default withTimeout("cron_jobs_T", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
 

@@ -248,7 +248,7 @@ function levelNotBlacklisted(title, desc) {
   return !_filters.some((w) => t.includes(normalizeText(w)));
 }
 
-export default withTimeout("cron_jobs_22", async () => {
+export default withTimeout("cron_jobs_L_6", async () => {
   _filters = await loadFilters();
 
   const SOURCES = [
@@ -279,7 +279,7 @@ export default withTimeout("cron_jobs_22", async () => {
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_22", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_L_6", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }

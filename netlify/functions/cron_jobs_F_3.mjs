@@ -260,7 +260,7 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://www.frissdiplomas.hu/allasok"),
 ]);
 
-export default withTimeout("cron_jobs_11", async () => {
+export default withTimeout("cron_jobs_F_3", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
 
@@ -301,7 +301,7 @@ export default withTimeout("cron_jobs_11", async () => {
       const count = await processListingPage(firstHtml, "frissdiplomas", "https://www.frissdiplomas.hu/allasok");
       console.log(`frissdiplomas page 1: ${count} items processed.`);
     } catch (err) {
-      await logFetchError("cron_jobs_11", { url: "https://www.frissdiplomas.hu/allasok", message: err.message });
+      await logFetchError("cron_jobs_F_3", { url: "https://www.frissdiplomas.hu/allasok", message: err.message });
       console.error("frissdiplomas fetch failed:", err.message);
     }
 
@@ -317,7 +317,7 @@ export default withTimeout("cron_jobs_11", async () => {
           console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
           break;
         }
-        await logFetchError("cron_jobs_11", { url: pageUrl, message: err.message });
+        await logFetchError("cron_jobs_F_3", { url: pageUrl, message: err.message });
         console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
         break;
       }

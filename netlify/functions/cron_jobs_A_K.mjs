@@ -219,7 +219,7 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
 ]);
 
-export default withTimeout("cron_jobs_10", async () => {
+export default withTimeout("cron_jobs_A_K", async () => {
   _filters = await loadFilters();
 
 
@@ -250,7 +250,7 @@ const SOURCES = [
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_10", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_A_K", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }

@@ -338,37 +338,52 @@ async function fetchAllKukaJobs() {
 }
 /* ── handler ────────────────────────────────────────────────── */
 
-export default withTimeout("cron_jobs_17", async () => {
+export default withTimeout("cron_jobs_MIX", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
 
   try {
     /* DreamJobs */
-    const dreamJobs = (await fetchAllDreamJobs()).filter((job) => !isSeniorLike(job.title, ""));
-    console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
+    try {
+      const dreamJobs = (await fetchAllDreamJobs()).filter((job) => !isSeniorLike(job.title, ""));
+      console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
 
-    for (const job of dreamJobs) {
-      await upsertJob(client, "dreamjobs", job);
+      for (const job of dreamJobs) {
+        await upsertJob(client, "dreamjobs", job);
+      }
+      console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
+    } catch (err) {
+      await logFetchError("cron_jobs_MIX", { url: "dreamjobs", message: err.message });
+      console.error("dreamjobs fetch failed:", err.message);
     }
-    console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
 
     /* MelonJobs */
-    const melonJobs = await fetchAllMelonJobs();
-    console.log(`melonjobs: ${melonJobs.length} jobs found`);
+    try {
+      const melonJobs = await fetchAllMelonJobs();
+      console.log(`melonjobs: ${melonJobs.length} jobs found`);
 
-    for (const job of melonJobs) {
-      await upsertJob(client, "melonjobs", job);
+      for (const job of melonJobs) {
+        await upsertJob(client, "melonjobs", job);
+      }
+      console.log(`melonjobs: ${melonJobs.length} jobs processed`);
+    } catch (err) {
+      await logFetchError("cron_jobs_MIX", { url: "melonjobs", message: err.message });
+      console.error("melonjobs fetch failed:", err.message);
     }
-    console.log(`melonjobs: ${melonJobs.length} jobs processed`);
 
     /* KUKA */
-    const kukaJobs = (await fetchAllKukaJobs()).filter((job) => !isSeniorLike(job.title, ""));
-    console.log(`kuka: ${kukaJobs.length} jobs found`);
+    try {
+      const kukaJobs = (await fetchAllKukaJobs()).filter((job) => !isSeniorLike(job.title, ""));
+      console.log(`kuka: ${kukaJobs.length} jobs found`);
 
-    for (const job of kukaJobs) {
-      await upsertJob(client, "kuka", job);
+      for (const job of kukaJobs) {
+        await upsertJob(client, "kuka", job);
+      }
+      console.log(`kuka: ${kukaJobs.length} jobs processed`);
+    } catch (err) {
+      await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
+      console.error("kuka fetch failed:", err.message);
     }
-    console.log(`kuka: ${kukaJobs.length} jobs processed`);
 
     return new Response("OK");
   } finally {

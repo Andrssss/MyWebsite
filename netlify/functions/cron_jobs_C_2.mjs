@@ -1,5 +1,5 @@
-// netlify/functions/cron_jobs_13.mjs
-console.log("CRON_JOBS_13 LOADED");
+// netlify/functions/cron_jobs_C_2.mjs
+console.log("CRON_JOBS_C_2 LOADED");
 export const config = {
   schedule: "11 4-23 * * *",
 };
@@ -341,7 +341,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_13", { url: p.url, message: err.message });
+        await logFetchError("cron_jobs_C_2", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
@@ -381,7 +381,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 }
 
 
-export default withTimeout("cron_jobs_13", async (request) => {
+export default withTimeout("cron_jobs_C_2", async (request) => {
   _filters = await loadFilters();
   const url = new URL(request.url);
 

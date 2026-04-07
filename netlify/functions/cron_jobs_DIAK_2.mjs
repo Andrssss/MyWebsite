@@ -177,7 +177,7 @@ async function fetchAllYdiakJobs() {
     console.log(`ydiak: ${jobs.length} IT jobs found`);
     return jobs;
   } catch (err) {
-    await logFetchError("cron_jobs_19", { url: YDIAK_URL, message: err.message, extra: { source: "ydiak" } });
+    await logFetchError("cron_jobs_DIAK_2", { url: YDIAK_URL, message: err.message, extra: { source: "ydiak" } });
     console.log(`ydiak: failed: ${err.message}`);
     return [];
   }
@@ -211,7 +211,7 @@ async function fetchAllQdiakJobs() {
     console.log(`qdiak: ${jobs.length} IT Budapest jobs found (from ${payload?.data?.length ?? 0} total IT)`);
     return jobs;
   } catch (err) {
-    await logFetchError("cron_jobs_19", { url: QDIAK_API_URL, message: err.message, extra: { source: "qdiak" } });
+    await logFetchError("cron_jobs_DIAK_2", { url: QDIAK_API_URL, message: err.message, extra: { source: "qdiak" } });
     console.log(`qdiak: failed: ${err.message}`);
     return [];
   }
@@ -282,7 +282,7 @@ async function fetchAllProdiakJobs() {
     console.log(`prodiak: ${allJobs.length} IT Budapest jobs found (${page} pages)`);
     return allJobs;
   } catch (err) {
-    await logFetchError("cron_jobs_19", { url: PRODIAK_API_URL, message: err.message, extra: { source: "prodiak", page } });
+    await logFetchError("cron_jobs_DIAK_2", { url: PRODIAK_API_URL, message: err.message, extra: { source: "prodiak", page } });
     console.log(`prodiak: failed on page ${page}: ${err.message}`);
     return allJobs;
   }
@@ -290,7 +290,7 @@ async function fetchAllProdiakJobs() {
 
 /* ── handler ────────────────────────────────────────────────── */
 
-export default withTimeout("cron_jobs_19", async () => {
+export default withTimeout("cron_jobs_DIAK_2", async () => {
   const client = await pool.connect();
 
   try {
