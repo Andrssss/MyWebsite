@@ -570,7 +570,7 @@ const JobWatcher = () => {
         </label>
 
         <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
-          📊 Statisztikák
+          📊 Statisztikák 📊
         </button>
         <button className="job-btn" onClick={() => fetchJobs(time24h, time7d)}>
           Frissítés
