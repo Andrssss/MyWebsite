@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./Filters.css";
 
 const API = "/.netlify/functions/filters";
 
 const Filters = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newWord, setNewWord] = useState("");
@@ -145,10 +147,8 @@ const Filters = () => {
   return (
     <div className="filters-page">
       <div className="filters-header">
-        <div>
-          <h1>Filters</h1>
-          <a href="/allasfigyelo" className="filters-btn" style={{ textDecoration: "none", display: "inline-block", marginTop: 8 }}>← Vissza</a>
-        </div>
+        <h1>Filters</h1>
+        <button className="filters-btn" onClick={() => navigate("/allasfigyelo")}>← Vissza</button>
       </div>
 
       {error && <p style={{ color: "#ef4444", margin: "12px 0" }}>{error}</p>}

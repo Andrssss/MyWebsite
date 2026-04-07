@@ -68,7 +68,7 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  height: 220px;
+  height: 320px;
   padding: 12px 0;
 }
 
@@ -79,12 +79,14 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  height: 100%;
 }
 
 .stats-bar-value {
   font-size: 12px;
   font-weight: 600;
   color: #a5b4fc;
+  flex-shrink: 0;
 }
 
 .stats-bar-track {
@@ -243,7 +245,7 @@
 /* ===== RESPONSIVE ===== */
 @media (max-width: 600px) {
   .stats-bar-chart {
-    height: 160px;
+    height: 240px;
     gap: 4px;
   }
 
