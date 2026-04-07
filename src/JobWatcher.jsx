@@ -115,7 +115,7 @@ const getKeywordNotesForJob = (job) => {
    Egy job csak 1 kategóriába kerül (az első illeszkedő).
 ======================= */
 const JOB_CATEGORIES = [
-  ["Webfejlesztés", ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "user interface", "user experience", "figma", "design system", "interaction design", "product designer"]],
+  ["Webfejlesztés", ["frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
   ["Data / AI", ["data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning", "nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform"]],
   ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
   ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
