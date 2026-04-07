@@ -33,31 +33,33 @@ const INTERN_SOURCES = [
 
 const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
 
-const JOB_CATEGORIES = {
-  "Fejlesztő": ["developer", "fejlesztő", "fejleszto", "programozó", "software engineer"],
-  "QA / Tesztelő": ["tester", "tesztelő", "qa", "quality", "test"],
-  "DevOps": ["devops", "sre", "site reliability"],
-  "Helpdesk": ["helpdesk", "help desk", "service desk", "servicenow"],
-  "Elemző": ["analyst", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport"],
-  "Data / AI": ["data engineer", "data scientist", "machine learning", "big data"],
-  "SAP": ["sap", "abap"],
-  "Webfejlesztés": ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "html", "css", "javascript"],
-  "Security": ["security", "cybersecurity"],
-  "Hálózat / Infra": ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök"],
-  "Hardware": ["hardware", "embedded", "hw verification"],
-};
+// Specifikusabb kategóriák ELŐRE, általános "Fejlesztő" HÁTRA
+// Minden job csak 1 kategóriába kerül (az első illeszkedő)
+const JOB_CATEGORIES = [
+  ["UI/UX", ["ui", "ux", "ui/ux", "user interface", "user experience", "figma", "design system", "interaction design", "product designer"]],
+  ["Webfejlesztés", ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript"]],
+  ["Data / AI", ["data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning", "nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform"]],
+  ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
+  ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
+  ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
+  ["Elemző", ["analyst", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
+  ["SAP", ["sap", "abap"]],
+  ["Security", ["security", "cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
+  ["Hálózat / Infra", ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök", "sysadmin", "linux admin", "windows admin", "it üzemeltető", "üzemeltetés"]],
+  ["Hardware", ["hardware", "embedded", "hw verification", "fpga", "pcb", "firmware"]],
+  ["Mobil", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin"]],
+  ["Fejlesztő", ["developer", "fejlesztő", "fejleszto", "programozó", "software engineer", "engineer"]],
+];
 
 function categorizeJobs(rows) {
   const counts = {};
-  for (const cat of Object.keys(JOB_CATEGORIES)) counts[cat] = 0;
+  for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
   counts["Egyéb"] = 0;
   for (const row of rows) {
     const title = (row.title || "").toLowerCase();
-    const matched = Object.entries(JOB_CATEGORIES)
-      .filter(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())))
-      .map(([cat]) => cat);
-    if (matched.length === 0) counts["Egyéb"]++;
-    else for (const cat of matched) counts[cat]++;
+    const match = JOB_CATEGORIES.find(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())));
+    if (match) counts[match[0]]++;
+    else counts["Egyéb"]++;
   }
   return Object.entries(counts)
     .filter(([, c]) => c > 0)

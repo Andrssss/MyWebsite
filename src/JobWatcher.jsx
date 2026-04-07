@@ -111,27 +111,30 @@ const getKeywordNotesForJob = (job) => {
 
 /* =======================
    KATEGÓRIÁK
+   Specifikusabb ELŐRE, általános ("Fejlesztő") HÁTRA.
+   Egy job csak 1 kategóriába kerül (az első illeszkedő).
 ======================= */
-const JOB_CATEGORIES = {
-  "Fejlesztő": ["developer", "fejlesztő", "fejleszto", "programozó", "software engineer"],
-  "QA / Tesztelő": ["tester", "tesztelő", "qa", "quality", "test"],
-  "DevOps": ["devops", "sre", "site reliability"],
-  "Helpdesk": ["helpdesk", "help desk", "service desk", "servicenow"],
-  "Elemző": ["analyst", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport"],
-  "Data / AI": ["data engineer", "data scientist", "machine learning", "big data"],
-  "SAP": ["sap", "abap"],
-  "Webfejlesztés": ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "html", "css", "javascript"],
-  "Security": ["security", "cybersecurity"],
-  "Hálózat / Infra": ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök"],
-  "Hardware": ["hardware", "embedded", "hw verification"],
-};
+const JOB_CATEGORIES = [
+  ["UI/UX", ["ui", "ux", "ui/ux", "user interface", "user experience", "figma", "design system", "interaction design", "product designer"]],
+  ["Webfejlesztés", ["frontend", "backend", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript"]],
+  ["Data / AI", ["data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning", "nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform"]],
+  ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
+  ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
+  ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
+  ["Elemző", ["analyst", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
+  ["SAP", ["sap", "abap"]],
+  ["Security", ["security", "cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
+  ["Hálózat / Infra", ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök", "sysadmin", "linux admin", "windows admin", "it üzemeltető", "üzemeltetés"]],
+  ["Hardware", ["hardware", "embedded", "hw verification", "fpga", "pcb", "firmware"]],
+  ["Mobil", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin"]],
+  ["Fejlesztő", ["developer", "fejlesztő", "fejleszto", "programozó", "software engineer", "engineer"]],
+];
 
 const getCategoriesForJob = (job) => {
   if (!job.title) return [];
   const title = job.title.toLowerCase();
-  return Object.entries(JOB_CATEGORIES)
-    .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
-    .map(([cat]) => cat);
+  const match = JOB_CATEGORIES.find(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())));
+  return match ? [match[0]] : [];
 };
 
 const JobWatcher = () => {
@@ -285,7 +288,7 @@ const JobWatcher = () => {
   /* Category counts */
   const categoryCounts = useMemo(() => {
     const counts = {};
-    for (const cat of Object.keys(JOB_CATEGORIES)) counts[cat] = 0;
+    for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
     counts["Egyéb"] = 0;
     for (const job of jobs) {
       const cats = getCategoriesForJob(job);
@@ -634,7 +637,7 @@ const JobWatcher = () => {
 
     <div className={`job-tabs-wrapper ${categoriesOpen ? "open" : ""}`}>
       <div className="job-tabs">
-        {Object.keys(JOB_CATEGORIES).concat("Egyéb").map((cat) => {
+        {JOB_CATEGORIES.map(([cat]) => cat).concat("Egyéb").map((cat) => {
           const state = categoryStates[cat] || "neutral";
           let cls = "job-tab";
           if (state === "selected") cls += " active";
