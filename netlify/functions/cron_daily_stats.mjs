@@ -80,10 +80,8 @@ export default async function handler() {
     );
 
     console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}`);
-    return { statusCode: 200, body: JSON.stringify({ date: today, totalJobs, internJobs }) };
   } catch (err) {
     console.error("[daily_stats] Error:", err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   } finally {
     client.release();
   }
