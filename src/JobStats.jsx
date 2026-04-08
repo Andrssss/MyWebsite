@@ -167,7 +167,7 @@ const JobStats = () => {
       <div className="stats-averages">
         <div className="stats-avg-card">
           <span className="stats-avg-number">{avgRegular}</span>
-          <span className="stats-avg-label">Napi átlag (sima)</span>
+          <span className="stats-avg-label">Napi átlag (juni/medi)</span>
         </div>
         <div className="stats-avg-card">
           <span className="stats-avg-number">{avgIntern}</span>
