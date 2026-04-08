@@ -1,7 +1,7 @@
 import { runBackup, listBackups, deleteBackup } from "./_backup-core.js";
 
 export const config = {
-  schedule: "0 1 * * 1", // Monday 01:00 UTC
+  schedule: "0 2 1 * *", // Minden hónap 1-jén 02:00 UTC
 };
 
 function budapestDateStamp() {
