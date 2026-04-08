@@ -35,7 +35,7 @@ export default async function handler() {
   try {
     // 3 hónappal ezelőtti dátum
     const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - 3);
+    cutoff.setMonth(cutoff.getMonth() - 6);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
     // Régi adatok lekérése

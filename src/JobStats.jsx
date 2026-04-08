@@ -72,7 +72,13 @@ const JobStats = () => {
   if (!data || (!data.month?.length && !data.last10?.length))
     return <div className="stats-page"><p className="stats-loading">Nincs még adat.</p></div>;
 
-  const { month = [], last10 = [], monthCategories = [], yesterdayCategories = [] } = data;
+  const {
+    month = [],
+    last10 = [],
+    monthlyTotals = [],
+    monthCategories = [],
+    weekCategories = [],
+  } = data;
 
   /* ===== HAVI ÁTLAGOK ===== */
   const monthTotal = month.reduce((s, d) => s + d.total_jobs, 0);
@@ -109,6 +115,15 @@ const JobStats = () => {
   const fmtDate = (iso) => {
     const d = new Date(iso);
     return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const fmtMonth = (monthKey) => {
+    const [year, monthNumber] = monthKey.split("-").map(Number);
+    const date = new Date(year, monthNumber - 1, 1);
+    return new Intl.DateTimeFormat("hu-HU", {
+      year: "numeric",
+      month: "short",
+    }).format(date);
   };
 
   return (
@@ -218,7 +233,47 @@ const JobStats = () => {
       {/* ===== PIE CHARTS ===== */}
       <div className="stats-pies-row">
         <PieChart data={monthCategories} title="Havi kategória bontás" />
-        <PieChart data={yesterdayCategories} title="Tegnapi kategória bontás" />
+        <PieChart data={weekCategories} title="Heti kategória bontás" />
+      </div>
+
+      <div className="stats-section stats-monthly-summary-section">
+        <h2>Utolsó 6 hónap összesítése</h2>
+        <div className="stats-monthly-table-wrap">
+          <table className="stats-monthly-table">
+            <thead>
+              <tr>
+                <th>Mutató</th>
+                {monthlyTotals.map((item) => (
+                  <th key={item.month}>{fmtMonth(item.month)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">
+                  <span className="stats-table-row-label">
+                    <span className="stats-dot regular" />
+                    Összes
+                  </span>
+                </th>
+                {monthlyTotals.map((item) => (
+                  <td key={`total-${item.month}`}>{item.total_jobs}</td>
+                ))}
+              </tr>
+              <tr>
+                <th scope="row">
+                  <span className="stats-table-row-label">
+                    <span className="stats-dot intern" />
+                    Diák/Intern
+                  </span>
+                </th>
+                {monthlyTotals.map((item) => (
+                  <td key={`intern-${item.month}`} className="stats-monthly-intern-cell">{item.intern_jobs}</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

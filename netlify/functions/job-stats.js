@@ -26,9 +26,12 @@ function jsonResponse(statusCode, body) {
 exports.handler = async () => {
   const client = await pool.connect();
   try {
-    // Aktuális hónap első napja
     const now = new Date();
+    const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const monthlyWindowStart = new Date(currentMonthStart);
+    monthlyWindowStart.setUTCMonth(monthlyWindowStart.getUTCMonth() - 5);
+    const monthlyWindowStartStr = monthlyWindowStart.toISOString().slice(0, 10);
 
     // Havi adatok
     const { rows: monthRows } = await client.query(
@@ -47,6 +50,37 @@ exports.handler = async () => {
        LIMIT 10`
     );
 
+    const { rows: monthlyRows } = await client.query(
+      `SELECT TO_CHAR(DATE_TRUNC('month', date), 'YYYY-MM') AS month,
+              SUM(total_jobs)::int AS total_jobs,
+              SUM(intern_jobs)::int AS intern_jobs
+       FROM job_daily_stats
+       WHERE date >= $1
+       GROUP BY 1
+       ORDER BY 1 ASC`,
+      [monthlyWindowStartStr]
+    );
+
+    const monthlyMap = new Map(
+      monthlyRows.map((row) => [row.month, row])
+    );
+
+    const monthlyTotals = Array.from({ length: 6 }, (_, index) => {
+      const monthDate = new Date(Date.UTC(
+        monthlyWindowStart.getUTCFullYear(),
+        monthlyWindowStart.getUTCMonth() + index,
+        1
+      ));
+      const monthKey = monthDate.toISOString().slice(0, 7);
+      const existing = monthlyMap.get(monthKey);
+
+      return {
+        month: monthKey,
+        total_jobs: existing?.total_jobs ?? 0,
+        intern_jobs: existing?.intern_jobs ?? 0,
+      };
+    });
+
     // Havi kategória bontás (mentett adatból)
     const { rows: monthCatRows } = await client.query(
       `SELECT category, SUM(count)::int AS count
@@ -58,25 +92,27 @@ exports.handler = async () => {
     );
     const monthCategories = monthCatRows.map((r) => ({ category: r.category, count: r.count }));
 
-    // Tegnapi kategória bontás (mentett adatból)
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    // Heti kategória bontás (utolsó 7 nap, mentett adatból)
+    const weeklyStart = new Date(now);
+    weeklyStart.setDate(weeklyStart.getDate() - 6);
+    const weeklyStartStr = `${weeklyStart.getFullYear()}-${String(weeklyStart.getMonth() + 1).padStart(2, "0")}-${String(weeklyStart.getDate()).padStart(2, "0")}`;
 
-    const { rows: yesterdayCatRows } = await client.query(
-      `SELECT category, count
+    const { rows: weeklyCatRows } = await client.query(
+      `SELECT category, SUM(count)::int AS count
        FROM job_daily_categories
-       WHERE date = $1
+       WHERE date >= $1
+       GROUP BY category
        ORDER BY count DESC`,
-      [yesterdayStr]
+      [weeklyStartStr]
     );
-    const yesterdayCategories = yesterdayCatRows.map((r) => ({ category: r.category, count: r.count }));
+    const weekCategories = weeklyCatRows.map((r) => ({ category: r.category, count: r.count }));
 
     return jsonResponse(200, {
       month: monthRows,
       last10: last10Rows.reverse(),
+      monthlyTotals,
       monthCategories,
-      yesterdayCategories,
+      weekCategories,
     });
   } catch (err) {
     console.error("[job-stats] Error:", err);
