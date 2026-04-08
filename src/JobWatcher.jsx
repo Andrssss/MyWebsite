@@ -116,17 +116,17 @@ const getKeywordNotesForJob = (job) => {
 ======================= */
 const JOB_CATEGORIES = [
   ["Webfejlesztés", ["frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
-  ["Data / AI", ["data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning", "nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform"]],
+  ["Data / AI", ["data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
   ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
   ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
   ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
-  ["Elemző", ["analyst", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
+  ["Elemző", ["analyst","elemzési", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
   ["SAP", ["sap", "abap"]],
-  ["Security", ["security", "cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
+  ["Security", ["security","biztonsági","Információbiztonsági", "Kiberbiztonsági","cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
   ["Hálózat / Infra", ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök", "sysadmin", "linux admin", "windows admin", "it üzemeltető", "üzemeltetés"]],
-  ["Hardware", ["hardware", "embedded", "hw verification", "fpga", "pcb", "firmware"]],
+  ["Hardware", ["hardware", "embedded", "hw", "fpga", "pcb", "firmware"]],
   ["Mobil", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin"]],
-  ["Fejlesztő", ["developer", "fejlesztő", "fejleszto", "programozó", "software engineer", "engineer"]],
+  ["Fejlesztő", ["python", "java","software development","developer", "fejlesztő","fejlesztés","development", "fejleszto", "programozó", "software engineer", "engineer"]],
 ];
 
 const getCategoriesForJob = (job) => {
