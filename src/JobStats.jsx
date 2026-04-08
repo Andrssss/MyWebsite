@@ -90,6 +90,7 @@ const JobStats = () => {
 
   /* ===== BAR CHART – utolsó 10 nap ===== */
   const barMax = Math.max(...last10.map((d) => d.total_jobs), 1);
+  const monthlyBarMax = Math.max(...monthlyTotals.map((d) => d.total_jobs), 1);
 
   /* ===== LINE CHART – havi ===== */
   const lineMax = Math.max(...month.map((d) => d.total_jobs), 1);
@@ -238,41 +239,29 @@ const JobStats = () => {
 
       <div className="stats-section stats-monthly-summary-section">
         <h2>Utolsó 6 hónap összesítése</h2>
-        <div className="stats-monthly-table-wrap">
-          <table className="stats-monthly-table">
-            <thead>
-              <tr>
-                <th>Mutató</th>
-                {monthlyTotals.map((item) => (
-                  <th key={item.month}>{fmtMonth(item.month)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">
-                  <span className="stats-table-row-label">
-                    <span className="stats-dot regular" />
-                    Összes
-                  </span>
-                </th>
-                {monthlyTotals.map((item) => (
-                  <td key={`total-${item.month}`}>{item.total_jobs}</td>
-                ))}
-              </tr>
-              <tr>
-                <th scope="row">
-                  <span className="stats-table-row-label">
-                    <span className="stats-dot intern" />
-                    Diák/Intern
-                  </span>
-                </th>
-                {monthlyTotals.map((item) => (
-                  <td key={`intern-${item.month}`} className="stats-monthly-intern-cell">{item.intern_jobs}</td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+        <div className="stats-bar-chart stats-monthly-bar-chart">
+          {monthlyTotals.map((item) => {
+            const totalPct = (item.total_jobs / monthlyBarMax) * 100;
+            return (
+              <div key={item.month} className="stats-bar-col stats-monthly-bar-col">
+                <span className="stats-bar-value">{item.total_jobs}</span>
+                <span className="stats-bar-value intern">{item.intern_jobs}</span>
+                <div className="stats-bar-track stats-monthly-bar-track">
+                  <div className="stats-bar-fill" style={{ height: `${totalPct}%` }}>
+                    <div
+                      className="stats-bar-intern"
+                      style={{ height: `${item.total_jobs ? (item.intern_jobs / item.total_jobs) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="stats-bar-label">{fmtMonth(item.month)}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="stats-legend">
+          <span className="stats-legend-item"><span className="stats-dot regular" /> Összes</span>
+          <span className="stats-legend-item"><span className="stats-dot intern" /> Diák/Intern</span>
         </div>
       </div>
     </div>

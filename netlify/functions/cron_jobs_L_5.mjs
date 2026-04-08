@@ -17,6 +17,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
+const ENABLE_FETCH_ERROR_LOGGING = false;
 
 /* ---------------------
    DB connection
@@ -279,7 +280,9 @@ export default withTimeout("cron_jobs_L_5", async () => {
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_L_5", { url: p.url, message: err.message });
+        if (ENABLE_FETCH_ERROR_LOGGING) {
+          await logFetchError("cron_jobs_L_5", { url: p.url, message: err.message });
+        }
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }

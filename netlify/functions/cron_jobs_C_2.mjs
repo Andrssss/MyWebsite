@@ -21,6 +21,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 
 let _filters = [];
+const ENABLE_FETCH_ERROR_LOGGING = false;
 
 // =====================
 // DB
@@ -341,7 +342,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_C_2", { url: p.url, message: err.message });
+        if (ENABLE_FETCH_ERROR_LOGGING) {
+          await logFetchError("cron_jobs_C_2", { url: p.url, message: err.message });
+        }
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }

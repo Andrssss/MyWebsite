@@ -295,71 +295,25 @@
   color: #d1d5db;
 }
 
-/* ===== MONTHLY SUMMARY TABLE ===== */
+/* ===== MONTHLY SUMMARY CHART ===== */
 .stats-monthly-summary-section {
   margin-top: 36px;
 }
 
-.stats-monthly-table-wrap {
-  width: 100%;
-  overflow-x: auto;
+.stats-monthly-bar-chart {
+  height: 340px;
+  padding: 20px 8px 12px;
   border: 1px solid rgba(99, 102, 241, 0.18);
   border-radius: 16px;
   background: rgba(15, 23, 42, 0.45);
 }
 
-.stats-monthly-table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
+.stats-monthly-bar-col {
+  gap: 6px;
 }
 
-.stats-monthly-table th,
-.stats-monthly-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-  text-align: center;
-}
-
-.stats-monthly-table thead th {
-  background: rgba(30, 41, 59, 0.72);
-  color: #c9d1ff;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.stats-monthly-table thead th:first-child,
-.stats-monthly-table tbody th {
-  text-align: left;
-}
-
-.stats-monthly-table tbody th {
-  color: #e5e7eb;
-  font-size: 14px;
-  font-weight: 600;
-  background: rgba(15, 23, 42, 0.55);
-}
-
-.stats-monthly-table tbody td {
-  color: #cbd5e1;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.stats-monthly-table tbody tr:last-child th,
-.stats-monthly-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.stats-table-row-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.stats-monthly-intern-cell {
-  color: #f59e0b !important;
+.stats-monthly-bar-track {
+  max-width: 52px;
 }
 
 .stats-pie-color {
@@ -418,6 +372,12 @@
 
   .stats-pies-row {
     flex-direction: column;
+  }
+
+  .stats-monthly-bar-chart {
+    height: 260px;
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .stats-pie-svg {
