@@ -1,6 +1,6 @@
 // netlify/functions/cron_stats_cleanup.mjs
-// Havonta egyszer (1-jén 02:00 UTC) kimenti a 3 hónapnál régebbi
-// job_daily_stats és job_daily_categories adatokat Netlify Blobs-ba,
+// Havonta egyszer (1-jén 02:00 UTC) kimenti az előző teljes hónap
+// job_daily_stats és job_daily_categories adatait Netlify Blobs-ba,
 // majd törli őket az adatbázisból.
 
 export const config = {
@@ -30,26 +30,41 @@ function budapestDateStamp() {
   }).format(new Date());
 }
 
+function monthRangeForPreviousMonth() {
+  const now = new Date();
+  const currentMonthStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+  );
+  const previousMonthStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
+  );
+
+  return {
+    start: previousMonthStart.toISOString().slice(0, 10),
+    end: currentMonthStart.toISOString().slice(0, 10),
+  };
+}
+
 export default async function handler() {
   const client = await pool.connect();
   try {
-    // 3 hónappal ezelőtti dátum
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - 6);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    // Az előző teljes hónap intervalluma: [monthStart, monthEnd)
+    const { start: monthStart, end: monthEnd } = monthRangeForPreviousMonth();
 
-    // Régi adatok lekérése
+    // Előző havi adatok lekérése
     const { rows: oldStats } = await client.query(
-      `SELECT * FROM job_daily_stats WHERE date < $1 ORDER BY date`,
-      [cutoffStr]
+      `SELECT * FROM job_daily_stats WHERE date >= $1 AND date < $2 ORDER BY date`,
+      [monthStart, monthEnd]
     );
     const { rows: oldCategories } = await client.query(
-      `SELECT * FROM job_daily_categories WHERE date < $1 ORDER BY date, category`,
-      [cutoffStr]
+      `SELECT * FROM job_daily_categories WHERE date >= $1 AND date < $2 ORDER BY date, category`,
+      [monthStart, monthEnd]
     );
 
     if (oldStats.length === 0 && oldCategories.length === 0) {
-      console.log("[stats_cleanup] Nincs régi adat, kihagyva.");
+      console.log(
+        `[stats_cleanup] Nincs archiválható adat a ${monthStart} - ${monthEnd} időszakra, kihagyva.`
+      );
       return;
     }
 
@@ -63,7 +78,8 @@ export default async function handler() {
       JSON.stringify(
         {
           exportedAt: new Date().toISOString(),
-          cutoff: cutoffStr,
+          rangeStart: monthStart,
+          rangeEnd: monthEnd,
           stats: oldStats,
           categories: oldCategories,
         },
@@ -73,18 +89,18 @@ export default async function handler() {
       { metadata: { type: "stats-archive" } }
     );
 
-    // Törlés az adatbázisból
+    // Előző havi adatok törlése az adatbázisból
     const { rowCount: deletedStats } = await client.query(
-      `DELETE FROM job_daily_stats WHERE date < $1`,
-      [cutoffStr]
+      `DELETE FROM job_daily_stats WHERE date >= $1 AND date < $2`,
+      [monthStart, monthEnd]
     );
     const { rowCount: deletedCats } = await client.query(
-      `DELETE FROM job_daily_categories WHERE date < $1`,
-      [cutoffStr]
+      `DELETE FROM job_daily_categories WHERE date >= $1 AND date < $2`,
+      [monthStart, monthEnd]
     );
 
     console.log(
-      `[stats_cleanup] Archived to ${key}: stats=${oldStats.length}, categories=${oldCategories.length}. Deleted: stats=${deletedStats}, categories=${deletedCats}`
+      `[stats_cleanup] Archived to ${key} for ${monthStart} - ${monthEnd}: stats=${oldStats.length}, categories=${oldCategories.length}. Deleted: stats=${deletedStats}, categories=${deletedCats}`
     );
   } catch (err) {
     console.error("[stats_cleanup] Error:", err);
