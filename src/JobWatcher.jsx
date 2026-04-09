@@ -138,6 +138,7 @@ const getCategoriesForJob = (job) => {
 
 const JobWatcher = () => {
   const navigate = useNavigate();
+  const debugMode = new URLSearchParams(window.location.search).has("debug");
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -682,6 +683,11 @@ const JobWatcher = () => {
                   {job.title}
                 </a>
                 <span className="job-source">{job.source}</span>
+                {debugMode && (
+                  <span className="job-source" style={{ opacity: 0.6, marginLeft: 4 }}>
+                    [{getCategoriesForJob(job).join(", ") || "Egyéb"}]
+                  </span>
+                )}
               </div>
 
               {job.description && (
