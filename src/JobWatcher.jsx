@@ -682,7 +682,7 @@ const JobWatcher = () => {
                 >
                   {job.title}
                   {debugMode && (
-                    <span style={{ opacity: 0.6, marginLeft: 6, fontSize: "0.85em" }}>
+                    <span style={{ color: "#f50b0b", marginLeft: 6, fontSize: "0.85em" }}>
                       [{getCategoriesForJob(job).join(", ") || "Egyéb"}]
                     </span>
                   )}
