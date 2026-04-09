@@ -93,14 +93,13 @@ export default async function handler() {
       ...INTERN_TITLE_KEYWORDS.map((kw) => `%${kw}%`),
     ];
 
-    const { rows: internRows } = await client.query(
-      `SELECT COUNT(*)::int AS cnt
-       FROM job_posts
+    const { rows: internJobRows } = await client.query(
+      `SELECT title FROM job_posts
        WHERE first_seen::date = $1
          AND (source IN (${sourcePlaceholders}) OR ${keywordConditions})`,
       params
     );
-    const internJobs = internRows[0]?.cnt ?? 0;
+    const internJobs = internJobRows.length;
 
     // Upsert a napi statisztikába
     await client.query(
@@ -112,7 +111,7 @@ export default async function handler() {
       [today, totalJobs, internJobs]
     );
 
-    // Kategória bontás mentése
+    // Kategória bontás mentése (összes)
     const { rows: todayJobs } = await client.query(
       `SELECT title FROM job_posts WHERE first_seen::date = $1`,
       [today]
@@ -129,7 +128,20 @@ export default async function handler() {
       );
     }
 
-    console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}`);
+    // Intern kategória bontás mentése (prefix: "intern:")
+    const internCategories = categorizeJobs(internJobRows);
+
+    for (const { category, count } of internCategories) {
+      await client.query(
+        `INSERT INTO job_daily_categories (date, category, count)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (date, category)
+         DO UPDATE SET count = EXCLUDED.count`,
+        [today, `intern:${category}`, count]
+      );
+    }
+
+    console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}, intern_categories=${internCategories.length}`);
   } catch (err) {
     console.error("[daily_stats] Error:", err);
   } finally {

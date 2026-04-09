@@ -111,6 +111,18 @@ exports.handler = async () => {
     );
     const weekCategories = weeklyCatRows.map((r) => ({ category: r.category, count: r.count }));
 
+    // 6 havi intern/diák kategória bontás (mentett adatból, "intern:" prefix)
+    const { rows: internCatRows } = await client.query(
+      `SELECT SUBSTRING(category FROM 8) AS category, SUM(count)::int AS count
+       FROM job_daily_categories
+       WHERE date >= $1
+         AND category LIKE 'intern:%'
+       GROUP BY 1
+       ORDER BY count DESC`,
+      [monthlyWindowStartStr]
+    );
+    const internCategories6m = internCatRows.map((r) => ({ category: r.category, count: r.count }));
+
     return jsonResponse(200, {
       month: monthRows,
       last10: last10Rows.reverse(),
@@ -118,6 +130,7 @@ exports.handler = async () => {
       monthlyTotals,
       monthCategories,
       weekCategories,
+      internCategories6m,
     });
   } catch (err) {
     console.error("[job-stats] Error:", err);

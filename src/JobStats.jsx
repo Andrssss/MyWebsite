@@ -106,6 +106,7 @@ const JobStats = () => {
     monthlyTotals = [],
     monthCategories = [],
     weekCategories = [],
+    internCategories6m = [],
   } = data;
 
   /* ===== ÁTLAGOK (összes adatból) ===== */
@@ -298,6 +299,9 @@ const JobStats = () => {
       <div className="stats-pies-row">
         <PieChart data={monthCategories} title="Elmúlt 30 nap kategória bontás" />
         <PieChart data={weekCategories} title="6 havi kategória bontás" />
+      </div>
+      <div className="stats-pies-row">
+        <PieChart data={internCategories6m} title="6 havi diák/intern kategória bontás" />
       </div>
 
       <div className="stats-section stats-monthly-summary-section">
