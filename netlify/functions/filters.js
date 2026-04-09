@@ -97,8 +97,7 @@ exports.handler = async (event) => {
         return json(400, { error: "Érvénytelen szó." });
       }
 
-      const whereClause = `WHERE LOWER(title) LIKE '%' || LOWER($1) || '%'
-           AND first_seen >= NOW() - INTERVAL '1 day'`;
+      const whereClause = `WHERE LOWER(title) LIKE '%' || LOWER($1) || '%'`;
 
       if (action === "count") {
         const { rows } = await client.query(
