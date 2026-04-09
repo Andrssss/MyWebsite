@@ -84,7 +84,6 @@ const JobStats = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lineRange, setLineRange] = useState(30);
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetch(API)
