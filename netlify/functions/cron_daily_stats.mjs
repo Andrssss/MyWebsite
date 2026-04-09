@@ -37,7 +37,7 @@ const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diák
 // Minden job csak 1 kategóriába kerül (az első illeszkedő)
 const JOB_CATEGORIES = [
   ["Webfejlesztés", ["Alkalmazásfejlesztő","frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
-  ["Data / AI", ["gen ai", "data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
+  ["Data / AI", ["ai fejleszto","gen ai", "data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
   ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
   ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
   ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
