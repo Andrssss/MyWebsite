@@ -233,8 +233,8 @@ const JobStats = () => {
 
       {/* ===== PIE CHARTS ===== */}
       <div className="stats-pies-row">
-        <PieChart data={monthCategories} title="Havi kategória bontás" />
-        <PieChart data={weekCategories} title="Heti kategória bontás" />
+        <PieChart data={monthCategories} title="E Havi kategória bontás" />
+        <PieChart data={weekCategories} title="6 havi kategória bontás" />
       </div>
 
       <div className="stats-section stats-monthly-summary-section">

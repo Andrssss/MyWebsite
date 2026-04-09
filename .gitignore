@@ -11,7 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
-
+*.txt
+backfill_daily_stats.mjs
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -92,18 +92,14 @@ exports.handler = async () => {
     );
     const monthCategories = monthCatRows.map((r) => ({ category: r.category, count: r.count }));
 
-    // Heti kategória bontás (utolsó 7 nap, mentett adatból)
-    const weeklyStart = new Date(now);
-    weeklyStart.setDate(weeklyStart.getDate() - 6);
-    const weeklyStartStr = `${weeklyStart.getFullYear()}-${String(weeklyStart.getMonth() + 1).padStart(2, "0")}-${String(weeklyStart.getDate()).padStart(2, "0")}`;
-
+    // 6 havi kategória bontás (mentett adatból)
     const { rows: weeklyCatRows } = await client.query(
       `SELECT category, SUM(count)::int AS count
        FROM job_daily_categories
        WHERE date >= $1
        GROUP BY category
        ORDER BY count DESC`,
-      [weeklyStartStr]
+      [monthlyWindowStartStr]
     );
     const weekCategories = weeklyCatRows.map((r) => ({ category: r.category, count: r.count }));
 
