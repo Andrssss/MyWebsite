@@ -1,10 +1,10 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-export const config = {
-  // pl. minden nap 01:30 UTC
-  schedule: "10 1 * * 1",
-};
+// export const config = {
+//   // pl. minden nap 01:30 UTC
+//   schedule: "10 1 * * 1",
+// };
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
