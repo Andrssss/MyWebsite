@@ -681,13 +681,13 @@ const JobWatcher = () => {
                   rel="noopener noreferrer"
                 >
                   {job.title}
+                  {debugMode && (
+                    <span style={{ opacity: 0.6, marginLeft: 6, fontSize: "0.85em" }}>
+                      [{getCategoriesForJob(job).join(", ") || "Egyéb"}]
+                    </span>
+                  )}
                 </a>
                 <span className="job-source">{job.source}</span>
-                {debugMode && (
-                  <span className="job-source" style={{ opacity: 0.6, marginLeft: 4 }}>
-                    [{getCategoriesForJob(job).join(", ") || "Egyéb"}]
-                  </span>
-                )}
               </div>
 
               {job.description && (
