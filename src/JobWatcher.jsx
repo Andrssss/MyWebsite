@@ -112,7 +112,8 @@ const getKeywordNotesForJob = (job) => {
 /* =======================
    KATEGÓRIÁK
    Specifikusabb ELŐRE, általános ("Fejlesztő") HÁTRA.
-   Egy job csak 1 kategóriába kerül (az első illeszkedő).
+   Egy job több kategóriába is kerülhet (minden illeszkedőbe).
+   Fejlesztő fallback: ha specifikusabb is illeszkedik, Fejlesztő nem számít.
 ======================= */
 const JOB_CATEGORIES = [
   ["Webfejlesztés", ["Webmaster","Alkalmazásfejlesztő","frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
@@ -132,8 +133,11 @@ const JOB_CATEGORIES = [
 const getCategoriesForJob = (job) => {
   if (!job.title) return [];
   const title = job.title.toLowerCase();
-  const match = JOB_CATEGORIES.find(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())));
-  return match ? [match[0]] : [];
+  const matches = JOB_CATEGORIES
+    .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
+    .map(([cat]) => cat);
+  const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
+  return withoutFallback.length > 0 ? withoutFallback : matches;
 };
 
 const JobWatcher = () => {

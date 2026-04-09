@@ -24,8 +24,6 @@ const INTERN_SOURCES = [
   "schonherz",
   "prodiak",
   "tudasdiak",
-  "otp",
-  "vizmuvek",
   "tudatosdiak",
   "ydiak",
   "qdiak",
@@ -56,11 +54,20 @@ function categorizeJobs(rows) {
   const counts = {};
   for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
   counts["Egyéb"] = 0;
+
   for (const row of rows) {
     const title = (row.title || "").toLowerCase();
-    const match = JOB_CATEGORIES.find(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())));
-    if (match) counts[match[0]]++;
-    else counts["Egyéb"]++;
+    const matches = JOB_CATEGORIES
+      .filter(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())))
+      .map(([cat]) => cat);
+    const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
+    const cats = withoutFallback.length > 0 ? withoutFallback : matches;
+
+    if (cats.length > 0) {
+      for (const cat of cats) counts[cat]++;
+    } else {
+      counts["Egyéb"]++;
+    }
   }
   return Object.entries(counts)
     .filter(([, c]) => c > 0)

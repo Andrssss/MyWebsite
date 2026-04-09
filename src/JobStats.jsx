@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import "./JobStats.css";
 
 const CATEGORY_COLOR_MAP = {
@@ -177,12 +176,14 @@ const JobStats = () => {
     <div className="stats-page">
       <div className="stats-header">
         <h1>Statisztikák</h1>
-        <button className="stats-back-btn" onClick={() => navigate("/allasfigyelo")}>
+        <button className="stats-back-btn" onClick={() => window.location.href = "/allasfigyelo"}>
           ← Vissza
         </button>
       </div>
-      <div className="stats-header">
-        Keep in mind, hogy azért vannak tüskék az adatokban, mert mostanában sok forrást adtam hozzá és sokat változtattam a filtereken is és azokon a napokon, amikor ezekkel foglalkoztam, akkor sok adat kerűlt a db-be !
+
+      <div className="stats-note">
+        Keep in mind, hogy azért vannak tüskék az adatokban, mert mostanában sok forrást adtam hozzá és
+        sokat változtattam a filtereken is és ilyenkor sok adat került a DB-be.
       </div>
       {/* ===== BAR CHART ===== */}
       <div className="stats-section">
@@ -239,13 +240,13 @@ const JobStats = () => {
         <div className="stats-line-header">
           <h2>{lineRangeLabel} napi bontás</h2>
           <div className="stats-range-buttons">
-            {[30, 90, 180].map((r) => (
+            {[30, 90, 180].map((range) => (
               <button
-                key={r}
-                className={`stats-range-btn${lineRange === r ? " active" : ""}`}
-                onClick={() => setLineRange(r)}
+                key={range}
+                className={`stats-range-btn${lineRange === range ? " active" : ""}`}
+                onClick={() => setLineRange(range)}
               >
-                {r === 30 ? "30 nap" : r === 90 ? "3 hónap" : "6 hónap"}
+                {range === 30 ? "30 nap" : range === 90 ? "3 hónap" : "6 hónap"}
               </button>
             ))}
           </div>
