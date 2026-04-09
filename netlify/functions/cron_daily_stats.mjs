@@ -29,9 +29,11 @@ const INTERN_SOURCES = [
   "tudatosdiak",
   "ydiak",
   "qdiak",
+  "frissdiplomas",
 ];
 
 const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
+const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])0\s*[-–/]\s*[1-9][0-9]*([^0-9]|$)`;
 
 // Specifikusabb kategóriák ELŐRE, általános "Fejlesztő" HÁTRA
 // Minden job csak 1 kategóriába kerül (az első illeszkedő)
@@ -83,8 +85,11 @@ export default async function handler() {
 
     // Mai diák/intern munkák: forrás alapján VAGY cím kulcsszó alapján
     const sourcePlaceholders = INTERN_SOURCES.map((_, i) => `$${i + 2}`).join(",");
-    const keywordConditions = INTERN_TITLE_KEYWORDS.map(
+    const titleKeywordConditions = INTERN_TITLE_KEYWORDS.map(
       (_, i) => `LOWER(title) LIKE $${INTERN_SOURCES.length + i + 2}`
+    ).join(" OR ");
+    const experienceKeywordConditions = INTERN_TITLE_KEYWORDS.map(
+      (_, i) => `LOWER(COALESCE(experience, '')) LIKE $${INTERN_SOURCES.length + i + 2}`
     ).join(" OR ");
 
     const params = [
@@ -96,7 +101,7 @@ export default async function handler() {
     const { rows: internJobRows } = await client.query(
       `SELECT title FROM job_posts
        WHERE first_seen::date = $1
-         AND (source IN (${sourcePlaceholders}) OR ${keywordConditions})`,
+         AND (source IN (${sourcePlaceholders}) OR ${titleKeywordConditions} OR ${experienceKeywordConditions} OR COALESCE(experience, '') ~* '${ZERO_RANGE_EXPERIENCE_REGEX}')`,
       params
     );
     const internJobs = internJobRows.length;

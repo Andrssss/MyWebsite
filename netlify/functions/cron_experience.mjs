@@ -50,6 +50,12 @@ function isInternshipTitle(title) {
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
 }
 
+// Ezek a források inherensen diák/intern fókuszúak → automatikusan diákmunka
+const INTERN_SOURCES = [
+  "minddiak", "muisz", "zyntern", "schonherz", "prodiak",
+  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas",
+];
+
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
@@ -231,6 +237,7 @@ const PIPELINES = [
     sourceFilter: "source = 'kuka'",
     interval: "20 minutes",
     extract: extractKukaExperience,
+    extraInternKeywords: ["junior"],
   },
   {
     label: "dreamjobs / melonjobs / tesco",
@@ -254,6 +261,28 @@ export default withTimeout("cron_experience", async () => {
   const client = await pool.connect();
 
   try {
+    // Intern-centrikus források: fetch nélkül, rögtön diákmunkára állítani
+    const internSourcePlaceholders = INTERN_SOURCES.map((_, i) => `$${i + 1}`).join(",");
+    const { rowCount: internMarked } = await client.query(
+      `UPDATE job_posts
+       SET experience = 'diákmunka'
+       WHERE (experience IS NULL OR experience = '-')
+         AND source IN (${internSourcePlaceholders})
+         AND first_seen >= NOW() - INTERVAL '20 minutes'`,
+      INTERN_SOURCES
+    );
+    console.log(`[intern-sources] ${internMarked} álláshirdetés megjelölve: diákmunka`);
+
+    // Kuka: "junior" experience → diákmunka
+    const { rowCount: kukaMarked } = await client.query(
+      `UPDATE job_posts
+       SET experience = 'diákmunka'
+       WHERE source = 'kuka'
+         AND LOWER(experience) = 'junior'
+         AND first_seen >= NOW() - INTERVAL '20 minutes'`
+    );
+    console.log(`[kuka-junior] ${kukaMarked} álláshirdetés átírva: junior → diákmunka`);
+
     for (const pipe of PIPELINES) {
       const { rows } = await client.query(
         `SELECT id, url, title
@@ -275,7 +304,7 @@ export default withTimeout("cron_experience", async () => {
           const html = await fetchText(row.url);
           let experience = pipe.extract(html);
 
-          if (isInternshipTitle(row.title)) experience = "diákmunka";
+          if (isInternshipTitle(row.title) || pipe.extraInternKeywords?.some(k => normalizeText(row.title).includes(k))) experience = "diákmunka";
 
           await client.query(
             `UPDATE job_posts SET experience = $1 WHERE id = $2`,
