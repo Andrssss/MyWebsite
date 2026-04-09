@@ -94,6 +94,7 @@ exports.handler = async () => {
       `SELECT category, SUM(count)::int AS count
        FROM job_daily_categories
        WHERE date >= $1
+         AND category NOT LIKE 'intern:%'
        GROUP BY category
        ORDER BY count DESC`,
       [rolling30DayStartStr]
@@ -105,6 +106,7 @@ exports.handler = async () => {
       `SELECT category, SUM(count)::int AS count
        FROM job_daily_categories
        WHERE date >= $1
+         AND category NOT LIKE 'intern:%'
        GROUP BY category
        ORDER BY count DESC`,
       [monthlyWindowStartStr]
