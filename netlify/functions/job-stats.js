@@ -1,6 +1,6 @@
 // netlify/functions/job-stats.js
 // API endpoint: GET /.netlify/functions/job-stats
-// Returns daily stats for the current month + last 10 days.
+// Returns daily stats for the last 30 days + last 10 days.
 
 const { Pool } = require("pg");
 
@@ -28,18 +28,19 @@ exports.handler = async () => {
   try {
     const now = new Date();
     const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const rolling30DayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 29));
+    const rolling30DayStartStr = rolling30DayStart.toISOString().slice(0, 10);
     const monthlyWindowStart = new Date(currentMonthStart);
     monthlyWindowStart.setUTCMonth(monthlyWindowStart.getUTCMonth() - 5);
     const monthlyWindowStartStr = monthlyWindowStart.toISOString().slice(0, 10);
 
-    // Havi adatok
+    // Elmúlt 30 nap adatai
     const { rows: monthRows } = await client.query(
       `SELECT date, total_jobs, intern_jobs
        FROM job_daily_stats
        WHERE date >= $1
        ORDER BY date ASC`,
-      [monthStart]
+      [rolling30DayStartStr]
     );
 
     // Utolsó 10 napi adatok
@@ -48,6 +49,13 @@ exports.handler = async () => {
        FROM job_daily_stats
        ORDER BY date DESC
        LIMIT 10`
+    );
+
+    // Összes adat (teljes DB)
+    const { rows: allDaysRows } = await client.query(
+      `SELECT date, total_jobs, intern_jobs
+       FROM job_daily_stats
+       ORDER BY date ASC`
     );
 
     const { rows: monthlyRows } = await client.query(
@@ -81,14 +89,14 @@ exports.handler = async () => {
       };
     });
 
-    // Havi kategória bontás (mentett adatból)
+    // Elmúlt 30 nap kategória bontás (mentett adatból)
     const { rows: monthCatRows } = await client.query(
       `SELECT category, SUM(count)::int AS count
        FROM job_daily_categories
        WHERE date >= $1
        GROUP BY category
        ORDER BY count DESC`,
-      [monthStart]
+      [rolling30DayStartStr]
     );
     const monthCategories = monthCatRows.map((r) => ({ category: r.category, count: r.count }));
 
@@ -106,6 +114,7 @@ exports.handler = async () => {
     return jsonResponse(200, {
       month: monthRows,
       last10: last10Rows.reverse(),
+      allDays: allDaysRows,
       monthlyTotals,
       monthCategories,
       weekCategories,

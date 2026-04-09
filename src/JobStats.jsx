@@ -2,11 +2,33 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./JobStats.css";
 
-const PIE_COLORS = [
-  "#6366f1", "#4f8cff", "#f59e0b", "#10b981", "#ef4444",
-  "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b",
-  "#a855f7", "#06b6d4",
-];
+const CATEGORY_COLOR_MAP = {
+  "Webfejlesztés": "#4f8cff",
+  "Data / AI": "#6366f1",
+  DevOps: "#10b981",
+  "QA / Tesztelő": "#f59e0b",
+  Helpdesk: "#ef4444",
+  Elemző: "#8b5cf6",
+  SAP: "#14b8a6",
+  Security: "#ec4899",
+  "Hálózat / Infra": "#64748b",
+  Hardware: "#f97316",
+  Mobil: "#06b6d4",
+  Fejlesztő: "#a855f7",
+  Egyéb: "#94a3b8",
+};
+
+const getCategoryColor = (category) => {
+  if (CATEGORY_COLOR_MAP[category]) return CATEGORY_COLOR_MAP[category];
+
+  let hash = 0;
+  for (let index = 0; index < category.length; index += 1) {
+    hash = category.charCodeAt(index) + ((hash << 5) - hash);
+  }
+
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 65% 55%)`;
+};
 
 const PieChart = ({ data, title }) => {
   const total = data.reduce((s, d) => s + d.count, 0);
@@ -27,7 +49,7 @@ const PieChart = ({ data, title }) => {
     const endY = cy + r * Math.sin(cumAngle);
     const largeArc = angle > Math.PI ? 1 : 0;
     const path = `M${cx},${cy} L${startX},${startY} A${r},${r} 0 ${largeArc},1 ${endX},${endY} Z`;
-    return { ...d, path, color: PIE_COLORS[i % PIE_COLORS.length], pct: ((d.count / total) * 100).toFixed(1) };
+    return { ...d, path, color: getCategoryColor(d.category), pct: ((d.count / total) * 100).toFixed(1) };
   });
 
   return (
@@ -75,18 +97,28 @@ const JobStats = () => {
   const {
     month = [],
     last10 = [],
+    allDays = [],
     monthlyTotals = [],
     monthCategories = [],
     weekCategories = [],
   } = data;
 
-  /* ===== HAVI ÁTLAGOK ===== */
-  const monthTotal = month.reduce((s, d) => s + d.total_jobs, 0);
-  const monthIntern = month.reduce((s, d) => s + d.intern_jobs, 0);
-  const daysCount = month.length || 1;
-  const avgTotal = (monthTotal / daysCount).toFixed(1);
-  const avgIntern = (monthIntern / daysCount).toFixed(1);
-  const avgRegular = ((monthTotal - monthIntern) / daysCount).toFixed(1);
+  /* ===== ÁTLAGOK (összes adatból) ===== */
+  const allTotal = allDays.reduce((s, d) => s + d.total_jobs, 0);
+  const allIntern = allDays.reduce((s, d) => s + d.intern_jobs, 0);
+  const allDaysCount = allDays.length || 1;
+  const avgTotal = (allTotal / allDaysCount).toFixed(1);
+  const avgIntern = (allIntern / allDaysCount).toFixed(1);
+  const avgRegular = ((allTotal - allIntern) / allDaysCount).toFixed(1);
+  const sortedDailyTotals = allDays
+    .map((d) => d.total_jobs)
+    .sort((a, b) => a - b);
+  const midIndex = Math.floor(sortedDailyTotals.length / 2);
+  const dailyMedian = sortedDailyTotals.length
+    ? (sortedDailyTotals.length % 2 === 0
+        ? ((sortedDailyTotals[midIndex - 1] + sortedDailyTotals[midIndex]) / 2).toFixed(1)
+        : sortedDailyTotals[midIndex])
+    : 0;
 
   /* ===== BAR CHART – utolsó 10 nap ===== */
   const barMax = Math.max(...last10.map((d) => d.total_jobs), 1);
@@ -167,25 +199,25 @@ const JobStats = () => {
       <div className="stats-averages">
         <div className="stats-avg-card">
           <span className="stats-avg-number">{avgRegular}</span>
-          <span className="stats-avg-label">Napi átlag (juni/medi)</span>
+          <span className="stats-avg-label">Napi átlag – juni/medi (összes adatból)</span>
         </div>
         <div className="stats-avg-card">
           <span className="stats-avg-number">{avgIntern}</span>
-          <span className="stats-avg-label">Napi átlag (diák/intern)</span>
+          <span className="stats-avg-label">Napi átlag – diák/intern (összes adatból)</span>
         </div>
         <div className="stats-avg-card highlight">
           <span className="stats-avg-number">{avgTotal}</span>
-          <span className="stats-avg-label">Napi átlag (összes)</span>
+          <span className="stats-avg-label">Napi átlag – összes (összes adatból)</span>
         </div>
         <div className="stats-avg-card">
-          <span className="stats-avg-number">{monthTotal}</span>
-          <span className="stats-avg-label">Havi összesen</span>
+          <span className="stats-avg-number">{dailyMedian}</span>
+          <span className="stats-avg-label">Napi medián – összes (összes adatból)</span>
         </div>
       </div>
 
       {/* ===== LINE CHART ===== */}
       <div className="stats-section">
-        <h2>E havi napi bontás</h2>
+        <h2>Elmúlt 30 nap napi bontás</h2>
         <div className="stats-line-chart-wrapper">
           <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
             {/* Grid lines */}
@@ -233,7 +265,7 @@ const JobStats = () => {
 
       {/* ===== PIE CHARTS ===== */}
       <div className="stats-pies-row">
-        <PieChart data={monthCategories} title="E Havi kategória bontás" />
+        <PieChart data={monthCategories} title="Elmúlt 30 nap kategória bontás" />
         <PieChart data={weekCategories} title="6 havi kategória bontás" />
       </div>
 
