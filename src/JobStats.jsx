@@ -80,6 +80,7 @@ const API = "/.netlify/functions/job-stats";
 const JobStats = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lineRange, setLineRange] = useState(30);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -124,20 +125,28 @@ const JobStats = () => {
   const barMax = Math.max(...last10.map((d) => d.total_jobs), 1);
   const monthlyBarMax = Math.max(...monthlyTotals.map((d) => d.total_jobs), 1);
 
-  /* ===== LINE CHART – havi ===== */
-  const lineMax = Math.max(...month.map((d) => d.total_jobs), 1);
+  /* ===== LINE CHART – időszak szűrés ===== */
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - (lineRange - 1));
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const rangeData = allDays.filter((d) => d.date >= cutoffStr);
+
+  const lineRangeLabel =
+    lineRange === 30 ? "Elmúlt 30 nap" : lineRange === 90 ? "Elmúlt 3 hónap" : "Elmúlt 6 hónap";
+
+  const lineMax = Math.max(...rangeData.map((d) => d.total_jobs), 1);
   const lineW = 600;
   const lineH = 200;
   const linePad = 30;
 
-  const linePoints = month.map((d, i) => {
-    const x = linePad + (i / Math.max(month.length - 1, 1)) * (lineW - 2 * linePad);
+  const linePoints = rangeData.map((d, i) => {
+    const x = linePad + (i / Math.max(rangeData.length - 1, 1)) * (lineW - 2 * linePad);
     const y = lineH - linePad - (d.total_jobs / lineMax) * (lineH - 2 * linePad);
     return { x, y, ...d };
   });
 
-  const internLinePoints = month.map((d, i) => {
-    const x = linePad + (i / Math.max(month.length - 1, 1)) * (lineW - 2 * linePad);
+  const internLinePoints = rangeData.map((d, i) => {
+    const x = linePad + (i / Math.max(rangeData.length - 1, 1)) * (lineW - 2 * linePad);
     const y = lineH - linePad - (d.intern_jobs / lineMax) * (lineH - 2 * linePad);
     return { x, y, ...d };
   });
@@ -196,28 +205,44 @@ const JobStats = () => {
       </div>
 
       {/* ===== KÖZÉPSŐ SZÁMOK ===== */}
+      <div className="stats-section">
+        <h2>Összes adatból</h2>
+      </div>
       <div className="stats-averages">
         <div className="stats-avg-card">
           <span className="stats-avg-number">{avgRegular}</span>
-          <span className="stats-avg-label">Napi átlag – juni/medi (összes adatból)</span>
+          <span className="stats-avg-label">Napi átlag (juni/medi)</span>
         </div>
         <div className="stats-avg-card">
           <span className="stats-avg-number">{avgIntern}</span>
-          <span className="stats-avg-label">Napi átlag – diák/intern (összes adatból)</span>
+          <span className="stats-avg-label">Napi átlag (diák/intern)</span>
         </div>
         <div className="stats-avg-card highlight">
           <span className="stats-avg-number">{avgTotal}</span>
-          <span className="stats-avg-label">Napi átlag – összes (összes adatból)</span>
+          <span className="stats-avg-label">Átlag (összes)</span>
         </div>
         <div className="stats-avg-card">
           <span className="stats-avg-number">{dailyMedian}</span>
-          <span className="stats-avg-label">Napi medián – összes (összes adatból)</span>
+          <span className="stats-avg-label">Medián (összes)</span>
         </div>
       </div>
 
       {/* ===== LINE CHART ===== */}
       <div className="stats-section">
-        <h2>Elmúlt 30 nap napi bontás</h2>
+        <div className="stats-line-header">
+          <h2>{lineRangeLabel} napi bontás</h2>
+          <div className="stats-range-buttons">
+            {[30, 90, 180].map((r) => (
+              <button
+                key={r}
+                className={`stats-range-btn${lineRange === r ? " active" : ""}`}
+                onClick={() => setLineRange(r)}
+              >
+                {r === 30 ? "30 nap" : r === 90 ? "3 hónap" : "6 hónap"}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="stats-line-chart-wrapper">
           <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
             {/* Grid lines */}

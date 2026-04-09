@@ -63,6 +63,46 @@
   color: #c9d1ff;
 }
 
+.stats-line-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.stats-line-header h2 {
+  margin: 0;
+}
+
+.stats-range-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.stats-range-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.stats-range-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.stats-range-btn.active {
+  background: linear-gradient(135deg, #4f8cff, #6aa9ff);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+
 /* ===== BAR CHART ===== */
 .stats-bar-chart {
   display: flex;
