@@ -64,7 +64,7 @@ function dedupeByUrl(items) {
   const seen = new Set();
   return items.filter((x) => {
     if (!x.url) return false;
-    const key = getDedupeKey(x.url);
+    const key = normalizeUrl(x.url);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -94,7 +94,7 @@ function normalizeUrl(raw) {
 /* ---------------------
    Fetch helper
 --------------------- */
-function fetchText(url, redirectLeft = 5) {
+function fetchText(url, { headers: extraHeaders, redirectLeft = 5 } = {}) {
   return new Promise((resolve, reject) => {
     console.log(`Script started at ${new Date().toISOString()}`);
     const u = new URL(url);
@@ -109,6 +109,7 @@ function fetchText(url, redirectLeft = 5) {
           Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
+          ...extraHeaders,
         },
         timeout: 25000,
       },
@@ -121,7 +122,7 @@ function fetchText(url, redirectLeft = 5) {
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
           const nextUrl = new URL(loc, url).toString();
           res.resume();
-          return resolve(fetchText(nextUrl, redirectLeft - 1));
+          return resolve(fetchText(nextUrl, { headers: extraHeaders, redirectLeft: redirectLeft - 1 }));
         }
 
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
@@ -148,7 +149,43 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 /* ---------------------
-   HTML extraction
+   Karrierhungaria Inertia API
+--------------------- */
+const KARRIERHUNGARIA_BASE = "https://karrierhungaria.hu";
+
+async function getInertiaVersion() {
+  const html = await fetchText(`${KARRIERHUNGARIA_BASE}/allasajanlatok`);
+  const match = html.match(/data-page="([^"]*)"/);
+  if (!match) throw new Error("Could not find Inertia data-page");
+  const decoded = match[1].replace(/&quot;/g, '"');
+  const pageData = JSON.parse(decoded);
+  return pageData.version;
+}
+
+async function fetchKarrierPage(url, inertiaVersion) {
+  const json = await fetchText(url, {
+    headers: {
+      "X-Inertia": "true",
+      "X-Inertia-Version": inertiaVersion,
+      "X-Requested-With": "XMLHttpRequest",
+    },
+  });
+  return JSON.parse(json);
+}
+
+async function fetchKarrierJobs(categoryUrl, inertiaVersion) {
+  const data = await fetchKarrierPage(categoryUrl, inertiaVersion);
+  const positions = data.props?.positions?.data ?? [];
+  return positions.map(p => ({
+    title: p.title,
+    url: `${KARRIERHUNGARIA_BASE}/allasajanlat/${p.href}`,
+    description: p.content_company || null,
+  }));
+}
+
+
+/* ---------------------
+   HTML extraction (AAM)
 --------------------- */
 function extractCandidates(html, baseUrl) {
   const $ = cheerioLoad(html);
@@ -203,49 +240,49 @@ function levelNotBlacklisted(title, desc) {
 }
 
 const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
-const KARRIERHUNGARIA_JOB_PREFIX = "https://karrierhungaria.hu/allasajanlat";
 const URL_BLACKLIST = new Set([
   normalizeUrl("https://aam.hu/allasajanlatok#content"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlat-kategoriak"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszerintegrator"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/kontrolling"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto"),
-  normalizeUrl("https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap"),
 ]);
 
 export default withTimeout("cron_jobs_A_K", async () => {
   _filters = await loadFilters();
 
-
-
 const SOURCES = [
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1" },
-  { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
-
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
-  { key: "aam", label: "aam", url: "https://aam.hu/allasajanlatok" },
+  "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1",
 ];
 
+  let inertiaVersion;
+  try {
+    inertiaVersion = await getInertiaVersion();
+    console.log("Inertia version:", inertiaVersion);
+  } catch (err) {
+    await logFetchError("cron_jobs_A_K", { url: KARRIERHUNGARIA_BASE, message: err.message });
+    console.error("Failed to get Inertia version:", err.message);
+    return new Response("FAIL");
+  }
+
+  const AAM_SOURCES = [
+    { key: "aam", url: "https://aam.hu/karrier" },
+    { key: "aam", url: "https://aam.hu/allasajanlatok" },
+  ];
+
   const client = await pool.connect();
+  const seen = new Set();
 
   try {
-    for (const p of SOURCES) {
+    /* --- AAM (HTML scraping) --- */
+    for (const p of AAM_SOURCES) {
       let html;
       try {
         html = await fetchText(p.url);
@@ -256,16 +293,13 @@ const SOURCES = [
       }
 
       const rawItems = extractCandidates(html, p.url);
-
       let items = rawItems.filter(it => {
         if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (p.key === "aam" && !it.url.startsWith(AAM_JOB_PREFIX)) return false;
-        if (p.key === "karrierhungaria" && !it.url.startsWith(KARRIERHUNGARIA_JOB_PREFIX)) return false;
+        if (!it.url.startsWith(AAM_JOB_PREFIX)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         return true;
       });
-
 
       for (const it of items) {
         try {
@@ -274,12 +308,42 @@ const SOURCES = [
           console.error(err);
         }
       }
-
       console.log(`${p.key}: ${items.length} items processed.`);
     }
 
+    /* --- Karrierhungaria (Inertia API) --- */
+    for (const url of SOURCES) {
+      let jobs;
+      try {
+        jobs = await fetchKarrierJobs(url, inertiaVersion);
+      } catch (err) {
+        await logFetchError("cron_jobs_A_K", { url, message: err.message });
+        console.error("fetch failed:", url, err.message);
+        continue;
+      }
+
+      let items = jobs.filter(it => {
+        const key = getDedupeKey(it.url);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        if (!levelNotBlacklisted(it.title, it.description)) return false;
+        if (!titleNotBlacklisted(it.title)) return false;
+        return true;
+      });
+
+      for (const it of items) {
+        try {
+          await upsertJob(client, "karrierhungaria", it);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      console.log(`karrierhungaria (${url.split("/")[4]}): ${items.length} items processed.`);
+    }
+
   } finally {
-    console.log(`Script started at ${new Date().toISOString()}`);
+    console.log(`Script finished at ${new Date().toISOString()}`);
     client.release();
   }
 

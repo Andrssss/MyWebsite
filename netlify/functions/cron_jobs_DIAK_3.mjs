@@ -7,7 +7,7 @@ export const config = {
 
 /* =========================
 const SOURCES = [
-  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=" },
+  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=Budapest&title=GYAKORNOK&date=&location=&shifttype=" },
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
@@ -129,6 +129,8 @@ function dedupeByUrl(items) {
 // Sources (csak az első 4 debugolásra)
 // =====================
 const SOURCES = [
+
+  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=di%C3%A1kmunka&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=&optionsFacetsDD_title=" },
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=" },
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
@@ -539,7 +541,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         })
         .filter((c) => !isSeniorLike(c.title, c.description));
 
-
+      if (source === "vizmuvek") {
+        matchedList = matchedList.filter(c => normalizeText(c.title).includes("gyakornok"));
+      }
 
       // =========================
       // BLACKLISTING
@@ -550,6 +554,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
         "https://muisz.hu/hu/regisztracio",
         "https://muisz.hu/hu/diakmunkaink",
+        "https://karrier.otpbank.hu/otp/job/Budapest-Gyakornok-V%C3%A1llalati-Sz%C3%A1mlavezet%C3%A9si-K%C3%B6zpont-1051-Budapest-N%C3%A1dor-utca-6_-1051/1366316233/",
 
       ];
 
