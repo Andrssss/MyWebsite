@@ -115,18 +115,18 @@ const getKeywordNotesForJob = (job) => {
    Egy job csak 1 kategóriába kerül (az első illeszkedő).
 ======================= */
 const JOB_CATEGORIES = [
-  ["Webfejlesztés", ["Alkalmazásfejlesztő","frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
-  ["Data / AI", ["ai fejleszto",    "gen ai", "data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
-  ["DevOps", ["devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
-  ["QA / Tesztelő", ["tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
+  ["Webfejlesztés", ["Webmaster","Alkalmazásfejlesztő","frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
+  ["Data / AI", ["ai automation","AI mérnök","copilot","ai prompt","conversation ai","ai applications","ai project","ai fejleszto","gen ai", "data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
+  ["DevOps", ["AWS","Azure","cloud architect","devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
+  ["QA / Tesztelő", ["tesztautomatizalo","testing","testing specialist","Tesztautomatizálási","automata tesztelo","fat","Tesztautomatizáló","Tesztautomatizálás","tesztmérnök","tesztelo","tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
   ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
   ["Elemző", ["analyst","elemzési", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
-  ["SAP", ["sap", "abap"]],
-  ["Security", ["security","biztonsági","Információbiztonsági", "Kiberbiztonsági","cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
+  ["SAP", ["sap", "abap", "s/4hana", "s4hana", "sap hana", "sap basis", "sap fiori", "sap tanácsadó", "sap konzultáns", "sap consultant", "sap fejlesztő", "sap developer", "sap admin", "sap rendszergazda", "sap üzemeltető", "successfactors", "ariba", "concur"]],
+  ["Security", ["IT Biztonságtechnikai","safety","security","biztonsági","Információbiztonsági", "Kiberbiztonsági","cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
   ["Hálózat / Infra", ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök", "sysadmin", "linux admin", "windows admin", "it üzemeltető", "üzemeltetés"]],
-  ["Hardware", ["hardware", "embedded", "hw", "fpga", "pcb", "firmware"]],
+  ["Hardware", ["karbantartási","eszközcserét","hardware", "embedded", "hw", "fpga", "pcb", "firmware"]],
   ["Mobil", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin"]],
-  ["Fejlesztő", ["python", "java","software development","developer", "fejlesztő","fejlesztés","development", "fejleszto", "programozó", "software engineer", "engineer"]],
+  ["Fejlesztő", ["C++","automation","autómatizálási","python", "java","software development","developer", "fejlesztő","fejlesztés","development", "fejleszto", "programozó", "software engineer", "engineer"]],
 ];
 
 const getCategoriesForJob = (job) => {
