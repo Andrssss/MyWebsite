@@ -177,7 +177,7 @@ const JobStats = () => {
         </button>
       </div>
       <div className="stats-header">
-        <h4>Keep in mind, hogy azért vannak tüskék az adatokban, mert mostanában sok forrást adtam hozzá és sokat változtattam a filtereken is !</h4>
+        <h4>Keep in mind, hogy azért vannak tüskék az adatokban, mert mostanában sok forrást adtam hozzá és sokat változtattam a filtereken is és azokon a napokon, amikor ezekkel foglalkoztam, akkor sok adat kerűlt a db-be !</h4>
       </div>
       {/* ===== BAR CHART ===== */}
       <div className="stats-section">
