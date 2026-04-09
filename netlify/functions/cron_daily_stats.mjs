@@ -33,7 +33,7 @@ const INTERN_SOURCES = [
 ];
 
 const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
-const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])0\s*[-–/]\s*[1-9][0-9]*([^0-9]|$)`;
+const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
 
 // Specifikusabb kategóriák ELŐRE, általános "Fejlesztő" HÁTRA
 // Minden job csak 1 kategóriába kerül (az első illeszkedő)
@@ -78,7 +78,7 @@ export default async function handler() {
     const { rows: totalRows } = await client.query(
       `SELECT COUNT(*)::int AS cnt
        FROM job_posts
-       WHERE first_seen::date = $1`,
+       WHERE (first_seen AT TIME ZONE 'UTC')::date = $1`,
       [today]
     );
     const totalJobs = totalRows[0]?.cnt ?? 0;
@@ -100,7 +100,7 @@ export default async function handler() {
 
     const { rows: internJobRows } = await client.query(
       `SELECT title FROM job_posts
-       WHERE first_seen::date = $1
+       WHERE (first_seen AT TIME ZONE 'UTC')::date = $1
          AND (source IN (${sourcePlaceholders}) OR ${titleKeywordConditions} OR ${experienceKeywordConditions} OR COALESCE(experience, '') ~* '${ZERO_RANGE_EXPERIENCE_REGEX}')`,
       params
     );
@@ -118,7 +118,7 @@ export default async function handler() {
 
     // Kategória bontás mentése (összes)
     const { rows: todayJobs } = await client.query(
-      `SELECT title FROM job_posts WHERE first_seen::date = $1`,
+      `SELECT title FROM job_posts WHERE (first_seen AT TIME ZONE 'UTC')::date = $1`,
       [today]
     );
     const categories = categorizeJobs(todayJobs);
