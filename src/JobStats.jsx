@@ -18,6 +18,10 @@ const CATEGORY_COLOR_MAP = {
   Egyéb: "#94a3b8",
 };
 
+const CATEGORY_DISPLAY_NAMES = {
+  "Fejlesztő": "Egyéb fejlesztő",
+};
+
 const getCategoryColor = (category) => {
   if (CATEGORY_COLOR_MAP[category]) return CATEGORY_COLOR_MAP[category];
 
@@ -65,7 +69,7 @@ const PieChart = ({ data, title }) => {
           {slices.map((s, i) => (
             <div key={i} className="stats-pie-legend-item">
               <span className="stats-pie-color" style={{ background: s.color }} />
-              <span className="stats-pie-label">{s.category}</span>
+              <span className="stats-pie-label">{CATEGORY_DISPLAY_NAMES[s.category] ?? s.category}</span>
               <span className="stats-pie-count">{s.count} ({s.pct}%)</span>
             </div>
           ))}
