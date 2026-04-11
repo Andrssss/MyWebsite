@@ -8,6 +8,7 @@ export const config = {
 
 import pkg from "pg";
 const { Pool } = pkg;
+import { loadCategories } from "./load_categories.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -33,24 +34,7 @@ const INTERN_SOURCES = [
 const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
 const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
 
-// Specifikusabb kategóriák ELŐRE, általános "Fejlesztő" HÁTRA
-// Minden job csak 1 kategóriába kerül (az első illeszkedő)
-const JOB_CATEGORIES = [
-  ["Webfejlesztés", ["Webmaster","Alkalmazásfejlesztő","frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
-  ["Data / AI", ["ai automation","AI mérnök","copilot","ai prompt","conversation ai","ai applications","ai project","ai fejleszto","gen ai", "data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
-  ["DevOps", ["AWS","Azure","cloud architect","devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
-  ["QA / Tesztelő", ["tesztautomatizalo","testing","testing specialist","Tesztautomatizálási","automata tesztelo","fat","Tesztautomatizáló","Tesztautomatizálás","tesztmérnök","tesztelo","tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
-  ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
-  ["Elemző", ["analyst","elemzési", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
-  ["SAP", ["sap", "abap", "s/4hana", "s4hana", "sap hana", "sap basis", "sap fiori", "sap tanácsadó", "sap konzultáns", "sap consultant", "sap fejlesztő", "sap developer", "sap admin", "sap rendszergazda", "sap üzemeltető", "successfactors", "ariba", "concur"]],
-  ["Security", ["IT Biztonságtechnikai","safety","security","biztonsági","Információbiztonsági", "Kiberbiztonsági","cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
-  ["Hálózat / Infra", ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök", "sysadmin", "linux admin", "windows admin", "it üzemeltető", "üzemeltetés"]],
-  ["Hardware", ["karbantartási","eszközcserét","hardware", "embedded", "hw", "fpga", "pcb", "firmware"]],
-  ["Mobil", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin"]],
-  ["Fejlesztő", ["C++","automation","autómatizálási","python", "java","software development","developer", "fejlesztő","fejlesztés","development", "fejleszto", "programozó", "software engineer", "engineer"]],
-];
-
-function categorizeJobs(rows) {
+function categorizeJobs(rows, JOB_CATEGORIES) {
   const counts = {};
   for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
   counts["Egyéb"] = 0;
@@ -78,6 +62,9 @@ function categorizeJobs(rows) {
 export default async function handler() {
   const client = await pool.connect();
   try {
+    // Kategóriák betöltése adatbázisból
+    const JOB_CATEGORIES = await loadCategories();
+
     // Mai dátum (UTC)
     const today = new Date().toISOString().slice(0, 10);
 
@@ -128,7 +115,7 @@ export default async function handler() {
       `SELECT title FROM job_posts WHERE (first_seen AT TIME ZONE 'UTC')::date = $1`,
       [today]
     );
-    const categories = categorizeJobs(todayJobs);
+    const categories = categorizeJobs(todayJobs, JOB_CATEGORIES);
 
     for (const { category, count } of categories) {
       await client.query(
@@ -141,7 +128,7 @@ export default async function handler() {
     }
 
     // Intern kategória bontás mentése (prefix: "intern:")
-    const internCategories = categorizeJobs(internJobRows);
+    const internCategories = categorizeJobs(internJobRows, JOB_CATEGORIES);
 
     for (const { category, count } of internCategories) {
       await client.query(

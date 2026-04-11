@@ -110,30 +110,12 @@ const getKeywordNotesForJob = (job) => {
 };
 
 /* =======================
-   KATEGÓRIÁK
-   Specifikusabb ELŐRE, általános ("Fejlesztő") HÁTRA.
-   Egy job több kategóriába is kerülhet (minden illeszkedőbe).
-   Fejlesztő fallback: ha specifikusabb is illeszkedik, Fejlesztő nem számít.
+   KATEGÓRIÁK – dynamikusan betöltve az adatbázisból
 ======================= */
-const JOB_CATEGORIES = [
-  ["Webfejlesztés", ["Webmaster","Alkalmazásfejlesztő","frontend", "front-end", "front end", "backend", "back-end", "back end", "full stack", "fullstack", "full-stack", "react", "angular", "vue", "node.js", "nodejs", "web developer", "webfejlesztő", "web fejlesztő", "php", "django", "laravel", "next.js", "nuxt", "svelte", "typescript", "ui", "ux", "ui/ux", "ux/ui", "ui designer", "ux designer", "ux engineer", "user interface", "user experience", "figma", "design system", "interaction design", "product designer", "web design", "webdesign"]],
-  ["Data / AI", ["ai automation","AI mérnök","copilot","ai prompt","conversation ai","ai applications","ai project","ai fejleszto","gen ai", "data engineer", "data scientist", "data science", "machine learning", "big data", "ai engineer", "ai developer", "artificial intelligence", "deep learning","adatbázis", "database" ,"nlp", "computer vision", "llm", "ml engineer", "ml ops", "mlops", "data platform", "generative ai"]],
-  ["DevOps", ["AWS","Azure","cloud architect","devops", "sre", "site reliability", "cloud engineer", "platform engineer", "kubernetes", "docker", "terraform", "ci/cd", "cicd"]],
-  ["QA / Tesztelő", ["tesztautomatizalo","testing","testing specialist","Tesztautomatizálási","automata tesztelo","fat","Tesztautomatizáló","Tesztautomatizálás","tesztmérnök","tesztelo","tester", "tesztelő", "qa", "quality assurance", "test engineer", "test automation", "automation engineer", "selenium"]],
-  ["Helpdesk", ["helpdesk", "help desk", "service desk", "servicenow", "it support", "it technikus"]],
-  ["Elemző", ["analyst","elemzési", "elemző", "elemzo", "analist", "analytics", "business analyst", "data analyst", "business intelligence", "bi developer", "bi specialist", "reporting", "riport", "power bi", "tableau"]],
-  ["SAP", ["sap", "abap", "s/4hana", "s4hana", "sap hana", "sap basis", "sap fiori", "sap tanácsadó", "sap konzultáns", "sap consultant", "sap fejlesztő", "sap developer", "sap admin", "sap rendszergazda", "sap üzemeltető", "successfactors", "ariba", "concur"]],
-  ["Security", ["IT Biztonságtechnikai","safety","security","biztonsági","Információbiztonsági", "Kiberbiztonsági","cybersecurity", "infosec", "penetration", "soc analyst", "security engineer"]],
-  ["Hálózat / Infra", ["network", "hálózat", "infrastructure", "system admin", "rendszermérnök", "sysadmin", "linux admin", "windows admin", "it üzemeltető", "üzemeltetés"]],
-  ["Hardware", ["karbantartási","eszközcserét","hardware", "embedded", "hw", "fpga", "pcb", "firmware"]],
-  ["Mobil", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin"]],
-  ["Fejlesztő", ["C++","automation","autómatizálási","python", "java","software development","developer", "fejlesztő","fejlesztés","development", "fejleszto", "programozó", "software engineer", "engineer"]],
-];
-
-const getCategoriesForJob = (job) => {
-  if (!job.title) return [];
+const getCategoriesForJob = (job, jobCategories) => {
+  if (!job.title || !jobCategories.length) return [];
   const title = job.title.toLowerCase();
-  const matches = JOB_CATEGORIES
+  const matches = jobCategories
     .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
     .map(([cat]) => cat);
   const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
@@ -149,6 +131,7 @@ const JobWatcher = () => {
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
+  const [jobCategories, setJobCategories] = useState([]);
 
   /* =======================
      FORRÁS SZŰRÉS (3 állapot)
@@ -234,6 +217,18 @@ const JobWatcher = () => {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setJobCategories(data.map((c) => [c.name, c.keywords]));
+      }
+    } catch {
+      setJobCategories([]);
+    }
+  };
+
   const fetchJobs = async (next24h = time24h, next7d = time7d) => {
     setLoading(true);
     setStatus("");
@@ -262,6 +257,7 @@ const JobWatcher = () => {
 
   useEffect(() => {
     fetchSources();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -292,10 +288,10 @@ const JobWatcher = () => {
   /* Category counts */
   const categoryCounts = useMemo(() => {
     const counts = {};
-    for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
+    for (const [cat] of jobCategories) counts[cat] = 0;
     counts["Egyéb"] = 0;
     for (const job of jobs) {
-      const cats = getCategoriesForJob(job);
+      const cats = getCategoriesForJob(job, jobCategories);
       if (cats.length === 0) {
         counts["Egyéb"]++;
       } else {
@@ -303,7 +299,7 @@ const JobWatcher = () => {
       }
     }
     return counts;
-  }, [jobs]);
+  }, [jobs, jobCategories]);
 
 
   /* =======================
@@ -445,13 +441,13 @@ const JobWatcher = () => {
 
     if (selectedCats.length) {
       list = list.filter((j) => {
-        const cats = getCategoriesForJob(j);
+        const cats = getCategoriesForJob(j, jobCategories);
         if (cats.length === 0) return selectedCats.includes("Egyéb");
         return cats.some((c) => selectedCats.includes(c));
       });
     } else if (excludedCats.length) {
       list = list.filter((j) => {
-        const cats = getCategoriesForJob(j);
+        const cats = getCategoriesForJob(j, jobCategories);
         if (cats.length === 0) return !excludedCats.includes("Egyéb");
         return !cats.some((c) => excludedCats.includes(c));
       });
@@ -461,7 +457,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
@@ -641,7 +637,7 @@ const JobWatcher = () => {
 
     <div className={`job-tabs-wrapper ${categoriesOpen ? "open" : ""}`}>
       <div className="job-tabs">
-        {JOB_CATEGORIES.map(([cat]) => cat).concat("Egyéb").map((cat) => {
+        {jobCategories.map(([cat]) => cat).concat("Egyéb").map((cat) => {
           const state = categoryStates[cat] || "neutral";
           let cls = "job-tab";
           if (state === "selected") cls += " active";
@@ -687,7 +683,7 @@ const JobWatcher = () => {
                   {job.title}
                   {debugMode && (
                     <span style={{ color: "#f50b0b", marginLeft: 6, fontSize: "0.85em" }}>
-                      [{getCategoriesForJob(job).join(", ") || "Egyéb"}]
+                      [{getCategoriesForJob(job, jobCategories).join(", ") || "Egyéb"}]
                     </span>
                   )}
                 </a>

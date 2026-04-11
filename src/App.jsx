@@ -18,6 +18,7 @@ import Particles from './Particles.jsx';
 import User_pages from './User_pages.tsx';
 import JobWatcher from "./JobWatcher.jsx";
 import Filters from "./Filters.jsx";
+import Categories from "./Categories.jsx";
 import JobStats from "./JobStats.jsx";
 
 const AppContent = () => {
@@ -148,6 +149,16 @@ useEffect(() => {
             element={
               <div className="re-page">
                 <Filters />
+              </div>
+            }
+          />
+
+          {/* Categories – rejtett, nincs rá gomb */}
+          <Route
+            path="/allasfigyelo/categories"
+            element={
+              <div className="re-page">
+                <Categories />
               </div>
             }
           />
