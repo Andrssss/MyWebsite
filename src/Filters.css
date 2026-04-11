@@ -109,6 +109,12 @@
   font-size: 14px;
 }
 
+.filter-chip--active {
+  background: rgba(79, 140, 255, 0.25);
+  border-color: #4f8cff;
+  color: #fff;
+}
+
 .filter-chip-x {
   background: none;
   border: none;

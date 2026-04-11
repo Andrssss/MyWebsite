@@ -17,9 +17,16 @@ const Categories = () => {
   // Keyword hozzáadás meglévő kategóriához
   const [addingKeyword, setAddingKeyword] = useState({}); // { [id]: inputValue }
 
-  // Undo stack
+  // Kiválasztott kategória
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Undo stack (kategória törlés)
   const [undoStack, setUndoStack] = useState([]);
   const undoTimers = React.useRef({});
+
+  // Undo stack (kulcsszó törlés)
+  const [kwUndoStack, setKwUndoStack] = useState([]);
+  const kwUndoTimers = React.useRef({});
 
   const load = async () => {
     try {
@@ -116,6 +123,36 @@ const Categories = () => {
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
       setCategories((prev) => prev.map((c) => (c.id === cat.id ? data : c)));
+      // Undo toast
+      const uid = Date.now() + "-kw-" + cat.id + "-" + keyword;
+      setKwUndoStack((prev) => [...prev, { catId: cat.id, catName: cat.name, keyword, uid }]);
+      kwUndoTimers.current[uid] = setTimeout(() => {
+        setKwUndoStack((prev) => prev.filter((u) => u.uid !== uid));
+        delete kwUndoTimers.current[uid];
+      }, 8000);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  // Keyword visszavonás
+  const undoKeyword = async (item) => {
+    clearTimeout(kwUndoTimers.current[item.uid]);
+    delete kwUndoTimers.current[item.uid];
+    setKwUndoStack((prev) => prev.filter((u) => u.uid !== item.uid));
+    setError(null);
+    const cat = categories.find((c) => c.id === item.catId);
+    if (!cat) return;
+    const merged = [...cat.keywords, item.keyword];
+    try {
+      const res = await fetch(API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.catId, keywords: merged }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+      setCategories((prev) => prev.map((c) => (c.id === item.catId ? data : c)));
     } catch (e) {
       setError(e.message);
     }
@@ -142,6 +179,8 @@ const Categories = () => {
       setError(e.message);
     }
   };
+
+  const selectedCat = categories.find((c) => c.id === selectedId);
 
   return (
     <div className="filters-page">
@@ -177,45 +216,66 @@ const Categories = () => {
       {loading ? (
         <p className="filters-status">Betöltés…</p>
       ) : (
-        categories.map((cat) => (
-          <div key={cat.id} className="filter-group">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <h2 className="filter-group-title" style={{ margin: 0 }}>
-                {cat.name} ({cat.keywords.length})
-              </h2>
+        <>
+          {/* Kategória választó tabok */}
+          <div className="filter-chips" style={{ marginTop: 20, marginBottom: 16 }}>
+            {categories.map((cat) => (
               <button
-                className="filter-chip-x"
-                onClick={() => removeCategory(cat.id)}
-                title="Kategória törlése"
-                style={{ fontSize: 22, color: "#ef4444" }}
-              >×</button>
-            </div>
-            <div className="filter-chips">
-              {cat.keywords.map((kw) => (
-                <span key={kw} className="filter-chip">
-                  {kw}
-                  <button
-                    className="filter-chip-x"
-                    onClick={() => removeKeyword(cat, kw)}
-                    title="Kulcsszó törlése"
-                  >×</button>
-                </span>
-              ))}
-            </div>
-            <div className="filter-add-row" style={{ marginTop: 8 }}>
-              <input
-                className="filter-input"
-                placeholder="Kulcsszó hozzáadása (vessző = több)..."
-                value={addingKeyword[cat.id] || ""}
-                onChange={(e) =>
-                  setAddingKeyword((prev) => ({ ...prev, [cat.id]: e.target.value }))
-                }
-                onKeyDown={(e) => e.key === "Enter" && addKeyword(cat)}
-              />
-              <button className="filters-btn" onClick={() => addKeyword(cat)}>+</button>
-            </div>
+                key={cat.id}
+                className={`filter-chip${selectedId === cat.id ? " filter-chip--active" : ""}`}
+                onClick={() => setSelectedId(selectedId === cat.id ? null : cat.id)}
+                style={{ cursor: "pointer" }}
+              >
+                {cat.name} ({cat.keywords.length})
+              </button>
+            ))}
           </div>
-        ))
+
+          {/* Kiválasztott kategória részletei */}
+          {selectedCat && (
+            <div className="filter-group">
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                <h2 className="filter-group-title" style={{ margin: 0 }}>
+                  {selectedCat.name} ({selectedCat.keywords.length})
+                </h2>
+                <button
+                  className="filter-chip-x"
+                  onClick={() => { removeCategory(selectedCat.id); setSelectedId(null); }}
+                  title="Kategória törlése"
+                  style={{ fontSize: 22, color: "#ef4444" }}
+                >×</button>
+              </div>
+              <div className="filter-chips">
+                {selectedCat.keywords.map((kw) => (
+                  <span key={kw} className="filter-chip">
+                    {kw}
+                    <button
+                      className="filter-chip-x"
+                      onClick={() => removeKeyword(selectedCat, kw)}
+                      title="Kulcsszó törlése"
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="filter-add-row" style={{ marginTop: 8 }}>
+                <input
+                  className="filter-input"
+                  placeholder="Kulcsszó hozzáadása (vessző = több)..."
+                  value={addingKeyword[selectedCat.id] || ""}
+                  onChange={(e) =>
+                    setAddingKeyword((prev) => ({ ...prev, [selectedCat.id]: e.target.value }))
+                  }
+                  onKeyDown={(e) => e.key === "Enter" && addKeyword(selectedCat)}
+                />
+                <button className="filters-btn" onClick={() => addKeyword(selectedCat)}>+</button>
+              </div>
+            </div>
+          )}
+
+          {!selectedCat && categories.length > 0 && (
+            <p className="filters-status">Válassz egy kategóriát a szerkesztéshez.</p>
+          )}
+        </>
       )}
 
       {undoStack.length > 0 && (
@@ -224,6 +284,17 @@ const Categories = () => {
             <div key={item.uid} className="undo-toast">
               <span className="undo-toast-text">Törölve: <strong>{item.name}</strong></span>
               <button className="undo-toast-btn" onClick={() => undo(item)}>↩ Visszavonás</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {kwUndoStack.length > 0 && (
+        <div className="undo-stack">
+          {kwUndoStack.map((item) => (
+            <div key={item.uid} className="undo-toast">
+              <span className="undo-toast-text">Kulcsszó törölve ({item.catName}): <strong>{item.keyword}</strong></span>
+              <button className="undo-toast-btn" onClick={() => undoKeyword(item)}>↩ Visszavonás</button>
             </div>
           ))}
         </div>
