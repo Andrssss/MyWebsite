@@ -265,7 +265,7 @@ const JobStats = () => {
             ))}
           </div>
         </div>
-        <div>
+        <div key={lineRange} className="stats-range-zoom">
           <div className="stats-line-chart-wrapper">
             <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
             {/* Grid lines */}
