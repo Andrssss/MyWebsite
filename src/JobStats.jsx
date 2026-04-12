@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./JobStats.css";
 
 const CATEGORY_COLOR_MAP = {
@@ -95,10 +95,45 @@ const PieChart = ({ data, title }) => {
 
 const API = "/.netlify/functions/job-stats";
 
+const lerp = (a, b, t) => a + (b - a) * t;
+
+const sampleSeries = (rows, key, count) => {
+  if (count <= 0) return [];
+  if (!rows.length) return Array.from({ length: count }, () => 0);
+  if (rows.length === 1) return Array.from({ length: count }, () => Number(rows[0][key] || 0));
+
+  return Array.from({ length: count }, (_, i) => {
+    const t = count === 1 ? 0 : i / (count - 1);
+    const rawIndex = t * (rows.length - 1);
+    const left = Math.floor(rawIndex);
+    const right = Math.min(rows.length - 1, Math.ceil(rawIndex));
+    const mix = rawIndex - left;
+    const a = Number(rows[left][key] || 0);
+    const b = Number(rows[right][key] || 0);
+    return lerp(a, b, mix);
+  });
+};
+
+const sampleDates = (rows, count) => {
+  if (count <= 0) return [];
+  if (!rows.length) return Array.from({ length: count }, () => "");
+  if (rows.length === 1) return Array.from({ length: count }, () => rows[0].date || "");
+
+  return Array.from({ length: count }, (_, i) => {
+    const t = count === 1 ? 0 : i / (count - 1);
+    const idx = Math.round(t * (rows.length - 1));
+    return rows[idx]?.date || "";
+  });
+};
+
 const JobStats = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lineRange, setLineRange] = useState(30);
+  const [lineMorphT, setLineMorphT] = useState(1);
+  const [lineMorphState, setLineMorphState] = useState({ from: [], to: [] });
+  const previousRangeDataRef = useRef([]);
+  const lineMorphRafRef = useRef(null);
 
   useEffect(() => {
     fetch(API)
@@ -143,31 +178,92 @@ const JobStats = () => {
   const barMax = Math.max(...last10.map((d) => d.total_jobs), 1);
   const monthlyBarMax = Math.max(...monthlyTotals.map((d) => d.total_jobs), 1);
 
-  /* ===== LINE CHART – időszak szűrés ===== */
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - (lineRange - 1));
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
-  const rangeData = allDays.filter((d) => d.date >= cutoffStr);
+  /* ===== LINE CHART – időszak szűrés + morph animáció ===== */
+  const rangeData = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (lineRange - 1));
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return allDays.filter((d) => d.date >= cutoffStr);
+  }, [allDays, lineRange]);
+
+  useEffect(() => {
+    const from = previousRangeDataRef.current.length
+      ? previousRangeDataRef.current
+      : rangeData;
+    const to = rangeData;
+
+    if (lineMorphRafRef.current) {
+      cancelAnimationFrame(lineMorphRafRef.current);
+    }
+
+    setLineMorphState({ from, to });
+    setLineMorphT(0);
+
+    const duration = 360;
+    const start = performance.now();
+
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      setLineMorphT(t);
+      if (t < 1) {
+        lineMorphRafRef.current = requestAnimationFrame(tick);
+      } else {
+        previousRangeDataRef.current = to;
+        lineMorphRafRef.current = null;
+      }
+    };
+
+    lineMorphRafRef.current = requestAnimationFrame(tick);
+  }, [rangeData]);
+
+  useEffect(() => () => {
+    if (lineMorphRafRef.current) {
+      cancelAnimationFrame(lineMorphRafRef.current);
+    }
+  }, []);
 
   const lineRangeLabel =
     lineRange === 30 ? "Elmúlt 30 nap" : lineRange === 90 ? "Elmúlt 3 hónap" : "Elmúlt 6 hónap";
 
-  const lineMax = Math.max(...rangeData.map((d) => d.total_jobs), 1);
   const lineW = 600;
   const lineH = 200;
   const linePad = 30;
 
-  const linePoints = rangeData.map((d, i) => {
-    const x = linePad + (i / Math.max(rangeData.length - 1, 1)) * (lineW - 2 * linePad);
-    const y = lineH - linePad - (d.total_jobs / lineMax) * (lineH - 2 * linePad);
-    return { x, y, ...d };
-  });
+  const { linePoints, internLinePoints, lineMax } = useMemo(() => {
+    const from = lineMorphState.from;
+    const to = lineMorphState.to;
+    const pointCount = Math.max(from.length, to.length, 2);
 
-  const internLinePoints = rangeData.map((d, i) => {
-    const x = linePad + (i / Math.max(rangeData.length - 1, 1)) * (lineW - 2 * linePad);
-    const y = lineH - linePad - (d.intern_jobs / lineMax) * (lineH - 2 * linePad);
-    return { x, y, ...d };
-  });
+    const fromTotals = sampleSeries(from, "total_jobs", pointCount);
+    const toTotals = sampleSeries(to, "total_jobs", pointCount);
+    const fromInterns = sampleSeries(from, "intern_jobs", pointCount);
+    const toInterns = sampleSeries(to, "intern_jobs", pointCount);
+    const dates = sampleDates(to.length ? to : from, pointCount);
+
+    const maxFrom = Math.max(...fromTotals, 1);
+    const maxTo = Math.max(...toTotals, 1);
+    const maxValue = Math.max(1, lerp(maxFrom, maxTo, lineMorphT));
+
+    const totalPoints = fromTotals.map((fromValue, i) => {
+      const value = lerp(fromValue, toTotals[i], lineMorphT);
+      const x = linePad + (i / Math.max(pointCount - 1, 1)) * (lineW - 2 * linePad);
+      const y = lineH - linePad - (value / maxValue) * (lineH - 2 * linePad);
+      return { x, y, value, date: dates[i] };
+    });
+
+    const internPoints = fromInterns.map((fromValue, i) => {
+      const value = lerp(fromValue, toInterns[i], lineMorphT);
+      const x = linePad + (i / Math.max(pointCount - 1, 1)) * (lineW - 2 * linePad);
+      const y = lineH - linePad - (value / maxValue) * (lineH - 2 * linePad);
+      return { x, y, value, date: dates[i] };
+    });
+
+    return {
+      linePoints: totalPoints,
+      internLinePoints: internPoints,
+      lineMax: maxValue,
+    };
+  }, [lineMorphState, lineMorphT]);
 
   const toPath = (pts) =>
     pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
@@ -265,7 +361,7 @@ const JobStats = () => {
             ))}
           </div>
         </div>
-        <div key={lineRange} className="stats-range-zoom">
+        <div>
           <div className="stats-line-chart-wrapper">
             <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
             {/* Grid lines */}

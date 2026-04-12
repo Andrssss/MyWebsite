@@ -74,22 +74,6 @@
   margin: 0;
 }
 
-.stats-range-zoom {
-  transform-origin: center top;
-  animation: stats-range-zoom-out 220ms ease-out;
-}
-
-@keyframes stats-range-zoom-out {
-  from {
-    transform: scale(1.03);
-    opacity: 0.88;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 .stats-range-buttons {
   display: flex;
   background: rgba(255, 255, 255, 0.06);
