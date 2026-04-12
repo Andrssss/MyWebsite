@@ -2,19 +2,28 @@ import React, { useEffect, useState } from "react";
 import "./JobStats.css";
 
 const CATEGORY_COLOR_MAP = {
-  "Webfejlesztés": "#4f8cff",
+  "Webfejlesztés": "#3b82f6",
   "Data / AI": "#6366f1",
   DevOps: "#10b981",
   "QA / Tesztelő": "#f59e0b",
-  Helpdesk: "#ef4444",
-  Elemző: "#8b5cf6",
+  "Computer Support": "#ef4444",
   SAP: "#14b8a6",
   Security: "#ec4899",
   "Hálózat / Infra": "#64748b",
   Hardware: "#f97316",
   Mobil: "#06b6d4",
   Fejlesztő: "#a855f7",
+  "C++": "#0ea5e9",
+  "Menedzser / PM": "#f43f5e",
+  "Business / System Analyst": "#8b5cf6",
+  "Data Analytics": "#06b6d4",
+  "BI (Business Intelligence)": "#0d9488",
+  "Mérnöki / Gyártás": "#84cc16",
   Egyéb: "#94a3b8",
+
+  // Backward compatibility for historical data
+  Helpdesk: "#ef4444",
+  Elemző: "#8b5cf6",
 };
 
 const CATEGORY_DISPLAY_NAMES = {
@@ -22,11 +31,17 @@ const CATEGORY_DISPLAY_NAMES = {
 };
 
 const getCategoryColor = (category) => {
-  if (CATEGORY_COLOR_MAP[category]) return CATEGORY_COLOR_MAP[category];
+  const normalizedCategory = category?.startsWith("intern:")
+    ? category.slice("intern:".length)
+    : category;
+
+  if (CATEGORY_COLOR_MAP[normalizedCategory]) {
+    return CATEGORY_COLOR_MAP[normalizedCategory];
+  }
 
   let hash = 0;
-  for (let index = 0; index < category.length; index += 1) {
-    hash = category.charCodeAt(index) + ((hash << 5) - hash);
+  for (let index = 0; index < normalizedCategory.length; index += 1) {
+    hash = normalizedCategory.charCodeAt(index) + ((hash << 5) - hash);
   }
 
   const hue = Math.abs(hash) % 360;
