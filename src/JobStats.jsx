@@ -252,9 +252,7 @@ const JobStats = () => {
       {/* ===== LINE CHART ===== */}
       <div className="stats-section">
         <div className="stats-line-header">
-          <h2>
-            <span key={lineRange} className="stats-range-title-anim">{lineRangeLabel}</span> napi bontás
-          </h2>
+          <h2>{lineRangeLabel} napi bontás</h2>
           <div className="stats-range-buttons">
             {[30, 90, 180].map((range) => (
               <button
@@ -267,7 +265,7 @@ const JobStats = () => {
             ))}
           </div>
         </div>
-        <div key={lineRange} className="stats-line-chart-anim">
+        <div key={lineRange} className="stats-range-fade">
           <div className="stats-line-chart-wrapper">
             <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
             {/* Grid lines */}
