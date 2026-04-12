@@ -74,6 +74,37 @@
   margin: 0;
 }
 
+.stats-range-title-anim {
+  display: inline-block;
+  animation: stats-range-title-in 220ms ease-out;
+}
+
+.stats-line-chart-anim {
+  animation: stats-line-block-in 260ms ease-out;
+}
+
+@keyframes stats-range-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stats-line-block-in {
+  from {
+    opacity: 0.2;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .stats-range-buttons {
   display: flex;
   background: rgba(255, 255, 255, 0.06);

@@ -237,7 +237,9 @@ const JobStats = () => {
       {/* ===== LINE CHART ===== */}
       <div className="stats-section">
         <div className="stats-line-header">
-          <h2>{lineRangeLabel} napi bontás</h2>
+          <h2>
+            <span key={lineRange} className="stats-range-title-anim">{lineRangeLabel}</span> napi bontás
+          </h2>
           <div className="stats-range-buttons">
             {[30, 90, 180].map((range) => (
               <button
@@ -250,8 +252,9 @@ const JobStats = () => {
             ))}
           </div>
         </div>
-        <div className="stats-line-chart-wrapper">
-          <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
+        <div key={lineRange} className="stats-line-chart-anim">
+          <div className="stats-line-chart-wrapper">
+            <svg viewBox={`0 0 ${lineW} ${lineH}`} className="stats-line-chart">
             {/* Grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((f) => {
               const y = lineH - linePad - f * (lineH - 2 * linePad);
@@ -287,11 +290,12 @@ const JobStats = () => {
                 {fmtDate(p.date)}
               </text>
             ))}
-          </svg>
-        </div>
-        <div className="stats-legend">
-          <span className="stats-legend-item"><span className="stats-dot regular" /> Összes</span>
-          <span className="stats-legend-item"><span className="stats-dot intern" /> Diák/Intern</span>
+            </svg>
+          </div>
+          <div className="stats-legend">
+            <span className="stats-legend-item"><span className="stats-dot regular" /> Összes</span>
+            <span className="stats-legend-item"><span className="stats-dot intern" /> Diák/Intern</span>
+          </div>
         </div>
       </div>
 
