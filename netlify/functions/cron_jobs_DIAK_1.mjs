@@ -1,7 +1,7 @@
 // netlify/functions/cron_jobs_DIAK_1.mjs
 console.log("CRON_JOBS_DIAK_1 LOADED");
 export const config = {
-  schedule: "19 4-23 * * *",
+  schedule: "21 4-23 * * *",
 };
 
 /* =========================
