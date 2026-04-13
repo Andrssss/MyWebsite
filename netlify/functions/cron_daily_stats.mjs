@@ -65,8 +65,10 @@ export default async function handler() {
     // Kategóriák betöltése adatbázisból
     const JOB_CATEGORIES = await loadCategories();
 
-    // Mai dátum (UTC)
-    const today = new Date().toISOString().slice(0, 10);
+    // Előző napi dátum (UTC): a statisztikát mindig tegnapra mentjük
+    const statsDate = new Date();
+    statsDate.setUTCDate(statsDate.getUTCDate() - 1);
+    const today = statsDate.toISOString().slice(0, 10);
 
     // Mai összes új munka
     const { rows: totalRows } = await client.query(
