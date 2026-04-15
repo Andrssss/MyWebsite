@@ -31,7 +31,7 @@ const INTERN_SOURCES = [
   "frissdiplomas",
 ];
 
-const INTERN_TITLE_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
+const INTERN_TITLE_KEYWORDS = ["tehetsegprogram","tehetségprogram","talent pool","intern", "gyakornok", "trainee", "diák", "diákmunka"];
 const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
 
 function categorizeJobs(rows, JOB_CATEGORIES) {
