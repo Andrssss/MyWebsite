@@ -176,21 +176,6 @@ function extractLinkedInExperience(html) {
   return extractYearsFromText(description);
 }
 
-function isLinkedInBudapestHungary(html) {
-  const $ = cheerioLoad(html);
-
-  const titleBlob = normalizeText([
-    $("meta[property='og:title']").attr("content"),
-    $("title").first().text(),
-  ].filter(Boolean).join(" "));
-
-  const hasBudapest = titleBlob.includes("budapest");
-  const hasHungary = titleBlob.includes("hungary") || titleBlob.includes("magyarorszag");
-
-  // Néhány LinkedIn cím csak Budapestet ír ki (ország nélkül), ezt is magyar találatnak vesszük.
-  return hasBudapest || hasHungary;
-}
-
 // profession-intern: #box_az-allashoz-tartozo-elvarasok
 function extractProfessionExperience(html) {
   const $ = cheerioLoad(html);
@@ -347,18 +332,10 @@ export default withTimeout("cron_experience", async () => {
 
       let success = 0;
       let failed = 0;
-      let deleted = 0;
 
       for (const row of rows) {
         try {
           const html = await fetchText(row.url);
-
-          if (pipe.label === "LinkedIn" && !isLinkedInBudapestHungary(html)) {
-            await client.query(`DELETE FROM job_posts WHERE id = $1`, [row.id]);
-            console.log(`[LinkedIn] deleted non-Budapest/Hungary job: ${row.id}`);
-            deleted++;
-            continue;
-          }
 
           let experience = pipe.extract(html);
 
@@ -384,7 +361,7 @@ export default withTimeout("cron_experience", async () => {
         }
       }
 
-      console.log(`[${pipe.label}] done — success: ${success}, deleted: ${deleted}, failed: ${failed}`);
+      console.log(`[${pipe.label}] done — success: ${success}, failed: ${failed}`);
     }
   } finally {
     client.release();
