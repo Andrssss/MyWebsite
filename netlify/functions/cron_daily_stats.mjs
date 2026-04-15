@@ -67,7 +67,7 @@ export default async function handler() {
 
     // Előző napi dátum (UTC): a statisztikát mindig tegnapra mentjük
     const statsDate = new Date();
-    statsDate.setUTCDate(statsDate.getUTCDate() - 1);
+    statsDate.setUTCDate(statsDate.getUTCDate() );
     const today = statsDate.toISOString().slice(0, 10);
 
     // Mai összes új munka
