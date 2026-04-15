@@ -231,7 +231,7 @@ const PIPELINES = [
   {
     label: "LinkedIn",
     sourceFilter: "source = 'LinkedIn'",
-    interval: "24 hours",
+    interval: "30 minutes",
     extract: extractLinkedInExperience,
   },
   {
@@ -328,7 +328,6 @@ export default withTimeout("cron_experience", async () => {
             await client.query(`DELETE FROM job_posts WHERE id = $1`, [row.id]);
             console.log(`[LinkedIn] deleted non-Budapest/Hungary job: ${row.id}`);
             deleted++;
-            await sleep(250);
             continue;
           }
 
