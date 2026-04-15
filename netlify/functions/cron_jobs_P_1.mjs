@@ -146,6 +146,11 @@ const INTERNSHIP_KEYWORDS = [
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
 ];
 
+const INTERN_SOURCES = [
+  "minddiak", "muisz", "zyntern", "schonherz", "prodiak",
+  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas",
+];
+
 function isInternshipTitle(title) {
   const n = normalizeText(title ?? "");
   return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
@@ -346,7 +351,6 @@ async function upsertJob(client, source, item) {
 
 
 
-// ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
 
@@ -420,6 +424,26 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (write && client) {
         for (const item of matchedList) {
           if (isInternshipTitle(item.title)) item.experience = "diákmunka";
+
+          // Skip "Diákmunka - X" if X already exists from intern sources
+          const diakMatch = item.title.match(/^\s*[Dd]i[áa]kmunka\s*[-–—:]\s*(.+)/);
+          if (diakMatch) {
+            const stripped = diakMatch[1].replace(/\s+/g, " ").trim();
+            const { rowCount } = await client.query(
+              `SELECT 1 FROM job_posts
+               WHERE source = ANY($1::text[])
+                 AND first_seen >= NOW() - INTERVAL '24 hours'
+                 AND LOWER(TRIM(REGEXP_REPLACE(title, '\\s+', ' ', 'g')))
+                     = LOWER($2)
+               LIMIT 1`,
+              [INTERN_SOURCES, stripped]
+            );
+            if (rowCount > 0) {
+              console.log(`[dedupe] skipped "${item.title}" — duplicate of intern source`);
+              continue;
+            }
+          }
+
           await upsertJob(client, source, item);
         }
       }
