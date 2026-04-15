@@ -179,18 +179,16 @@ function extractLinkedInExperience(html) {
 function isLinkedInBudapestHungary(html) {
   const $ = cheerioLoad(html);
 
-  const textBlob = normalizeText([
+  const titleBlob = normalizeText([
     $("meta[property='og:title']").attr("content"),
-    $("meta[name='description']").attr("content"),
-    $("meta[property='og:description']").attr("content"),
     $("title").first().text(),
-    $(".job-details-jobs-unified-top-card__bullet").first().text(),
   ].filter(Boolean).join(" "));
 
-  const hasBudapest = textBlob.includes("budapest");
-  const hasHungary = textBlob.includes("hungary") || textBlob.includes("magyarorszag");
+  const hasBudapest = titleBlob.includes("budapest");
+  const hasHungary = titleBlob.includes("hungary") || titleBlob.includes("magyarorszag");
 
-  return hasBudapest && hasHungary;
+  // Néhány LinkedIn cím csak Budapestet ír ki (ország nélkül), ezt is magyar találatnak vesszük.
+  return hasBudapest || hasHungary;
 }
 
 // profession-intern: #box_az-allashoz-tartozo-elvarasok
@@ -231,13 +229,13 @@ const PIPELINES = [
   {
     label: "LinkedIn",
     sourceFilter: "source = 'LinkedIn'",
-    interval: "30 minutes",
+    interval: "24 hours",
     extract: extractLinkedInExperience,
   },
   {
     label: "profession-intern",
     sourceFilter: "source = 'profession-intern'",
-    interval: "300 minutes",
+    interval: "30 minutes",
     extract: extractProfessionExperience,
   },
   {
@@ -330,11 +328,16 @@ export default withTimeout("cron_experience", async () => {
     console.log(`[profession-dedupe] ${professionDuplicatesDeleted} profession-intern duplikátum törölve`);
 
     for (const pipe of PIPELINES) {
+      const experienceCondition =
+        pipe.label === "LinkedIn"
+          ? "TRUE"
+          : "(experience IS NULL OR experience = '-')";
+
       const { rows } = await client.query(
         `SELECT id, url, title
          FROM job_posts
          WHERE first_seen >= NOW() - INTERVAL '${pipe.interval}'
-           AND (experience IS NULL OR experience = '-')
+           AND ${experienceCondition}
            AND ${pipe.sourceFilter}
          ORDER BY first_seen DESC
          LIMIT 300`
