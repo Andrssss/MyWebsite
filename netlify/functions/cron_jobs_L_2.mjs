@@ -173,7 +173,8 @@ function extractLinkedInJobs(html) {
   $("ul.jobs-search__results-list li").each((_, el) => {
     const title = normalizeText($(el).find("h3.base-search-card__title").text());
     const company = normalizeText($(el).find("h4.base-search-card__subtitle").text());
-    const location = normalizeText($(el).find("span.job-search-card__location").text());
+    let location = normalizeText($(el).find("span.job-search-card__location").text());
+    if (!location) location = normalizeText($(el).text());
     const url = $(el).find("a.base-card__full-link").attr("href");
     if (title && url) jobs.push({ title, url, company, location });
   });
@@ -275,6 +276,7 @@ const SOURCES = [
       let items = rawItems.filter(it => {
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
+        if (!it.location || (!it.location.includes("budapest") && !it.location.includes("hungary"))) return false;
         return true;
       });
 
