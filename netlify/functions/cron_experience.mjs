@@ -237,7 +237,7 @@ const PIPELINES = [
   {
     label: "profession-intern",
     sourceFilter: "source = 'profession-intern'",
-    interval: "30 minutes",
+    interval: "300 minutes",
     extract: extractProfessionExperience,
   },
   {
@@ -302,6 +302,24 @@ export default withTimeout("cron_experience", async () => {
          AND first_seen >= NOW() - INTERVAL '20 minutes'`
     );
     console.log(`[kuka-junior] ${kukaMarked} álláshirdetés átírva: junior → diákmunka`);
+
+    // profession-intern duplikátumok törlése:
+    // "Diákmunka - <pozíció>" ha azonos címmel már volt diákszövetkezeti poszt az elmúlt 2 órában
+    const { rowCount: professionDuplicatesDeleted } = await client.query(
+      `DELETE FROM job_posts p
+       WHERE p.source = 'profession-intern'
+         AND p.first_seen >= NOW() - INTERVAL '2 hours'
+         AND p.title ~* '^\\s*di[áa]kmunka\\s*-\\s*'
+         AND EXISTS (
+           SELECT 1
+           FROM job_posts d
+           WHERE d.source = ANY($1::text[])
+             AND d.first_seen >= NOW() - INTERVAL '2 hours'
+             AND LOWER(TRIM(d.title)) = LOWER(TRIM(REGEXP_REPLACE(p.title, '^\\s*di[áa]kmunka\\s*-\\s*', '', 'i')))
+         )`,
+      [INTERN_SOURCES]
+    );
+    console.log(`[profession-dedupe] ${professionDuplicatesDeleted} profession-intern duplikátum törölve`);
 
     for (const pipe of PIPELINES) {
       const { rows } = await client.query(
