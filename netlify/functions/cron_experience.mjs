@@ -176,6 +176,23 @@ function extractLinkedInExperience(html) {
   return extractYearsFromText(description);
 }
 
+function isLinkedInBudapestHungary(html) {
+  const $ = cheerioLoad(html);
+
+  const textBlob = normalizeText([
+    $("meta[property='og:title']").attr("content"),
+    $("meta[name='description']").attr("content"),
+    $("meta[property='og:description']").attr("content"),
+    $("title").first().text(),
+    $(".job-details-jobs-unified-top-card__bullet").first().text(),
+  ].filter(Boolean).join(" "));
+
+  const hasBudapest = textBlob.includes("budapest");
+  const hasHungary = textBlob.includes("hungary") || textBlob.includes("magyarorszag");
+
+  return hasBudapest && hasHungary;
+}
+
 // profession-intern: #box_az-allashoz-tartozo-elvarasok
 function extractProfessionExperience(html) {
   const $ = cheerioLoad(html);
@@ -214,44 +231,44 @@ const PIPELINES = [
   {
     label: "LinkedIn",
     sourceFilter: "source = 'LinkedIn'",
-    interval: "20 minutes",
+    interval: "24 hours",
     extract: extractLinkedInExperience,
   },
   {
     label: "profession-intern",
     sourceFilter: "source = 'profession-intern'",
-    interval: "20 minutes",
+    interval: "30 minutes",
     extract: extractProfessionExperience,
   },
   {
     label: "aam / karrierhungaria",
     sourceFilter: "source IN ('aam','karrierhungaria')",
-    interval: "20 minutes",
+    interval: "30 minutes",
     extract: extractBodyExperience,
   },
   {
     label: "cvcentrum",
     sourceFilter: "source = 'cvcentrum-gyakornok-it'",
-    interval: "20 minutes",
+    interval: "30 minutes",
     extract: extractBodyExperience,
   },
   {
     label: "kuka",
     sourceFilter: "source = 'kuka'",
-    interval: "20 minutes",
+    interval: "30 minutes",
     extract: extractKukaExperience,
     extraInternKeywords: ["junior"],
   },
   {
     label: "dreamjobs / melonjobs / tesco",
     sourceFilter: "source IN ('dreamjobs','melonjobs','tesco')",
-    interval: "20 minutes",
+    interval: "30 minutes",
     extract: extractBodyExperience,
   },
   {
     label: "talent",
     sourceFilter: "source = 'talent'",
-    interval: "20 minutes",
+    interval: "30 minutes",
     extract: extractBodyExperience,
   },
 ];
@@ -301,10 +318,20 @@ export default withTimeout("cron_experience", async () => {
 
       let success = 0;
       let failed = 0;
+      let deleted = 0;
 
       for (const row of rows) {
         try {
           const html = await fetchText(row.url);
+
+          if (pipe.label === "LinkedIn" && !isLinkedInBudapestHungary(html)) {
+            await client.query(`DELETE FROM job_posts WHERE id = $1`, [row.id]);
+            console.log(`[LinkedIn] deleted non-Budapest/Hungary job: ${row.id}`);
+            deleted++;
+            await sleep(250);
+            continue;
+          }
+
           let experience = pipe.extract(html);
 
           if (isInternshipTitle(row.title) || pipe.extraInternKeywords?.some(k => normalizeText(row.title).includes(k))) experience = "diákmunka";
@@ -329,7 +356,7 @@ export default withTimeout("cron_experience", async () => {
         }
       }
 
-      console.log(`[${pipe.label}] done — success: ${success}, failed: ${failed}`);
+      console.log(`[${pipe.label}] done — success: ${success}, deleted: ${deleted}, failed: ${failed}`);
     }
   } finally {
     client.release();
