@@ -44,7 +44,10 @@ function normalizeText(s) {
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-];
+  "tehetsegprogram","tehetségprogram","talent pool"
+ ];
+
+
 function isInternshipTitle(title) {
   const t = normalizeText(title);
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
