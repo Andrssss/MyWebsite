@@ -3,9 +3,7 @@
 // job_daily_stats és job_daily_categories adatait Netlify Blobs-ba,
 // majd törli őket az adatbázisból.
 
-export const config = {
-  schedule: "0 2 1 * *", // Minden hónap 1-jén 02:00 UTC
-};
+
 
 import { getStore } from "@netlify/blobs";
 import pkg from "pg";
