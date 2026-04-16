@@ -69,6 +69,7 @@ function normalizeWhitespace(s) {
 function isProfessionNoResultsPage(html) {
   const n = normalizeText(html);
   return (
+    n.includes("nem talaltunk allast") ||
     n.includes("nem talaltunk allast a megadott feltetelekkel") ||
     n.includes("kerjuk modositsa kereseset")
   );
@@ -349,14 +350,20 @@ function extractCandidates(html, baseUrl) {
 }
 
 async function extractProfessionCandidatesAllPages(source, baseUrl) {
-  const maxPages = 25;
   const all = [];
+  const seenUrls = new Set();
   let pagesVisited = 0;
   let pagesWithJobs = 0;
 
-  for (let page = 1; page <= maxPages; page++) {
+  for (let page = 1; ; page++) {
     const pageUrl = professionPageUrl(baseUrl, page);
-    const html = await fetchText(pageUrl);
+    let html;
+    try {
+      html = await fetchText(pageUrl);
+    } catch (err) {
+      console.log(`[profession] fetch error at page ${page}: ${err.message} — stopping pagination`);
+      break;
+    }
     pagesVisited++;
 
     if (isProfessionNoResultsPage(html)) {
@@ -373,8 +380,21 @@ async function extractProfessionCandidatesAllPages(source, baseUrl) {
       break;
     }
 
+    let newItems = 0;
+    for (const it of pageItems) {
+      const key = normalizeUrl(it.url);
+      if (seenUrls.has(key)) continue;
+      seenUrls.add(key);
+      all.push(it);
+      newItems++;
+    }
+
+    if (newItems === 0) {
+      console.log(`[profession] stop at page ${page}: no new job URLs: ${pageUrl}`);
+      break;
+    }
+
     pagesWithJobs++;
-    all.push(...pageItems);
     await sleep(10);
   }
 
