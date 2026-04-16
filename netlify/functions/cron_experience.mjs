@@ -214,7 +214,7 @@ const PIPELINES = [
   {
     label: "LinkedIn",
     sourceFilter: "source = 'LinkedIn'",
-    interval: "24 hours",
+    interval: "30 minutes",
     extract: extractLinkedInExperience,
   },
   {
