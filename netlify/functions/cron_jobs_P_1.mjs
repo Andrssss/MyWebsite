@@ -66,6 +66,30 @@ function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
+function isProfessionNoResultsPage(html) {
+  const n = normalizeText(html);
+  return (
+    n.includes("nem talaltunk allast a megadott feltetelekkel") ||
+    n.includes("kerjuk modositsa kereseset")
+  );
+}
+
+function professionPageUrl(baseUrl, page) {
+  try {
+    const u = new URL(baseUrl);
+    const parts = u.pathname.split("/");
+    const last = parts[parts.length - 1] || "";
+    const m = last.match(/^(\d+),(.+)$/);
+    if (m) {
+      parts[parts.length - 1] = `${page},${m[2]}`;
+      u.pathname = parts.join("/");
+    }
+    return u.toString();
+  } catch {
+    return baseUrl;
+  }
+}
+
 
 
 
@@ -324,6 +348,43 @@ function extractCandidates(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
+async function extractProfessionCandidatesAllPages(source, baseUrl) {
+  const maxPages = 25;
+  const all = [];
+  let pagesVisited = 0;
+  let pagesWithJobs = 0;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const pageUrl = professionPageUrl(baseUrl, page);
+    const html = await fetchText(pageUrl);
+    pagesVisited++;
+
+    if (isProfessionNoResultsPage(html)) {
+      console.log(`[profession] no results at page ${page}: ${pageUrl}`);
+      break;
+    }
+
+    const pageItems = extractCandidates(html, pageUrl).filter((c) =>
+      looksLikeJobUrl(source, c.url)
+    );
+
+    if (!pageItems.length) {
+      console.log(`[profession] no job cards at page ${page}: ${pageUrl}`);
+      break;
+    }
+
+    pagesWithJobs++;
+    all.push(...pageItems);
+    await sleep(10);
+  }
+
+  return {
+    items: dedupeByUrl(all),
+    pagesVisited,
+    pagesWithJobs,
+  };
+}
+
 
 
 // =====================
@@ -374,22 +435,28 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
     for (const p of listToProcess) {
       const source = p.key;
 
-      let html = null;
+      // =========================
+      // MERGE JOBS
+      // =========================
+
+      let merged = [];
       try {
-        html = await fetchText(p.url);
+        if (source.startsWith("profession")) {
+          const professionResult = await extractProfessionCandidatesAllPages(source, p.url);
+          merged = professionResult.items;
+          console.log(
+            `[profession] crawled ${professionResult.pagesVisited} page(s), ` +
+              `${professionResult.pagesWithJobs} page(s) with jobs for source URL: ${p.url}`
+          );
+        } else {
+          const html = await fetchText(p.url);
+          merged = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
+        }
       } catch (err) {
         await logFetchError("cron_jobs_P_1", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
-
-    
-
-      // =========================
-      // MERGE JOBS
-      // =========================
-
-      let merged = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
 
 
       // =========================
@@ -432,7 +499,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             const { rowCount } = await client.query(
               `SELECT 1 FROM job_posts
                WHERE source = ANY($1::text[])
-                 AND first_seen >= NOW() - INTERVAL '24 hours'
                  AND LOWER(TRIM(REGEXP_REPLACE(title, '\\s+', ' ', 'g')))
                      = LOWER($2)
                LIMIT 1`,
