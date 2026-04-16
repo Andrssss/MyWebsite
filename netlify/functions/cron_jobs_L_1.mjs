@@ -219,6 +219,14 @@ function getDedupeKey(rawUrl) {
   return u;
 }
 
+function isHungarianLinkedInUrl(rawUrl) {
+  try {
+    return new URL(rawUrl).hostname.toLowerCase() === "hu.linkedin.com";
+  } catch {
+    return false;
+  }
+}
+
 /* ---------------------
    DB upsert
 --------------------- */
@@ -294,7 +302,7 @@ export default withTimeout("cron_jobs_L_1", async () => {
       let items = rawItems.filter(it => {
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
-        if (!it.location || (!it.location.includes("budapest") && !it.location.includes("hungary"))) return false;
+        if (!isHungarianLinkedInUrl(it.url) && (!it.location || (!it.location.includes("budapest") && !it.location.includes("hungary")))) return false;
         return true;
       });
 
