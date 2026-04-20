@@ -7,6 +7,9 @@ const universityLinks = [
   { name: 'zimbra 📮', url: 'https://hallgato.ppke.hu/zimbra/mail#1' },
   { name: 'Neptun 📘', url: 'https://neptun3.ppke.hu/hallgato3_uj/' },
   { name: 'TO oldala 💝', url: 'https://ppke.sharepoint.com/sites/itk-to' },
+  
+    { name: 'PPKE chatbot 🤖', url:  ' https://mad.itk.ppke.hu/chatbot' },
+
   { name: 'Szakmai gyakorlat 💼', url: 'https://ppke.sharepoint.com/sites/itk-to/SitePages/Szakmai-gyakorlat.aspx' },
   { name: 'Önlab / FÖT 🧪', url: 'https://space.itk.ppke.hu/onlab/lista' },
   { name: 'Távoktatás Felvételek (Megtekint gomb) 📺', url: 'https://tavoktatas.ppke.hu/lister' },
