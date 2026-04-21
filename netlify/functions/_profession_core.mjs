@@ -253,13 +253,17 @@ function extractCandidates(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
-async function extractProfessionCandidatesAllPages(source, baseUrl) {
+async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 1, maxPages = Infinity) {
   const all = [];
   const seenUrls = new Set();
   let pagesVisited = 0;
   let pagesWithJobs = 0;
 
-  for (let page = 1; ; page++) {
+  for (let page = startPage; ; page++) {
+    if (maxPages !== Infinity && page >= startPage + maxPages) {
+      console.log(`[profession] maxPages limit (${maxPages}) reached, stopping at page ${page}`);
+      break;
+    }
     const pageUrl = professionPageUrl(baseUrl, page);
     let html;
     try {
@@ -339,7 +343,7 @@ const BLACKLIST_URLS = [
 // =====================
 // Main processing function
 // =====================
-export async function processProfessionSources(sources, jobName, request) {
+export async function processProfessionSources(sources, jobName, request, pageOptions = {}) {
   _filters = await loadFilters();
   const url = new URL(request.url);
 
@@ -352,7 +356,7 @@ export async function processProfessionSources(sources, jobName, request) {
     const client = await pool.connect();
     try {
       for (const p of sources) {
-        await processOneSource(client, p, jobName);
+        await processOneSource(client, p, jobName, pageOptions);
         await sleep(50);
       }
     } finally {
@@ -384,7 +388,7 @@ export async function processProfessionSources(sources, jobName, request) {
 
   try {
     for (const p of listToProcess) {
-      const result = await processOneSource(client, p, jobName);
+      const result = await processOneSource(client, p, jobName, pageOptions);
       stats.portals.push(result);
     }
   } finally {
@@ -397,13 +401,13 @@ export async function processProfessionSources(sources, jobName, request) {
   });
 }
 
-async function processOneSource(client, p, jobName) {
+async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}) {
   const source = p.key;
 
   let merged = [];
   try {
     if (source.startsWith("profession")) {
-      const professionResult = await extractProfessionCandidatesAllPages(source, p.url);
+      const professionResult = await extractProfessionCandidatesAllPages(source, p.url, startPage, maxPages);
       merged = professionResult.items;
       console.log(
         `[profession] crawled ${professionResult.pagesVisited} page(s), ` +

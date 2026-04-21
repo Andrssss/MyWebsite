@@ -2,13 +2,37 @@ export const config = {
   schedule: "1 4-23 * * *",
 };
 
-import { processProfessionSources } from "./_profession_core.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 
-const SOURCES = [
-  { key: "profession-intern", label: "Profession – Intern", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
-];
+export default withTimeout("cron_jobs_P_1", async () => {
+  const siteUrl = process.env.URL;
+  const secret = process.env.CRON_SECRET;
 
-export default withTimeout("cron_jobs_P_1", (request) =>
-  processProfessionSources(SOURCES, "cron_jobs_P_1", request)
-);
+  if (!siteUrl || !secret) {
+    console.warn("[cron_jobs_P_1] URL or CRON_SECRET not set, cannot trigger background functions");
+    return new Response("Missing env vars", { status: 500 });
+  }
+
+  // Trigger both halves in parallel — each ~15 pages × 30s = ~7.5 min (well within 15 min limit)
+  const triggers = [
+    { suffix: "a", startPage: 1,  maxPages: 15 },
+    { suffix: "b", startPage: 16, maxPages: 15 },
+  ];
+
+  await Promise.all(
+    triggers.map(({ suffix, startPage, maxPages }) =>
+      fetch(`${siteUrl}/.netlify/functions/cron_jobs_P_1-background`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${secret}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ startPage, maxPages }),
+      })
+        .then(() => console.log(`[cron_jobs_P_1] triggered background ${suffix} (pages ${startPage}-${startPage + maxPages - 1})`))
+        .catch((err) => console.error(`[cron_jobs_P_1] failed to trigger background ${suffix}: ${err.message}`))
+    )
+  );
+
+  return new Response("Background functions triggered", { status: 200 });
+});
