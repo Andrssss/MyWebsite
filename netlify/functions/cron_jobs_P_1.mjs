@@ -7,7 +7,7 @@ import { withTimeout } from "./_error-logger.mjs";
 export default withTimeout("cron_jobs_P_1", async () => {
   const siteUrl = process.env.URL;
   const secret = process.env.CRON_SECRET;
-
+//
   if (!siteUrl || !secret) {
     console.warn("[cron_jobs_P_1] URL or CRON_SECRET not set, cannot trigger background functions");
     return new Response("Missing env vars", { status: 500 });
