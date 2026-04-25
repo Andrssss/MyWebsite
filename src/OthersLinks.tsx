@@ -2,6 +2,7 @@ import React from 'react';
 import './styles/others-ll.css';
 
 const OTHERS_LINKS = [
+    { name: 'kozma ⚜️', url: 'https://users.itk.ppke.hu/~kozma1/' },
     { name: 'hakkeltamas 🖤', url: 'https://itk.hakkeltamas.hu/' },
     { name: 'hudes ☁️', url: 'https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO' },
     { name: 'vecha ☁️', url: 'https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ' },
