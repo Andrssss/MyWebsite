@@ -598,6 +598,11 @@ function matchesKeywords(title, desc) {
   return !hasBlacklistedWord;
 }
 
+function findBlacklistHit(title, desc) {
+  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  return _filters.find((k) => n.includes(normalizeText(k))) || null;
+}
+
 function isSeniorLike(title = "", desc = "") {
   const n = normalizeText(`${title} ${desc}`);
   return _filters.some(k => n.includes(normalizeText(k)));
@@ -1238,12 +1243,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (source === "minddiak") {
         matchedList = [];
         for (const c of merged) {
-          const blacklisted = !matchesKeywords(c.title, c.description);
-          const senior = isSeniorLike(c.title, c.description);
-          if (blacklisted) {
-            console.log(`[minddiak] SKIP blacklist: "${c.title}"`);
-          } else if (senior) {
-            console.log(`[minddiak] SKIP senior: "${c.title}"`);
+          const hit = findBlacklistHit(c.title, c.description);
+          if (hit) {
+            console.log(`[minddiak] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
           } else {
             matchedList.push(c);
           }
