@@ -503,7 +503,7 @@ async function minddiakCount(where, token) {
   ];
 
   for (const base of candidates) {
-    const u  = new URL("https://api.humancentrum.hu/positions/count");
+    const u  = new URL(base);
     u.searchParams.set("where", JSON.stringify(where));
     try {
       const txt = await fetchTextWithHeaders(u.toString(), {
@@ -1210,7 +1210,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       } else if (source === "minddiak") {
         try {
-          merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 6, debug });
+          merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 20, debug });
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `MindDiák API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
