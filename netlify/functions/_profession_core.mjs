@@ -438,9 +438,13 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
     for (const item of matchedList) {
       if (isInternshipTitle(item.title)) item.experience = "diákmunka";
 
-      const diakMatch = item.title.match(/^\s*[Dd]i[áa]kmunka\s*[-–—:]\s*(.+)/);
-      if (diakMatch) {
-        const stripped = diakMatch[1].replace(/\s+/g, " ").trim();
+      const prefixMatch = item.title.match(/^\s*[Dd]i[áa]kmunka\s*[-–—:]\s*(.+)$/);
+      const suffixMatch = item.title.match(/^(.+?)\s*[-–—:]\s*[Dd]i[áa]kmunka\s*$/);
+      let stripped = null;
+      if (prefixMatch) stripped = prefixMatch[1].replace(/\s+/g, " ").trim();
+      else if (suffixMatch) stripped = suffixMatch[1].replace(/\s+/g, " ").trim();
+
+      if (stripped) {
         const { rowCount } = await client.query(
           `SELECT 1 FROM job_posts
            WHERE source = ANY($1::text[])
