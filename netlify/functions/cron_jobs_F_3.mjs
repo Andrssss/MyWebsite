@@ -286,6 +286,7 @@ export default withTimeout("cron_jobs_F_3", async () => {
           }
 
           if (!keep) continue;
+          console.log(`[${sourceKey}] Mentés: ${it.title} | ${it.url}`);
           await upsertJob(client, sourceKey, it);
         } catch (err) {
           console.error(err);
@@ -295,18 +296,8 @@ export default withTimeout("cron_jobs_F_3", async () => {
       return items.length;
     }
 
-    // Only process pages 1-4
-    try {
-      const firstHtml = await fetchText("https://www.frissdiplomas.hu/allasok");
-      const count = await processListingPage(firstHtml, "frissdiplomas", "https://www.frissdiplomas.hu/allasok");
-      console.log(`frissdiplomas page 1: ${count} items processed.`);
-    } catch (err) {
-      await logFetchError("cron_jobs_F_3", { url: "https://www.frissdiplomas.hu/allasok", message: err.message });
-      console.error("frissdiplomas fetch failed:", err.message);
-    }
-
-    // Pages 2-4 only
-    for (let page = 2; page <= 3; page++) {
+    // Pages 1-3
+    for (let page = 1; page <= 3; page++) {
       const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
       try {
         const html = await fetchText(pageUrl);
