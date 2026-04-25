@@ -590,22 +590,27 @@ async function getMinddiakApiTokenFromBundle(pageUrl) {
 
 
 
+function _blacklistRegex(k) {
+  const norm = normalizeText(k);
+  const escaped = norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // szóhatár: csak teljes szóra/kifejezésre illeszkedjen
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 function matchesKeywords(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-
-  // Blacklist alapú szűrés: ami tiltott szóval érkezik, kiesik.
-  const hasBlacklistedWord = _filters.some((k) => n.includes(normalizeText(k)));
+  const hasBlacklistedWord = _filters.some((k) => _blacklistRegex(k).test(n));
   return !hasBlacklistedWord;
 }
 
 function findBlacklistHit(title, desc) {
   const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return _filters.find((k) => n.includes(normalizeText(k))) || null;
+  return _filters.find((k) => _blacklistRegex(k).test(n)) || null;
 }
 
 function isSeniorLike(title = "", desc = "") {
-  const n = normalizeText(`${title} ${desc}`);
-  return _filters.some(k => n.includes(normalizeText(k)));
+  const n = normalizeText(title);
+  return _filters.some(k => _blacklistRegex(k).test(n));
 }
 
 
@@ -1243,7 +1248,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (source === "minddiak") {
         matchedList = [];
         for (const c of merged) {
-          const hit = findBlacklistHit(c.title, c.description);
+          // minddiaknál csak a címre szűrünk – a description gyakran tartalmaz
+          // ártatlan cégleírás-szavakat (pl. "support", "hr"), ami false positive-ot okoz
+          const hit = findBlacklistHit(c.title, "");
           if (hit) {
             console.log(`[minddiak] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
           } else {

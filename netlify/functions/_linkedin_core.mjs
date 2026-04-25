@@ -41,9 +41,14 @@ function isInternshipTitle(title) {
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
 }
 
+function _blacklistRegex(k) {
+  const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 function titleNotBlacklisted(title) {
   const t = normalizeText(title);
-  return !_filters.some(word => t.includes(normalizeText(word)));
+  return !_filters.some(word => _blacklistRegex(word).test(t));
 }
 
 function dedupeByUrl(items) {

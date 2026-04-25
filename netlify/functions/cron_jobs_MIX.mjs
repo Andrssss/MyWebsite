@@ -241,9 +241,14 @@ function inferExperience(title, description) {
   return null;
 }
 
+function _blacklistRegex(k) {
+  const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 function isSeniorLike(title, description) {
-  const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
-  return _filters.some((kw) => normalized.includes(normalizeText(kw)));
+  const normalized = normalizeText(title ?? "");
+  return _filters.some((kw) => _blacklistRegex(kw).test(normalized));
 }
 
 function extractMelonJobs(payload) {

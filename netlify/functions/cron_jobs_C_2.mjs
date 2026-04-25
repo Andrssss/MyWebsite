@@ -128,9 +128,14 @@ function isInternshipTitle(title) {
 
 
 
+function _blacklistRegex(k) {
+  const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 function isSeniorLike(title = "", desc = "") {
-  const n = normalizeText(`${title} ${desc}`);
-  return _filters.some(k => n.includes(normalizeText(k)));
+  const n = normalizeText(title);
+  return _filters.some(k => _blacklistRegex(k).test(n));
 }
 
 

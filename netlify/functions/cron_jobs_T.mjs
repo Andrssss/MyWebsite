@@ -142,9 +142,14 @@ async function upsertJob(client, sourceKey, item) {
 
 /* ── talent.com ─────────────────────────────────────────────── */
 
+function _blacklistRegex(k) {
+  const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 function isSeniorLike(title) {
   const normalized = normalizeText(title);
-  return _filters.some((kw) => normalized.includes(normalizeText(kw)));
+  return _filters.some((kw) => _blacklistRegex(kw).test(normalized));
 }
 
 const INTERNSHIP_KEYWORDS = [
