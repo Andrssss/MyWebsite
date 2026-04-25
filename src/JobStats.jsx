@@ -28,6 +28,7 @@ const CATEGORY_COLOR_MAP = {
 
 const CATEGORY_DISPLAY_NAMES = {
   "Fejlesztő": "Egyéb fejlesztő",
+  "Egyéb": "Nem kategorizált",
 };
 
 const getCategoryColor = (category) => {
@@ -315,11 +316,11 @@ const JobStats = () => {
 
       {/* ===== PIE CHARTS ===== */}
       <div className="stats-pies-row">
-        <PieChart data={monthCategories} title="Elmúlt 30 nap kategória bontás" />
-        <PieChart data={weekCategories} title="6 havi kategória bontás" />
+        <PieChart data={monthCategories} title="Elmúlt 30 nap kategória bontás (összes)" />
+        <PieChart data={weekCategories} title="6 havi kategória bontás (összes)" />
       </div>
       <div className="stats-pies-row">
-        <PieChart data={internCategories6m} title="6 havi diák/intern kategória bontás" />
+        <PieChart data={internCategories6m} title="6 havi kategória bontás (diák/intern)" />
       </div>
 
       <div className="stats-section stats-monthly-summary-section">
