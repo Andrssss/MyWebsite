@@ -183,7 +183,7 @@ function isMatchingFrissdiplomasDetail(html) {
   );
   if (directLocation || directArea) {
     const isBudapest = directLocation.includes("budapest");
-    const isInformatikai = directArea.includes("informatikai") || directArea.includes("mérnöki");
+    const isInformatikai = directArea.includes("informatikai") || directArea.includes("mernoki");
     return isBudapest && isInformatikai;
   }
   const pageText = normalizeText(normalizeWhitespace($("body").text()));
@@ -194,7 +194,7 @@ function isMatchingFrissdiplomasDetail(html) {
   if (idxLocation === -1 || idxArea === -1) return false;
   const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
   const aroundArea = pageText.slice(idxArea, idxArea + 220);
-  return aroundLocation.includes("budapest") && (aroundArea.includes("informatikai") || aroundArea.includes("mérnöki"));
+  return aroundLocation.includes("budapest") && (aroundArea.includes("informatikai") || aroundArea.includes("mernoki"));
 }
 
 async function upsertJob(client, source, item) {
