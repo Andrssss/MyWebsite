@@ -269,10 +269,22 @@ export default withTimeout("cron_jobs_F_3", async () => {
       const rawItems = extractCandidates(html, baseUrl);
 
       const items = rawItems.filter((it) => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
-        if (!levelNotBlacklisted(it.title, it.description)) return false;
-        if (!titleNotBlacklisted(it.title)) return false;
+        if (URL_BLACKLIST.has(normalizeUrl(it.url))) {
+          console.log(`[SKIP url_blacklist] ${it.title} | ${it.url}`);
+          return false;
+        }
+        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) {
+          console.log(`[SKIP not_job_url] ${it.title} | ${it.url}`);
+          return false;
+        }
+        if (!levelNotBlacklisted(it.title, it.description)) {
+          console.log(`[SKIP level_blacklist] ${it.title}`);
+          return false;
+        }
+        if (!titleNotBlacklisted(it.title)) {
+          console.log(`[SKIP title_blacklist] ${it.title}`);
+          return false;
+        }
         return true;
       });
 
@@ -283,6 +295,7 @@ export default withTimeout("cron_jobs_F_3", async () => {
           if (sourceKey === "frissdiplomas") {
             const detailHtml = await fetchText(it.url);
             keep = isMatchingFrissdiplomasDetail(detailHtml);
+            if (!keep) console.log(`[SKIP detail_check] ${it.title} | nem Budapest+informatikai`);
           }
 
           if (!keep) continue;
