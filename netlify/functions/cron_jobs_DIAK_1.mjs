@@ -598,13 +598,13 @@ function _blacklistRegex(k) {
 }
 
 function matchesKeywords(title, desc) {
-  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  const n = normalizeText(title ?? "");
   const hasBlacklistedWord = _filters.some((k) => _blacklistRegex(k).test(n));
   return !hasBlacklistedWord;
 }
 
 function findBlacklistHit(title, desc) {
-  const n = normalizeText(`${title ?? ""} ${desc ?? ""}`);
+  const n = normalizeText(title ?? "");
   return _filters.find((k) => _blacklistRegex(k).test(n)) || null;
 }
 
@@ -991,9 +991,12 @@ function extractScriptSrcs(html, baseUrl) {
 
 
 function buildMinddiakWhere_UI() {
+  const today = new Date().toISOString().slice(0, 10) + " 00:00:00";
+
   return {
     type: 20,
     status: 30,                 // aktív pozíciók
+    date: today,                // csak a mai napon feladott állások
     work_type_md_id: [null, 10],// IT mérnök
     distance: 20,               // UI szerint
     county: [null, 13],         // Budapest

@@ -216,8 +216,8 @@ async function upsertJob(client, source, item) {
 }
 
 function levelNotBlacklisted(title, desc) {
-  const t = normalizeText(`${title ?? ""} ${desc ?? ""}`);
-  return !_filters.some((w) => t.includes(normalizeText(w)));
+  const t = normalizeText(title ?? "");
+  return !_filters.some((w) => _blacklistRegex(w).test(t));
 }
 
 const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";

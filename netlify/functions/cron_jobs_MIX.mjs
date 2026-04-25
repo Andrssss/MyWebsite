@@ -231,12 +231,13 @@ const INTERNSHIP_KEYWORDS = [
 
 
 function inferExperience(title, description) {
-  const normalized = normalizeText(`${title ?? ""} ${description ?? ""}`);
+  const titleNorm = normalizeText(title ?? "");
+  const fullNorm = normalizeText(`${title ?? ""} ${description ?? ""}`);
 
-  if (INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))) return "diákmunka";
-  if (_filters.some((kw) => normalized.includes(normalizeText(kw)))) return "senior";
-  if (/\bmedior\b/.test(normalized)) return "medior";
-  if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(normalized)) return "junior";
+  if (INTERNSHIP_KEYWORDS.some(k => fullNorm.includes(k))) return "diákmunka";
+  if (_filters.some((kw) => _blacklistRegex(kw).test(titleNorm))) return "senior";
+  if (/\bmedior\b/.test(titleNorm)) return "medior";
+  if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(titleNorm)) return "junior";
 
   return null;
 }
