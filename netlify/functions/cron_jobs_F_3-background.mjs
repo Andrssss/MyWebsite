@@ -1,19 +1,12 @@
-// export const config = {
-//   schedule: "18 4-23 * * *",
-// };
-
-/* ========================= PAGE 7-INF ONLY
-const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
-*/
-
-
 import { Pool } from "pg";
 import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { logFetchError, flushErrors } from "./_error-logger.mjs";
+
+const JOB_NAME = "cron_jobs_F_3-background";
 
 let _filters = [];
 
@@ -201,13 +194,12 @@ function isMatchingFrissdiplomasDetail(html) {
   if (idxLocation === -1 || idxArea === -1) return false;
   const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
   const aroundArea = pageText.slice(idxArea, idxArea + 220);
-  return aroundLocation.includes("budapest") && ((aroundArea.includes("informatikai") || aroundArea.includes("mérnöki")));
+  return aroundLocation.includes("budapest") && (aroundArea.includes("informatikai") || aroundArea.includes("mérnöki"));
 }
 
 async function upsertJob(client, source, item) {
   const canonicalUrl = item.url;
   const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
-
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, canonical_url, experience, first_seen)
@@ -228,27 +220,62 @@ const URL_BLACKLIST = new Set([
   normalizeUrl("https://www.frissdiplomas.hu/allasok"),
 ]);
 
-export default withTimeout("cron_jobs_F_2", async () => {
+export default async (request) => {
+  const auth = (request.headers.get("authorization") || "").trim();
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const expected = process.env.CRON_SECRET;
+  if (!expected || token !== expected) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  let startPage = 1;
+  let maxPages = Infinity;
+  try {
+    const body = await request.json();
+    if (typeof body.startPage === "number") startPage = body.startPage;
+    if (typeof body.maxPages === "number") maxPages = body.maxPages;
+  } catch {
+    // no body or invalid JSON — use defaults
+  }
+
+  console.log(`[${JOB_NAME}] starting pages ${startPage}–${maxPages === Infinity ? "∞" : startPage + maxPages - 1}`);
+
   _filters = await loadFilters();
   const client = await pool.connect();
+
   try {
     async function processListingPage(html, sourceKey, baseUrl) {
       const rawItems = extractCandidates(html, baseUrl);
       const items = rawItems.filter((it) => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) return false;
-        if (!levelNotBlacklisted(it.title, it.description)) return false;
-        if (!titleNotBlacklisted(it.title)) return false;
+        if (URL_BLACKLIST.has(normalizeUrl(it.url))) {
+          console.log(`[SKIP url_blacklist] ${it.title} | ${it.url}`);
+          return false;
+        }
+        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) {
+          console.log(`[SKIP not_job_url] ${it.title} | ${it.url}`);
+          return false;
+        }
+        if (!levelNotBlacklisted(it.title, it.description)) {
+          console.log(`[SKIP level_blacklist] ${it.title}`);
+          return false;
+        }
+        if (!titleNotBlacklisted(it.title)) {
+          console.log(`[SKIP title_blacklist] ${it.title}`);
+          return false;
+        }
         return true;
       });
+
       for (const it of items) {
         try {
           let keep = true;
           if (sourceKey === "frissdiplomas") {
             const detailHtml = await fetchText(it.url);
             keep = isMatchingFrissdiplomasDetail(detailHtml);
+            if (!keep) console.log(`[SKIP detail_check] ${it.title} | nem Budapest+informatikai`);
           }
           if (!keep) continue;
+          console.log(`[${sourceKey}] Mentés: ${it.title} | ${it.url}`);
           await upsertJob(client, sourceKey, it);
         } catch (err) {
           console.error(err);
@@ -256,27 +283,31 @@ export default withTimeout("cron_jobs_F_2", async () => {
       }
       return items.length;
     }
-    // Skip pages 1-6, start from page 7
-    let page = 7;
-    while (true) {
+
+    let page = startPage;
+    let pagesProcessed = 0;
+    while (pagesProcessed < maxPages) {
       const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
       try {
         const html = await fetchText(pageUrl);
         const count = await processListingPage(html, "frissdiplomas", pageUrl);
         console.log(`frissdiplomas page ${page}: ${count} items processed.`);
         page += 1;
+        pagesProcessed += 1;
       } catch (err) {
         if (String(err?.message || "").includes("HTTP 404")) {
           console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
           break;
         }
-        await logFetchError("cron_jobs_F_2", { url: pageUrl, message: err.message });
+        await logFetchError(JOB_NAME, { url: pageUrl, message: err.message });
         console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
         break;
       }
     }
   } finally {
     client.release();
+    await flushErrors(JOB_NAME).catch(() => {});
   }
+
   return new Response("OK");
-});
+};
