@@ -437,7 +437,7 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
   const total = await minddiakCount(where, token);
   const pages = total == null ? maxPages : Math.min(Math.ceil(total / limit), maxPages);
 
-  if (debug) console.log("[minddiak] count:", total, "pages:", pages);
+  console.log(`[minddiak] count=${total ?? "?"}  pages=${pages}  limit=${limit}`);
 
   const all = [];
   for (let page = 0; page < pages; page++) {
@@ -484,6 +484,7 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
       })
       .filter((x) => x.title && x.url);
 
+    console.log(`[minddiak] page ${page}: raw=${arr.length}  parsed=${items.length}`);
     if (!items.length) break;
     all.push(...items);
 
@@ -491,7 +492,9 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
     if (items.length < limit) break;
   }
 
-  return dedupeByUrl(all);
+  const deduped = dedupeByUrl(all);
+  console.log(`[minddiak] fetchAllDone: total_raw=${all.length}  after_dedup=${deduped.length}`);
+  return deduped;
 }
 
 
@@ -978,15 +981,12 @@ function extractScriptSrcs(html, baseUrl) {
 
 
 function buildMinddiakWhere_UI() {
-  const today = new Date().toISOString().slice(0, 10) + " 00:00:00";
-
   return {
     type: 20,
-    status: 30,                 // ez nálad a probe-ban is 30
-    date: today,                // UI is küld date-et
-    work_type_md_id: [null, 10],// IT mérnök (a képed alapján)
+    status: 30,                 // aktív pozíciók
+    work_type_md_id: [null, 10],// IT mérnök
     distance: 20,               // UI szerint
-    county: [null, 13],         // Budapest (a képed alapján)
+    county: [null, 13],         // Budapest
   };
 }
 
@@ -1211,6 +1211,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       } else if (source === "minddiak") {
         try {
           merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 20, debug });
+          console.log(`[minddiak] fetched=${merged.length}`);
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `MindDiák API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
@@ -1233,9 +1234,26 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       // FILTER & KEYWORD MATCH
       // =========================
-      let matchedList = merged
-        .filter((c) => matchesKeywords(c.title, c.description))
-        .filter((c) => !isSeniorLike(c.title, c.description));
+      let matchedList;
+      if (source === "minddiak") {
+        matchedList = [];
+        for (const c of merged) {
+          const blacklisted = !matchesKeywords(c.title, c.description);
+          const senior = isSeniorLike(c.title, c.description);
+          if (blacklisted) {
+            console.log(`[minddiak] SKIP blacklist: "${c.title}"`);
+          } else if (senior) {
+            console.log(`[minddiak] SKIP senior: "${c.title}"`);
+          } else {
+            matchedList.push(c);
+          }
+        }
+        console.log(`[minddiak] after_filter=${matchedList.length}  skipped=${merged.length - matchedList.length}`);
+      } else {
+        matchedList = merged
+          .filter((c) => matchesKeywords(c.title, c.description))
+          .filter((c) => !isSeniorLike(c.title, c.description));
+      }
 
 
 
@@ -1260,10 +1278,20 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // DB UPSERT
       // =========================
       if (write && client) {
+        let saved = 0;
         for (const item of matchedList) {
           item.experience = "diákmunka";
-          await upsertJob(client, source, item);
+          try {
+            await upsertJob(client, source, item);
+            if (source === "minddiak") console.log(`[minddiak] SAVED: "${item.title}"  url=${item.url}`);
+            saved++;
+          } catch (e) {
+            if (source === "minddiak") console.log(`[minddiak] SAVE_ERR: "${item.title}"  err=${e.message}`);
+          }
         }
+        if (source === "minddiak") console.log(`[minddiak] db_saved=${saved}/${matchedList.length}`);
+      } else if (source === "minddiak") {
+        console.log(`[minddiak] write=false, would save ${matchedList.length} items`);
       }
     }
   } finally {
