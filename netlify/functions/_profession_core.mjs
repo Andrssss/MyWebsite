@@ -436,6 +436,11 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
 
   if (client) {
     for (const item of matchedList) {
+      if (source === "profession-intern" && isInternshipTitle(item.title)) {
+        console.log(`[skip] profession-intern internship title: "${item.title}"`);
+        continue;
+      }
+
       if (isInternshipTitle(item.title)) item.experience = "diákmunka";
 
       const prefixMatch = item.title.match(/^\s*[Dd]i[áa]kmunka\s*[-–—:]\s*(.+)$/);
