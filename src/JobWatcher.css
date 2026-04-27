@@ -513,3 +513,69 @@ html, body {
   font-weight: bold;
   color: #ffcc66;
 }
+
+/* ===== SOCIAL ICONS ===== */
+.social-icons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 40px;
+  padding: 20px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: wrap;
+}
+
+.social-icons .icon-button {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.social-icons .icon-button:hover {
+  color: #e4e4e7;
+}
+
+.social-icons .email-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.social-icons .email-reveal {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 14px;
+  color: #9ca3af;
+  transition: max-width 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+
+.social-icons .email-block.open .email-reveal {
+  max-width: 250px;
+  opacity: 1;
+}
+
+.wau-badge {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wau-badge strong {
+  color: #e5e7eb;
+  font-weight: 600;
+}

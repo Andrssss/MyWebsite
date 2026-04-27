@@ -1,10 +1,65 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaEnvelope, FaLinkedin } from "react-icons/fa";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
 const TIME_RANGE_24H = "24h";
 const TIME_RANGE_7D = "7d";
+
+const VISITOR_TRACK_API = "/.netlify/functions/daily-visitor";
+const VISITOR_COOKIE_NAME = "jobWatcherVisitorId";
+const DAILY_VISITOR_SENT_KEY = "jobWatcherVisitorSentDate";
+const ONE_MINUTE_MS = 60 * 1000;
+
+const getTodayLocalDateString = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const readCookie = (name) => {
+  const cookieName = `${name}=`;
+  const parts = document.cookie.split(";");
+  for (const part of parts) {
+    const item = part.trim();
+    if (item.startsWith(cookieName)) {
+      return decodeURIComponent(item.slice(cookieName.length));
+    }
+  }
+  return "";
+};
+
+const writeCookie = (name, value, days) => {
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+};
+
+const createVisitorId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const getOrCreateVisitorId = () => {
+  const existing = readCookie(VISITOR_COOKIE_NAME);
+  if (existing) return existing;
+  const nextId = createVisitorId();
+  writeCookie(VISITOR_COOKIE_NAME, nextId, 365 * 2);
+  return nextId;
+};
+
+const sendDailyVisitor = async (visitorId) => {
+  const res = await fetch(VISITOR_TRACK_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visitorId }),
+  });
+  if (!res.ok) throw new Error("Visitor tracking request failed");
+};
 
 const hoursSince = (iso) => {
   const ms = Date.now() - new Date(iso).getTime();
@@ -182,6 +237,32 @@ const JobWatcher = () => {
 
   const [lastUpdates, setLastUpdates] = useState([]);
   const [commitsOpen, setCommitsOpen] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const [weeklyActiveUsers, setWeeklyActiveUsers] = useState(null);
+
+  useEffect(() => {
+    fetch(VISITOR_TRACK_API)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.wau === "number") setWeeklyActiveUsers(data.wau);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      const today = getTodayLocalDateString();
+      if (localStorage.getItem(DAILY_VISITOR_SENT_KEY) === today) return;
+      try {
+        const visitorId = getOrCreateVisitorId();
+        await sendDailyVisitor(visitorId);
+        localStorage.setItem(DAILY_VISITOR_SENT_KEY, today);
+      } catch {
+        // silent fail
+      }
+    }, ONE_MINUTE_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     fetch("/.netlify/functions/last-commit")
@@ -721,6 +802,39 @@ const JobWatcher = () => {
         })}
       </ul>
     )}
+
+    {/* ICON SOR */}
+    <div className="social-icons">
+      <div className={`email-block ${showEmail ? "open" : ""}`}>
+        <button
+          className="icon-button"
+          onClick={() => setShowEmail((v) => !v)}
+          aria-label="Email"
+        >
+          <FaEnvelope />
+        </button>
+        <span className="email-reveal">bak.andrs@gmail.com</span>
+      </div>
+
+      <a
+        href="https://www.linkedin.com/in/andras-bako123/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="LinkedIn"
+        className="icon-button icon-button-linkedin"
+      >
+        <FaLinkedin />
+      </a>
+
+      {weeklyActiveUsers !== null && (
+        <span
+          className="wau-badge"
+          title="Egyedi látogatók az elmúlt 7 napban (admin nélkül)"
+        >
+          Active users : <strong>{weeklyActiveUsers}</strong>
+        </span>
+      )}
+    </div>
   </div>
 );
 
