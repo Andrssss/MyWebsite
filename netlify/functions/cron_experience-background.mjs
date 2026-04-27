@@ -259,7 +259,7 @@ const PIPELINES = [
 /* ======================
    MAIN
 ====================== */
-export default withTimeout("cron_experience", async () => {
+export default withTimeout("cron_experience-background", async () => {
   console.log("=== EXPERIENCE ENRICHMENT STARTED ===");
   const client = await pool.connect();
 
@@ -323,7 +323,7 @@ export default withTimeout("cron_experience", async () => {
           success++;
           await sleep(250);
         } catch (err) {
-          await logFetchError("cron_experience", { url: row.url, message: err.message, extra: { source: pipe.label, jobId: row.id } });
+          await logFetchError("cron_experience-background", { url: row.url, message: err.message, extra: { source: pipe.label, jobId: row.id } });
           console.error(`[${pipe.label}] FAILED ID:`, row.id, "|", err.message);
 
           await client.query(

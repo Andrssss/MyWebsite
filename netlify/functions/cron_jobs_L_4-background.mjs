@@ -24,6 +24,6 @@ const SOURCES = [
   { key: "LinkedIn", label: "LinkedIn PAST 24H", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=2&f_TPR=r86400&geoId=104291169&keywords=Software%20Engineer&location=Budapest%2C%20Budapest%2C%20Hungary&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 ];
 
-export default withTimeout("cron_jobs_L_4", () =>
-  processLinkedInSources(SOURCES, "cron_jobs_L_4")
+export default withTimeout("cron_jobs_L_4-background", () =>
+  processLinkedInSources(SOURCES, "cron_jobs_L_4-background")
 );

@@ -69,10 +69,15 @@ export async function flushErrors(cronJob) {
  *
  * @param {string} cronJob  – cron job identifier, e.g. "cron_experience"
  * @param {Function} handler – the original async handler
- * @param {number} [limitMs=29000] – timeout threshold in ms (default 29s)
+ * @param {number} [limitMs] – timeout threshold in ms.
+ *   Defaults to 29s for normal scheduled functions and 14 min for
+ *   background functions (cronJob name ending in "-background").
  * @returns {Function} wrapped handler
  */
-export function withTimeout(cronJob, handler, limitMs = 29000) {
+export function withTimeout(cronJob, handler, limitMs) {
+  if (limitMs == null) {
+    limitMs = cronJob.endsWith("-background") ? 14 * 60 * 1000 : 29000;
+  }
   return async (...args) => {
     const start = Date.now();
 

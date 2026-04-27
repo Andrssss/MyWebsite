@@ -18,6 +18,6 @@ const SOURCES = [
   { key: "LinkedIn", label: "LinkedIn JR DEVELOPER", url: "https://www.linkedin.com/jobs/search/?distance=10&f_E=1&f_TPR=r604800&geoId=104291169&keywords=Junior&location=Budapest%2C%20Budapest%2C%20Hungary&origin=JOB_SEARCH_PAGE_JOB_FILTER" },
 ];
 
-export default withTimeout("cron_jobs_L_7", () =>
-  processLinkedInSources(SOURCES, "cron_jobs_L_7")
+export default withTimeout("cron_jobs_L_7-background", () =>
+  processLinkedInSources(SOURCES, "cron_jobs_L_7-background")
 );
