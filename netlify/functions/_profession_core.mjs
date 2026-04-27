@@ -274,14 +274,19 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
     try {
       html = await fetchText(pageUrl);
     } catch (err) {
-      console.log(`[profession] fetch error at page ${page}: ${err.message} — stopping pagination`);
-      break;
+      const msg = err && err.message ? err.message : String(err);
+      if (/HTTP 404/.test(msg)) {
+        console.log(`[profession] HTTP 404 at page ${page}: ${pageUrl} — stopping pagination`);
+        break;
+      }
+      console.log(`[profession] fetch error at page ${page}: ${msg} — continuing to next page`);
+      continue;
     }
     pagesVisited++;
 
     if (isProfessionNoResultsPage(html)) {
-      console.log(`[profession] no results at page ${page}: ${pageUrl}`);
-      break;
+      console.log(`[profession] no-results marker at page ${page}: ${pageUrl} — continuing (waiting for 404)`);
+      continue;
     }
 
     const pageItems = extractCandidates(html, pageUrl).filter((c) =>
@@ -289,8 +294,8 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
     );
 
     if (!pageItems.length) {
-      console.log(`[profession] no job cards at page ${page}: ${pageUrl}`);
-      break;
+      console.log(`[profession] no job cards at page ${page}: ${pageUrl} — continuing (waiting for 404)`);
+      continue;
     }
 
     let newItems = 0;
@@ -303,11 +308,11 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
     }
 
     if (newItems === 0) {
-      console.log(`[profession] stop at page ${page}: no new job URLs: ${pageUrl}`);
-      break;
+      console.log(`[profession] page ${page}: no new job URLs (all duplicates) — continuing (waiting for 404)`);
+    } else {
+      pagesWithJobs++;
     }
 
-    pagesWithJobs++;
     await sleep(10);
   }
 
