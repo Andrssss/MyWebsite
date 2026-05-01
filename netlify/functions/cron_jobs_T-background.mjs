@@ -11,6 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { enrichExperience, extractBodyExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -30,6 +31,12 @@ const TALENT_SEARCH_URLS = [
     "https://hu.talent.com/jobs?k=programmer&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=developer&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=qa&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=analyst&l=Budapest%2C+HU&date=14",
+    "https://hu.talent.com/jobs?k=data&l=Budapest%2C+HU&date=14",
+    "https://hu.talent.com/jobs?k=devops&l=Budapest%2C+HU&date=14",
+    "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU&date=14",
+    "https://hu.talent.com/jobs?k=support&l=Budapest%2C+HU&date=14",
+    "https://hu.talent.com/jobs?k=c%2B%2B&l=Budapest%2C+HU&date=14",
 
 ];
 
@@ -253,11 +260,23 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
       await upsertJob(client, "talent", job);
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);
-
-    return new Response("OK");
   } finally {
     client.release();
   }
+
+  // Enrich experience for newly inserted talent rows
+  try {
+    await enrichExperience({
+      sourceFilter: "source = 'talent'",
+      extract: extractBodyExperience,
+      label: "talent",
+      jobName: "cron_jobs_T-background",
+    });
+  } catch (err) {
+    console.error("[cron_jobs_T-background] experience enrichment failed:", err.message);
+  }
+
+  return new Response("OK");
 });
 
 export default async (request) => {

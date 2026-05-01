@@ -12,6 +12,11 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import {
+  enrichExperience,
+  extractBodyExperience,
+  extractKukaExperience,
+} from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -386,11 +391,54 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
       console.error("kuka fetch failed:", err.message);
     }
-
-    return new Response("OK");
   } finally {
     client.release();
   }
+
+  // Kuka: "junior" experience → diákmunka (recent rows only)
+  try {
+    const kukaClient = await pool.connect();
+    try {
+      const { rowCount: kukaMarked } = await kukaClient.query(
+        `UPDATE job_posts
+            SET experience = 'diákmunka'
+          WHERE source = 'kuka'
+            AND LOWER(experience) = 'junior'
+            AND first_seen >= NOW() - INTERVAL '30 minutes'`
+      );
+      console.log(`[kuka-junior] ${kukaMarked} álláshirdetés átírva: junior → diákmunka`);
+    } finally {
+      kukaClient.release();
+    }
+  } catch (err) {
+    console.error("[cron_jobs_MIX-background] kuka-junior update failed:", err.message);
+  }
+
+  // Enrich experience for newly inserted dreamjobs / melonjobs / kuka rows
+  for (const pipe of [
+    {
+      sourceFilter: "source IN ('dreamjobs','melonjobs')",
+      extract: extractBodyExperience,
+      label: "dreamjobs / melonjobs",
+    },
+    {
+      sourceFilter: "source = 'kuka'",
+      extract: extractKukaExperience,
+      label: "kuka",
+      extraInternKeywords: ["junior"],
+    },
+  ]) {
+    try {
+      await enrichExperience({
+        ...pipe,
+        jobName: "cron_jobs_MIX-background",
+      });
+    } catch (err) {
+      console.error(`[cron_jobs_MIX-background] experience enrichment (${pipe.label}) failed:`, err.message);
+    }
+  }
+
+  return new Response("OK");
 });
 
 export default async (request) => {

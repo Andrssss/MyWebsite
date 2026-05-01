@@ -12,6 +12,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { enrichExperience, extractBodyExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -346,6 +347,18 @@ const SOURCES = [
   } finally {
     console.log(`Script finished at ${new Date().toISOString()}`);
     client.release();
+  }
+
+  // Enrich experience for newly inserted aam / karrierhungaria rows
+  try {
+    await enrichExperience({
+      sourceFilter: "source IN ('aam','karrierhungaria')",
+      extract: extractBodyExperience,
+      label: "aam / karrierhungaria",
+      jobName: "cron_jobs_A_K-background",
+    });
+  } catch (err) {
+    console.error("[cron_jobs_A_K-background] experience enrichment failed:", err.message);
   }
 
   return new Response("OK");

@@ -1,5 +1,6 @@
 import { processProfessionSources } from "./_profession_core.mjs";
 import { flushErrors } from "./_error-logger.mjs";
+import { enrichExperience, extractProfessionExperience } from "./_experience_core.mjs";
 
 const BASE_JOB_NAME = "cron_jobs_P-background";
 
@@ -36,6 +37,18 @@ export default async (request) => {
   let response;
   try {
     response = await processProfessionSources(sources, fullJobName, fakeRequest);
+
+    // Enrich experience for newly inserted profession-intern rows
+    try {
+      await enrichExperience({
+        sourceFilter: "source = 'profession-intern'",
+        extract: extractProfessionExperience,
+        label: "profession-intern",
+        jobName: fullJobName,
+      });
+    } catch (err) {
+      console.error(`[${fullJobName}] experience enrichment failed:`, err.message);
+    }
   } finally {
     await flushErrors(fullJobName).catch(() => {});
   }

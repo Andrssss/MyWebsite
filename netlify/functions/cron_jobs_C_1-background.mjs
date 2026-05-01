@@ -16,6 +16,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { enrichExperience, extractBodyExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 const ENABLE_FETCH_ERROR_LOGGING = false;
@@ -410,6 +411,19 @@ const _runJob = withTimeout("cron_jobs_C_1-background", async (request) => {
 
   if (!debug) {
     await runBatch({ batch: 0, size: SOURCES.length, write: true, debug: false, bundleDebug: false });
+
+    // Enrich experience for newly inserted cvcentrum rows
+    try {
+      await enrichExperience({
+        sourceFilter: "source = 'cvcentrum-gyakornok-it'",
+        extract: extractBodyExperience,
+        label: "cvcentrum",
+        jobName: "cron_jobs_C_1-background",
+      });
+    } catch (err) {
+      console.error("[cron_jobs_C_1-background] experience enrichment failed:", err.message);
+    }
+
     return new Response("Cron jobs done", { status: 200 });
   }
 
