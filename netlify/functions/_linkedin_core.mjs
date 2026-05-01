@@ -128,46 +128,21 @@ function normalizeUrl(raw) {
 // Fetch helper
 // =====================
 function fetchText(url, opts = {}, redirectLeft = 5) {
-  // opts: { userAgent, referer }
-  const userAgent = opts.userAgent || pickUserAgent();
-  const referer = opts.referer || "https://www.linkedin.com/jobs/";
-
+  // opts: { userAgent, referer } — kept for signature compatibility, ignored
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
-
-    // Detect browser family from UA so client hints / Sec-Fetch-Site stay
-    // consistent. Mismatched hints (e.g. Firefox UA + sec-ch-ua Chromium)
-    // are a trivial bot signal that triggers HTTP 999.
-    const isChromeFamily = /Chrome\/|Edg\//.test(userAgent) && !/Firefox\//.test(userAgent);
-    const isFirstHop = redirectLeft === 5; // top-level call, not a redirect follow
-    const headers = {
-      "User-Agent": userAgent,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Accept-Language": "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Accept-Encoding": "gzip,deflate,br",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-      Referer: referer,
-      "Sec-Fetch-Dest": "document",
-      "Sec-Fetch-Mode": "navigate",
-      // First direct hit: no prior page → "none". Sub-requests (pagination
-      // with the search page as referer): "same-origin".
-      "Sec-Fetch-Site": isFirstHop ? "none" : "same-origin",
-      "Sec-Fetch-User": "?1",
-      "Upgrade-Insecure-Requests": "1",
-    };
-    if (isChromeFamily) {
-      headers["sec-ch-ua"] = '"Chromium";v="124", "Not-A.Brand";v="99"';
-      headers["sec-ch-ua-mobile"] = "?0";
-      headers["sec-ch-ua-platform"] = '"Windows"';
-    }
 
     const req = lib.request(
       u,
       {
         method: "GET",
-        headers,
+        headers: {
+          "User-Agent": "JobWatcher/1.0",
+          Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+          "Accept-Encoding": "gzip,deflate,br",
+        },
         timeout: 25000,
       },
       (res) => {
@@ -179,7 +154,7 @@ function fetchText(url, opts = {}, redirectLeft = 5) {
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
           const nextUrl = new URL(loc, url).toString();
           res.resume();
-          return resolve(fetchText(nextUrl, { userAgent, referer }, redirectLeft - 1));
+          return resolve(fetchText(nextUrl, opts, redirectLeft - 1));
         }
 
         // Hard block / rate limit signals from LinkedIn
@@ -347,6 +322,11 @@ async function fetchAllLinkedInPages(searchUrl, {
 // Main processing function
 // =====================
 export async function processLinkedInSources(sources, jobName) {
+  if (String(process.env.LINKEDIN_DISABLED || "").toLowerCase() === "true") {
+    console.warn(`${jobName}: LINKEDIN_DISABLED=true — skipping run.`);
+    return new Response("DISABLED");
+  }
+
   _filters = await loadFilters();
 
   const client = await pool.connect();
