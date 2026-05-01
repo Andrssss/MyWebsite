@@ -31,12 +31,12 @@ const TALENT_SEARCH_URLS = [
     "https://hu.talent.com/jobs?k=programmer&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=developer&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=qa&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=analyst&l=Budapest%2C+HU&date=14",
-    "https://hu.talent.com/jobs?k=data&l=Budapest%2C+HU&date=14",
-    "https://hu.talent.com/jobs?k=devops&l=Budapest%2C+HU&date=14",
-    "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU&date=14",
-    "https://hu.talent.com/jobs?k=support&l=Budapest%2C+HU&date=14",
-    "https://hu.talent.com/jobs?k=c%2B%2B&l=Budapest%2C+HU&date=14",
+    "https://hu.talent.com/jobs?k=analyst&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=data&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=devops&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=support&l=Budapest%2C+HU&date=1",
+    "https://hu.talent.com/jobs?k=c%2B%2B&l=Budapest%2C+HU&date=1",
 
 ];
 
@@ -168,8 +168,6 @@ function isInternshipTitle(title) {
 function inferTalentExperience(title) {
   const normalized = normalizeText(title);
   if (INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))) return "diákmunka";
-  if (_filters.some((kw) => normalized.includes(normalizeText(kw))))
-    return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b/.test(normalized))
     return "junior";
@@ -264,13 +262,15 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     client.release();
   }
 
-  // Enrich experience for newly inserted talent rows
+  // Enrich experience for newly inserted talent rows,
+  // AND fix old rows incorrectly labelled 'senior' by the previous bug
   try {
     await enrichExperience({
       sourceFilter: "source = 'talent'",
       extract: extractBodyExperience,
       label: "talent",
       jobName: "cron_jobs_T-background",
+      experienceCondition: "(experience IS NULL OR experience = '-' OR experience = 'senior')",
     });
   } catch (err) {
     console.error("[cron_jobs_T-background] experience enrichment failed:", err.message);
