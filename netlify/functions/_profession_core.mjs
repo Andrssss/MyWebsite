@@ -263,10 +263,14 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
   const seenUrls = new Set();
   let pagesVisited = 0;
   let pagesWithJobs = 0;
+  const effectiveMaxPages = Math.min(
+    Number.isFinite(maxPages) ? Math.max(1, Number(maxPages)) : 100,
+    100
+  );
 
   for (let page = startPage; ; page++) {
-    if (maxPages !== Infinity && page >= startPage + maxPages) {
-      console.log(`[profession] maxPages limit (${maxPages}) reached, stopping at page ${page}`);
+    if (page >= startPage + effectiveMaxPages) {
+      console.log(`[profession] maxPages limit (${effectiveMaxPages}) reached, stopping at page ${page}`);
       break;
     }
     const pageUrl = professionPageUrl(baseUrl, page);
