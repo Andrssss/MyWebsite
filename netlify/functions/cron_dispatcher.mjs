@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "17 5-22 * * *",
+  schedule: "15 5-22 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -12,13 +12,12 @@ import { withTimeout } from "./_error-logger.mjs";
  * independently — keeping its own scraping logic intact.
  *
  * Targets:
- *   A_K, BLUE, C_1, C_2, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, T
+ *   A_K, BLUE, C, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, T
  */
 const TARGETS = [
   { name: "cron_jobs_A_K-background" },
   { name: "cron_jobs_BLUE-background" },
-  { name: "cron_jobs_C_1-background" },
-  { name: "cron_jobs_C_2-background" },
+  { name: "cron_jobs_C-background" },
   { name: "cron_jobs_DIAK_1-background" },
   { name: "cron_jobs_DIAK_2-background" },
   { name: "cron_jobs_DIAK_3-background" },
