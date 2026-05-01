@@ -225,6 +225,7 @@ function isBudapestLocation(location) {
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+    "tehetsegprogram", "tehetségprogram", "talent pool",
 ];
 
 
