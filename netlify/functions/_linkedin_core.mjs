@@ -7,7 +7,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 
 let _filters = [];
-const ENABLE_FETCH_ERROR_LOGGING = false;
+const ENABLE_FETCH_ERROR_LOGGING = true;
 
 // =====================
 // DB
@@ -355,13 +355,13 @@ export async function processLinkedInSources(sources, jobName) {
         if (err instanceof LinkedInBlockedError) {
           console.error(`${jobName}: BLOCKED by LinkedIn (HTTP ${err.status}) at ${p.url} — aborting cron run.`);
           if (ENABLE_FETCH_ERROR_LOGGING) {
-            await logFetchError(jobName, { url: p.url, message: err.message, blocked: true });
+            await logFetchError(jobName, { url: p.url, message: err.message, extra: { key: p.key, blocked: true } });
           }
           blocked = true;
           continue;
         }
         if (ENABLE_FETCH_ERROR_LOGGING) {
-          await logFetchError(jobName, { url: p.url, message: err.message });
+          await logFetchError(jobName, { url: p.url, message: err.message, extra: { key: p.key } });
         }
         console.error(p.key, "fetch failed:", err.message);
         continue;
