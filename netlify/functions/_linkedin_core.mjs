@@ -35,6 +35,7 @@ function normalizeText(s) {
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+  "tehetsegprogram", "tehetségprogram", "talent pool",
 ];
 function isInternshipTitle(title) {
   const t = normalizeText(title);
@@ -67,6 +68,39 @@ function randomDelay(minMs = 600, maxMs = 1400) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// LinkedIn guest pagination endpoint (returns HTML fragment with the same
+// `ul.jobs-search__results-list li` structure as the public search page).
+const LINKEDIN_GUEST_PAGINATION_URL =
+  "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search";
+const LINKEDIN_PAGE_SIZE = 25;
+
+// =====================
+// Bot-evasion helpers
+// =====================
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+];
+
+function pickUserAgent() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+// Custom error class so processLinkedInSources can detect a hard ban
+// and abort the entire cron run instead of hammering further.
+class LinkedInBlockedError extends Error {
+  constructor(status, url) {
+    super(`LinkedIn blocked request (HTTP ${status}) for ${url}`);
+    this.name = "LinkedInBlockedError";
+    this.status = status;
+  }
+}
+
 // =====================
 // URL helpers
 // =====================
@@ -93,9 +127,12 @@ function normalizeUrl(raw) {
 // =====================
 // Fetch helper
 // =====================
-function fetchText(url, redirectLeft = 5) {
+function fetchText(url, opts = {}, redirectLeft = 5) {
+  // opts: { userAgent, referer }
+  const userAgent = opts.userAgent || pickUserAgent();
+  const referer = opts.referer || "https://www.linkedin.com/jobs/";
+
   return new Promise((resolve, reject) => {
-    console.log(`Script started at ${new Date().toISOString()}`);
     const u = new URL(url);
     const lib = u.protocol === "https:" ? https : http;
 
@@ -104,10 +141,21 @@ function fetchText(url, redirectLeft = 5) {
       {
         method: "GET",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+          "User-Agent": userAgent,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7",
           "Accept-Encoding": "gzip,deflate,br",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          Referer: referer,
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "same-origin",
+          "Sec-Fetch-User": "?1",
+          "Upgrade-Insecure-Requests": "1",
+          "sec-ch-ua": '"Chromium";v="124", "Not-A.Brand";v="99"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
         },
         timeout: 25000,
       },
@@ -120,7 +168,13 @@ function fetchText(url, redirectLeft = 5) {
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
           const nextUrl = new URL(loc, url).toString();
           res.resume();
-          return resolve(fetchText(nextUrl, redirectLeft - 1));
+          return resolve(fetchText(nextUrl, { userAgent, referer }, redirectLeft - 1));
+        }
+
+        // Hard block / rate limit signals from LinkedIn
+        if (code === 429 || code === 999 || code === 403) {
+          res.resume();
+          return reject(new LinkedInBlockedError(code, url));
         }
 
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
@@ -223,28 +277,104 @@ function levelNotBlacklisted(title, desc) {
 }
 
 // =====================
+// Pagination (opt-in via source.paginate = true)
+// =====================
+function buildLinkedInPageUrl(searchUrl, start) {
+  // Reuse the keywords/geoId/location/etc. params from the original search URL
+  // and call the guest "seeMore" endpoint with start=N.
+  const orig = new URL(searchUrl);
+  const out = new URL(LINKEDIN_GUEST_PAGINATION_URL);
+  for (const [k, v] of orig.searchParams.entries()) {
+    out.searchParams.set(k, v);
+  }
+  out.searchParams.set("start", String(start));
+  return out.toString();
+}
+
+async function fetchAllLinkedInPages(searchUrl, {
+  maxPages = 5,
+  minDelayMs = 8000,
+  maxDelayMs = 15000,
+  userAgent,
+} = {}) {
+  const all = [];
+  // Use one UA per source so all pages of one search look like one browser
+  // session (real users keep the same UA when scrolling).
+  const ua = userAgent || pickUserAgent();
+  const referer = "https://www.linkedin.com/jobs/search/";
+
+  // Page 0: the normal search page (returns full HTML with the same list).
+  const firstHtml = await fetchText(searchUrl, { userAgent: ua, referer });
+  const firstItems = extractLinkedInJobs(firstHtml);
+  all.push(...firstItems);
+
+  // If first page already empty, no point paging.
+  if (firstItems.length === 0) return dedupeByUrl(all);
+
+  for (let page = 1; page < maxPages; page++) {
+    // Delay BEFORE every page (incl. first paginated one) — humans don't
+    // scroll instantly after the page renders.
+    await randomDelay(minDelayMs, maxDelayMs);
+    const pageUrl = buildLinkedInPageUrl(searchUrl, page * LINKEDIN_PAGE_SIZE);
+    let html;
+    try {
+      html = await fetchText(pageUrl, { userAgent: ua, referer: searchUrl });
+    } catch (err) {
+      if (err instanceof LinkedInBlockedError) throw err; // bubble up — abort cron
+      console.error(`pagination stop at start=${page * LINKEDIN_PAGE_SIZE}: ${err.message}`);
+      break;
+    }
+    const items = extractLinkedInJobs(html);
+    if (items.length === 0) break;
+    all.push(...items);
+  }
+
+  return dedupeByUrl(all);
+}
+
+// =====================
 // Main processing function
 // =====================
 export async function processLinkedInSources(sources, jobName) {
   _filters = await loadFilters();
 
   const client = await pool.connect();
+  let blocked = false;
 
   try {
     for (const p of sources) {
-      await randomDelay();
-      let html;
+      if (blocked) {
+        console.warn(`${jobName}: aborting remaining sources after LinkedIn block.`);
+        break;
+      }
+      await randomDelay(2000, 5000); // longer pause between sources
+      const ua = pickUserAgent();
+      let rawItems;
       try {
-        html = await fetchText(p.url);
+        if (p.paginate) {
+          rawItems = await fetchAllLinkedInPages(p.url, {
+            maxPages: p.maxPages ?? 5,
+            userAgent: ua,
+          });
+        } else {
+          const html = await fetchText(p.url, { userAgent: ua });
+          rawItems = extractLinkedInJobs(html);
+        }
       } catch (err) {
+        if (err instanceof LinkedInBlockedError) {
+          console.error(`${jobName}: BLOCKED by LinkedIn (HTTP ${err.status}) at ${p.url} — aborting cron run.`);
+          if (ENABLE_FETCH_ERROR_LOGGING) {
+            await logFetchError(jobName, { url: p.url, message: err.message, blocked: true });
+          }
+          blocked = true;
+          continue;
+        }
         if (ENABLE_FETCH_ERROR_LOGGING) {
           await logFetchError(jobName, { url: p.url, message: err.message });
         }
         console.error(p.key, "fetch failed:", err.message);
         continue;
       }
-
-      const rawItems = extractLinkedInJobs(html);
 
       let items = rawItems.filter(it => {
         if (!levelNotBlacklisted(it.title, it.description)) return false;
@@ -264,9 +394,9 @@ export async function processLinkedInSources(sources, jobName) {
       console.log(`${p.key}: ${items.length} items processed.`);
     }
   } finally {
-    console.log(`Script finished at ${new Date().toISOString()}`);
+    console.log(`Script finished at ${new Date().toISOString()}${blocked ? " (ABORTED: LinkedIn block)" : ""}`);
     client.release();
   }
 
-  return new Response("OK");
+  return new Response(blocked ? "BLOCKED" : "OK");
 }

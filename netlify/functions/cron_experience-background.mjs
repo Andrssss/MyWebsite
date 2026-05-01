@@ -59,15 +59,17 @@ export default withTimeout("cron_experience-background", async () => {
     client.release();
   }
 
-  // LinkedIn enrichment — re-run over recent LinkedIn rows regardless of current
-  // experience value (intentionally TRUE condition, matching previous behaviour).
+  // LinkedIn enrichment — re-run over recent LinkedIn rows whose experience is
+  // not yet known. Rows already marked as "diákmunka" by the LinkedIn ingest
+  // (based on the job title containing intern/trainee/gyakornok/etc.) are
+  // skipped here to save fetches.
   try {
     await enrichExperience({
       sourceFilter: "source = 'LinkedIn'",
       extract: extractLinkedInExperience,
       label: "LinkedIn",
       jobName: "cron_experience-background",
-      experienceCondition: "TRUE",
+      experienceCondition: "(experience IS NULL OR experience = '-')",
     });
   } catch (err) {
     console.error("[cron_experience-background] LinkedIn enrichment failed:", err.message);
