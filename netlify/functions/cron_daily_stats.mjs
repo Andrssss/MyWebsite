@@ -34,6 +34,11 @@ const INTERN_SOURCES = [
 const INTERN_TITLE_KEYWORDS = ["tehetsegprogram","tehetségprogram","talent pool","intern", "gyakornok", "trainee", "diák", "diákmunka"];
 const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
 
+function kwRegex(kw) {
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 function categorizeJobs(rows, JOB_CATEGORIES) {
   const counts = {};
   for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
@@ -42,7 +47,7 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
   for (const row of rows) {
     const title = (row.title || "").toLowerCase();
     const matches = JOB_CATEGORIES
-      .filter(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())))
+      .filter(([, kws]) => kws.some((kw) => kwRegex(kw.toLowerCase()).test(title)))
       .map(([cat]) => cat);
     // Ha a title tartalmaz "analyst" vagy "elemző" → mindig Elemző / Analyst (keywords-től függetlenül)
     if (title.includes("analyst") || title.includes("elemző")) {

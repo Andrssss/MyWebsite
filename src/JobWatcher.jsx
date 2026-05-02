@@ -167,11 +167,16 @@ const getKeywordNotesForJob = (job) => {
 /* =======================
    KATEGÓRIÁK – dynamikusan betöltve az adatbázisból
 ======================= */
+function kwRegex(kw) {
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
 const getCategoriesForJob = (job, jobCategories) => {
   if (!job.title || !jobCategories.length) return [];
   const title = job.title.toLowerCase();
   const matches = jobCategories
-    .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
+    .filter(([, keywords]) => keywords.some((kw) => kwRegex(kw.toLowerCase()).test(title)))
     .map(([cat]) => cat);
   // Ha a title tartalmaz "analyst" vagy "elemző" → mindig Elemző / Analyst (keywords-től függetlenül)
   if (title.includes("analyst") || title.includes("elemző")) {
