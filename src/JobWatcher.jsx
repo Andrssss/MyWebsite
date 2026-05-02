@@ -173,6 +173,10 @@ const getCategoriesForJob = (job, jobCategories) => {
   const matches = jobCategories
     .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
     .map(([cat]) => cat);
+  // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
+  if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
+    return ["Elemző / Analyst"];
+  }
   const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
   return withoutFallback.length > 0 ? withoutFallback : matches;
 };

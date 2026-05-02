@@ -44,6 +44,11 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
     const matches = JOB_CATEGORIES
       .filter(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())))
       .map(([cat]) => cat);
+    // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
+    if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
+      counts["Elemző / Analyst"]++;
+      continue;
+    }
     const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
     const cats = withoutFallback.length > 0 ? withoutFallback : matches;
 
