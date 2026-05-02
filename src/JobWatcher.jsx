@@ -173,9 +173,21 @@ const getCategoriesForJob = (job, jobCategories) => {
   const matches = jobCategories
     .filter(([, keywords]) => keywords.some((kw) => title.includes(kw.toLowerCase())))
     .map(([cat]) => cat);
+  // Ha a title tartalmaz "analyst" vagy "elemző" → mindig Elemző / Analyst (keywords-től függetlenül)
+  if (title.includes("analyst") || title.includes("elemző")) {
+    return ["Elemző / Analyst"];
+  }
   // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
   if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
     return ["Elemző / Analyst"];
+  }
+  // Ha több kategória matchelt és az egyik DevOps → csak DevOps
+  if (matches.length > 1 && matches.includes("DevOps")) {
+    return ["DevOps"];
+  }
+  // Ha több kategória matchelt és az egyik C++ → csak C++
+  if (matches.length > 1 && matches.includes("C++")) {
+    return ["C++"];
   }
   const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
   return withoutFallback.length > 0 ? withoutFallback : matches;
@@ -321,7 +333,8 @@ const JobWatcher = () => {
       const params = new URLSearchParams({ limit: "5000" });
 
       let effectiveRange = null;
-      if (next7d) effectiveRange = TIME_RANGE_7D;
+      if (next24h && next7d) effectiveRange = "30d";
+      else if (next7d) effectiveRange = TIME_RANGE_7D;
       else if (next24h) effectiveRange = TIME_RANGE_24H;
 
       if (effectiveRange) {

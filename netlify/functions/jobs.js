@@ -85,6 +85,8 @@ exports.handler = async (event) => {
           ? "24h"
           : timeRangeRaw === "7d" || timeRangeRaw === "1w" || timeRangeRaw === "week"
           ? "7d"
+          : timeRangeRaw === "30d" || timeRangeRaw === "1m" || timeRangeRaw === "month"
+          ? "30d"
           : onlyNew
           ? "24h"
           : null;
@@ -143,6 +145,15 @@ exports.handler = async (event) => {
                AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
+          : timeRange === "30d"
+          ? `SELECT source, title, url,
+                    first_seen AS "firstSeen",
+                    experience
+             FROM job_posts
+             WHERE source = $1
+               AND first_seen >= NOW() - INTERVAL '30 days'
+             ORDER BY first_seen DESC, id DESC
+             LIMIT $2`
           : `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
@@ -170,6 +181,14 @@ exports.handler = async (event) => {
               experience
             FROM job_posts
             WHERE first_seen >= NOW() - INTERVAL '7 days'
+            ORDER BY first_seen DESC, id DESC
+            LIMIT $1`
+         : timeRange === "30d"
+         ? `SELECT source, title, url,
+              first_seen AS "firstSeen",
+              experience
+            FROM job_posts
+            WHERE first_seen >= NOW() - INTERVAL '30 days'
             ORDER BY first_seen DESC, id DESC
             LIMIT $1`
         : `SELECT source, title, url,

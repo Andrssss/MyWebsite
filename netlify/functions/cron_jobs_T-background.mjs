@@ -11,7 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { enrichExperience, extractBodyExperience } from "./_experience_core.mjs";
+import { enrichExperience, extractTalentExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -265,7 +265,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
   try {
     await enrichExperience({
       sourceFilter: "source = 'talent'",
-      extract: extractBodyExperience,
+      extract: extractTalentExperience,
       label: "talent",
       jobName: "cron_jobs_T-background",
       experienceCondition: "(experience IS NULL OR experience = '-' OR experience = 'senior')",

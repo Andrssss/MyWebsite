@@ -44,9 +44,24 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
     const matches = JOB_CATEGORIES
       .filter(([, kws]) => kws.some((kw) => title.includes(kw.toLowerCase())))
       .map(([cat]) => cat);
+    // Ha a title tartalmaz "analyst" vagy "elemző" → mindig Elemző / Analyst (keywords-től függetlenül)
+    if (title.includes("analyst") || title.includes("elemző")) {
+      counts["Elemző / Analyst"] = (counts["Elemző / Analyst"] || 0) + 1;
+      continue;
+    }
     // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
     if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
       counts["Elemző / Analyst"]++;
+      continue;
+    }
+    // Ha több kategória matchelt és az egyik DevOps → csak DevOps
+    if (matches.length > 1 && matches.includes("DevOps")) {
+      counts["DevOps"]++;
+      continue;
+    }
+    // Ha több kategória matchelt és az egyik C++ → csak C++
+    if (matches.length > 1 && matches.includes("C++")) {
+      counts["C++"]++;
       continue;
     }
     const withoutFallback = matches.filter((c) => c !== "Fejlesztő");

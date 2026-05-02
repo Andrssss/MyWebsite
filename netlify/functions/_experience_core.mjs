@@ -170,7 +170,7 @@ export function extractLinkedInExperience(html) {
   return extractYearsFromText(description);
 }
 
-// profession-intern: #box_az-allashoz-tartozo-elvarasok
+// profession-intern: #box_az-allashoz-tartozo-elvarasok, with body fallback
 export function extractProfessionExperience(html) {
   const $ = cheerioLoad(html);
   const box = $("#box_az-allashoz-tartozo-elvarasok");
@@ -182,14 +182,53 @@ export function extractProfessionExperience(html) {
   let description = normalizeWhitespace(box.text()) || "";
   description = description ? description + " " + listText : listText || null;
 
-  return extractYearsFromText(description);
+  const fromBox = extractYearsFromText(description);
+  if (fromBox) return fromBox;
+
+  // Fallback: full body scan (handles English-language jobs, variant layouts)
+  const pageText = normalizeWhitespace($("body").text());
+  return extractYearsFromText(pageText);
 }
 
-// aam, karrierhungaria, cvcentrum, dreamjobs, melonjobs, talent: full body text
+// aam, karrierhungaria, cvcentrum, dreamjobs, melonjobs: full body text
 export function extractBodyExperience(html) {
   const $ = cheerioLoad(html);
   const pageText = normalizeWhitespace($("body").text());
   return extractYearsFromText(pageText);
+}
+
+// talent.com: Next.js SSR — description is in __NEXT_DATA__ JSON, not in visible body text
+export function extractTalentExperience(html) {
+  // 1. Try __NEXT_DATA__ (Next.js SSR blob)
+  const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+  if (nextDataMatch) {
+    try {
+      const data = JSON.parse(nextDataMatch[1]);
+      // talent.com puts job description in props.pageProps.job.description or similar
+      const jobStr = JSON.stringify(data?.props?.pageProps ?? data);
+      const result = extractYearsFromText(jobStr);
+      if (result) return result;
+    } catch {
+      // ignore JSON parse errors
+    }
+  }
+
+  // 2. Try JSON-LD structured data
+  const jsonLdMatches = html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+  for (const m of jsonLdMatches) {
+    try {
+      const obj = JSON.parse(m[1]);
+      const text = JSON.stringify(obj);
+      const result = extractYearsFromText(text);
+      if (result) return result;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 3. Fallback: body text (for cases where SSR did render content)
+  const $ = cheerioLoad(html);
+  return extractYearsFromText(normalizeWhitespace($("body").text()));
 }
 
 // kuka: "What you need to succeed" section
