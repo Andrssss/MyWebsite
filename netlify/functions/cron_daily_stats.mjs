@@ -69,6 +69,12 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
       counts["C++"]++;
       continue;
     }
+    // Hálózat / Infra alacsony prioritású: ha más is matchelt, az nyerjen
+    if (matches.length > 1 && matches.includes("Hálózat / Infra")) {
+      const others = matches.filter((c) => c !== "Hálózat / Infra");
+      for (const cat of others) counts[cat]++;
+      continue;
+    }
     const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
     const cats = withoutFallback.length > 0 ? withoutFallback : matches;
 
