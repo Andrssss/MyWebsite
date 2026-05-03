@@ -27,7 +27,6 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
 // FIXED lista (key/label)
 const FIXED = [
   { key: "karrierhungaria", label: "Karrier Hungaria" },
-  { key: "aam", label: "AAM" },
   { key: "frissdiplomas", label: "Frissdiplomas" },
   { key: "minddiak", label: "Minddiák" },
   { key: "muisz", label: "Muisz" },

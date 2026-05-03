@@ -295,8 +295,8 @@ function looksLikeJobUrl(sourceKey, url) {
   }
 
   if (sourceKey === "otp") {
-    // csak a pozíció-oldalak kellenek, pl. /otp/job/Budapest-.../1234/
-    if (!u.pathname.startsWith("/otp/job/")) return false;
+    // pozíció-oldalak: /otp/job/... vagy leányvállalati /leanyvallalatok/job/...
+    if (!u.pathname.startsWith("/otp/job/") && !u.pathname.startsWith("/leanyvallalatok/job/")) return false;
   }
 
   if (sourceKey === "vizmuvek") {

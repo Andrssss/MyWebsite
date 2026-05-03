@@ -5,12 +5,10 @@ export const config = {
 /* =========================
    EXPERIENCE ENRICHMENT — LinkedIn only.
 
-   Per-source experience extraction (profession-intern, aam, karrierhungaria,
    cvcentrum, kuka, dreamjobs, melonjobs, talent) has been moved back into
    the corresponding source background cron files:
 
      - cron_jobs_P-background.mjs   → profession-intern
-     - cron_jobs_A_K-background.mjs → aam, karrierhungaria
      - cron_jobs_C_1-background.mjs / C_2 → cvcentrum-gyakornok-it
      - cron_jobs_MIX-background.mjs → kuka, dreamjobs, melonjobs
      - cron_jobs_T-background.mjs   → talent

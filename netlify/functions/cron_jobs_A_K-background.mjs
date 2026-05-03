@@ -1,6 +1,5 @@
 /* ========================= keywords=teszt
   { key: "karrierhungaria", label: "karrierhungaria", url: "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1" },
-  { key: "aam", label: "aam", url: "https://aam.hu/karrier" },
 */
 
 
@@ -49,10 +48,6 @@ function isInternshipTitle(title) {
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
 }
 
-function normalizeWhitespace(s) {
-  return String(s ?? "").replace(/\s+/g, " ").trim();
-}
-
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
@@ -61,17 +56,6 @@ function _blacklistRegex(k) {
 function titleNotBlacklisted(title) {
   const t = normalizeText(title);
   return !_filters.some(word => _blacklistRegex(word).test(t));
-}
-
-function dedupeByUrl(items) {
-  const seen = new Set();
-  return items.filter((x) => {
-    if (!x.url) return false;
-    const key = normalizeUrl(x.url);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 
@@ -187,33 +171,6 @@ async function fetchKarrierJobs(categoryUrl, inertiaVersion) {
 }
 
 
-/* ---------------------
-   HTML extraction (AAM)
---------------------- */
-function extractCandidates(html, baseUrl) {
-  const $ = cheerioLoad(html);
-
-  const items = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    const url = new URL(href, baseUrl).toString();
-    if (!/^https?:\/\//i.test(url)) return;
-
-    let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
-    if (!card.length) card = $(el).closest("div");
-
-    let title =
-      normalizeWhitespace($(el).text()) ||
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
-    if (!title || title.length < 4) return;
-
-    const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0,300), url, description: desc ? desc.slice(0,800) : null });
-  });
-  return dedupeByUrl(items);
-}
-
 function getDedupeKey(rawUrl) {
   return normalizeUrl(rawUrl);
 }
@@ -241,11 +198,6 @@ function levelNotBlacklisted(title, desc) {
   const t = normalizeText(title ?? "");
   return !_filters.some((w) => _blacklistRegex(w).test(t));
 }
-
-const AAM_JOB_PREFIX = "https://aam.hu/allasajanlatok";
-const URL_BLACKLIST = new Set([
-  normalizeUrl("https://aam.hu/allasajanlatok#content"),
-]);
 
 const _runJob = withTimeout("cron_jobs_A_K-background", async (request) => {
   _filters = await loadFilters();
@@ -275,45 +227,10 @@ const SOURCES = [
     return new Response("FAIL");
   }
 
-  const AAM_SOURCES = [
-    { key: "aam", url: "https://aam.hu/karrier" },
-    { key: "aam", url: "https://aam.hu/allasajanlatok" },
-  ];
-
   const client = await pool.connect();
   const seen = new Set();
 
   try {
-    /* --- AAM (HTML scraping) --- */
-    for (const p of AAM_SOURCES) {
-      let html;
-      try {
-        html = await fetchText(p.url);
-      } catch (err) {
-        await logFetchError("cron_jobs_A_K", { url: p.url, message: err.message });
-        console.error(p.key, "fetch failed:", err.message);
-        continue;
-      }
-
-      const rawItems = extractCandidates(html, p.url);
-      let items = rawItems.filter(it => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) return false;
-        if (!it.url.startsWith(AAM_JOB_PREFIX)) return false;
-        if (!levelNotBlacklisted(it.title, it.description)) return false;
-        if (!titleNotBlacklisted(it.title)) return false;
-        return true;
-      });
-
-      for (const it of items) {
-        try {
-          await upsertJob(client, p.key, it);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      console.log(`${p.key}: ${items.length} items processed.`);
-    }
-
     /* --- Karrierhungaria (Inertia API) --- */
     for (const url of SOURCES) {
       let jobs;
@@ -350,12 +267,12 @@ const SOURCES = [
     client.release();
   }
 
-  // Enrich experience for newly inserted aam / karrierhungaria rows
+  // Enrich experience for newly inserted karrierhungaria rows
   try {
     await enrichExperience({
-      sourceFilter: "source IN ('aam','karrierhungaria')",
+      sourceFilter: "source = 'karrierhungaria'",
       extract: extractBodyExperience,
-      label: "aam / karrierhungaria",
+      label: "karrierhungaria",
       jobName: "cron_jobs_A_K-background",
     });
   } catch (err) {
