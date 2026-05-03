@@ -31,7 +31,6 @@ const TALENT_SEARCH_URLS = [
     "https://hu.talent.com/jobs?k=programmer&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=developer&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=qa&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=analyst&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=data&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=devops&l=Budapest%2C+HU&date=1",
     "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU&date=1",
