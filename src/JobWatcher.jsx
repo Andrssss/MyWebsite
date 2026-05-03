@@ -79,7 +79,6 @@ const JUNIOR_EXCLUDED_SOURCES = [
   "schonherz",
   "prodiak",
   "tudasdiak",
-  "otp",
   "vizmuvek",
   "tudatosdiak",
   "ydiak",

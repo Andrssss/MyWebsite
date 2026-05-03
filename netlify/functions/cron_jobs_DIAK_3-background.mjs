@@ -27,6 +27,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { extractBodyExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -129,7 +130,6 @@ const SOURCES = [
 
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=di%C3%A1kmunka&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=&optionsFacetsDD_title=" },
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=&title=GYAKORNOK&date=&location=&shifttype=" },
-  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=P%C3%A1lyakezd%C5%91&optionsFacetsDD_customfield2=Informatika+%C3%A9s+digitaliz%C3%A1ci%C3%B3&optionsFacetsDD_title="},
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
@@ -474,6 +474,17 @@ async function upsertJob(client, source, item) {
 }
 
 
+async function fetchNofluffExperience(url) {
+  try {
+    const html = await fetchText(url);
+    const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
+    return extractBodyExperience(normalizedHtml) || null;
+  } catch (err) {
+    await logFetchError("cron_jobs_DIAK_3", { url, message: `nofluff experience: ${err.message}` });
+    return null;
+  }
+}
+
 function cleanJobTitle(rawTitle) {
   if (!rawTitle) return null;
   // Cut at 'ÚJ' or similar markers
@@ -572,7 +583,13 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (write && client) {
         const DIAKMUNKA_SOURCES = ["otp", "vizmuvek"];
         for (const item of matchedList) {
-          if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) item.experience = "diákmunka";
+          if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
+            item.experience = "diákmunka";
+          } else if (source === "nofluffjobs" || source === "wherewework") {
+            const exp = await fetchNofluffExperience(item.url);
+            if (exp) item.experience = exp;
+            await sleep(400);
+          }
           await upsertJob(client, source, item);
         }
       }
