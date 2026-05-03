@@ -193,6 +193,11 @@ export function extractProfessionExperience(html) {
 // aam, karrierhungaria, cvcentrum, dreamjobs, melonjobs: full body text
 export function extractBodyExperience(html) {
   const $ = cheerioLoad(html);
+  // Insert spaces between block elements so adjacent <li>/<p>/<div> texts
+  // don't get concatenated (e.g. "végzettség3 év" → no \b before digit).
+  $("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+    $(el).prepend(" ").append(" ");
+  });
   const pageText = normalizeWhitespace($("body").text());
   return extractYearsFromText(pageText);
 }
