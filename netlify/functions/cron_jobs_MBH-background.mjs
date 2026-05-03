@@ -21,7 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -226,7 +226,12 @@ function parseDetailPage(html) {
   if (!location.toLowerCase().includes("budapest")) return null;
 
   const title = normalizeWhitespace($("h1").first().text());
-  const experience = extractBodyExperience(html);
+  let experience;
+  if (isInternshipTitle(title)) {
+    experience = "diákmunka";
+  } else {
+    experience = extractBodyExperience(html);
+  }
 
   return { title, experience };
 }

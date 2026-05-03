@@ -350,7 +350,12 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
   try {
     /* DreamJobs */
     try {
-      const dreamJobs = (await fetchAllDreamJobs()).filter((job) => !isSeniorLike(job.title, ""));
+      const dreamJobs = (await fetchAllDreamJobs()).filter((job) => {
+        if (isSeniorLike(job.title, "")) return false;
+        const exp = String(job.experience || "").toLowerCase();
+        if (/\bsenior\b/.test(exp)) return false;
+        return true;
+      });
       console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
 
       for (const job of dreamJobs) {

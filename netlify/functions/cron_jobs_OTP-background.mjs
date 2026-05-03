@@ -23,7 +23,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -234,7 +234,9 @@ export default withTimeout("cron_jobs_OTP-background", async () => {
           continue;
         }
 
-        const experience = extractBodyExperience(html) || "-";
+        const experience = isInternshipTitle(title)
+          ? "diákmunka"
+          : extractBodyExperience(html) || "-";
 
         const wasNew = await upsertJob(client, "otp", {
           title,
