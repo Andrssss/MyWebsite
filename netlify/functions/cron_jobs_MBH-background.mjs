@@ -196,16 +196,17 @@ function extractJobLinks(html, baseUrl) {
   const $ = cheerioLoad(html);
   const links = new Set();
 
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
+  // API response uses data-position-url attributes, not <a href>
+  $("[data-position-url]").each((_, el) => {
+    const raw = $(el).attr("data-position-url");
+    if (!raw) return;
     try {
-      const full = new URL(href, baseUrl).toString();
+      const full = new URL(raw, baseUrl).toString();
       if (/\/JobAdvertisement\/\d+\//i.test(full)) {
         links.add(normalizeUrl(full));
       }
     } catch {
-      // ignore malformed hrefs
+      // ignore malformed
     }
   });
 
@@ -277,7 +278,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
         });
 
         const html = await postJson(API, body, { Referer: listUrl, Cookie: cookie });
-        const links = extractJobLinks(html);
+        const links = extractJobLinks(html, BASE);
         console.log(`[mbh] list regsite=${regsite}: ${links.length} links`);
 
         for (const link of links) jobSet.add(link);
