@@ -34,11 +34,21 @@ const pool = new Pool({
 });
 
 const BASE = "https://karrier.mbhbank.hu";
+const API = `${BASE}/Datacenter/Registration/GetPositionsBySearchDto`;
 
+// Each LIST_SOURCES entry sets its own `regsite` cookie via the list page,
+// then POSTs to the API to get the rendered HTML fragment with all jobs.
 const LIST_SOURCES = [
-  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/it?p=64`, source: "mbh" },
-  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok?p=64`, source: "mbh" },
-  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok`, source: "mbh" },
+  {
+    listUrl: `${BASE}/DataCenter/Registration/JobAdvertisements/it?p=64`,
+    regsite: "it",
+    positionGroupIdList: [64],
+  },
+  {
+    listUrl: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok`,
+    regsite: "gyakornok",
+    positionGroupIdList: [64],
+  },
 ];
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -82,7 +92,7 @@ function isSeniorLike(title) {
   return _filters.some((kw) => _blacklistRegex(kw).test(n));
 }
 
-function fetchText(url, redirectLeft = 5) {
+function fetchText(url, redirectLeft = 5, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
     const lib = parsedUrl.protocol === "https:" ? https : http;
@@ -96,6 +106,7 @@ function fetchText(url, redirectLeft = 5) {
           Accept: "text/html,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
+          ...extraHeaders,
         },
         timeout: 25000,
       },
@@ -107,7 +118,7 @@ function fetchText(url, redirectLeft = 5) {
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
           res.resume();
-          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1));
+          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1, extraHeaders));
         }
 
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
@@ -130,6 +141,51 @@ function fetchText(url, redirectLeft = 5) {
 
     req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
     req.on("error", reject);
+    req.end();
+  });
+}
+
+function postJson(url, body, extraHeaders = {}) {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const lib = parsedUrl.protocol === "https:" ? https : http;
+    const req = lib.request(
+      parsedUrl,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "JobWatcher/1.0",
+          Accept: "*/*",
+          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+          "Accept-Encoding": "gzip,deflate,br",
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Length": Buffer.byteLength(body),
+          "X-Requested-With": "XMLHttpRequest",
+          ...extraHeaders,
+        },
+        timeout: 25000,
+      },
+      (res) => {
+        const code = res.statusCode || 0;
+        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
+        let stream = res;
+        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
+        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
+        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
+        let buf = "";
+        stream.setEncoding("utf8");
+        stream.on("data", (c) => (buf += c));
+        stream.on("end", () =>
+          code >= 200 && code < 300
+            ? resolve(buf)
+            : reject(new Error(`HTTP ${code} for ${url}`))
+        );
+        stream.on("error", reject);
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
+    req.on("error", reject);
+    req.write(body);
     req.end();
   });
 }
@@ -195,27 +251,45 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
   const client = await pool.connect();
 
   try {
-    // Collect unique detail URLs across all list pages; first source wins on duplicate
-    const jobMap = new Map(); // detailUrl → source
+    // Collect unique detail URLs across all list sources; first wins on duplicate
+    const jobSet = new Set();
 
-    for (const { url, source } of LIST_SOURCES) {
+    for (const { listUrl, regsite, positionGroupIdList } of LIST_SOURCES) {
       try {
-        const html = await fetchText(url);
-        const links = extractJobLinks(html, url);
-        console.log(`[mbh] list ${url}: ${links.length} links`);
+        const cookie = `regsite=${regsite}`;
+        // Prime the cookie (server may also need to know we visited the list page)
+        await fetchText(listUrl, 5, { Cookie: cookie }).catch(() => {});
 
-        for (const link of links) {
-          if (!jobMap.has(link)) jobMap.set(link, source);
-        }
+        const body = JSON.stringify({
+          searchDto: {
+            searchText: "",
+            careerLevelTypeIdList: [],
+            locationOfWorkTypeIdList: [],
+            styleOfWorkTypeIdList: [],
+            positionGroupIdList,
+            qualificationTypeIdList: [],
+            corporationIdList: [],
+            categoryTypeIdList: [],
+            languageWithLevelIdList: [],
+            isLanguageConnectionAnd: null,
+            positionGroupId: null,
+          },
+        });
+
+        const html = await postJson(API, body, { Referer: listUrl, Cookie: cookie });
+        const links = extractJobLinks(html);
+        console.log(`[mbh] list regsite=${regsite}: ${links.length} links`);
+
+        for (const link of links) jobSet.add(link);
 
         await sleep(1000);
       } catch (err) {
-        await logFetchError("cron_jobs_MBH-background", { url, message: err.message });
-        console.error(`[mbh] list fetch failed ${url}: ${err.message}`);
+        await logFetchError("cron_jobs_MBH-background", { url: listUrl, message: err.message });
+        console.error(`[mbh] list fetch failed ${listUrl}: ${err.message}`);
       }
     }
 
-    console.log(`[mbh] total unique job links: ${jobMap.size}`);
+    console.log(`[mbh] total unique job links: ${jobSet.size}`);
 
     let newlyInserted = 0;
     let alreadyExisted = 0;
@@ -224,7 +298,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
     let notBudapest = 0;
     let detailFetchFailed = 0;
 
-    for (const [detailUrl, source] of jobMap) {
+    for (const detailUrl of jobSet) {
       try {
         await sleep(800);
         const html = await fetchText(detailUrl);
@@ -248,7 +322,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
           continue;
         }
 
-        const wasNew = await upsertJob(client, source, {
+        const wasNew = await upsertJob(client, "mbh", {
           title: parsed.title,
           url: detailUrl,
           experience: parsed.experience,
@@ -257,11 +331,11 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
         if (wasNew) {
           newlyInserted++;
           console.log(
-            `[mbh] NEW [${source}] "${parsed.title}" exp=${parsed.experience ?? "-"} → ${detailUrl}`
+            `[mbh] NEW "${parsed.title}" exp=${parsed.experience ?? "-"} → ${detailUrl}`
           );
         } else {
           alreadyExisted++;
-          console.log(`[mbh] EXISTS [${source}] "${parsed.title}" → ${detailUrl}`);
+          console.log(`[mbh] EXISTS "${parsed.title}" → ${detailUrl}`);
         }
       } catch (err) {
         detailFetchFailed++;
@@ -271,7 +345,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
     }
 
     console.log(
-      `[mbh] DONE — total=${jobMap.size}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
+      `[mbh] DONE — total=${jobSet.size}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, ` +
       `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
     );
