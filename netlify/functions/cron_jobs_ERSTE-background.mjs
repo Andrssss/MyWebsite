@@ -221,11 +221,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
           isInternshipTitle(title);
 
         let source = "erste";
-        let experience = expCombined || "-";
-        if (isIntern) {
-          source = "erste-intern";
-          experience = "diákmunka";
-        }
+        let experience = isIntern ? "diákmunka" : expCombined || "-";
 
         const wasNew = await upsertJob(client, source, { title, url, experience });
         if (wasNew) {

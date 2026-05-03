@@ -188,7 +188,6 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
         let experience;
 
         if (isInternshipTitle(job.title)) {
-          source = "unicredit-intern";
           experience = "diákmunka";
         } else {
           await sleep(800);

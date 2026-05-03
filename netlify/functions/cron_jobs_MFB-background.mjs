@@ -206,7 +206,6 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
         let source = "mfb";
         let experience;
         if (levelLower.includes("gyakornok") || isInternshipTitle(title)) {
-          source = "mfb-intern";
           experience = "diákmunka";
         } else {
           // extract year range like "(2-5 év)" → "2-5 év"

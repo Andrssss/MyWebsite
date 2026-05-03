@@ -45,13 +45,17 @@ const FIXED = [
   { key: "dreamjobs", label: "DreamJobs" },
   { key: "melonjobs", label: "MelonJobs" },
   { key: "kuka", label: "KUKA" },
-  { key: "tesco", label: "Tesco" },
   { key: "talent", label: "Talent" },
   { key: "bluebird", label: "bluebird" },
   { key: "ydiak", label: "Y Diák" },
   { key: "qdiak", label: "Q Diák" },
   { key: "prodiak", label: "Prodiák" },
-
+  { key: "mbh", label: "MBH Bank" },
+  { key: "kh", label: "K&H Bank" },
+  { key: "raiffeisen", label: "Raiffeisen Bank" },
+  { key: "erste", label: "Erste Bank" },
+  { key: "mfb", label: "MFB Bank" },
+  { key: "unicredit", label: "UniCredit Bank" },
 ];
 
 exports.handler = async (event) => {
@@ -102,11 +106,11 @@ exports.handler = async (event) => {
         `);
 
         const map = new Map(rows.map((r) => [r.source, r]));
-        const out = FIXED.map((s) => ({
-          source: s.key,
-          label: s.label,
-          count: map.get(s.key)?.count ?? 0,
-        }));
+        const out = FIXED.map((s) => {
+          const dbKeys = s.keys || [s.key];
+          const count = dbKeys.reduce((sum, k) => sum + (map.get(k)?.count ?? 0), 0);
+          return { source: s.key, label: s.label, count };
+        });
 
         return jsonResponse(200, out);
       }
@@ -127,12 +131,14 @@ exports.handler = async (event) => {
 
       // GET /jobs?source=...
       if (source) {
+        const fixedEntry = FIXED.find((s) => s.key === source);
+        const dbKeys = fixedEntry?.keys || [source];
         const sourceQuery = timeRange === "24h"
           ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = $1
+             WHERE source = ANY($1)
                AND first_seen >= NOW() - INTERVAL '24 hours'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
@@ -141,7 +147,7 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = $1
+             WHERE source = ANY($1)
                AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
@@ -150,7 +156,7 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = $1
+             WHERE source = ANY($1)
                AND first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`
@@ -158,11 +164,11 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = $1
+             WHERE source = ANY($1)
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`;
 
-        const { rows } = await client.query(sourceQuery, [source, limit]);
+        const { rows } = await client.query(sourceQuery, [dbKeys, limit]);
         return jsonResponse(200, rows);
       }
 

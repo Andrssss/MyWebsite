@@ -37,8 +37,8 @@ const BASE = "https://karrier.mbhbank.hu";
 
 const LIST_SOURCES = [
   { url: `${BASE}/DataCenter/Registration/JobAdvertisements/it?p=64`, source: "mbh" },
-  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok?p=64`, source: "mbh-intern" },
-  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok`, source: "mbh-intern" },
+  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok?p=64`, source: "mbh" },
+  { url: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok`, source: "mbh" },
 ];
 
 /* ── helpers ─────────────────────────────────────────────────── */

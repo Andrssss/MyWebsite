@@ -16,8 +16,11 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+
+let _filters = [];
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -56,6 +59,65 @@ function normalizeUrl(raw) {
   } catch {
     return raw;
   }
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function _blacklistRegex(k) {
+  const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
+function isSeniorLike(title) {
+  const n = normalizeText(title ?? "");
+  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+}
+
+function fetchText(url, redirectLeft = 5) {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const lib = parsedUrl.protocol === "https:" ? https : http;
+    const req = lib.request(
+      parsedUrl,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "JobWatcher/1.0",
+          Accept: "text/html,*/*;q=0.8",
+          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+          "Accept-Encoding": "gzip,deflate,br",
+        },
+        timeout: 25000,
+      },
+      (res) => {
+        const code = res.statusCode || 0;
+        if ([301, 302, 303, 307, 308].includes(code)) {
+          const loc = res.headers.location;
+          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
+          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
+          res.resume();
+          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1));
+        }
+        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
+        let stream = res;
+        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
+        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
+        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
+        let body = "";
+        stream.setEncoding("utf8");
+        stream.on("data", (c) => (body += c));
+        stream.on("end", () =>
+          code >= 200 && code < 300 ? resolve(body) : reject(new Error(`HTTP ${code} for ${url}`))
+        );
+        stream.on("error", reject);
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 function postForm(url, body) {
@@ -124,6 +186,7 @@ async function upsertJob(client, source, item) {
 /* ── handler ─────────────────────────────────────────────────── */
 
 export default withTimeout("cron_jobs_KH-background", async () => {
+  _filters = await loadFilters();
   const client = await pool.connect();
   try {
     const allRows = [];
@@ -159,7 +222,9 @@ export default withTimeout("cron_jobs_KH-background", async () => {
 
     let newlyInserted = 0;
     let alreadyExisted = 0;
+    let skippedSenior = 0;
     let skippedNoTitle = 0;
+    let detailFetchFailed = 0;
 
     for (const row of dedup) {
       try {
@@ -174,13 +239,30 @@ export default withTimeout("cron_jobs_KH-background", async () => {
           continue;
         }
 
+        if (isSeniorLike(title)) {
+          skippedSenior++;
+          console.log(`[kh] SKIP senior "${title}" → ${url}`);
+          continue;
+        }
+
         const expLower = expRaw.toLowerCase();
         let source = "kh";
-        let experience = expRaw || "-";
+        let experience;
 
         if (expLower === "szakmai gyakorlat" || isInternshipTitle(title)) {
-          source = "kh-intern";
           experience = "diákmunka";
+        } else {
+          await sleep(800);
+          let detailHtml;
+          try {
+            detailHtml = await fetchText(url);
+          } catch (err) {
+            detailFetchFailed++;
+            await logFetchError("cron_jobs_KH-background", { url, message: err.message });
+            console.error(`[kh] detail fetch failed ${url}: ${err.message}`);
+            continue;
+          }
+          experience = extractBodyExperience(detailHtml) || "-";
         }
 
         const wasNew = await upsertJob(client, source, { title, url, experience });
@@ -198,7 +280,7 @@ export default withTimeout("cron_jobs_KH-background", async () => {
 
     console.log(
       `[kh] DONE — total=${dedup.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_no_title=${skippedNoTitle}`
+      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
   } finally {
     client.release();
