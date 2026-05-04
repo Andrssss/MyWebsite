@@ -285,6 +285,18 @@
   box-shadow: 0 12px 30px rgba(0,0,0,0.35);
 }
 
+.job-card--visited {
+  opacity: 0.5;
+}
+
+.job-card--visited:hover {
+  opacity: 0.75;
+}
+
+.job-title--visited {
+  color: #a78bfa;
+}
+
 /* ====== CARD HEADER ====== */
 .job-row {
   display: flex;

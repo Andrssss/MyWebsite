@@ -54,14 +54,23 @@ const getOrCreateVisitorId = () => {
 
 const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
 
-const trackClick = (target) => {
+const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
+
+const loadClickedKeys = () => {
   try {
-    const visitorId = getOrCreateVisitorId();
-    fetch(VISITOR_CLICK_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ visitorId, target }),
-    }).catch(() => {});
+    return new Set(JSON.parse(localStorage.getItem(CLICKED_KEYS_STORAGE) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
+const saveClickedKey = (key) => {
+  try {
+    const set = loadClickedKeys();
+    set.add(key);
+    // max 500 bejegyzés, régieket eldobja
+    const arr = [...set].slice(-500);
+    localStorage.setItem(CLICKED_KEYS_STORAGE, JSON.stringify(arr));
   } catch {
     // silent
   }
@@ -274,6 +283,27 @@ const JobWatcher = () => {
     const saved = localStorage.getItem("jobWatcherCategoriesOpen");
     return saved !== null ? saved === "true" : true;
   });
+
+  const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
+
+  const trackClick = (target) => {
+    setClickedKeys((prev) => {
+      const next = new Set(prev);
+      next.add(target);
+      return next;
+    });
+    saveClickedKey(target);
+    try {
+      const visitorId = getOrCreateVisitorId();
+      fetch(VISITOR_CLICK_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitorId, target }),
+      }).catch(() => {});
+    } catch {
+      // silent
+    }
+  };
 
   const [lastUpdates, setLastUpdates] = useState([]);
   const [commitsOpen, setCommitsOpen] = useState(false);
@@ -800,16 +830,19 @@ const JobWatcher = () => {
             job.firstSeen && hoursSince(job.firstSeen) <= 1;
           const notes = getKeywordNotesForJob(job);
           const rowKey = `${job.source || "src"}-${job.url || job.title}-${job.firstSeen || "ts"}`;
+          const clickKey = `job:${job.source}:${job.title}`;
+          const isVisited = clickedKeys.has(clickKey);
 
           return (
-            <li key={rowKey} className="job-card">
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}`}>
               <div className="job-row">
                 <a
-                  className="job-title"
+                  className={`job-title${isVisited ? " job-title--visited" : ""}`}
                   href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => trackClick(`job:${job.source}:${job.title}`)}
+                  onClick={() => trackClick(clickKey)}
+                  onAuxClick={(e) => { if (e.button === 1) trackClick(clickKey); }}
                 >
                   {job.title}
                   {debugMode && (

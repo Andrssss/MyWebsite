@@ -128,17 +128,6 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*)::int AS today_count
-       FROM visitor_clicks
-       WHERE visitor_cookie = $1
-         AND clicked_at >= CURRENT_DATE`,
-      [visitorId]
-    );
-    if (countRows[0].today_count >= 50) {
-      return jsonResponse(200, { ok: true, skipped: true });
-    }
-
     await pool.query(
       `INSERT INTO visitor_clicks (visitor_cookie, clicked_on) VALUES ($1, $2)`,
       [visitorId, target]
