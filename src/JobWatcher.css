@@ -475,8 +475,9 @@ html, body {
 
   /* ===== KÁRTYA FEJLÉC MOBILON STACKELT ===== */
   .job-row {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 6px;
     width: 100%;
   }
