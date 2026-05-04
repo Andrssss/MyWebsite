@@ -488,6 +488,36 @@ html, body {
   padding: 0;
 }
 
+/* ====== APPLIED BUTTON ====== */
+.job-applied-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.job-applied-btn:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.job-applied-btn.applied {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.job-card--applied {
+  border-left: 4px solid #22c55e;
+}
+
 .active-filter {
   background: #6c5ce7;
   color: white;

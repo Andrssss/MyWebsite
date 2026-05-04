@@ -55,6 +55,7 @@ const getOrCreateVisitorId = () => {
 const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
 
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
+const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
 
 const loadClickedKeys = () => {
   try {
@@ -71,6 +72,22 @@ const saveClickedKey = (key) => {
     // max 500 bejegyzés, régieket eldobja
     const arr = [...set].slice(-500);
     localStorage.setItem(CLICKED_KEYS_STORAGE, JSON.stringify(arr));
+  } catch {
+    // silent
+  }
+};
+
+const loadAppliedKeys = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(APPLIED_KEYS_STORAGE) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
+const saveAppliedKeys = (set) => {
+  try {
+    localStorage.setItem(APPLIED_KEYS_STORAGE, JSON.stringify([...set]));
   } catch {
     // silent
   }
@@ -285,6 +302,17 @@ const JobWatcher = () => {
   });
 
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
+  const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
+
+  const toggleApplied = (key) => {
+    setAppliedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveAppliedKeys(next);
+      return next;
+    });
+  };
 
   const longPressTimerRef = useRef(null);
   const startLongPress = (target) => {
@@ -841,9 +869,10 @@ const JobWatcher = () => {
           const rowKey = `${job.source || "src"}-${job.url || job.title}-${job.firstSeen || "ts"}`;
           const clickKey = `job:${job.source}:${job.title}`;
           const isVisited = clickedKeys.has(clickKey);
+          const isApplied = appliedKeys.has(clickKey);
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}`}>
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}`}>
               <div className="job-row">
                 <a
                   className="job-title"
@@ -893,6 +922,13 @@ const JobWatcher = () => {
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")
                     : "—"}
                 </span>
+                <button
+                  className={`job-applied-btn${isApplied ? " applied" : ""}`}
+                  onClick={() => toggleApplied(clickKey)}
+                  title={isApplied ? "Jelentkezés visszavonása" : "Megjelölés: Jelentkeztem"}
+                >
+                  {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
+                </button>
               </div>
             </li>
           );
