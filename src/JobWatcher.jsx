@@ -95,6 +95,8 @@ const saveAppliedKeys = (set) => {
 
 const APPLIED_CACHE_STORAGE = "jobWatcherAppliedCache";
 
+const SYNC_API = "/.netlify/functions/sync-data";
+
 const loadAppliedCache = () => {
   try {
     const raw = localStorage.getItem(APPLIED_CACHE_STORAGE);
@@ -324,6 +326,72 @@ const JobWatcher = () => {
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
   const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
   const [showAppliedOnly, setShowAppliedOnly] = useState(false);
+
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncIdShown, setSyncIdShown] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("");
+  const [importId, setImportId] = useState("");
+  const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
+
+  const handleSyncUpload = async () => {
+    setSyncStatus("Feltöltés…");
+    try {
+      const data = {
+        clicked: [...loadClickedKeys()],
+        applied: [...loadAppliedKeys()],
+        appliedCache: loadAppliedCache(),
+      };
+      const res = await fetch(SYNC_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitorId: myVisitorId, data }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const respJson = await res.json();
+      setSyncStatus(`✔ Feltöltve (${respJson.counts.clicked} megtekintve, ${respJson.counts.applied} jelentkezés)`);
+    } catch {
+      setSyncStatus("✗ Hiba a feltöltés során");
+    }
+  };
+
+  const handleSyncDownload = async () => {
+    const id = importId.trim();
+    if (!id) {
+      setSyncStatus("Adj meg egy szinkron ID-t");
+      return;
+    }
+    setSyncStatus("Letöltés…");
+    try {
+      const res = await fetch(`${SYNC_API}?visitorId=${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { data } = await res.json();
+      if (!data) {
+        setSyncStatus("✗ Nincs ilyen szinkron ID-hez tartozó adat");
+        return;
+      }
+      const mergedClicked = new Set([...loadClickedKeys(), ...(data.clicked || [])]);
+      const mergedApplied = new Set([...loadAppliedKeys(), ...(data.applied || [])]);
+      const mergedCache = { ...loadAppliedCache(), ...(data.appliedCache || {}) };
+      localStorage.setItem(CLICKED_KEYS_STORAGE, JSON.stringify([...mergedClicked].slice(-500)));
+      localStorage.setItem(APPLIED_KEYS_STORAGE, JSON.stringify([...mergedApplied]));
+      localStorage.setItem(APPLIED_CACHE_STORAGE, JSON.stringify(mergedCache));
+      setClickedKeys(mergedClicked);
+      setAppliedKeys(mergedApplied);
+      setAppliedCache(mergedCache);
+      setSyncStatus(`✔ Importálva (${data.clicked?.length || 0} megtekintve, ${data.applied?.length || 0} jelentkezés)`);
+    } catch {
+      setSyncStatus("✗ Hiba a letöltés során");
+    }
+  };
+
+  const handleCopySyncId = async () => {
+    try {
+      await navigator.clipboard.writeText(myVisitorId);
+      setSyncStatus("✔ ID másolva");
+    } catch {
+      setSyncStatus("✗ Másolás nem sikerült");
+    }
+  };
 
   const toggleApplied = (key, job) => {
     setAppliedKeys((prev) => {
@@ -848,6 +916,50 @@ const JobWatcher = () => {
           </button>
         </div>
       </div>
+    </div>
+
+    {/* ===== ESZKÖZÖK KÖZÖTTI SZINKRON ===== */}
+    <div className="job-sync">
+      <button
+        className="job-tabs-toggle"
+        onClick={() => setSyncOpen((v) => !v)}
+      >
+        {syncOpen ? "▲ Szinkron elrejtése" : "🔄 Szinkron eszközök között"}
+      </button>
+      {syncOpen && (
+        <div className="job-sync-panel">
+          <div className="job-sync-section">
+            <strong>A te szinkron ID-d:</strong>
+            <code className="job-sync-id">
+              {syncIdShown ? myVisitorId : "•••••••• (rejtett)"}
+            </code>
+            <button className="job-btn job-btn--toggle" onClick={() => setSyncIdShown((v) => !v)}>
+              {syncIdShown ? "Elrejtés" : "Mutatás"}
+            </button>
+            <button className="job-btn job-btn--toggle" onClick={handleCopySyncId}>📋 Másolás</button>
+            <button className="job-btn job-btn-stats" onClick={handleSyncUpload}>
+              ⬆ Feltöltés
+            </button>
+          </div>
+          <div className="job-sync-section">
+            <strong>Importálás másik eszközről:</strong>
+            <input
+              className="job-search"
+              placeholder="Másik eszköz szinkron ID-ja"
+              value={importId}
+              onChange={(e) => setImportId(e.target.value)}
+            />
+            <button className="job-btn" onClick={handleSyncDownload}>
+              ⬇ Letöltés és összefésülés
+            </button>
+          </div>
+          {syncStatus && <div className="job-sync-status">{syncStatus}</div>}
+          <p className="job-sync-help">
+            ⚠️ Az ID-t senkinek ne add ki — aki ismeri, le tudja tölteni a megnézett és jelentkezett állásaid listáját.
+            Az importálás összefésüli az adatokat a meglevőkkel (nem felülírja).
+          </p>
+        </div>
+      )}
     </div>
 
     {/* ===== FORRÁS TAB TOGGLE ===== */}
