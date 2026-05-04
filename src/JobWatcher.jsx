@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLinkedin } from "react-icons/fa";
 import "./JobWatcher.css";
@@ -285,6 +285,15 @@ const JobWatcher = () => {
   });
 
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
+
+  const longPressTimerRef = useRef(null);
+  const startLongPress = (target) => {
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => trackClick(target), 500);
+  };
+  const cancelLongPress = () => {
+    clearTimeout(longPressTimerRef.current);
+  };
 
   const trackClick = (target) => {
     setClickedKeys((prev) => {
@@ -843,6 +852,11 @@ const JobWatcher = () => {
                   rel="noopener noreferrer"
                   onClick={() => trackClick(clickKey)}
                   onAuxClick={(e) => { if (e.button === 1) trackClick(clickKey); }}
+                  onContextMenu={() => trackClick(clickKey)}
+                  onTouchStart={() => startLongPress(clickKey)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onTouchCancel={cancelLongPress}
                 >
                   {job.title}
                   {debugMode && (
