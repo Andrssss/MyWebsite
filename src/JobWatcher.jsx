@@ -53,7 +53,6 @@ const getOrCreateVisitorId = () => {
 };
 
 const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
-const JOB_APPLIED_API = "/.netlify/functions/job-applied";
 
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
 const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
@@ -308,20 +307,9 @@ const JobWatcher = () => {
   const toggleApplied = (key) => {
     setAppliedKeys((prev) => {
       const next = new Set(prev);
-      const newVal = !next.has(key);
-      if (newVal) next.add(key);
-      else next.delete(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       saveAppliedKeys(next);
-      try {
-        const visitorId = getOrCreateVisitorId();
-        fetch(JOB_APPLIED_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ visitorId, jobKey: key, applied: newVal }),
-        }).catch(() => {});
-      } catch {
-        // silent
-      }
       return next;
     });
   };
@@ -358,26 +346,6 @@ const JobWatcher = () => {
   const [commitsOpen, setCommitsOpen] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [weeklyActiveUsers, setWeeklyActiveUsers] = useState(null);
-
-  useEffect(() => {
-    try {
-      const visitorId = getOrCreateVisitorId();
-      fetch(`${JOB_APPLIED_API}?visitorId=${encodeURIComponent(visitorId)}`)
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (data?.applied?.length) {
-            setAppliedKeys((prev) => {
-              const merged = new Set([...prev, ...data.applied]);
-              saveAppliedKeys(merged);
-              return merged;
-            });
-          }
-        })
-        .catch(() => {});
-    } catch {
-      // silent
-    }
-  }, []);
 
   useEffect(() => {
     fetch(VISITOR_TRACK_API)
