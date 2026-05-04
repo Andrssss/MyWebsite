@@ -199,7 +199,7 @@ const JobStats = () => {
 
       <div className="stats-note">
         Keep in mind, hogy azért vannak tüskék az adatokban, mert mostanában sok forrást adtam hozzá és
-        sokat változtattam a filtereken is és ilyenkor sok adat került a DB-be.
+        sokat változtattam a filtereken is és ilyenkor két maroknyi adat került a DB-be.
       </div>
       {/* ===== BAR CHART ===== */}
       <div className="stats-section">
