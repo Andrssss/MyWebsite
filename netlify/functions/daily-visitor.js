@@ -25,24 +25,6 @@ const VISITOR_RATE_LIMIT_MAX_REQUESTS = 10;
 const visitorHits = globalThis.__dailyVisitorHits || new Map();
 globalThis.__dailyVisitorHits = visitorHits;
 
-let schemaReady = false;
-async function ensureSchema() {
-  if (schemaReady) return;
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS daily_visitors (
-      visit_date DATE NOT NULL,
-      visitor_cookie TEXT NOT NULL,
-      visitor_type TEXT NOT NULL DEFAULT 'user',
-      PRIMARY KEY (visit_date, visitor_cookie)
-    )
-  `);
-  await pool.query(
-    `ALTER TABLE daily_visitors
-     ADD COLUMN IF NOT EXISTS visitor_type TEXT NOT NULL DEFAULT 'user'`
-  );
-  schemaReady = true;
-}
-
 function getVisitorType(visitorId) {
   return ADMIN_VISITOR_IDS.has(visitorId) ? "admin" : "user";
 }
@@ -95,13 +77,6 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
-  }
-
-  try {
-    await ensureSchema();
-  } catch (err) {
-    console.error("[daily-visitor] schema error:", err);
-    return jsonResponse(500, { error: "Server error" });
   }
 
   if (event.httpMethod === "GET") {
@@ -161,11 +136,18 @@ exports.handler = async (event) => {
 
   try {
     const visitorType = getVisitorType(visitorId);
+    const rawOrigin = (event.headers?.origin || event.headers?.referer || "").trim();
+    let site = null;
+    try {
+      if (rawOrigin) site = new URL(rawOrigin).hostname;
+    } catch {
+      // ignore malformed
+    }
     const { rowCount } = await pool.query(
-      `INSERT INTO daily_visitors (visit_date, visitor_cookie, visitor_type)
-       VALUES (CURRENT_DATE, $1, $2)
+      `INSERT INTO daily_visitors (visit_date, visitor_cookie, visitor_type, site)
+       VALUES (CURRENT_DATE, $1, $2, $3)
        ON CONFLICT (visit_date, visitor_cookie) DO NOTHING`,
-      [visitorId, visitorType]
+      [visitorId, visitorType, site]
     );
     return jsonResponse(200, {
       ok: true,

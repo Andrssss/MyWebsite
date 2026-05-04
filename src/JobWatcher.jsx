@@ -845,7 +845,6 @@ const JobWatcher = () => {
                   onAuxClick={(e) => { if (e.button === 1) trackClick(clickKey); }}
                 >
                   {job.title}
-                  {isVisited && <span className="job-visited-check">✓</span>}
                   {debugMode && (
                     <span style={{ color: "#f50b0b", marginLeft: 6, fontSize: "0.85em" }}>
                       [{getCategoriesForJob(job, jobCategories).join(", ") || "Egyéb"}]
