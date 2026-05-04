@@ -234,6 +234,12 @@
   box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
 }
 
+.job-btn--toggle.active:hover:not(:disabled) {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
+  transform: translateY(-1px);
+}
+
 /* ====== TABS ====== */
 .job-tabs {
   display: flex;
