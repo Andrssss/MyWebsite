@@ -14,9 +14,9 @@ const pool = new Pool({
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
 const ADMIN_VISITOR_IDS = new Set([
-//   "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
-//   "69872482-1311-4702-a5e5-a782ca9f2669",
-//   "82906f93-dfbb-4684-b2b1-a948b99553e0",
+  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
+  "69872482-1311-4702-a5e5-a782ca9f2669",
+  "82906f93-dfbb-4684-b2b1-a948b99553e0",
 ]);
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;

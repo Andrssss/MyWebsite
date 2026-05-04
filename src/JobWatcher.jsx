@@ -834,10 +834,10 @@ const JobWatcher = () => {
           const isVisited = clickedKeys.has(clickKey);
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}`}>
+            <li key={rowKey} className="job-card">
               <div className="job-row">
                 <a
-                  className={`job-title${isVisited ? " job-title--visited" : ""}`}
+                  className="job-title"
                   href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -871,6 +871,7 @@ const JobWatcher = () => {
 
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
+                {isVisited && <span className="job-badge job-badge--visited">Megnézted</span>}
                 {job.experience && (
                   <span className="job-experience">{job.experience}</span>
                 )}
