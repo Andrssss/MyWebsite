@@ -372,6 +372,20 @@
   border-style: solid;
   border-width: 0 56px 56px 0;
   border-color: transparent #4f8cff transparent transparent;
+  z-index: 1;
+}
+
+.job-card--visited::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 25px 25px 0;
+  border-color: transparent #2a2a2a transparent transparent;
+  z-index: 2;
 }
 
 .job-card--applied::after {
@@ -384,6 +398,20 @@
   border-style: solid;
   border-width: 0 56px 56px 0;
   border-color: transparent #22c55e transparent transparent;
+  z-index: 1;
+}
+
+.job-card--applied::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 25px 25px 0;
+  border-color: transparent #2a2a2a transparent transparent;
+  z-index: 2;
 }
 
 .job-meta {
