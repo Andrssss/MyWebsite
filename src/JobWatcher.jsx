@@ -834,7 +834,7 @@ const JobWatcher = () => {
           const isVisited = clickedKeys.has(clickKey);
 
           return (
-            <li key={rowKey} className="job-card">
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}`}>
               <div className="job-row">
                 <a
                   className="job-title"
