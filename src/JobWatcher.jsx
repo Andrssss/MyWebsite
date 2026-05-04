@@ -93,6 +93,25 @@ const saveAppliedKeys = (set) => {
   }
 };
 
+const APPLIED_CACHE_STORAGE = "jobWatcherAppliedCache";
+
+const loadAppliedCache = () => {
+  try {
+    const raw = localStorage.getItem(APPLIED_CACHE_STORAGE);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveAppliedCache = (cache) => {
+  try {
+    localStorage.setItem(APPLIED_CACHE_STORAGE, JSON.stringify(cache));
+  } catch {
+    // silent
+  }
+};
+
 const sendDailyVisitor = async (visitorId) => {
   const res = await fetch(VISITOR_TRACK_API, {
     method: "POST",
@@ -303,12 +322,29 @@ const JobWatcher = () => {
 
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
+  const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
+  const [showAppliedOnly, setShowAppliedOnly] = useState(false);
 
-  const toggleApplied = (key) => {
+  const toggleApplied = (key, job) => {
     setAppliedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(key)) {
+        next.delete(key);
+        setAppliedCache((c) => {
+          const { [key]: _, ...rest } = c;
+          saveAppliedCache(rest);
+          return rest;
+        });
+      } else {
+        next.add(key);
+        if (job) {
+          setAppliedCache((c) => {
+            const updated = { ...c, [key]: job };
+            saveAppliedCache(updated);
+            return updated;
+          });
+        }
+      }
       saveAppliedKeys(next);
       return next;
     });
@@ -661,11 +697,18 @@ const JobWatcher = () => {
       });
     }
 
+    if (showAppliedOnly) {
+      const cachedJobs = Object.values(appliedCache);
+      const apiKeys = new Set(list.map((j) => `job:${j.source}:${j.title}`));
+      const onlyCached = cachedJobs.filter((j) => !apiKeys.has(`job:${j.source}:${j.title}`) && appliedKeys.has(`job:${j.source}:${j.title}`));
+      list = [...list.filter((j) => appliedKeys.has(`job:${j.source}:${j.title}`)), ...onlyCached];
+    }
+
     return [...list].sort(
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories, showAppliedOnly, appliedKeys, appliedCache]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
@@ -788,7 +831,13 @@ const JobWatcher = () => {
           Csak új (1 hét)
         </label>
 
-        <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
+        <button
+            className={`job-btn job-btn--toggle${showAppliedOnly ? " active" : ""}`}
+            onClick={() => setShowAppliedOnly((v) => !v)}
+          >
+            {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
+          </button>
+          <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
           📊 Statisztikák 📊
         </button>
         <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
@@ -944,7 +993,7 @@ const JobWatcher = () => {
                 {(isVisited || isApplied) && (
                   <button
                     className={`job-applied-btn${isApplied ? " applied" : ""}`}
-                    onClick={() => toggleApplied(clickKey)}
+                    onClick={() => toggleApplied(clickKey, job)}
                     title={isApplied ? "Jelentkezés visszavonása" : "Megjelölés: Jelentkeztem"}
                   >
                     {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
