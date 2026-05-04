@@ -772,77 +772,81 @@ const JobWatcher = () => {
           placeholder="Keresés…"
         />
 
-        <label className="job-checkbox">
-          <input
-            type="checkbox"
-            checked={internMode}
-            onChange={(e) => handleInternToggle(e.target.checked)}
-          />
-          Csak gyakornok
-        </label>
+        <div className="job-filters">
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={internMode}
+              onChange={(e) => handleInternToggle(e.target.checked)}
+            />
+            Csak gyakornok
+          </label>
 
-        <label className="job-checkbox">
-          <input
-            type="checkbox"
-            checked={juniorMode}
-            onChange={(e) => handleJuniorToggle(e.target.checked)}
-          />
-          Csak junior
-        </label>
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={juniorMode}
+              onChange={(e) => handleJuniorToggle(e.target.checked)}
+            />
+            Csak junior
+          </label>
 
-        <label className="job-checkbox">
-          <input
-            type="checkbox"
-            checked={mediorMode}
-            onChange={(e) => handleMediorToggle(e.target.checked)}
-          />
-          Csak medior
-        </label>
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={mediorMode}
+              onChange={(e) => handleMediorToggle(e.target.checked)}
+            />
+            Csak medior
+          </label>
 
-        <label className="job-checkbox">
-          <input
-            type="checkbox"
-            checked={time24h}
-            onChange={(e) => {
-              setTime24h(e.target.checked);
-              localStorage.setItem("jobWatcherTime24h", String(e.target.checked));
-              if (e.target.checked) {
-                setTime7d(false);
-                localStorage.setItem("jobWatcherTime7d", "false");
-              }
-            }}
-          />
-          Csak új (24h)
-        </label>
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={time24h}
+              onChange={(e) => {
+                setTime24h(e.target.checked);
+                localStorage.setItem("jobWatcherTime24h", String(e.target.checked));
+                if (e.target.checked) {
+                  setTime7d(false);
+                  localStorage.setItem("jobWatcherTime7d", "false");
+                }
+              }}
+            />
+            Csak új (24h)
+          </label>
 
-        <label className="job-checkbox">
-          <input
-            type="checkbox"
-            checked={time7d}
-            onChange={(e) => {
-              setTime7d(e.target.checked);
-              localStorage.setItem("jobWatcherTime7d", String(e.target.checked));
-              if (e.target.checked) {
-                setTime24h(false);
-                localStorage.setItem("jobWatcherTime24h", "false");
-              }
-            }}
-          />
-          Csak új (1 hét)
-        </label>
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={time7d}
+              onChange={(e) => {
+                setTime7d(e.target.checked);
+                localStorage.setItem("jobWatcherTime7d", String(e.target.checked));
+                if (e.target.checked) {
+                  setTime24h(false);
+                  localStorage.setItem("jobWatcherTime24h", "false");
+                }
+              }}
+            />
+            Csak új (1 hét)
+          </label>
+        </div>
 
-        <button
+        <div className="job-action-btns">
+          <button
             className={`job-btn job-btn--toggle${showAppliedOnly ? " active" : ""}`}
             onClick={() => setShowAppliedOnly((v) => !v)}
           >
             {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
           </button>
           <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
-          📊 Statisztikák 📊
-        </button>
-        <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
-          Frissítés
-        </button>
+            📊 Statisztikák 📊
+          </button>
+          <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
+            Frissítés
+          </button>
+        </div>
       </div>
     </div>
 

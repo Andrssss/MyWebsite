@@ -132,9 +132,41 @@
   flex-wrap: wrap;
 }
 
+.job-filters {
+  display: contents;
+}
+
+.job-action-btns {
+  display: contents;
+}
+
 @media (min-width: 900px) {
   .job-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "search btns"
+      "filters filters";
+    align-items: center;
+  }
+
+  .job-search {
+    grid-area: search;
+  }
+
+  .job-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    grid-area: filters;
+  }
+
+  .job-action-btns {
+    display: flex;
+    gap: 12px;
     flex-wrap: nowrap;
+    grid-area: btns;
+    justify-content: flex-end;
   }
 }
 
