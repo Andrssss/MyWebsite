@@ -843,6 +843,7 @@ const JobWatcher = () => {
                   rel="noopener noreferrer"
                   onClick={() => trackClick(clickKey)}
                   onAuxClick={(e) => { if (e.button === 1) trackClick(clickKey); }}
+                  onContextMenu={() => trackClick(clickKey)}
                 >
                   {job.title}
                   {debugMode && (
