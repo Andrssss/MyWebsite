@@ -662,6 +662,10 @@ const JobWatcher = () => {
             onChange={(e) => {
               setTime24h(e.target.checked);
               localStorage.setItem("jobWatcherTime24h", String(e.target.checked));
+              if (e.target.checked) {
+                setTime7d(false);
+                localStorage.setItem("jobWatcherTime7d", "false");
+              }
             }}
           />
           Csak új (24h)
@@ -674,6 +678,10 @@ const JobWatcher = () => {
             onChange={(e) => {
               setTime7d(e.target.checked);
               localStorage.setItem("jobWatcherTime7d", String(e.target.checked));
+              if (e.target.checked) {
+                setTime24h(false);
+                localStorage.setItem("jobWatcherTime24h", "false");
+              }
             }}
           />
           Csak új (1 hét)
