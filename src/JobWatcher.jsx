@@ -450,24 +450,43 @@ const JobWatcher = () => {
   };
 
   const fetchJobs = async (next24h = time24h, next7d = time7d) => {
+    let effectiveRange = null;
+    if (next24h && next7d) effectiveRange = "30d";
+    else if (next7d) effectiveRange = TIME_RANGE_7D;
+    else if (next24h) effectiveRange = TIME_RANGE_24H;
+
+    const cacheKey = `jobWatcherJobsCache_${effectiveRange || "all"}`;
+    const cacheTsKey = `${cacheKey}_ts`;
+    const CACHE_TTL_MS = 5 * 60 * 1000; // 5 perc
+
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      const cachedTs = parseInt(localStorage.getItem(cacheTsKey) || "0", 10);
+      if (cached && Date.now() - cachedTs < CACHE_TTL_MS) {
+        setJobs(JSON.parse(cached));
+        return;
+      }
+    } catch {
+      // cache olvasás nem kritikus
+    }
+
     setLoading(true);
     setStatus("");
     try {
       const params = new URLSearchParams({ limit: "5000" });
-
-      let effectiveRange = null;
-      if (next24h && next7d) effectiveRange = "30d";
-      else if (next7d) effectiveRange = TIME_RANGE_7D;
-      else if (next24h) effectiveRange = TIME_RANGE_24H;
-
-      if (effectiveRange) {
-        params.set("timeRange", effectiveRange);
-      }
+      if (effectiveRange) params.set("timeRange", effectiveRange);
 
       const res = await fetch(`${API_BASE_URL}/jobs?${params.toString()}`);
       const txt = await res.text();
       if (!res.ok) throw new Error(txt);
-      setJobs(JSON.parse(txt) || []);
+      const parsed = JSON.parse(txt) || [];
+      setJobs(parsed);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(parsed));
+        localStorage.setItem(cacheTsKey, String(Date.now()));
+      } catch {
+        // localStorage quota exceeded, silent
+      }
     } catch (e) {
       setStatus(`Hiba: ${e.message}`);
       setJobs([]);
