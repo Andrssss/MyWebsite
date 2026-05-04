@@ -52,6 +52,21 @@ const getOrCreateVisitorId = () => {
   return nextId;
 };
 
+const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
+
+const trackClick = (target) => {
+  try {
+    const visitorId = getOrCreateVisitorId();
+    fetch(VISITOR_CLICK_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visitorId, target }),
+    }).catch(() => {});
+  } catch {
+    // silent
+  }
+};
+
 const sendDailyVisitor = async (visitorId) => {
   const res = await fetch(VISITOR_TRACK_API, {
     method: "POST",
@@ -794,6 +809,7 @@ const JobWatcher = () => {
                   href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackClick(`job:${job.source}:${job.title}`)}
                 >
                   {job.title}
                   {debugMode && (

@@ -423,3 +423,47 @@
     height: 140px;
   }
 }
+
+/* ===== CLICK STATS TABLE ===== */
+.stats-click-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.stats-click-table th,
+.stats-click-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.stats-click-table th {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stats-click-table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.stats-click-target {
+  word-break: break-all;
+  color: #a5b4fc;
+}
+
+.stats-click-table td:first-child,
+.stats-click-table th:first-child {
+  width: 40px;
+  color: #64748b;
+}
+
+.stats-click-table td:last-child,
+.stats-click-table th:last-child {
+  width: 60px;
+  text-align: right;
+}
