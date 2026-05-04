@@ -922,13 +922,15 @@ const JobWatcher = () => {
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")
                     : "—"}
                 </span>
-                <button
-                  className={`job-applied-btn${isApplied ? " applied" : ""}`}
-                  onClick={() => toggleApplied(clickKey)}
-                  title={isApplied ? "Jelentkezés visszavonása" : "Megjelölés: Jelentkeztem"}
-                >
-                  {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
-                </button>
+                {(isVisited || isApplied) && (
+                  <button
+                    className={`job-applied-btn${isApplied ? " applied" : ""}`}
+                    onClick={() => toggleApplied(clickKey)}
+                    title={isApplied ? "Jelentkezés visszavonása" : "Megjelölés: Jelentkeztem"}
+                  >
+                    {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
+                  </button>
+                )}
               </div>
             </li>
           );

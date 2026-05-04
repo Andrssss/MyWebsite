@@ -365,25 +365,27 @@
 .job-card--visited::after {
   content: '';
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 4px;
+  right: 4px;
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 0 22px 22px 0;
+  border-width: 0 18px 18px 0;
   border-color: transparent #4f8cff transparent transparent;
+  border-radius: 2px;
 }
 
 .job-card--applied::after {
   content: '';
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 4px;
+  right: 4px;
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 0 22px 22px 0;
+  border-width: 0 18px 18px 0;
   border-color: transparent #22c55e transparent transparent;
+  border-radius: 2px;
 }
 
 .job-meta {
