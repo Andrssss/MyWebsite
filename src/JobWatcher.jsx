@@ -449,7 +449,7 @@ const JobWatcher = () => {
     }
   };
 
-  const fetchJobs = async (next24h = time24h, next7d = time7d) => {
+  const fetchJobs = async (next24h = time24h, next7d = time7d, force = false) => {
     let effectiveRange = null;
     if (next24h && next7d) effectiveRange = "30d";
     else if (next7d) effectiveRange = TIME_RANGE_7D;
@@ -462,7 +462,7 @@ const JobWatcher = () => {
     try {
       const cached = localStorage.getItem(cacheKey);
       const cachedTs = parseInt(localStorage.getItem(cacheTsKey) || "0", 10);
-      if (cached && Date.now() - cachedTs < CACHE_TTL_MS) {
+      if (!force && cached && Date.now() - cachedTs < CACHE_TTL_MS) {
         setJobs(JSON.parse(cached));
         return;
       }
@@ -823,7 +823,7 @@ const JobWatcher = () => {
         <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
           📊 Statisztikák 📊
         </button>
-        <button className="job-btn" onClick={() => fetchJobs(time24h, time7d)}>
+        <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
           Frissítés
         </button>
       </div>
