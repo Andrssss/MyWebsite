@@ -56,6 +56,7 @@ const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
 
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
 const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
+const IMPORT_ID_STORAGE = "jobWatcherImportId";
 
 const loadClickedKeys = () => {
   try {
@@ -330,7 +331,9 @@ const JobWatcher = () => {
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncIdShown, setSyncIdShown] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
-  const [importId, setImportId] = useState("");
+  const [importId, setImportId] = useState(
+    () => localStorage.getItem(IMPORT_ID_STORAGE) || ""
+  );
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
 
   const handleSyncUpload = async () => {
@@ -947,7 +950,11 @@ const JobWatcher = () => {
               className="job-search"
               placeholder="Másik eszköz szinkron ID-ja"
               value={importId}
-              onChange={(e) => setImportId(e.target.value)}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setImportId(nextValue);
+                localStorage.setItem(IMPORT_ID_STORAGE, nextValue);
+              }}
             />
             <button className="job-btn" onClick={handleSyncDownload}>
               ⬇ Letöltés és összefésülés
