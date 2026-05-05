@@ -83,9 +83,10 @@ const FIXED = [
 ];
 
 // Parameterized query helper. Returns rows array.
-// neon() tagged-template fn: sql(text, params) → rows[] directly (no {rows} wrapper)
+// neon() exposes sql.query(text, params) → { rows, fields }
 async function query(text, params = []) {
-  return await sql(text, params);
+  const result = await sql.query(text, params);
+  return result.rows;
 }
 
 exports.handler = async (event) => {
