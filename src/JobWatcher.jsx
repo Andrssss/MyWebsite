@@ -20,14 +20,6 @@ const getTodayLocalDateString = () => {
   return `${y}-${m}-${d}`;
 };
 
-const getTodayHuDateString = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}. ${m}. ${d}.`;
-};
-
 const readCookie = (name) => {
   const cookieName = `${name}=`;
   const parts = document.cookie.split(";");
@@ -458,15 +450,15 @@ const JobWatcher = () => {
   };
 
   const longPressTimerRef = useRef(null);
-  const startLongPress = (target, localKey = target) => {
+  const startLongPress = (target, localKey = target, clickedDate = getTodayLocalDateString()) => {
     clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey), 400);
+    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey, clickedDate), 400);
   };
   const cancelLongPress = () => {
     clearTimeout(longPressTimerRef.current);
   };
 
-  const trackClick = (target, localKey = target) => {
+  const trackClick = (target, localKey = target, clickedDate = getTodayLocalDateString()) => {
     setClickedKeys((prev) => {
       const next = new Set(prev);
       next.add(localKey);
@@ -478,7 +470,7 @@ const JobWatcher = () => {
       fetch(VISITOR_CLICK_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visitorId, target }),
+        body: JSON.stringify({ visitorId, target, clickedDate }),
       }).catch(() => {});
     } catch {
       // silent
@@ -1096,7 +1088,8 @@ const JobWatcher = () => {
           const notes = getKeywordNotesForJob(job);
           const rowKey = `${job.source || "src"}-${job.url || job.title}-${job.firstSeen || "ts"}`;
           const clickKeyBase = `job:${job.source}:${job.title}`;
-          const clickTarget = `${clickKeyBase} ${getTodayHuDateString()}`;
+          const clickTarget = clickKeyBase;
+          const clickDate = getTodayLocalDateString();
           const isVisited = clickedKeys.has(clickKeyBase);
           const isApplied = appliedKeys.has(clickKeyBase);
 
@@ -1108,10 +1101,10 @@ const JobWatcher = () => {
                   href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => trackClick(clickTarget, clickKeyBase)}
-                  onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase); }}
-                  onContextMenu={() => trackClick(clickTarget, clickKeyBase)}
-                  onTouchStart={() => startLongPress(clickTarget, clickKeyBase)}
+                  onClick={() => trackClick(clickTarget, clickKeyBase, clickDate)}
+                  onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase, clickDate); }}
+                  onContextMenu={() => trackClick(clickTarget, clickKeyBase, clickDate)}
+                  onTouchStart={() => startLongPress(clickTarget, clickKeyBase, clickDate)}
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onTouchCancel={cancelLongPress}

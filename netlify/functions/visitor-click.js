@@ -24,6 +24,32 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 30;
 const clickHits = globalThis.__visitorClickHits || new Map();
 globalThis.__visitorClickHits = clickHits;
+const targetDateSuffixRegex = /\s+\d{4}\.\s\d{2}\.\s\d{2}\.$/;
+const clickDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+const clickDateColumnCache = globalThis.__visitorClickDateColumnCache || { checked: false, exists: false };
+globalThis.__visitorClickDateColumnCache = clickDateColumnCache;
+
+function normalizeTarget(target) {
+  return String(target || "").replace(targetDateSuffixRegex, "").trim();
+}
+
+async function hasClickedDateColumn() {
+  if (clickDateColumnCache.checked) return clickDateColumnCache.exists;
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_name = 'visitor_clicks' AND column_name = 'clicked_date'
+       LIMIT 1`
+    );
+    clickDateColumnCache.exists = rows.length > 0;
+  } catch {
+    clickDateColumnCache.exists = false;
+  } finally {
+    clickDateColumnCache.checked = true;
+  }
+  return clickDateColumnCache.exists;
+}
 
 function corsHeaders(extra = {}) {
   return {
@@ -73,10 +99,16 @@ exports.handler = async (event) => {
     try {
       const limit = Math.min(parseInt(event.queryStringParameters?.limit || "50", 10), 200);
       const { rows } = await pool.query(
-        `SELECT clicked_on, COUNT(*)::int AS count
-         FROM visitor_clicks
-         WHERE visitor_cookie NOT IN (SELECT unnest($1::text[]))
-         GROUP BY clicked_on
+        `SELECT normalized_clicked_on AS clicked_on, COUNT(DISTINCT visitor_cookie)::int AS count
+         FROM (
+           SELECT
+             visitor_cookie,
+             regexp_replace(clicked_on, '\\s+[0-9]{4}\\.\\s[0-9]{2}\\.\\s[0-9]{2}\\.$', '') AS normalized_clicked_on
+           FROM visitor_clicks
+           WHERE visitor_cookie NOT IN (SELECT unnest($1::text[]))
+             AND clicked_on NOT LIKE 'applied:%'
+         ) AS dedup
+         GROUP BY normalized_clicked_on
          ORDER BY count DESC
          LIMIT $2`,
         [[...ADMIN_VISITOR_IDS], limit]
@@ -112,12 +144,16 @@ exports.handler = async (event) => {
   }
 
   const visitorId = String(payload.visitorId || "").trim();
-  const target = String(payload.target || "").trim();
+  const target = normalizeTarget(payload.target);
+  const clickedDate = String(payload.clickedDate || "").trim();
 
   if (!visitorId) return jsonResponse(400, { error: "visitorId is required" });
   if (!target) return jsonResponse(400, { error: "target is required" });
   if (visitorId.length > 128) return jsonResponse(400, { error: "visitorId too long" });
   if (target.length > 512) return jsonResponse(400, { error: "target too long" });
+  if (clickedDate && !clickDateRegex.test(clickedDate)) {
+    return jsonResponse(400, { error: "clickedDate must be YYYY-MM-DD" });
+  }
 
   if (ADMIN_VISITOR_IDS.has(visitorId)) {
     return jsonResponse(200, { ok: true, skipped: true });
@@ -129,10 +165,17 @@ exports.handler = async (event) => {
   }
 
   try {
-    await pool.query(
-      `INSERT INTO visitor_clicks (visitor_cookie, clicked_on) VALUES ($1, $2)`,
-      [visitorId, target]
-    );
+    if (await hasClickedDateColumn()) {
+      await pool.query(
+        `INSERT INTO visitor_clicks (visitor_cookie, clicked_on, clicked_date) VALUES ($1, $2, $3)`,
+        [visitorId, target, clickedDate || null]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO visitor_clicks (visitor_cookie, clicked_on) VALUES ($1, $2)`,
+        [visitorId, target]
+      );
+    }
     return jsonResponse(200, { ok: true });
   } catch (err) {
     console.error("[visitor-click] INSERT error:", err);
