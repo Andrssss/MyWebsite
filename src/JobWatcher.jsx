@@ -328,6 +328,14 @@ const JobWatcher = () => {
   const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
   const [showAppliedOnly, setShowAppliedOnly] = useState(false);
 
+  const [manualAppliedTitle, setManualAppliedTitle] = useState("");
+  const [manualAppliedSource, setManualAppliedSource] = useState("");
+  const [manualAppliedUrl, setManualAppliedUrl] = useState("");
+  const [manualAppliedDate, setManualAppliedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [manualAppliedExperience, setManualAppliedExperience] = useState("");
+  const [manualAppliedStatus, setManualAppliedStatus] = useState("");
+  const [manualAddOpen, setManualAddOpen] = useState(false);
+
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncIdShown, setSyncIdShown] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
@@ -419,6 +427,26 @@ const JobWatcher = () => {
       saveAppliedKeys(next);
       return next;
     });
+  };
+
+  const handleAddManualApplied = () => {
+    const title = manualAppliedTitle.trim();
+    const source = manualAppliedSource.trim() || "manual";
+    const url = manualAppliedUrl.trim();
+    if (!title) { setManualAppliedStatus("Adj meg legalább egy pozíció nevet"); return; }
+    const key = `job:${source}:${title}`;
+    const firstSeen = manualAppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(manualAppliedDate)
+      ? new Date(manualAppliedDate + "T00:00:00").toISOString()
+      : new Date().toISOString();
+    const manualJob = { source, title, url, firstSeen, experience: manualAppliedExperience.trim() || undefined };
+    setAppliedKeys((prev) => { const next = new Set(prev); next.add(key); saveAppliedKeys(next); return next; });
+    setAppliedCache((prev) => { const updated = { ...prev, [key]: manualJob }; saveAppliedCache(updated); return updated; });
+    setManualAppliedTitle("");
+    setManualAppliedSource("");
+    setManualAppliedUrl("");
+    setManualAppliedDate(new Date().toISOString().slice(0, 10));
+    setManualAppliedExperience("");
+    setManualAppliedStatus("Hozzáadva");
   };
 
   const longPressTimerRef = useRef(null);
@@ -1127,6 +1155,72 @@ const JobWatcher = () => {
             </li>
           );
         })}
+
+        {showAppliedOnly && (
+          <li className={`job-card job-card--manual-add${manualAddOpen ? " open" : ""}`}>
+            <span className="job-card-fold" aria-hidden="true" />
+            <button
+              type="button"
+              className="job-manual-toggle"
+              onClick={() => { setManualAddOpen((v) => !v); setManualAppliedStatus(""); }}
+            >
+              <span className="job-manual-cta">
+                <strong>Kézileg hozzáadott jelentkezés</strong>
+              </span>
+              <span className="job-source">{manualAddOpen ? "Nyitva" : "Megnyitás"}</span>
+            </button>
+
+            {manualAddOpen && (
+              <>
+                <div className="job-manual-fields">
+                  <input
+                    className="job-search"
+                    value={manualAppliedTitle}
+                    onChange={(e) => setManualAppliedTitle(e.target.value)}
+                    placeholder="Pozíció neve (kötelező)"
+                  />
+                  <input
+                    className="job-search"
+                    value={manualAppliedSource}
+                    onChange={(e) => setManualAppliedSource(e.target.value)}
+                    placeholder="Forrás (pl: profession)"
+                  />
+                  <input
+                    className="job-search"
+                    value={manualAppliedUrl}
+                    onChange={(e) => setManualAppliedUrl(e.target.value)}
+                    placeholder="Link (opcionális)"
+                  />
+                  <input
+                    className="job-search"
+                    value={manualAppliedExperience}
+                    onChange={(e) => setManualAppliedExperience(e.target.value)}
+                    placeholder="Tapasztalat szint (opcionális)"
+                  />
+                  <label className="job-manual-date-label">
+                    <span>Jelentkezés dátuma</span>
+                    <div className="job-manual-date-wrapper">
+                      <span className="job-manual-date-icon">&#128197;</span>
+                      <input
+                        type="text"
+                        className="job-search job-manual-date"
+                        value={manualAppliedDate}
+                        onChange={(e) => setManualAppliedDate(e.target.value)}
+                        placeholder="YYYY-MM-DD"
+                        pattern="\d{4}-\d{2}-\d{2}"
+                        maxLength={10}
+                      />
+                    </div>
+                  </label>
+                </div>
+                <div className="job-meta job-manual-submit-row">
+                  <span style={{ color: manualAppliedStatus === "Hozzáadva" ? "#4ade80" : "#ef4444" }}>{manualAppliedStatus}</span>
+                  <button className="job-btn" onClick={handleAddManualApplied}>Hozzáadás</button>
+                </div>
+              </>
+            )}
+          </li>
+        )}
       </ul>
     )}
 

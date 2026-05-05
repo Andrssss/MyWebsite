@@ -778,3 +778,129 @@ html, body {
   color: #999;
   line-height: 1.5;
 }
+
+
+/* ===== MANUAL ADD CARD ===== */
+.job-card--manual-add {
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.job-card-fold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 56px 56px 0;
+  border-color: transparent #4f8cff transparent transparent;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.job-card-fold::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -56px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 25px 25px 0;
+  border-color: transparent #0f1117 transparent transparent;
+  z-index: 2;
+}
+
+.job-card--manual-add::after {
+  content: "+";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 100px;
+  font-weight: 200;
+  line-height: 1;
+  color: rgba(79, 140, 255, 0.14);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  transition: opacity 0.2s ease;
+}
+
+.job-card--manual-add.open::after {
+  opacity: 0.35;
+}
+
+.job-manual-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+  gap: 16px;
+}
+
+.job-manual-cta strong {
+  font-size: 1rem;
+  color: #eef2ff;
+}
+
+.job-manual-fields {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.job-manual-fields .job-search {
+  width: 100%;
+  min-width: 0;
+}
+
+.job-manual-date-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.job-manual-date-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.job-manual-date-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 15px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+.job-manual-date {
+  padding-left: 38px !important;
+}
+
+.job-manual-submit-row {
+  position: relative;
+  z-index: 1;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
