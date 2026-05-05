@@ -84,7 +84,8 @@ const FIXED = [
 
 // Parameterized query helper. Returns rows array.
 async function query(text, params = []) {
-  return await sql.query(text, params);
+  const { rows } = await sql.query(text, params);
+  return rows;
 }
 
 exports.handler = async (event) => {
