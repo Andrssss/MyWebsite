@@ -20,6 +20,14 @@ const getTodayLocalDateString = () => {
   return `${y}-${m}-${d}`;
 };
 
+const getTodayHuDateString = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}. ${m}. ${d}.`;
+};
+
 const readCookie = (name) => {
   const cookieName = `${name}=`;
   const parts = document.cookie.split(";");
@@ -450,21 +458,21 @@ const JobWatcher = () => {
   };
 
   const longPressTimerRef = useRef(null);
-  const startLongPress = (target) => {
+  const startLongPress = (target, localKey = target) => {
     clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => trackClick(target), 500);
+    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey), 300);
   };
   const cancelLongPress = () => {
     clearTimeout(longPressTimerRef.current);
   };
 
-  const trackClick = (target) => {
+  const trackClick = (target, localKey = target) => {
     setClickedKeys((prev) => {
       const next = new Set(prev);
-      next.add(target);
+      next.add(localKey);
       return next;
     });
-    saveClickedKey(target);
+    saveClickedKey(localKey);
     try {
       const visitorId = getOrCreateVisitorId();
       fetch(VISITOR_CLICK_API, {
@@ -1087,9 +1095,10 @@ const JobWatcher = () => {
             job.firstSeen && hoursSince(job.firstSeen) <= 1;
           const notes = getKeywordNotesForJob(job);
           const rowKey = `${job.source || "src"}-${job.url || job.title}-${job.firstSeen || "ts"}`;
-          const clickKey = `job:${job.source}:${job.title}`;
-          const isVisited = clickedKeys.has(clickKey);
-          const isApplied = appliedKeys.has(clickKey);
+          const clickKeyBase = `job:${job.source}:${job.title}`;
+          const clickTarget = `${clickKeyBase} ${getTodayHuDateString()}`;
+          const isVisited = clickedKeys.has(clickKeyBase);
+          const isApplied = appliedKeys.has(clickKeyBase);
 
           return (
             <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}`}>
@@ -1099,10 +1108,10 @@ const JobWatcher = () => {
                   href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => trackClick(clickKey)}
-                  onAuxClick={(e) => { if (e.button === 1) trackClick(clickKey); }}
-                  onContextMenu={() => trackClick(clickKey)}
-                  onTouchStart={() => startLongPress(clickKey)}
+                  onClick={() => trackClick(clickTarget, clickKeyBase)}
+                  onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase); }}
+                  onContextMenu={() => trackClick(clickTarget, clickKeyBase)}
+                  onTouchStart={() => startLongPress(clickTarget, clickKeyBase)}
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onTouchCancel={cancelLongPress}
@@ -1145,7 +1154,7 @@ const JobWatcher = () => {
                 {(isVisited || isApplied) && (
                   <button
                     className={`job-applied-btn${isApplied ? " applied" : ""}`}
-                    onClick={() => toggleApplied(clickKey, job)}
+                    onClick={() => toggleApplied(clickKeyBase, job)}
                     title={isApplied ? "Jelentkezés visszavonása" : "Megjelölés: Jelentkeztem"}
                   >
                     {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
