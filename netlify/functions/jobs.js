@@ -1,5 +1,8 @@
 // netlify/functions/jobs.js
-const { Pool } = require("@neondatabase/serverless");
+const { Pool, neonConfig } = require("@neondatabase/serverless");
+const ws = require("ws");
+
+neonConfig.webSocketConstructor = ws;
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
