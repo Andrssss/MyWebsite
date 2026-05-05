@@ -164,6 +164,7 @@ exports.handler = async (event) => {
                     experience
              FROM job_posts
              WHERE source = ANY($1)
+               AND first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $2`;
 
@@ -200,6 +201,7 @@ exports.handler = async (event) => {
                   first_seen AS "firstSeen",
                   experience
            FROM job_posts
+           WHERE first_seen >= NOW() - INTERVAL '30 days'
            ORDER BY first_seen DESC, id DESC
            LIMIT $1`;
 
