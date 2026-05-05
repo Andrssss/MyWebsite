@@ -1,5 +1,5 @@
 // netlify/functions/jobs.js
-const { Pool } = require("pg");
+const { neon } = require("@neondatabase/serverless");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -7,10 +7,8 @@ if (!connectionString) {
   throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
 }
 
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
+// HTTP-based Neon driver — no pool, no connect/release, fast on cold starts.
+const sql = neon(connectionString);
 
 function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
@@ -23,6 +21,33 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
     body: JSON.stringify(body),
   };
 }
+
+// In-memory cache (per warm container). TTL in ms.
+const CACHE_TTL_MS = 60 * 1000; // 60s
+const cache = globalThis.__jobsCache || new Map();
+globalThis.__jobsCache = cache;
+
+function cacheGet(key) {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.t > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return hit.v;
+}
+
+function cacheSet(key, value) {
+  if (cache.size > 200) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) cache.delete(oldestKey);
+  }
+  cache.set(key, { t: Date.now(), v: value });
+}
+
+const CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=120",
+};
 
 // FIXED lista (key/label)
 const FIXED = [
@@ -57,27 +82,41 @@ const FIXED = [
   { key: "unicredit", label: "UniCredit Bank" },
 ];
 
+// Parameterized query helper. Returns rows array.
+async function query(text, params = []) {
+  return await sql.query(text, params);
+}
+
 exports.handler = async (event) => {
-  const client = await pool.connect();
-  try {
-    const method = event.httpMethod;
-    const path = event.path || "";
-    const parts = path.split("/");
-    const maybeId = parts[parts.length - 1];
-    const id = /^\d+$/.test(maybeId) ? parseInt(maybeId, 10) : null;
+  const method = event.httpMethod;
+  const path = event.path || "";
+  const parts = path.split("/");
+  const maybeId = parts[parts.length - 1];
+  const id = /^\d+$/.test(maybeId) ? parseInt(maybeId, 10) : null;
 
-    if (method === "OPTIONS") {
-      return {
-        statusCode: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "https://bakan7.netlify.app/allasfigyelo",
-          "Access-Control-Allow-Methods": "GET,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
-        body: "",
-      };
+  if (method === "OPTIONS") {
+    return {
+      statusCode: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "https://bakan7.netlify.app/allasfigyelo",
+        "Access-Control-Allow-Methods": "GET,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+      body: "",
+    };
+  }
+
+  // Cache check BEFORE hitting db
+  let cacheKey = null;
+  if (method === "GET") {
+    cacheKey = `${path}?${event.rawQuery || ""}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      return jsonResponse(200, cached, { ...CACHE_HEADERS, "X-Cache": "HIT" });
     }
+  }
 
+  try {
     if (method === "GET") {
       const qs = event.queryStringParameters || {};
       const source = qs.source || null;
@@ -97,12 +136,12 @@ exports.handler = async (event) => {
 
       // GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
-        const { rows } = await client.query(`
-          SELECT source,
-                 COUNT(*)::int AS count
-          FROM job_posts
-          GROUP BY source
-        `);
+        const rows = await query(
+          `SELECT source, COUNT(*)::int AS count
+           FROM job_posts
+           WHERE first_seen >= NOW() - INTERVAL '30 days'
+           GROUP BY source`
+        );
 
         const map = new Map(rows.map((r) => [r.source, r]));
         const out = FIXED.map((s) => {
@@ -111,12 +150,13 @@ exports.handler = async (event) => {
           return { source: s.key, label: s.label, count };
         });
 
-        return jsonResponse(200, out);
+        cacheSet(cacheKey, out);
+        return jsonResponse(200, out, { ...CACHE_HEADERS, "X-Cache": "MISS" });
       }
 
       // GET /jobs/:id
       if (id) {
-        const { rows } = await client.query(
+        const rows = await query(
           `SELECT source, title, url,
                   first_seen AS "firstSeen",
                   experience
@@ -125,88 +165,76 @@ exports.handler = async (event) => {
           [id]
         );
         if (rows.length === 0) return jsonResponse(404, { error: "Nem található." });
-        return jsonResponse(200, rows[0]);
+        cacheSet(cacheKey, rows[0]);
+        return jsonResponse(200, rows[0], { ...CACHE_HEADERS, "X-Cache": "MISS" });
       }
 
       // GET /jobs?source=...
       if (source) {
         const fixedEntry = FIXED.find((s) => s.key === source);
         const dbKeys = fixedEntry?.keys || [source];
-        const sourceQuery = timeRange === "24h"
+        const sourceQuery =
+          timeRange === "24h"
+            ? `SELECT source, title, url,
+                      first_seen AS "firstSeen",
+                      experience
+               FROM job_posts
+               WHERE source = ANY($1)
+                 AND first_seen >= NOW() - INTERVAL '24 hours'
+               ORDER BY first_seen DESC, id DESC
+               LIMIT $2`
+            : timeRange === "7d"
+            ? `SELECT source, title, url,
+                      first_seen AS "firstSeen",
+                      experience
+               FROM job_posts
+               WHERE source = ANY($1)
+                 AND first_seen >= NOW() - INTERVAL '7 days'
+               ORDER BY first_seen DESC, id DESC
+               LIMIT $2`
+            : `SELECT source, title, url,
+                      first_seen AS "firstSeen",
+                      experience
+               FROM job_posts
+               WHERE source = ANY($1)
+                 AND first_seen >= NOW() - INTERVAL '30 days'
+               ORDER BY first_seen DESC, id DESC
+               LIMIT $2`;
+
+        const rows = await query(sourceQuery, [dbKeys, limit]);
+        cacheSet(cacheKey, rows);
+        return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
+      }
+
+      // GET /jobs
+      const allQuery =
+        timeRange === "24h"
           ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = ANY($1)
-               AND first_seen >= NOW() - INTERVAL '24 hours'
+             WHERE first_seen >= NOW() - INTERVAL '24 hours'
              ORDER BY first_seen DESC, id DESC
-             LIMIT $2`
+             LIMIT $1`
           : timeRange === "7d"
           ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = ANY($1)
-               AND first_seen >= NOW() - INTERVAL '7 days'
+             WHERE first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
-             LIMIT $2`
-          : timeRange === "30d"
-          ? `SELECT source, title, url,
-                    first_seen AS "firstSeen",
-                    experience
-             FROM job_posts
-             WHERE source = ANY($1)
-               AND first_seen >= NOW() - INTERVAL '30 days'
-             ORDER BY first_seen DESC, id DESC
-             LIMIT $2`
+             LIMIT $1`
           : `SELECT source, title, url,
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE source = ANY($1)
-               AND first_seen >= NOW() - INTERVAL '30 days'
+             WHERE first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
-             LIMIT $2`;
+             LIMIT $1`;
 
-        const { rows } = await client.query(sourceQuery, [dbKeys, limit]);
-        return jsonResponse(200, rows);
-      }
-
-      // GET /jobs
-            const allQuery = timeRange === "24h"
-        ? `SELECT source, title, url,
-                  first_seen AS "firstSeen",
-                  experience
-           FROM job_posts
-           WHERE first_seen >= NOW() - INTERVAL '24 hours'
-           ORDER BY first_seen DESC, id DESC
-           LIMIT $1`
-         : timeRange === "7d"
-         ? `SELECT source, title, url,
-              first_seen AS "firstSeen",
-              experience
-            FROM job_posts
-            WHERE first_seen >= NOW() - INTERVAL '7 days'
-            ORDER BY first_seen DESC, id DESC
-            LIMIT $1`
-         : timeRange === "30d"
-         ? `SELECT source, title, url,
-              first_seen AS "firstSeen",
-              experience
-            FROM job_posts
-            WHERE first_seen >= NOW() - INTERVAL '30 days'
-            ORDER BY first_seen DESC, id DESC
-            LIMIT $1`
-        : `SELECT source, title, url,
-                  first_seen AS "firstSeen",
-                  experience
-           FROM job_posts
-           WHERE first_seen >= NOW() - INTERVAL '30 days'
-           ORDER BY first_seen DESC, id DESC
-           LIMIT $1`;
-
-      const { rows } = await client.query(allQuery, [limit]);
-      return jsonResponse(200, rows);
+      const rows = await query(allQuery, [limit]);
+      cacheSet(cacheKey, rows);
+      return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
     }
 
     if (method === "DELETE") {
@@ -219,7 +247,5 @@ exports.handler = async (event) => {
   } catch (err) {
     console.error("Function error:", err);
     return jsonResponse(500, { error: "Szerver hiba", details: err.message });
-  } finally {
-    client.release();
   }
 };
