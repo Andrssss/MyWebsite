@@ -1,8 +1,5 @@
 // netlify/functions/jobs.js
-const { Pool, neonConfig } = require("@neondatabase/serverless");
-const ws = require("ws");
-
-neonConfig.webSocketConstructor = ws;
+const { neon } = require("@neondatabase/serverless");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -10,14 +7,15 @@ if (!connectionString) {
   throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
 }
 
-// Fresh pool per invocation — no stale WebSocket connections
-function getPool() {
-  return new Pool({ connectionString });
-}
+// fullResults:true → sql.query(text, params) returns { rows, ... } like pg Pool
+const sql =
+  globalThis.__neonSqlClient ||
+  neon(connectionString, { fullResults: true });
+globalThis.__neonSqlClient = sql;
 
 // Convenience wrapper — exactly like the other project's sql.query()
-const sql = {
-  query: (text, params) => getPool().query(text, params),
+const sqlQuery = {
+  query: (text, params) => sql.query(text, params),
 };
 
 function jsonResponse(statusCode, body, extraHeaders = {}) {
@@ -94,7 +92,7 @@ const FIXED = [
 
 // Parameterized query helper. Returns rows array.
 async function query(text, params = []) {
-  const { rows } = await sql.query(text, params);
+  const { rows } = await sqlQuery.query(text, params);
   return rows;
 }
 
