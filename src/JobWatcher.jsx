@@ -460,7 +460,7 @@ const JobWatcher = () => {
   const longPressTimerRef = useRef(null);
   const startLongPress = (target, localKey = target) => {
     clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey), 300);
+    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey), 400);
   };
   const cancelLongPress = () => {
     clearTimeout(longPressTimerRef.current);
