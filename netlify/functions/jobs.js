@@ -1,5 +1,5 @@
 // netlify/functions/jobs.js
-const { Pool } = require("pg");
+const { Pool } = require("@neondatabase/serverless");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -7,11 +7,7 @@ if (!connectionString) {
   throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
 }
 
-const pool = globalThis.__jobsPool || new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-  max: 1,
-});
+const pool = globalThis.__jobsPool || new Pool({ connectionString });
 globalThis.__jobsPool = pool;
 
 // Convenience wrapper — exactly like the other project's sql.query()
@@ -119,7 +115,9 @@ exports.handler = async (event) => {
   // Cache check BEFORE hitting db
   let cacheKey = null;
   if (method === "GET") {
-    cacheKey = `${path}?${event.rawQuery || ""}`;
+    const qs = event.queryStringParameters || {};
+    const qsSorted = Object.keys(qs).sort().map((k) => `${k}=${qs[k]}`).join("&");
+    cacheKey = `${path}?${qsSorted}`;
     const cached = cacheGet(cacheKey);
     if (cached) {
       return jsonResponse(200, cached, { ...CACHE_HEADERS, "X-Cache": "HIT" });
