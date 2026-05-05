@@ -99,16 +99,16 @@ exports.handler = async (event) => {
     try {
       const limit = Math.min(parseInt(event.queryStringParameters?.limit || "50", 10), 200);
       const { rows } = await pool.query(
-        `SELECT normalized_clicked_on AS clicked_on, COUNT(DISTINCT visitor_cookie)::int AS count
+        `SELECT clicked_on, COUNT(*)::int AS count
          FROM (
-           SELECT
-             visitor_cookie,
-             regexp_replace(clicked_on, '\\s+[0-9]{4}\\.\\s[0-9]{2}\\.\\s[0-9]{2}\\.$', '') AS normalized_clicked_on
+           SELECT DISTINCT
+             lower(trim(visitor_cookie::text)) AS visitor_cookie,
+             trim(regexp_replace(clicked_on, '\\s+[0-9]{4}\\.\\s*[0-9]{2}\\.\\s*[0-9]{2}\\.\\s*$', '')) AS clicked_on
            FROM visitor_clicks
            WHERE visitor_cookie NOT IN (SELECT unnest($1::text[]))
              AND clicked_on NOT LIKE 'applied:%'
-         ) AS dedup
-         GROUP BY normalized_clicked_on
+         ) AS unique_pairs
+         GROUP BY clicked_on
          ORDER BY count DESC
          LIMIT $2`,
         [[...ADMIN_VISITOR_IDS], limit]

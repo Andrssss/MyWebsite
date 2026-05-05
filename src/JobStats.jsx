@@ -363,13 +363,13 @@ const JobStats = () => {
       {/* ===== CLICK STATS ===== */}
       {clickData.length > 0 && (
         <div className="stats-section">
-          <h2>Top kattintások (összes)</h2>
+          <h2>Top kattintások (egyedi userek)</h2>
           <table className="stats-click-table">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Kattintott</th>
-                <th>Db</th>
+                <th>Egyedi user</th>
               </tr>
             </thead>
             <tbody>
