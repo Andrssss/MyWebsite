@@ -360,7 +360,8 @@ const JobStats = () => {
         </div>
       </div>
 
-      {/* ===== CLICK STATS ===== */}
+      {/* ===== CLICK STATS (ideiglenesen kikommentezve, visszaállítható) ===== */}
+      {/*
       {clickData.length > 0 && (
         <div className="stats-section">
           <h2>Top kattintások (egyedi userek)</h2>
@@ -384,6 +385,7 @@ const JobStats = () => {
           </table>
         </div>
       )}
+      */}
     </div>
   );
 };
