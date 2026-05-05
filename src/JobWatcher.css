@@ -796,7 +796,7 @@ html, body {
   height: 0;
   border-style: solid;
   border-width: 0 56px 56px 0;
-  border-color: transparent #4f8cff transparent transparent;
+  border-color: transparent #22c55e transparent transparent;
   z-index: 1;
   pointer-events: none;
 }
