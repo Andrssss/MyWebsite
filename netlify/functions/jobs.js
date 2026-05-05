@@ -1,5 +1,5 @@
 // netlify/functions/jobs.js
-const { neon } = require("@neondatabase/serverless");
+const { Pool } = require("pg");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -7,8 +7,17 @@ if (!connectionString) {
   throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
 }
 
-// HTTP-based Neon driver — no pool, no connect/release, fast on cold starts.
-const sql = neon(connectionString);
+const pool = globalThis.__jobsPool || new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  max: 1,
+});
+globalThis.__jobsPool = pool;
+
+// Convenience wrapper — exactly like the other project's sql.query()
+const sql = {
+  query: (text, params) => pool.query(text, params),
+};
 
 function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
@@ -83,10 +92,9 @@ const FIXED = [
 ];
 
 // Parameterized query helper. Returns rows array.
-// neon() exposes sql.query(text, params) → { rows, fields }
 async function query(text, params = []) {
-  const result = await sql.query(text, params);
-  return result.rows;
+  const { rows } = await sql.query(text, params);
+  return rows;
 }
 
 exports.handler = async (event) => {
