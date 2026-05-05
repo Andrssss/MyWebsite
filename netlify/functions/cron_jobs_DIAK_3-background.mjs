@@ -147,7 +147,7 @@ const SOURCES = [
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent pool",
+    "tehetsegprogram", "tehetségprogram", "talent",
 ];
 
 function isInternshipTitle(title) {

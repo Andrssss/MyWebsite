@@ -100,11 +100,15 @@ exports.handler = async (event) => {
       const whereClause = `WHERE LOWER(title) LIKE '%' || LOWER($1) || '%'`;
 
       if (action === "count") {
-        const { rows } = await client.query(
+        const countRes = await client.query(
           `SELECT COUNT(*)::int AS count FROM job_posts ${whereClause}`,
           [trimmed]
         );
-        return json(200, { count: rows[0].count });
+        const titlesRes = await client.query(
+          `SELECT title FROM job_posts ${whereClause} ORDER BY first_seen DESC LIMIT 100`,
+          [trimmed]
+        );
+        return json(200, { count: countRes.rows[0].count, titles: titlesRes.rows.map(r => r.title) });
       }
 
       // default: delete

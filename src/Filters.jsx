@@ -87,7 +87,7 @@ const Filters = () => {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); setPurging(prev => { const n = { ...prev }; delete n[item.uid]; return n; }); return; }
-      setPurging(prev => ({ ...prev, [item.uid]: { counted: true, count: data.count } }));
+      setPurging(prev => ({ ...prev, [item.uid]: { counted: true, count: data.count, titles: data.titles || [] } }));
     } catch (e) {
       setError(e.message);
       setPurging(prev => { const n = { ...prev }; delete n[item.uid]; return n; });
@@ -190,36 +190,45 @@ const Filters = () => {
       {recentlyAdded.length > 0 && (
         <div className="undo-stack purge-stack">
           {recentlyAdded.map(item => (
-            <div key={item.uid} className="undo-toast purge-toast">
-              <span className="undo-toast-text">
-                Hozzáadva: <strong>{item.word}</strong>
-              </span>
-              {purging[item.uid]?.done ? (
-                <span className="purge-done">✓ {purging[item.uid].count} hirdetés törölve</span>
-              ) : purging[item.uid]?.counted ? (
-                purging[item.uid].count > 0 ? (
-                  <>
-                    <span className="purge-count">{purging[item.uid].count} találat</span>
-                    <button
-                      className="undo-toast-btn purge-btn"
-                      onClick={() => confirmPurge(item)}
-                    >
-                      Törlés megerősítése
-                    </button>
-                  </>
+            <div key={item.uid} className={`undo-toast purge-toast${purging[item.uid]?.titles?.length > 0 ? " purge-toast--expanded" : ""}`}>
+              <div className="purge-toast-row">
+                <span className="undo-toast-text">
+                  Hozzáadva: <strong>{item.word}</strong>
+                </span>
+                {purging[item.uid]?.done ? (
+                  <span className="purge-done">✓ {purging[item.uid].count} hirdetés törölve</span>
+                ) : purging[item.uid]?.counted ? (
+                  purging[item.uid].count > 0 ? (
+                    <>
+                      <span className="purge-count">{purging[item.uid].count} találat</span>
+                      <button
+                        className="undo-toast-btn purge-btn"
+                        onClick={() => confirmPurge(item)}
+                      >
+                        Törlés megerősítése
+                      </button>
+                    </>
+                  ) : (
+                    <span className="purge-count">0 találat</span>
+                  )
                 ) : (
-                  <span className="purge-count">0 találat</span>
-                )
-              ) : (
-                <button
-                  className="undo-toast-btn purge-btn"
-                  onClick={() => countJobs(item)}
-                  disabled={purging[item.uid] === "counting" || purging[item.uid] === "deleting"}
-                >
-                  {purging[item.uid] === "counting" ? "Keresés…" : purging[item.uid] === "deleting" ? "Törlés…" : "🗑 Hirdetések törlése"}
-                </button>
+                  <button
+                    className="undo-toast-btn purge-btn"
+                    onClick={() => countJobs(item)}
+                    disabled={purging[item.uid] === "counting" || purging[item.uid] === "deleting"}
+                  >
+                    {purging[item.uid] === "counting" ? "Keresés…" : purging[item.uid] === "deleting" ? "Törlés…" : "🗑 Hirdetések törlése"}
+                  </button>
+                )}
+                <button className="undo-toast-close" onClick={() => dismissAdded(item)}>×</button>
+              </div>
+              {purging[item.uid]?.titles?.length > 0 && (
+                <div className="purge-titles">
+                  {purging[item.uid].titles.map((t, i) => (
+                    <div key={i} className="purge-title-item">{t}</div>
+                  ))}
+                </div>
               )}
-              <button className="undo-toast-close" onClick={() => dismissAdded(item)}>×</button>
             </div>
           ))}
         </div>

@@ -104,7 +104,7 @@ function dedupeByUrl(items) {
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent pool",
+    "tehetsegprogram", "tehetségprogram", "talent",
 ];
 
 const INTERN_SOURCES = [

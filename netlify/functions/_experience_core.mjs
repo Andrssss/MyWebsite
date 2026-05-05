@@ -39,7 +39,7 @@ function normalizeText(s) {
 export const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetsegprogram", "tehetségprogram", "talent pool",
+  "tehetsegprogram", "tehetségprogram", "talent",
 ];
 
 export function isInternshipTitle(title) {

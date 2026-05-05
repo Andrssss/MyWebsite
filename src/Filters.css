@@ -241,6 +241,41 @@
   color: #ef4444;
 }
 
+.purge-toast--expanded {
+  flex-direction: column;
+  align-items: stretch;
+  white-space: normal;
+  width: 380px;
+  max-width: 90vw;
+}
+
+.purge-toast-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.purge-titles {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.purge-title-item {
+  padding: 3px 0;
+  color: #d4d4d8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.purge-title-item:last-child {
+  border-bottom: none;
+}
+
 /* ===== MOBILE ===== */
 @media (max-width: 700px) {
   .filter-add-row {

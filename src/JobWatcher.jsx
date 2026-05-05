@@ -132,7 +132,7 @@ const hoursSince = (iso) => {
 /* =======================
    INTERN / JUNIOR LOGIKA
 ======================= */
-const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
+const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka", "talent"];
 const JUNIOR_KEYWORD = "junior";
 
 const JUNIOR_EXCLUDED_SOURCES = [
