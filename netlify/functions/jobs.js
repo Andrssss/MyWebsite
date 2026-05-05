@@ -10,12 +10,14 @@ if (!connectionString) {
   throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
 }
 
-const pool = globalThis.__jobsPool || new Pool({ connectionString });
-globalThis.__jobsPool = pool;
+// Fresh pool per invocation — no stale WebSocket connections
+function getPool() {
+  return new Pool({ connectionString });
+}
 
 // Convenience wrapper — exactly like the other project's sql.query()
 const sql = {
-  query: (text, params) => pool.query(text, params),
+  query: (text, params) => getPool().query(text, params),
 };
 
 function jsonResponse(statusCode, body, extraHeaders = {}) {
