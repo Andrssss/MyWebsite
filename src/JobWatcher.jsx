@@ -539,6 +539,7 @@ const JobWatcher = () => {
       const cachedTs = parseInt(localStorage.getItem(cacheTsKey) || "0", 10);
       if (!force && cached && Date.now() - cachedTs < CACHE_TTL_MS) {
         setJobs(JSON.parse(cached));
+        setLoading(false);
         return;
       }
     } catch {
