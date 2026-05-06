@@ -107,8 +107,9 @@ async function fetchSmartRecruiters(src) {
     if (!title || !it.ref) continue;
 
     let applyUrl = null;
+    let detail = null;
     try {
-      const detail = await fetchJson(it.ref);
+      detail = await fetchJson(it.ref);
       applyUrl = detail?.applyUrl || null;
     } catch (err) {
       await logFetchError("cron_jobs_ATS-background", { url: it.ref, message: err.message });
