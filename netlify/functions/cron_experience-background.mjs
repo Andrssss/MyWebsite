@@ -2,21 +2,6 @@ export const config = {
   schedule: "23 4-22 * * *",
 };
 
-/* =========================
-   EXPERIENCE ENRICHMENT — LinkedIn only.
-
-   cvcentrum, kuka, dreamjobs, melonjobs, talent) has been moved back into
-   the corresponding source background cron files:
-
-     - cron_jobs_P-background.mjs   → profession-intern
-     - cron_jobs_C_1-background.mjs / C_2 → cvcentrum-gyakornok-it
-     - cron_jobs_MIX-background.mjs → kuka, dreamjobs, melonjobs
-     - cron_jobs_T-background.mjs   → talent
-
-   This file still handles:
-     - bulk auto-mark of intern-source rows as "diákmunka"
-     - LinkedIn experience enrichment (kept here intentionally)
-   ========================= */
 
 import { Pool } from "pg";
 import { withTimeout } from "./_error-logger.mjs";

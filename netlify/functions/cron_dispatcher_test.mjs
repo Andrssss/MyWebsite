@@ -17,6 +17,8 @@ const TARGETS = [
   { name: "cron_jobs_ERSTE-background" },
   { name: "cron_jobs_MFB-background" },
   { name: "cron_jobs_UNICREDIT-background" },
+  { name: "cron_jobs_CG-background" },
+  { name: "cron_jobs_ATS-background" },
 ];
 
 export default withTimeout("cron_dispatcher_test", async () => {
