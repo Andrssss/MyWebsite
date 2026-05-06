@@ -63,6 +63,62 @@
   color: #c9d1ff;
 }
 
+/* ===== PDF LINK CARDS ===== */
+.stats-pdf-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stats-pdf-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: rgba(79, 140, 255, 0.08);
+  border: 1px solid rgba(79, 140, 255, 0.25);
+  border-radius: 12px;
+  text-decoration: none;
+  color: #e4e4e7;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.stats-pdf-card:hover {
+  background: rgba(79, 140, 255, 0.16);
+  border-color: rgba(79, 140, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.stats-pdf-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.stats-pdf-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-pdf-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #93c5fd;
+}
+
+.stats-pdf-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.stats-pdf-arrow {
+  font-size: 18px;
+  color: #4f8cff;
+  flex-shrink: 0;
+}
+
 .stats-line-header {
   display: flex;
   align-items: center;
