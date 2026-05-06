@@ -99,21 +99,40 @@ async function fetchSmartRecruiters(src) {
   const payload = await fetchJson(listUrl);
   const all = Array.isArray(payload?.content) ? payload.content : [];
 
+  const nonHu = all.filter((it) => !isHungaryLocation(it?.location));
   const huItems = all.filter((it) => isHungaryLocation(it?.location));
+
+  console.log(`[ats][${src.label}] total=${all.length} hu=${huItems.length} non-hu=${nonHu.length}`);
+  if (nonHu.length > 0) {
+    for (const it of nonHu) {
+      const loc = it?.location;
+      console.log(`[ats][${src.label}] skip non-HU: "${it.name}" → country=${loc?.country ?? "?"} city=${loc?.city ?? "?"}`);
+    }
+  }
 
   const results = [];
   for (const it of huItems) {
     const title = normalizeWhitespace(it.name);
-    if (!title || !it.ref) continue;
+    if (!title) {
+      console.log(`[ats][${src.label}] skip no-title: id=${it.id}`);
+      continue;
+    }
+    if (!it.ref) {
+      console.log(`[ats][${src.label}] skip no-ref: "${title}"`);
+      continue;
+    }
 
     let applyUrl = null;
     let detail = null;
     try {
       detail = await fetchJson(it.ref);
       applyUrl = detail?.applyUrl || null;
+      if (!applyUrl) {
+        console.log(`[ats][${src.label}] skip no-applyUrl: "${title}" ref=${it.ref}`);
+      }
     } catch (err) {
       await logFetchError("cron_jobs_ATS-background", { url: it.ref, message: err.message });
-      console.error(`[ats] detail fetch failed for ${it.id}: ${err.message}`);
+      console.error(`[ats][${src.label}] detail fetch failed for "${title}" (${it.id}): ${err.message}`);
     }
 
     if (!applyUrl) continue;
@@ -126,6 +145,7 @@ async function fetchSmartRecruiters(src) {
       experience = (descHtml ? extractBodyExperience(descHtml) : null) || "-";
     }
 
+    console.log(`[ats][${src.label}] ACCEPT: "${title}" exp=${experience} url=${url}`);
     results.push({ source: src.key, title, url, experience });
   }
 
@@ -189,6 +209,7 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
 
     for (const item of deduped) {
       if (isSeniorLike(item.title)) {
+        console.log(`[ats] skip senior: "${item.title}" (${item.source})`);
         skippedSenior += 1;
         continue;
       }
