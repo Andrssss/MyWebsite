@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "1 5-22 * * *",
+  schedule: "1 4-22 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
