@@ -386,6 +386,17 @@ const JobStats = () => {
         </div>
       )}
       */}
+
+      <div className="stats-section">
+        <h2>More stat and bértábla</h2>
+        <a
+          href="https://cdn.penzcentrum.hu/files/h/hu-hays-hungary-salary-guide-2026.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Hays Hungary Salary Guide 2026 (PDF)
+        </a>
+      </div>
     </div>
   );
 };
