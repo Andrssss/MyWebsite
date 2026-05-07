@@ -23,8 +23,8 @@ const pool = new Pool({
 });
 
 const SR_SOURCES = [
-  { key: "ats-sr-wise",   company: "Wise",         label: "SmartRecruiters Wise" },
-  { key: "ats-sr-roland", company: "RolandBerger", label: "SmartRecruiters Roland Berger" },
+  { key: "wise",   company: "Wise",         label: "SmartRecruiters Wise" },
+  { key: "roland", company: "RolandBerger", label: "SmartRecruiters Roland Berger" },
 ];
 
 function normalizeWhitespace(value) {

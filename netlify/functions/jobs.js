@@ -89,8 +89,8 @@ const FIXED = [
   { key: "mfb", label: "MFB Bank" },
   { key: "unicredit", label: "UniCredit Bank" },
   { key: "cg-jobstream", label: "Capgemini" },
-  { key: "ats-sr-wise", label: "Wise" },
-  { key: "ats-sr-roland", label: "Roland Berger" },
+  { key: "wise", label: "Wise" },
+  { key: "roland", label: "Roland Berger" },
 ];
 
 // Parameterized query helper. Returns rows array.
