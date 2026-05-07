@@ -12,6 +12,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { enrichExperience, extractTalentExperience } from "./_experience_core.mjs";
+import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 
 let _filters = [];
 
@@ -131,11 +132,11 @@ async function upsertJob(client, sourceKey, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, canonical_url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;`,
-    [sourceKey, item.title, item.url, canonicalUrl, item.experience]
+        DO UPDATE SET company = COALESCE(job_posts.company, EXCLUDED.company);`,
+    [sourceKey, item.title, item.url, canonicalUrl, item.experience, item.company || null]
   );
 }
 
@@ -196,14 +197,19 @@ function extractTalentJobs(html) {
     if (!title) return;
 
     let viewHref = null;
+    let company = null;
     let $card = $h2;
     for (let j = 0; j < 8; j++) {
       $card = $card.parent();
-      const link = $card.find('a[href*="/view?id="]').first();
-      if (link.length) {
-        viewHref = link.attr("href");
-        break;
+      if (!viewHref) {
+        const link = $card.find('a[href*="/view?id="]').first();
+        if (link.length) viewHref = link.attr("href");
       }
+      if (!company) {
+        const c = $card.find('[class*="JobCard_company"]').first();
+        if (c.length) company = normalizeWhitespace(c.text()) || null;
+      }
+      if (viewHref && company) break;
     }
 
     if (!viewHref) return;
@@ -218,6 +224,7 @@ function extractTalentJobs(html) {
     jobs.push({
       title,
       url,
+      company,
       experience: inferTalentExperience(title) ?? "-",
     });
   });
@@ -303,6 +310,8 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
       await upsertJob(client, "talent", job);
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);
+
+    await flagCrossDuplicates(client, { days: 2, label: "talent" });
   } finally {
     client.release();
   }

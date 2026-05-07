@@ -6,6 +6,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
+import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 
 let _filters = [];
 
@@ -249,10 +250,25 @@ function extractCandidates(html, baseUrl) {
       normalizeWhitespace(card.find(".description, .job-desc, .job-description").first().text()) ||
       null;
 
+    let company = null;
+    const $logo = card.find('img[alt*="karrier"]').first();
+    if ($logo.length) {
+      const alt = normalizeWhitespace($logo.attr("alt") || "");
+      company = alt.replace(/\s*karrier,?\s*\u00e1ll\u00e1s\s*\u00e9s\s*munka\s*$/i, "").trim() || null;
+    }
+    if (!company) {
+      const $emp = card.find('a[href*="/allasok/"][href*=",0,0,0,0,0,0,0,0,0,"]').first();
+      if ($emp.length) {
+        const slug = ($emp.attr("href") || "").match(/\/allasok\/([^\/]+)\//)?.[1];
+        if (slug) company = slug.replace(/-/g, " ").trim();
+      }
+    }
+
     items.push({
       title: title.slice(0, 300),
       url,
       description: desc ? desc.slice(0, 800) : null,
+      company: company ? company.slice(0, 200) : null,
     });
   });
 
@@ -336,12 +352,12 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
-     DO NOTHING;
+     DO UPDATE SET company = COALESCE(job_posts.company, EXCLUDED.company);
     `,
-    [source, item.title, canonicalUrl, item.experience || null]
+    [source, item.title, canonicalUrl, item.experience || null, item.company || null]
   );
 }
 
@@ -374,6 +390,7 @@ export async function processProfessionSources(sources, jobName, request, pageOp
         await processOneSource(client, p, jobName, pageOptions);
         await sleep(50);
       }
+      await flagCrossDuplicates(client, { days: 2, label: jobName || "profession" });
     } finally {
       client.release();
     }

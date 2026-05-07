@@ -5,6 +5,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
+import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 
 let _filters = [];
 const ENABLE_FETCH_ERROR_LOGGING = true;
@@ -245,15 +246,15 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     SELECT $1,$2,$3,$4,$5,NOW()
+      (source, title, url, canonical_url, experience, company, first_seen)
+     SELECT $1,$2,$3,$4,$5,$6,NOW()
      WHERE NOT EXISTS (
        SELECT 1 FROM job_posts WHERE source = $1 AND canonical_url = $4
      )
      ON CONFLICT (source, url)
-        DO NOTHING;
+        DO UPDATE SET company = COALESCE(job_posts.company, EXCLUDED.company);
         `,
-    [source, item.title, item.url, canonicalUrl, experience]
+    [source, item.title, item.url, canonicalUrl, experience, item.company || null]
   );
 }
 
@@ -384,6 +385,8 @@ export async function processLinkedInSources(sources, jobName) {
 
       console.log(`${p.key}: ${items.length} items processed.`);
     }
+
+    await flagCrossDuplicates(client, { days: 2, label: jobName || "linkedin" });
   } finally {
     console.log(`Script finished at ${new Date().toISOString()}${blocked ? " (ABORTED: LinkedIn block)" : ""}`);
     client.release();

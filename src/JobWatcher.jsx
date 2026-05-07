@@ -1094,7 +1094,7 @@ const JobWatcher = () => {
           const isApplied = appliedKeys.has(clickKeyBase);
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}`}>
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${job.isCrossDuplicate ? " job-card--crossdup" : ""}`}>
               <div className="job-row">
                 <a
                   className="job-title"
@@ -1136,6 +1136,14 @@ const JobWatcher = () => {
 
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
+                {job.isCrossDuplicate && (
+                  <span className="job-badge job-badge--crossdup" title="Ugyanez a cím és cég más forrásban is megjelent">
+                    Dupla
+                  </span>
+                )}
+                {job.company && (
+                  <span className="job-company">{job.company}</span>
+                )}
                 {job.experience && (
                   <span className="job-experience">{job.experience}</span>
                 )}
