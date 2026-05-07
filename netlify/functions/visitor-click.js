@@ -11,44 +11,36 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+const sql = { query: (text, params) => pool.query(text, params) };
+
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
 const ADMIN_VISITOR_IDS = new Set([
   "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
   "69872482-1311-4702-a5e5-a782ca9f2669",
   "82906f93-dfbb-4684-b2b1-a948b99553e0",
-   "b878ceed-55b7-47db-87ec-c4e2825246f8",
+  "b878ceed-55b7-47db-87ec-c4e2825246f8",
 ]);
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 30;
 const clickHits = globalThis.__visitorClickHits || new Map();
 globalThis.__visitorClickHits = clickHits;
-const targetDateSuffixRegex = /\s+\d{4}\.\s\d{2}\.\s\d{2}\.$/;
-const clickDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-const clickDateColumnCache = globalThis.__visitorClickDateColumnCache || { checked: false, exists: false };
-globalThis.__visitorClickDateColumnCache = clickDateColumnCache;
+const TARGET_DATE_SUFFIX_RE = /\s+\d{4}\.\s\d{2}\.\s\d{2}\.$/;
+
+const ensureTable =
+  globalThis.__ensureVisitorClickDatesTable ||
+  sql.query(
+    `CREATE TABLE IF NOT EXISTS visitor_click_dates (
+       visitor_cookie text NOT NULL,
+       clicked_on text NOT NULL,
+       created_at timestamptz NOT NULL DEFAULT now()
+     )`
+  );
+globalThis.__ensureVisitorClickDatesTable = ensureTable;
 
 function normalizeTarget(target) {
-  return String(target || "").replace(targetDateSuffixRegex, "").trim();
-}
-
-async function hasClickedDateColumn() {
-  if (clickDateColumnCache.checked) return clickDateColumnCache.exists;
-  try {
-    const { rows } = await pool.query(
-      `SELECT 1
-       FROM information_schema.columns
-       WHERE table_name = 'visitor_clicks' AND column_name = 'clicked_date'
-       LIMIT 1`
-    );
-    clickDateColumnCache.exists = rows.length > 0;
-  } catch {
-    clickDateColumnCache.exists = false;
-  } finally {
-    clickDateColumnCache.checked = true;
-  }
-  return clickDateColumnCache.exists;
+  return String(target || "").replace(TARGET_DATE_SUFFIX_RE, "").trim();
 }
 
 function corsHeaders(extra = {}) {
@@ -94,18 +86,42 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
 
-  // GET: top clicked items (admin only or public stats)
   if (event.httpMethod === "GET") {
+    if (event.queryStringParameters?.detail === "1") {
+      const adminId = event.queryStringParameters?.adminId || "";
+      if (!ADMIN_VISITOR_IDS.has(adminId)) {
+        return jsonResponse(403, { error: "Forbidden" });
+      }
+      try {
+        await ensureTable;
+        const { rows } = await sql.query(
+          `SELECT visitor_cookie,
+                  REGEXP_REPLACE(clicked_on, '\\s+\\d{4}\\.\\s\\d{2}\\.\\s\\d{2}\\.$', '') AS clicked_on,
+                  created_at
+           FROM visitor_click_dates
+           WHERE visitor_cookie <> ALL($1::text[])
+           ORDER BY created_at DESC
+           LIMIT 2000`,
+          [[...ADMIN_VISITOR_IDS]]
+        );
+        return jsonResponse(200, { rows });
+      } catch (err) {
+        console.error("[visitor-click] GET detail error:", err);
+        return jsonResponse(500, { error: "Server error" });
+      }
+    }
+
     try {
+      await ensureTable;
       const limit = Math.min(parseInt(event.queryStringParameters?.limit || "50", 10), 200);
-      const { rows } = await pool.query(
+      const { rows } = await sql.query(
         `SELECT clicked_on, COUNT(*)::int AS count
          FROM (
            SELECT DISTINCT
              lower(trim(visitor_cookie::text)) AS visitor_cookie,
              trim(regexp_replace(clicked_on, '\\s+[0-9]{4}\\.\\s*[0-9]{2}\\.\\s*[0-9]{2}\\.\\s*$', '')) AS clicked_on
-           FROM visitor_clicks
-           WHERE visitor_cookie NOT IN (SELECT unnest($1::text[]))
+           FROM visitor_click_dates
+           WHERE visitor_cookie <> ALL($1::text[])
              AND clicked_on NOT LIKE 'applied:%'
          ) AS unique_pairs
          GROUP BY clicked_on
@@ -145,15 +161,11 @@ exports.handler = async (event) => {
 
   const visitorId = String(payload.visitorId || "").trim();
   const target = normalizeTarget(payload.target);
-  const clickedDate = String(payload.clickedDate || "").trim();
 
   if (!visitorId) return jsonResponse(400, { error: "visitorId is required" });
   if (!target) return jsonResponse(400, { error: "target is required" });
   if (visitorId.length > 128) return jsonResponse(400, { error: "visitorId too long" });
   if (target.length > 512) return jsonResponse(400, { error: "target too long" });
-  if (clickedDate && !clickDateRegex.test(clickedDate)) {
-    return jsonResponse(400, { error: "clickedDate must be YYYY-MM-DD" });
-  }
 
   if (ADMIN_VISITOR_IDS.has(visitorId)) {
     return jsonResponse(200, { ok: true, skipped: true });
@@ -165,17 +177,12 @@ exports.handler = async (event) => {
   }
 
   try {
-    if (await hasClickedDateColumn()) {
-      await pool.query(
-        `INSERT INTO visitor_clicks (visitor_cookie, clicked_on, clicked_date) VALUES ($1, $2, $3)`,
-        [visitorId, target, clickedDate || null]
-      );
-    } else {
-      await pool.query(
-        `INSERT INTO visitor_clicks (visitor_cookie, clicked_on) VALUES ($1, $2)`,
-        [visitorId, target]
-      );
-    }
+    await ensureTable;
+    await sql.query(
+      `INSERT INTO visitor_click_dates (visitor_cookie, clicked_on, created_at)
+       VALUES ($1, $2, now())`,
+      [visitorId, target]
+    );
     return jsonResponse(200, { ok: true });
   } catch (err) {
     console.error("[visitor-click] INSERT error:", err);

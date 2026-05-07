@@ -116,6 +116,11 @@ const INTERNSHIP_KEYWORDS = [
     "tehetsegprogram", "tehetségprogram", "talent",
 ];
 
+const INTERN_SOURCES = [
+  "minddiak", "muisz", "zyntern", "schonherz", "prodiak",
+  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas",
+];
+
 function isInternshipTitle(title) {
   const n = normalizeText(title ?? "");
   return INTERNSHIP_KEYWORDS.some((k) => n.includes(k));
@@ -363,6 +368,32 @@ const _runJob = withTimeout("cron_jobs_C-background", async () => {
 
       for (const item of matched) {
         if (isInternshipTitle(item.title)) item.experience = "diákmunka";
+
+        const prefixMatch = item.title.match(/^\s*[Dd]i[áa]kmunka\s*[-–—:]\s*(.+)$/);
+        const suffixMatch = item.title.match(/^(.+?)\s*[-–—:]\s*[Dd]i[áa]kmunka\s*$/);
+        let stripped = null;
+        if (prefixMatch) stripped = prefixMatch[1].replace(/\s+/g, " ").trim();
+        else if (suffixMatch) stripped = suffixMatch[1].replace(/\s+/g, " ").trim();
+
+        if (stripped) {
+          try {
+            const { rowCount } = await client.query(
+              `SELECT 1 FROM job_posts
+               WHERE source = ANY($1::text[])
+                 AND LOWER(TRIM(REGEXP_REPLACE(title, '\\s+', ' ', 'g')))
+                     = LOWER($2)
+               LIMIT 1`,
+              [INTERN_SOURCES, stripped]
+            );
+            if (rowCount > 0) {
+              console.log(`[cvcentrum][dedupe] skipped "${item.title}" — duplicate of intern source`);
+              continue;
+            }
+          } catch (err) {
+            console.error(`[cvcentrum] dedupe check failed for "${item.title}": ${err.message}`);
+          }
+        }
+
         try {
           await upsertJob(client, SOURCE_KEY, item);
           totalInserted += 1;
