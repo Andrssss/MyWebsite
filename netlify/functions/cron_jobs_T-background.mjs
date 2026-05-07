@@ -171,6 +171,20 @@ function inferTalentExperience(title) {
   return null;
 }
 
+const TALENT_NO_RESULTS_RE = /nincsenek\s+tal[áa]latok\s+a\s+k[öo]vetkez[őo]re/i;
+const TALENT_MAX_PAGES = 30;
+
+function isTalentNoResults(html) {
+  return TALENT_NO_RESULTS_RE.test(html);
+}
+
+function buildTalentPagedUrl(baseUrl, page) {
+  const u = new URL(baseUrl);
+  if (page > 1) u.searchParams.set("p", String(page));
+  else u.searchParams.delete("p");
+  return u.toString();
+}
+
 function extractTalentJobs(html) {
   const $ = cheerioLoad(html);
   const jobs = [];
@@ -216,24 +230,58 @@ async function fetchAllTalentJobs() {
   const seen = new Set();
 
   for (const searchUrl of TALENT_SEARCH_URLS) {
-    try {
-      const html = await fetchText(searchUrl);
-      const jobs = extractTalentJobs(html);
+    const keyword = searchUrl.match(/k=([^&]+)/)?.[1] || "?";
+    let pagesVisited = 0;
+    let stopReason = "max-pages";
+    let totalAddedForKeyword = 0;
 
+    for (let page = 1; page <= TALENT_MAX_PAGES; page += 1) {
+      const pageUrl = buildTalentPagedUrl(searchUrl, page);
+      let html;
+      try {
+        html = await fetchText(pageUrl);
+      } catch (err) {
+        await logFetchError("cron_jobs_T", { url: pageUrl, message: err.message, extra: { source: "talent" } });
+        console.log(`talent: failed ${pageUrl}: ${err.message}`);
+        stopReason = "fetch-error";
+        break;
+      }
+
+      pagesVisited = page;
+
+      if (isTalentNoResults(html)) {
+        stopReason = "no-results";
+        break;
+      }
+
+      const jobs = extractTalentJobs(html);
+      if (jobs.length === 0) {
+        stopReason = "empty";
+        break;
+      }
+
+      let newOnPage = 0;
       for (const job of jobs) {
         const canonical = normalizeUrl(job.url);
         if (!seen.has(canonical)) {
           seen.add(canonical);
           allJobs.push(job);
+          newOnPage += 1;
         }
       }
+      totalAddedForKeyword += newOnPage;
 
-      console.log(`talent: ${searchUrl.match(/k=([^&]+)/)?.[1]} → ${jobs.length} jobs`);
-    } catch (err) {
-      await logFetchError("cron_jobs_T", { url: searchUrl, message: err.message, extra: { source: "talent" } });
-      console.log(`talent: failed ${searchUrl}: ${err.message}`);
+      console.log(`talent[${keyword}] page ${page}: ${jobs.length} jobs, ${newOnPage} new`);
+
+      if (newOnPage === 0) {
+        stopReason = "no-new";
+        break;
+      }
+
+      await sleep(1000);
     }
 
+    console.log(`talent[${keyword}] done — pages=${pagesVisited}, added=${totalAddedForKeyword}, stop=${stopReason}`);
     await sleep(1000);
   }
 
