@@ -193,9 +193,14 @@ function extractJobs(html, categoryUrl) {
     }
     // Ha nincs Munkavégzés helye mező → elfogadjuk (site eleve Budapest-fókuszú)
 
+    // Strip company-age phrases ("8 éves múlttal rendelkező" etc.) before extracting
+    const cleanSection = nextSection.replace(/\d+\s?(?:\+\s?)?(év|éves|éve)\s+múlt\w*/gi, "");
+    // Prefer "Elvárások" section to avoid company intro years
+    const elvarasMatch = cleanSection.match(/elv[aá]r[aá]sok[^:]*:([\s\S]{0,1500})/i);
+    const experienceSource = elvarasMatch ? elvarasMatch[1] : cleanSection;
     const experience = isInternshipTitle(titleText)
       ? "diákmunka"
-      : extractBodyExperience(nextSection) || "-";
+      : extractBodyExperience(experienceSource) || "-";
 
     const baseUrl = categoryUrl.replace(/\/$/, "");
     const syntheticUrl = `${baseUrl}?${titleHash(titleText)}`;
@@ -249,6 +254,11 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
       console.log(`[valorebasis] ${catUrl.split("/").pop()} → ${jobs.length} active jobs`);
 
       for (const job of jobs) {
+        if (isSeniorLike(job.title)) {
+          skippedSenior++;
+          console.log(`[valorebasis] SKIP senior "${job.title}"`);
+          continue;
+        }
         const wasNew = await upsertJob(client, "valorebasis", job);
         if (wasNew) {
           newlyInserted++;
@@ -261,7 +271,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
     }
 
     console.log(
-      `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, fetch_failed=${fetchFailed}`
+      `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
   } finally {
     client.release();
