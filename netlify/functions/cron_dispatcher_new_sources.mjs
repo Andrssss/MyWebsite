@@ -11,9 +11,9 @@ import { withTimeout } from "./_error-logger.mjs";
  */
 const TARGETS = [
 //   { name: "cron_jobs_EUDIAKOK-background" },
-  { name: "cron_jobs_MELODIAK-background" },
+//   { name: "cron_jobs_MELODIAK-background" },
 //   { name: "cron_jobs_ATLASZ-background" },
-//   { name: "cron_jobs_PANNONDIAK-background" },
+  { name: "cron_jobs_PANNONDIAK-background" },
 //   { name: "cron_jobs_VALOREBASIS-background" },
 //   { name: "cron_jobs_TRENKWALDER-background" },
 //   { name: "cron_jobs_WORKCENTER-background" },

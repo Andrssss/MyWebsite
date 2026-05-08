@@ -1,28 +1,25 @@
 /*
   PannonDiák – IT (category 1845) / Budapest scraper
 
-  List URL:
-    https://pannondiak.hu/allas?where=Budapest&category[]=1845
+  API: POST https://pannondiak.hu/jobs/ajaxSearch
+  Body: where=Budapest&category[]=1845&page=N&perPage=50
+  Response: { counter, jobs: [], view: "<HTML cards>" }
+  Title: article.card h3.card-title
+  URL: article.card .card-body a[href*="/allas/"]
 
   Flow:
-    1. Fetch list page → extract /allas/.../{ID} canonical URLs OR /details/{ID} URLs
-    2. Fetch each detail page (URL filter where=Budapest already filters)
-    3. Parse <h1> for job title
-    4. extractBodyExperience → experience field
-    5. Senior filter via _filters
-    6. Upsert to job_posts (source = "pannondiak")
-
-  Platform: NeoPortal (NeoSoft Kft.). No public JSON API.
+    1. Paginate POST /jobs/ajaxSearch until view is empty
+    2. Parse view HTML → extract title + canonical URL per card
+    3. Dedup by URL (Set)
+    4. Senior filter via _filters
+    5. Upsert (source = "pannondiak", experience = "diákmunka")
 */
 
 import { Pool } from "pg";
 import https from "https";
-import http from "http";
-import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -35,7 +32,8 @@ const pool = new Pool({
 });
 
 const BASE = "https://pannondiak.hu";
-const LIST_URL = `${BASE}/allas?where=Budapest&category%5B%5D=1845`;
+const SEARCH_URL = `${BASE}/jobs/ajaxSearch`;
+const IT_CATEGORY = "1845";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -64,10 +62,6 @@ function normalizeUrl(raw) {
   }
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
@@ -78,116 +72,91 @@ function isSeniorLike(title) {
   return _filters.some((kw) => _blacklistRegex(kw).test(n));
 }
 
-function fetchText(url, redirectLeft = 5) {
-  return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
-    const lib = parsedUrl.protocol === "https:" ? https : http;
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-    const req = lib.request(
-      parsedUrl,
+function postSearch(page) {
+  return new Promise((resolve, reject) => {
+    const params = new URLSearchParams({
+      where: "Budapest",
+      page: String(page),
+      perPage: "50",
+    });
+    params.append("category[]", IT_CATEGORY);
+    const body = params.toString();
+
+    const req = https.request(
+      new URL(SEARCH_URL),
       {
-        method: "GET",
+        method: "POST",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip,deflate,br",
+          "User-Agent": "Mozilla/5.0",
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(body),
+          "Accept": "application/json, */*",
+          "X-Requested-With": "XMLHttpRequest",
+          "Referer": `${BASE}/allas`,
         },
         timeout: 25000,
       },
       (res) => {
-        const code = res.statusCode || 0;
-
-        if ([301, 302, 303, 307, 308].includes(code)) {
-          const loc = res.headers.location;
-          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
-          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          res.resume();
-          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1));
-        }
-
-        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
-        let stream = res;
-        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
-        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
-        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
-
-        let body = "";
-        stream.setEncoding("utf8");
-        stream.on("data", (c) => (body += c));
-        stream.on("end", () =>
-          code >= 200 && code < 300
-            ? resolve(body)
-            : reject(new Error(`HTTP ${code} for ${url}`))
-        );
-        stream.on("error", reject);
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try { resolve(JSON.parse(data)); }
+            catch { reject(new Error(`JSON parse error at page ${page}`)); }
+          } else {
+            reject(new Error(`HTTP ${res.statusCode} for page ${page}`));
+          }
+        });
+        res.on("error", reject);
       }
     );
-
-    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
+    req.on("timeout", () => req.destroy(new Error(`Timeout at page ${page}`)));
     req.on("error", reject);
-    req.end();
+    req.end(body);
   });
 }
 
-/* ── list page parser ────────────────────────────────────────── */
+function parseCards(viewHtml) {
+  const $ = cheerioLoad(viewHtml);
+  const results = [];
 
-// Detail URLs come in two formats:
-//   /allas/{cat-slug}/{title-slug}/{ID}     (canonical, from listing)
-//   /details/{ID}                            (short alias, from share links)
-// Prefer the canonical form when available.
-function extractJobLinks(html, baseUrl) {
-  const $ = cheerioLoad(html);
-  const links = new Set();
+  $("article.card").each((_, el) => {
+    const article = $(el);
+    // URL from card-body link (canonical form: /allas/{cat}/{slug}/{ID})
+    const linkEl = article.find(".card-body a[href*='/allas/']").first();
+    const href = linkEl.attr("href");
+    if (!href || !/\/allas\/[^/]+\/[^/]+\/\d+/.test(href)) return;
 
-  $("a[href]").each((_, el) => {
-    const raw = $(el).attr("href");
-    if (!raw) return;
-    let path;
-    try {
-      path = new URL(raw, baseUrl).pathname;
-    } catch {
-      return;
-    }
-    // Canonical: /allas/{cat}/{slug}/{ID}
-    if (/^\/allas\/[^/]+\/[^/]+\/\d+\/?$/.test(path)) {
-      links.add(normalizeUrl(new URL(raw, baseUrl).toString()));
-      return;
-    }
-    // Short: /details/{ID}
-    if (/^\/details\/\d+\/?$/.test(path)) {
-      links.add(normalizeUrl(new URL(raw, baseUrl).toString()));
-    }
+    // Title from h3.card-title inside the link
+    const title = normalizeWhitespace(
+      article.find(".card-title").first().text()
+    );
+    if (!title) return;
+
+    results.push({
+      url: normalizeUrl(`${BASE}${href}`),
+      title,
+    });
   });
 
-  return [...links];
-}
-
-/* ── detail page parser ──────────────────────────────────────── */
-
-function extractTitle(html) {
-  const $ = cheerioLoad(html);
-  const h1 = normalizeWhitespace($("h1").first().text());
-  if (h1 && h1.length >= 3) return h1;
-
-  const h2 = normalizeWhitespace($("h2, h3").first().text());
-  if (h2 && h2.length >= 3) return h2;
-
-  const raw = normalizeWhitespace($("title").first().text());
-  // Strip site suffix
-  return raw.replace(/\s*[|·-]\s*PannonDi[aá]k.*$/i, "").trim();
+  return results;
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
-  const canonicalUrl = normalizeUrl(item.url);
+  const canonicalUrl = item.url;
   const res = await client.query(
     `INSERT INTO job_posts (source, title, url, canonical_url, experience, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, canonicalUrl, item.experience ?? "-"]
+    [source, item.title, item.url, canonicalUrl, "diákmunka"]
   );
   return res.rowCount > 0;
 }
@@ -198,71 +167,60 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
 
-  let listHtml;
-  try {
-    listHtml = await fetchText(LIST_URL);
-  } catch (err) {
-    await logFetchError("cron_jobs_PANNONDIAK-background", { url: LIST_URL, message: err.message });
-    console.error(`[pannondiak] list fetch failed: ${err.message}`);
-    client.release();
-    return;
-  }
-
-  const jobLinks = extractJobLinks(listHtml, BASE);
-  console.log(`[pannondiak] list: ${jobLinks.length} links`);
-
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
-  let skippedNoTitle = 0;
-  let detailFetchFailed = 0;
+  let fetchFailed = 0;
+  const seen = new Set();
 
   try {
-    for (const detailUrl of jobLinks) {
+    for (let page = 1; page <= 10; page++) {
+      let result;
       try {
-        await sleep(800);
-        const html = await fetchText(detailUrl);
-        const title = extractTitle(html);
-
-        if (!title) {
-          skippedNoTitle++;
-          console.log(`[pannondiak] SKIP no-title → ${detailUrl}`);
-          continue;
-        }
-
-        if (isSeniorLike(title)) {
-          skippedSenior++;
-          console.log(`[pannondiak] SKIP senior "${title}" → ${detailUrl}`);
-          continue;
-        }
-
-        const experience = isInternshipTitle(title)
-          ? "diákmunka"
-          : extractBodyExperience(html) || "-";
-
-        const wasNew = await upsertJob(client, "pannondiak", {
-          title,
-          url: detailUrl,
-          experience,
+        await sleep(600);
+        result = await postSearch(page);
+      } catch (err) {
+        fetchFailed++;
+        await logFetchError("cron_jobs_PANNONDIAK-background", {
+          url: `${SEARCH_URL}?page=${page}`,
+          message: err.message,
         });
+        console.error(`[pannondiak] page ${page} fetch failed: ${err.message}`);
+        break;
+      }
 
+      const cards = parseCards(result.view ?? "");
+      if (cards.length === 0) {
+        console.log(`[pannondiak] page ${page} empty, done`);
+        break;
+      }
+
+      console.log(`[pannondiak] page ${page}: ${cards.length} cards`);
+
+      for (const job of cards) {
+        if (seen.has(job.url)) continue;
+        seen.add(job.url);
+
+        if (isSeniorLike(job.title)) {
+          skippedSenior++;
+          console.log(`[pannondiak] SKIP senior "${job.title}"`);
+          continue;
+        }
+
+        const wasNew = await upsertJob(client, "pannondiak", job);
         if (wasNew) {
           newlyInserted++;
-          console.log(`[pannondiak] NEW "${title}" exp=${experience} → ${detailUrl}`);
+          console.log(`[pannondiak] NEW "${job.title}" → ${job.url}`);
         } else {
           alreadyExisted++;
-          console.log(`[pannondiak] EXISTS "${title}" → ${detailUrl}`);
+          console.log(`[pannondiak] EXISTS "${job.title}"`);
         }
-      } catch (err) {
-        detailFetchFailed++;
-        await logFetchError("cron_jobs_PANNONDIAK-background", { url: detailUrl, message: err.message });
-        console.error(`[pannondiak] detail fetch failed ${detailUrl}: ${err.message}`);
       }
     }
 
     console.log(
-      `[pannondiak] DONE — total=${jobLinks.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
+      `[pannondiak] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
+      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
   } finally {
     client.release();
