@@ -30,7 +30,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { isInternshipTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, extractYearsFromText } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -155,7 +155,14 @@ function detectExperienceFromText(title, descText) {
   const t = normalizeText(title);
   const d = normalizeText(descText ?? "");
   const combined = t + " " + d;
+
+  // 1. Internship/entry markers take priority
   if (INTERN_TEXT_KEYWORDS.some(k => combined.includes(normalizeText(k)))) return "diákmunka";
+
+  // 2. Extract year-based experience from description
+  const years = extractYearsFromText(descText ?? "");
+  if (years) return years;
+
   return "-";
 }
 
@@ -183,7 +190,7 @@ function extractJobEntries(html) {
   // Title:    h3.job-listing-loop-job__title  (inside the anchor)
   // Location: .job-location.location (first one, inside .job-details-inner)
   $("li.job_listing").each((_, li) => {
-    const anchor = $(li).find("a[href*='/munka/']").first();
+    const anchor = $(li).find("a[href*='/munka/'], a[href*='post_type=job_listing']").first();
     if (!anchor.length) return;
 
     const href = anchor.attr("href") ?? "";
