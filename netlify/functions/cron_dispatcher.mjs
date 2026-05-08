@@ -26,6 +26,9 @@ const TARGETS = [
   { name: "cron_jobs_MIX-background" },
   { name: "cron_jobs_OTP-background" },
   { name: "cron_jobs_T-background" },
+  { name: "cron_jobs_PANNONDIAK-background" },
+  { name: "cron_jobs_VALOREBASIS-background" },
+  { name: "cron_jobs_TRENKWALDER-background" },
 ];
 
 export default withTimeout("cron_dispatcher", async () => {
