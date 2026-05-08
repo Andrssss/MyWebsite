@@ -1,27 +1,30 @@
 /*
   Trenkwalder HU – Budapest / IT-Szoftverfejlesztés scraper
 
-  List URL:
-    https://hu.trenkwalder.com/jobs?aroundLoc=Budapest&refinements[jobObject.jobCategory.national][0]=IT/Szoftverfejlesztés
+  API: Algolia REST API
+    appId:    02IH9HMLGA
+    apiKey:   b885435a7745a7fd4c7637560f35f48a  (search-only, public)
+    index:    PROD_HU_New_Index_1_date
+    endpoint: POST https://02IH9HMLGA-dsn.algolia.net/1/indexes/PROD_HU_New_Index_1_date/query
+
+  Query:
+    filters:       publishingStatus:Published
+    facetFilters:  jobObject.jobCategory.national:IT/Szoftverfejlesztés
+    aroundLatLng:  47.497912,19.040235 (Budapest center)
+    aroundRadius:  25000 (25 km)
 
   Flow:
-    1. Fetch list pages (page=1,2,...) — stop when no job links found
-    2. Extract detail links: /jobs/{18-char-salesforce-id}
-    3. Fetch each detail → parse <h1> title
-    4. Budapest filter: aroundLoc=Budapest szerver-szűr, list-szintű elég
-    5. extractBodyExperience, isInternshipTitle
-    6. isSeniorLike filter
-    7. Upsert (source = "trenkwalder")
+    1. Paginate Algolia query until no more hits
+    2. Extract title (hit.jobObject.title) + URL (hit.web.jobUrl)
+    3. Senior filter via _filters
+    4. Upsert (source = "trenkwalder")
 */
 
 import { Pool } from "pg";
 import https from "https";
-import http from "http";
-import zlib from "zlib";
-import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+import { isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -33,10 +36,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const BASE = "https://hu.trenkwalder.com";
-const LIST_BASE =
-  `${BASE}/jobs?aroundLoc=Budapest` +
-  `&refinements%5BjobObject.jobCategory.national%5D%5B0%5D=IT%2FSzoftverfejleszt%C3%A9s`;
+const ALGOLIA_APP_ID = "02IH9HMLGA";
+const ALGOLIA_API_KEY = "b885435a7745a7fd4c7637560f35f48a";
+const ALGOLIA_INDEX = "PROD_HU_New_Index_1_date";
+const ALGOLIA_HOST = `${ALGOLIA_APP_ID}-dsn.algolia.net`;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -65,10 +68,6 @@ function normalizeUrl(raw) {
   }
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
@@ -79,92 +78,54 @@ function isSeniorLike(title) {
   return _filters.some((kw) => _blacklistRegex(kw).test(n));
 }
 
-function fetchText(url, redirectLeft = 5) {
-  return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
-    const lib = parsedUrl.protocol === "https:" ? https : http;
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-    const req = lib.request(
-      parsedUrl,
+function algoliaSearch(page) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      query: "",
+      filters: "publishingStatus:Published",
+      facetFilters: [["jobObject.jobCategory.national:IT/Szoftverfejlesztés"]],
+      aroundLatLng: "47.497912,19.040235",
+      aroundRadius: 25000,
+      hitsPerPage: 100,
+      page,
+    });
+
+    const req = https.request(
       {
-        method: "GET",
+        hostname: ALGOLIA_HOST,
+        path: `/1/indexes/${ALGOLIA_INDEX}/query`,
+        method: "POST",
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip,deflate,br",
+          "X-Algolia-Application-Id": ALGOLIA_APP_ID,
+          "X-Algolia-API-Key": ALGOLIA_API_KEY,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
         },
         timeout: 25000,
       },
       (res) => {
-        const code = res.statusCode || 0;
-
-        if ([301, 302, 303, 307, 308].includes(code)) {
-          const loc = res.headers.location;
-          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
-          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          res.resume();
-          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1));
-        }
-
-        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
-        let stream = res;
-        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
-        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
-        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
-
-        let body = "";
-        stream.setEncoding("utf8");
-        stream.on("data", (c) => (body += c));
-        stream.on("end", () =>
-          code >= 200 && code < 300
-            ? resolve(body)
-            : reject(new Error(`HTTP ${code} for ${url}`))
-        );
-        stream.on("error", reject);
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try { resolve(JSON.parse(data)); }
+            catch { reject(new Error(`JSON parse error at page ${page}`)); }
+          } else {
+            reject(new Error(`HTTP ${res.statusCode} at page ${page}: ${data.slice(0, 200)}`));
+          }
+        });
+        res.on("error", reject);
       }
     );
-
-    req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
+    req.on("timeout", () => req.destroy(new Error(`Algolia timeout page ${page}`)));
     req.on("error", reject);
-    req.end();
+    req.end(body);
   });
-}
-
-/* ── list page parser ────────────────────────────────────────── */
-
-// Detail links: /jobs/{18-char-id}  (Salesforce ID format)
-const DETAIL_RE = /^\/jobs\/[a-zA-Z0-9]{15,18}\/?$/;
-
-function extractDetailLinks(html) {
-  const $ = cheerioLoad(html);
-  const links = new Set();
-
-  $("a[href]").each((_, el) => {
-    const raw = $(el).attr("href");
-    if (!raw) return;
-    let path;
-    try {
-      path = new URL(raw, BASE).pathname;
-    } catch {
-      return;
-    }
-    if (DETAIL_RE.test(path)) {
-      links.add(normalizeUrl(new URL(raw, BASE).toString()));
-    }
-  });
-
-  return [...links];
-}
-
-/* ── detail page parser ──────────────────────────────────────── */
-
-function extractTitle(html) {
-  const $ = cheerioLoad(html);
-  const h1 = normalizeWhitespace($("h1").first().text());
-  if (h1 && h1.length >= 3) return h1;
-  const raw = normalizeWhitespace($("title").first().text());
-  return raw.replace(/\s*[|·-]\s*Trenkwalder.*$/i, "").trim();
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
@@ -190,79 +151,66 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
-  let skippedNoTitle = 0;
-  let detailFetchFailed = 0;
+  let fetchFailed = 0;
+  const seen = new Set();
 
   try {
-    // Collect all detail links across pages
-    const allLinks = new Set();
-    let page = 1;
-
-    while (true) {
-      const listUrl = `${LIST_BASE}&page=${page}`;
-      let listHtml;
+    for (let page = 0; page < 10; page++) {
+      let result;
       try {
-        await sleep(800);
-        listHtml = await fetchText(listUrl);
+        await sleep(300);
+        result = await algoliaSearch(page);
       } catch (err) {
-        await logFetchError("cron_jobs_TRENKWALDER-background", { url: listUrl, message: err.message });
-        console.error(`[trenkwalder] list page ${page} fetch failed: ${err.message}`);
+        fetchFailed++;
+        await logFetchError("cron_jobs_TRENKWALDER-background", {
+          url: `algolia:${ALGOLIA_INDEX}:page=${page}`,
+          message: err.message,
+        });
+        console.error(`[trenkwalder] algolia page ${page} failed: ${err.message}`);
         break;
       }
 
-      const links = extractDetailLinks(listHtml);
-      console.log(`[trenkwalder] page ${page} → ${links.length} links`);
-      if (links.length === 0) break;
+      const hits = result.hits ?? [];
+      console.log(`[trenkwalder] page ${page}: ${hits.length} hits (nbHits=${result.nbHits})`);
+      if (hits.length === 0) break;
 
-      links.forEach((l) => allLinks.add(l));
-      page++;
-    }
+      for (const hit of hits) {
+        const jobUrl = hit.web?.jobUrl;
+        if (!jobUrl) continue;
+        const url = normalizeUrl(jobUrl);
+        if (seen.has(url)) continue;
+        seen.add(url);
 
-    console.log(`[trenkwalder] total unique detail links: ${allLinks.size}`);
+        const title = normalizeWhitespace(hit.jobObject?.title ?? "");
+        if (!title) continue;
 
-    for (const detailUrl of allLinks) {
-      try {
-        await sleep(800);
-        const html = await fetchText(detailUrl);
-        const title = extractTitle(html);
-
-        if (!title) {
-          skippedNoTitle++;
-          console.log(`[trenkwalder] SKIP no-title → ${detailUrl}`);
-          continue;
-        }
         if (isSeniorLike(title)) {
           skippedSenior++;
           console.log(`[trenkwalder] SKIP senior "${title}"`);
           continue;
         }
 
-        const experience = isInternshipTitle(title)
-          ? "diákmunka"
-          : extractBodyExperience(html) || "-";
+        // Experience: check tags for "Student", otherwise check title
+        const isStudent = hit.web?.tags?.some((t) => t.en === "Student");
+        const experience = isStudent || isInternshipTitle(title) ? "diákmunka" : "-";
 
-        const wasNew = await upsertJob(client, "trenkwalder", {
-          title,
-          url: detailUrl,
-          experience,
-        });
+        const wasNew = await upsertJob(client, "trenkwalder", { title, url, experience });
         if (wasNew) {
           newlyInserted++;
-          console.log(`[trenkwalder] NEW "${title}" exp=${experience} → ${detailUrl}`);
+          console.log(`[trenkwalder] NEW "${title}" exp=${experience} → ${url}`);
         } else {
           alreadyExisted++;
           console.log(`[trenkwalder] EXISTS "${title}"`);
         }
-      } catch (err) {
-        detailFetchFailed++;
-        await logFetchError("cron_jobs_TRENKWALDER-background", { url: detailUrl, message: err.message });
-        console.error(`[trenkwalder] detail fetch failed ${detailUrl}: ${err.message}`);
       }
+
+      // Stop if we've seen all pages
+      if (page >= (result.nbPages ?? 1) - 1) break;
     }
 
     console.log(
       `[trenkwalder] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
+      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
   } finally {
     client.release();
