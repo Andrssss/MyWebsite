@@ -138,8 +138,7 @@ export default async function handler() {
       `INSERT INTO job_daily_stats (date, total_jobs, intern_jobs)
        VALUES ($1, $2, $3)
        ON CONFLICT (date)
-       DO UPDATE SET total_jobs = EXCLUDED.total_jobs,
-                     intern_jobs = EXCLUDED.intern_jobs`,
+       DO NOTHING`,
       [today, totalJobs, internJobs]
     );
 
@@ -155,7 +154,7 @@ export default async function handler() {
         `INSERT INTO job_daily_categories (date, category, count)
          VALUES ($1, $2, $3)
          ON CONFLICT (date, category)
-         DO UPDATE SET count = EXCLUDED.count`,
+          DO NOTHING`,
         [today, category, count]
       );
     }
@@ -168,7 +167,7 @@ export default async function handler() {
         `INSERT INTO job_daily_categories (date, category, count)
          VALUES ($1, $2, $3)
          ON CONFLICT (date, category)
-         DO UPDATE SET count = EXCLUDED.count`,
+          DO NOTHING`,
         [today, `intern:${category}`, count]
       );
     }

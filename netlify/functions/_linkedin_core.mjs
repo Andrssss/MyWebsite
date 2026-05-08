@@ -252,7 +252,7 @@ async function upsertJob(client, source, item) {
        SELECT 1 FROM job_posts WHERE source = $1 AND canonical_url = $4
      )
      ON CONFLICT (source, url)
-        DO UPDATE SET company = COALESCE(job_posts.company, EXCLUDED.company);
+        DO NOTHING;
         `,
     [source, item.title, item.url, canonicalUrl, experience, item.company || null]
   );

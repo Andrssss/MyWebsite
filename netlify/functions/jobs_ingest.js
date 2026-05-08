@@ -65,10 +65,7 @@ exports.handler = async (event) => {
         `INSERT INTO job_posts (source, title, url, description, first_seen, last_seen)
          VALUES ($1,$2,$3,$4,NOW(),NOW())
          ON CONFLICT (source, url)
-         DO UPDATE SET
-           title = EXCLUDED.title,
-           description = COALESCE(EXCLUDED.description, job_posts.description),
-           last_seen = NOW()`,
+         DO NOTHING`,
         [source, title, url, description]
       );
       upserted++;
