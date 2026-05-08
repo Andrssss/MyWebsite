@@ -35,11 +35,19 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const BASE = "https://valorebasis.hu";
-const INDEX_URL = `${BASE}/allasok/`;
-
-// Exclude these paths from category link discovery
-const EXCLUDED_PATHS = new Set(["/", "/cegeknek/", "/cegeknek", "/allasok", "/allasok/"]);
+const CATEGORY_URLS = [
+  "https://valorebasis.hu/php-fejlesztoi-allasok",
+  "https://valorebasis.hu/java-fejlesztoi-allasok/",
+  "https://valorebasis.hu/c-fejlesztoi-allasok",
+  "https://valorebasis.hu/c-fejlesztoi-allasok-2",
+  "https://valorebasis.hu/net-fejlesztoi-allasok/",
+  "https://valorebasis.hu/ios-android-fejlesztoi-allasok",
+  "https://valorebasis.hu/egyeb-fejlesztoi-poziciok",
+  "https://valorebasis.hu/szoftverteszteloi-allasok",
+  "https://valorebasis.hu/it-sales-poziciok",
+  "https://valorebasis.hu/projektvezetoi-poziciok",
+  "https://valorebasis.hu/rendszergazda-mernok-poziciok",
+];
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -77,6 +85,13 @@ function normalizeUrl(raw) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// Deterministic 5-digit number from title — stable across runs, unique per title
+function titleHash(s) {
+  let h = 0;
+  for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff;
+  return String(10000 + (h % 90000));
 }
 
 function _blacklistRegex(k) {
@@ -141,32 +156,6 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
-/* ── index page: discover category URLs ──────────────────────── */
-
-function extractCategoryUrls(html) {
-  const $ = cheerioLoad(html);
-  const urls = new Set();
-
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href") ?? "";
-    let parsed;
-    try {
-      parsed = new URL(href, BASE);
-    } catch {
-      return;
-    }
-    // Only same-origin, non-excluded paths
-    if (parsed.hostname !== "valorebasis.hu") return;
-    const path = parsed.pathname.replace(/\/$/, "") || "/";
-    if (EXCLUDED_PATHS.has(path) || EXCLUDED_PATHS.has(path + "/")) return;
-    // Must look like a content slug (not a file)
-    if (path.includes(".")) return;
-    urls.add(normalizeUrl(parsed.toString()));
-  });
-
-  return [...urls];
-}
-
 /* ── category page parser ────────────────────────────────────── */
 
 function extractJobs(html, categoryUrl) {
@@ -213,7 +202,9 @@ function extractJobs(html, categoryUrl) {
       ? "diákmunka"
       : extractBodyExperience(nextSection) || "-";
 
-    const syntheticUrl = normalizeUrl(categoryUrl) + "#" + slugify(titleText);
+    // Use ?NNNNN suffix — stable hash of title, NOT stripped by normalizeUrl
+    const baseUrl = categoryUrl.replace(/\/$/, "");
+    const syntheticUrl = `${baseUrl}?${titleHash(titleText)}`;
 
     jobs.push({ title: titleText, url: syntheticUrl, experience });
     i++; // ugorjuk a státusz h5-öt
@@ -248,20 +239,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
   let fetchFailed = 0;
 
   try {
-    // Step 1: discover category URLs from index page
-    let categoryUrls;
-    try {
-      const indexHtml = await fetchText(INDEX_URL);
-      categoryUrls = extractCategoryUrls(indexHtml);
-      console.log(`[valorebasis] discovered ${categoryUrls.length} category URLs`);
-    } catch (err) {
-      await logFetchError("cron_jobs_VALOREBASIS-background", { url: INDEX_URL, message: err.message });
-      console.error(`[valorebasis] index fetch failed: ${err.message}`);
-      client.release();
-      return;
-    }
-
-    for (const catUrl of categoryUrls) {
+    for (const catUrl of CATEGORY_URLS) {
       let html;
       try {
         await sleep(1000);
