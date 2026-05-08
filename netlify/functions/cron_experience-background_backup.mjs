@@ -23,7 +23,7 @@ export default withTimeout("cron_experience-background", async () => {
       extract: extractLinkedInExperience,
       label: "LinkedIn",
       jobName: "cron_experience-background",
-      intervalMinutes: 60,
+      intervalMinutes: 180, // 3 hours
       experienceCondition: "(experience IS NULL OR experience = '-')",
     });
   } catch (err) {
