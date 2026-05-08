@@ -1,21 +1,19 @@
 /*
   Valore Basis – IT fejvadász scraper
 
-  Az `/allasok/` oldal kategória-kártyák indexe. Nincs egyedi job detail URL.
-  Az összes hirdetés inline van a kategória oldalakon.
-
-  Kategóriák (hardkódolt, stabil URL-ek):
-    php, java, c#, c++, .net, ios/android, egyéb, tesztelő, IT sales,
-    projektvezető, rendszergazda
+  Entry point: https://valorebasis.hu/allasok/
+  Az oldal flip-kártyákat tartalmaz, minden kártya hátoldalán
+  "kattints a részletekért !" link mutat a kategória oldalra.
 
   Flow:
-    1. Minden kategória URL fetch
-    2. h5 elemekből title + státusz parse
-    3. Státusz "szünetel" → skip
-    4. Munkavégzés helye → Budapest check
-    5. extractBodyExperience az inline szövegből
-    6. Senior filter via _filters
-    7. Upsert (source = "valorebasis", url = kategória URL + "#" + slugify(title))
+    1. Fetch /allasok/ → kategória URL-ek dinamikus kinyerése
+    2. Minden kategória URL fetch
+    3. h5 elemekből title + státusz parse
+    4. Státusz "szünetel" → skip
+    5. Munkavégzés helye → Budapest check
+    6. extractBodyExperience az inline szövegből
+    7. Senior filter via _filters
+    8. Upsert (source = "valorebasis", url = kategória URL + "#" + slugify(title))
 */
 
 import { Pool } from "pg";
@@ -37,19 +35,11 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const CATEGORY_URLS = [
-  "https://valorebasis.hu/php-fejlesztoi-allasok",
-  "https://valorebasis.hu/java-fejlesztoi-allasok/",
-  "https://valorebasis.hu/c-fejlesztoi-allasok",
-  "https://valorebasis.hu/c-fejlesztoi-allasok-2",
-  "https://valorebasis.hu/net-fejlesztoi-allasok/",
-  "https://valorebasis.hu/ios-android-fejlesztoi-allasok",
-  "https://valorebasis.hu/egyeb-fejlesztoi-poziciok",
-  "https://valorebasis.hu/szoftverteszteloi-allasok",
-  "https://valorebasis.hu/it-sales-poziciok",
-  "https://valorebasis.hu/projektvezetoi-poziciok",
-  "https://valorebasis.hu/rendszergazda-mernok-poziciok",
-];
+const BASE = "https://valorebasis.hu";
+const INDEX_URL = `${BASE}/allasok/`;
+
+// Exclude these paths from category link discovery
+const EXCLUDED_PATHS = new Set(["/", "/cegeknek/", "/cegeknek", "/allasok", "/allasok/"]);
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -151,6 +141,32 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
+/* ── index page: discover category URLs ──────────────────────── */
+
+function extractCategoryUrls(html) {
+  const $ = cheerioLoad(html);
+  const urls = new Set();
+
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href") ?? "";
+    let parsed;
+    try {
+      parsed = new URL(href, BASE);
+    } catch {
+      return;
+    }
+    // Only same-origin, non-excluded paths
+    if (parsed.hostname !== "valorebasis.hu") return;
+    const path = parsed.pathname.replace(/\/$/, "") || "/";
+    if (EXCLUDED_PATHS.has(path) || EXCLUDED_PATHS.has(path + "/")) return;
+    // Must look like a content slug (not a file)
+    if (path.includes(".")) return;
+    urls.add(normalizeUrl(parsed.toString()));
+  });
+
+  return [...urls];
+}
+
 /* ── category page parser ────────────────────────────────────── */
 
 function extractJobs(html, categoryUrl) {
@@ -232,7 +248,20 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
   let fetchFailed = 0;
 
   try {
-    for (const catUrl of CATEGORY_URLS) {
+    // Step 1: discover category URLs from index page
+    let categoryUrls;
+    try {
+      const indexHtml = await fetchText(INDEX_URL);
+      categoryUrls = extractCategoryUrls(indexHtml);
+      console.log(`[valorebasis] discovered ${categoryUrls.length} category URLs`);
+    } catch (err) {
+      await logFetchError("cron_jobs_VALOREBASIS-background", { url: INDEX_URL, message: err.message });
+      console.error(`[valorebasis] index fetch failed: ${err.message}`);
+      client.release();
+      return;
+    }
+
+    for (const catUrl of categoryUrls) {
       let html;
       try {
         await sleep(1000);
