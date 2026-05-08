@@ -161,38 +161,33 @@ function fetchText(url, redirectLeft = 5) {
 function extractJobs(html, categoryUrl) {
   const $ = cheerioLoad(html);
   const jobs = [];
+  const seen = new Set();
 
-  // h5 elemek alternálva: cím, státusz, leírás...
-  // "PHP FEJLESZTŐ" → h5 cím
-  // "Jelentkezési határidő: ..." → h5 státusz
-  // A kettő mindig egymás után jelenik meg
-  const h5els = $("h5").toArray();
+  // Struktúra: h4 = job cím, következő h5 = státusz ("Jelentkezési határidő: ...")
+  const h4els = $("h4").toArray();
 
-  for (let i = 0; i < h5els.length; i++) {
-    const titleText = normalizeWhitespace($(h5els[i]).text());
-    // h5 státusz elem a következő h5, tartalmaz "Jelentkezési határidő"
-    const statusEl = h5els[i + 1];
-    if (!statusEl) continue;
+  for (const h4el of h4els) {
+    const titleText = normalizeWhitespace($(h4el).text());
+    if (!titleText) continue;
 
-    const statusText = normalizeWhitespace($(statusEl).text());
+    // Duplikált cím kiszűrése (az oldal flip-kártya miatt többszöröz)
+    if (seen.has(titleText)) continue;
+
+    // Következő h5 — tartalmazza a státuszt
+    const statusEl = $(h4el).nextAll("h5").first();
+    if (!statusEl.length) continue;
+    const statusText = normalizeWhitespace(statusEl.text());
     if (!statusText.toLowerCase().includes("jelentkezési határidő")) continue;
 
-    // Skip ha szünetel
-    if (statusText.toLowerCase().includes("szünetel")) {
-      console.log(`[valorebasis] SKIP inactive "${titleText}"`);
-      i++; // ugorjuk a státusz h5-öt is
-      continue;
-    }
+    // Szövegtörzs h4 és következő h4 között
+    const nextSection = $(h4el).nextUntil("h4").text();
 
-    // Budapest validáció — szövegtörzsben keresünk a cím h5 után
-    // Kinyerjük a h5 utáni szövegből a "Munkavégzés helye" blokkot
-    const nextSection = $(h5els[i]).nextUntil("h5").text();
+    // Budapest validáció
     const locMatch = nextSection.match(/Munkavégzés helye[:\s]*([^\n•◦]+)/i);
     if (locMatch) {
       const loc = normalizeText(locMatch[1]);
       if (!loc.includes("budapest")) {
         console.log(`[valorebasis] SKIP non-Budapest "${titleText}" loc="${locMatch[1].trim()}"`);
-        i++;
         continue;
       }
     }
@@ -202,12 +197,11 @@ function extractJobs(html, categoryUrl) {
       ? "diákmunka"
       : extractBodyExperience(nextSection) || "-";
 
-    // Use ?NNNNN suffix — stable hash of title, NOT stripped by normalizeUrl
     const baseUrl = categoryUrl.replace(/\/$/, "");
     const syntheticUrl = `${baseUrl}?${titleHash(titleText)}`;
 
+    seen.add(titleText);
     jobs.push({ title: titleText, url: syntheticUrl, experience });
-    i++; // ugorjuk a státusz h5-öt
   }
 
   return jobs;
@@ -255,12 +249,6 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
       console.log(`[valorebasis] ${catUrl.split("/").pop()} → ${jobs.length} active jobs`);
 
       for (const job of jobs) {
-        if (isSeniorLike(job.title)) {
-          skippedSenior++;
-          console.log(`[valorebasis] SKIP senior "${job.title}"`);
-          continue;
-        }
-
         const wasNew = await upsertJob(client, "valorebasis", job);
         if (wasNew) {
           newlyInserted++;
@@ -273,8 +261,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
     }
 
     console.log(
-      `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
+      `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, fetch_failed=${fetchFailed}`
     );
   } finally {
     client.release();
