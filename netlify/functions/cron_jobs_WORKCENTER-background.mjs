@@ -173,7 +173,7 @@ async function fetchDetailExperience(url, title) {
   try {
     const html = await fetchText(url);
     const $ = cheerioLoad(html);
-    const descText = $(".job_description").first().text();
+    const descText = $(".single-job-listing__description").first().text();
     return detectExperienceFromText(title, descText);
   } catch {
     return "-";

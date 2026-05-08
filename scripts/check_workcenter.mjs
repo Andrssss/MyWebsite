@@ -1,9 +1,10 @@
 import https from "https";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { extractYearsFromText } from "../netlify/functions/_experience_core.mjs";
 
 const BASE = "https://workcenter.hu";
-const url = "https://workcenter.hu/jobs/page/2/?s=Budapest&filter_job_listing_category=informatikus";
+const url = "https://workcenter.hu/munka/support-mernok/";
 
 const req = https.request(new URL(url), {
   headers: {
@@ -40,15 +41,10 @@ const req = https.request(new URL(url), {
     const scriptMatches = body.match(/<script[^>]+src=[^>]+>/g) || [];
     console.log("scripts:", scriptMatches.slice(0, 5));
 
-    // Dump each li.job_listing: title + location selector output
     const $ = cheerioLoad(body);
-    $("li.job_listing").each((i, li) => {
-      const title = $(li).find("h3.job-listing-loop-job__title").first().text().trim();
-      const locInner = $(li).find(".job-details-inner .job-location.location").first().text().trim();
-      const href = $(li).find("a[href]").first().attr("href") ?? "(no link)";
-      console.log(`LI[${i}]: title="${title}" loc="${locInner}" href="${href}"`);
-    });
-    console.log("Total li.job_listing:", $("li.job_listing").length);
+    const descText = $(".single-job-listing__description").first().text();
+    console.log("descText snippet:", descText.substring(0, 200));
+    console.log("extractYearsFromText:", extractYearsFromText(descText));
   });
 });
 req.on("error", e => console.error("ERROR:", e.message));
