@@ -1,28 +1,21 @@
 /*
   Atlasz Munkák – IT kategória scraper
 
-  List URL:
-    https://atlaszmunkak.hu/munkak.php?cat=22&catnev=IT
+  API endpoint: POST https://atlaszmunkak.hu/inc/jobsearch.php
+  Body: job_ids[]=22  (22 = IT kategória)
+  Returns JSON: { data: [{ position, location_city, url, ... }] }
 
   Flow:
-    1. Fetch list page → extract <a href="/ad.php?id=NNNN"> job links
-       Budapest validation done at LIST level: anchor's text content must contain "budapest"
-       (no Budapest URL filter exists; non-Budapest jobs e.g. "Budaörs" appear in the list)
-    2. Fetch each Budapest detail page
-    3. Parse <h1> for job title
-    4. extractBodyExperience → experience field
-    5. Senior filter via _filters
-    6. Upsert to job_posts (source = "atlasz")
+    1. POST /inc/jobsearch.php?job_ids[]=22 → JSON jobs
+    2. Filter location_city = "Budapest"
+    3. Senior filter via _filters
+    4. Upsert to job_posts (source = "atlasz", experience = "diákmunka" always — student job site)
 */
 
 import { Pool } from "pg";
 import https from "https";
-import http from "http";
-import zlib from "zlib";
-import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -35,7 +28,8 @@ const pool = new Pool({
 });
 
 const BASE = "https://atlaszmunkak.hu";
-const LIST_URL = `${BASE}/munkak.php?cat=22&catnev=IT`;
+const API_URL = `${BASE}/inc/jobsearch.php`;
+const IT_CAT_ID = "22";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -56,7 +50,6 @@ function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
     u.hash = "";
-    // Strip the cosmetic `pnev` slug parameter — it's display-only
     u.searchParams.delete("pnev");
     ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"]
       .forEach((p) => u.searchParams.delete(p));
@@ -64,10 +57,6 @@ function normalizeUrl(raw) {
   } catch {
     return raw;
   }
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 function _blacklistRegex(k) {
@@ -80,102 +69,41 @@ function isSeniorLike(title) {
   return _filters.some((kw) => _blacklistRegex(kw).test(n));
 }
 
-function fetchText(url, redirectLeft = 5) {
+function postJson(url, body) {
   return new Promise((resolve, reject) => {
+    const postData = body;
     const parsedUrl = new URL(url);
-    const lib = parsedUrl.protocol === "https:" ? https : http;
-
-    const req = lib.request(
+    const req = https.request(
       parsedUrl,
       {
-        method: "GET",
+        method: "POST",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip,deflate,br",
+          "User-Agent": "Mozilla/5.0",
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(postData),
         },
         timeout: 25000,
       },
       (res) => {
-        const code = res.statusCode || 0;
-
-        if ([301, 302, 303, 307, 308].includes(code)) {
-          const loc = res.headers.location;
-          if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
-          if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          res.resume();
-          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1));
-        }
-
-        const enc = String(res.headers["content-encoding"] || "").toLowerCase();
-        let stream = res;
-        if (enc.includes("gzip")) stream = res.pipe(zlib.createGunzip());
-        else if (enc.includes("deflate")) stream = res.pipe(zlib.createInflate());
-        else if (enc.includes("br")) stream = res.pipe(zlib.createBrotliDecompress());
-
-        let body = "";
-        stream.setEncoding("utf8");
-        stream.on("data", (c) => (body += c));
-        stream.on("end", () =>
-          code >= 200 && code < 300
-            ? resolve(body)
-            : reject(new Error(`HTTP ${code} for ${url}`))
-        );
-        stream.on("error", reject);
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try { resolve(JSON.parse(data)); }
+            catch { reject(new Error(`JSON parse error: ${data.slice(0, 100)}`)); }
+          } else {
+            reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+          }
+        });
+        res.on("error", reject);
       }
     );
-
     req.on("timeout", () => req.destroy(new Error(`Timeout for ${url}`)));
     req.on("error", reject);
+    req.write(postData);
     req.end();
   });
-}
-
-/* ── list page parser ────────────────────────────────────────── */
-
-// Extract Budapest-only job links. Each kártya is an <a href="/ad.php?id=NNNN">
-// whose visible text contains: TITLE | helyszín | kategóriák | óra/hét.
-// Non-Budapest links (e.g. "Budaörs") are filtered out here.
-function extractJobLinks(html, baseUrl) {
-  const $ = cheerioLoad(html);
-  const items = [];
-  const seen = new Set();
-
-  $("a[href]").each((_, el) => {
-    const raw = $(el).attr("href");
-    if (!raw) return;
-    let path;
-    try {
-      path = new URL(raw, baseUrl).pathname;
-    } catch {
-      return;
-    }
-    if (path !== "/ad.php") return;
-
-    const full = normalizeUrl(new URL(raw, baseUrl).toString());
-    if (seen.has(full)) return;
-
-    const linkText = normalizeText($(el).text());
-    if (!linkText.includes("budapest")) return; // Budapest-only
-
-    seen.add(full);
-    items.push({ url: full, listingText: $(el).text().trim() });
-  });
-
-  return items;
-}
-
-/* ── detail page parser ──────────────────────────────────────── */
-
-function extractTitle(html) {
-  const $ = cheerioLoad(html);
-  const h1 = normalizeWhitespace($("h1").first().text());
-  if (h1 && h1.length >= 3) return h1;
-
-  const raw = normalizeWhitespace($("title").first().text());
-  // strip site suffix
-  return raw.replace(/\s*[|·-]\s*Atlasz.*$/i, "").trim();
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
@@ -198,78 +126,61 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
 
-  let listHtml;
+  let apiResult;
   try {
-    listHtml = await fetchText(LIST_URL);
+    apiResult = await postJson(API_URL, `job_ids[]=${IT_CAT_ID}`);
   } catch (err) {
-    await logFetchError("cron_jobs_ATLASZ-background", { url: LIST_URL, message: err.message });
-    console.error(`[atlasz] list fetch failed: ${err.message}`);
+    await logFetchError("cron_jobs_ATLASZ-background", { url: API_URL, message: err.message });
+    console.error(`[atlasz] API fetch failed: ${err.message}`);
     client.release();
     return;
   }
 
-  const items = extractJobLinks(listHtml, BASE);
-  console.log(`[atlasz] list: ${items.length} Budapest job links`);
+  const jobs = apiResult?.data ?? [];
+  console.log(`[atlasz] API returned ${jobs.length} IT jobs`);
 
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
-  let skippedNoTitle = 0;
-  let detailFetchFailed = 0;
+  let skippedNonBudapest = 0;
 
   try {
-    for (const { url: detailUrl, listingText } of items) {
-      try {
-        await sleep(800);
-        const html = await fetchText(detailUrl);
-        let title = extractTitle(html);
+    for (const job of jobs) {
+      const title = normalizeWhitespace(job.position);
+      if (!title) continue;
 
-        // Fallback: derive title from listing anchor text (first chunk before helyszín)
-        if (!title && listingText) {
-          // Listing format: "TITLE Budapest Kategória 20 óra/hét" – grab tokens up to "Budapest"
-          const m = listingText.match(/^(.+?)\s+Budapest/i);
-          if (m) title = normalizeWhitespace(m[1]);
-        }
+      if (normalizeText(job.location_city ?? "") !== "budapest") {
+        skippedNonBudapest++;
+        console.log(`[atlasz] SKIP non-Budapest "${title}" loc="${job.location_city}"`);
+        continue;
+      }
 
-        if (!title) {
-          skippedNoTitle++;
-          console.log(`[atlasz] SKIP no-title → ${detailUrl}`);
-          continue;
-        }
+      if (isSeniorLike(title)) {
+        skippedSenior++;
+        console.log(`[atlasz] SKIP senior "${title}"`);
+        continue;
+      }
 
-        if (isSeniorLike(title)) {
-          skippedSenior++;
-          console.log(`[atlasz] SKIP senior "${title}" → ${detailUrl}`);
-          continue;
-        }
+      const jobUrl = normalizeUrl(new URL(job.url, BASE).toString());
 
-        const experience = isInternshipTitle(title)
-          ? "diákmunka"
-          : extractBodyExperience(html) || "-";
+      const wasNew = await upsertJob(client, "atlasz", {
+        title,
+        url: jobUrl,
+        experience: "diákmunka",
+      });
 
-        const wasNew = await upsertJob(client, "atlasz", {
-          title,
-          url: detailUrl,
-          experience,
-        });
-
-        if (wasNew) {
-          newlyInserted++;
-          console.log(`[atlasz] NEW "${title}" exp=${experience} → ${detailUrl}`);
-        } else {
-          alreadyExisted++;
-          console.log(`[atlasz] EXISTS "${title}" → ${detailUrl}`);
-        }
-      } catch (err) {
-        detailFetchFailed++;
-        await logFetchError("cron_jobs_ATLASZ-background", { url: detailUrl, message: err.message });
-        console.error(`[atlasz] detail fetch failed ${detailUrl}: ${err.message}`);
+      if (wasNew) {
+        newlyInserted++;
+        console.log(`[atlasz] NEW "${title}" → ${jobUrl}`);
+      } else {
+        alreadyExisted++;
+        console.log(`[atlasz] EXISTS "${title}"`);
       }
     }
 
     console.log(
-      `[atlasz] DONE — total=${items.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
+      `[atlasz] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
+      `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}`
     );
   } finally {
     client.release();
