@@ -350,6 +350,11 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
 async function upsertJob(client, source, item) {
   const canonicalUrl = normalizeUrl(item.url);
 
+  // Check company first — skip if PannonDiák
+  if (item.company === 'PannonDiák') {
+    return;
+  }
+
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, first_seen)
