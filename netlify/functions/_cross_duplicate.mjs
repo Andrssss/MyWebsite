@@ -13,8 +13,18 @@ export async function flagCrossDuplicates(client, { days = 2, label = "" } = {})
       `
       WITH groups AS (
         SELECT
-          LOWER(REGEXP_REPLACE(TRIM(title), '\\s+', ' ', 'g'))   AS t,
-          LOWER(REGEXP_REPLACE(TRIM(company), '\\s+', ' ', 'g')) AS c,
+          TRIM(REGEXP_REPLACE(
+            LOWER(TRANSLATE(title, 'áéíóöőúüűÁÉÍÓÖŐÚÜŰ', 'aeiooouuuAEIOOOUUU')),
+            '[^a-z0-9]+',
+            ' ',
+            'g'
+          )) AS t,
+          TRIM(REGEXP_REPLACE(
+            LOWER(TRANSLATE(company, 'áéíóöőúüűÁÉÍÓÖŐÚÜŰ', 'aeiooouuuAEIOOOUUU')),
+            '[^a-z0-9]+',
+            ' ',
+            'g'
+          )) AS c,
           ARRAY_AGG(DISTINCT source) AS sources,
           ARRAY_AGG(id)              AS ids
         FROM job_posts
