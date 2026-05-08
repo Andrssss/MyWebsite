@@ -1141,9 +1141,6 @@ const JobWatcher = () => {
                     Dupla
                   </span>
                 )}
-                {job.company && (
-                  <span className="job-company">{job.company}</span>
-                )}
                 {job.experience && (
                   <span className="job-experience">{job.experience}</span>
                 )}

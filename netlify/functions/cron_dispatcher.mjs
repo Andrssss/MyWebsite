@@ -12,7 +12,8 @@ import { withTimeout } from "./_error-logger.mjs";
  * independently — keeping its own scraping logic intact.
  *
  * Targets:
- *   A_K, BLUE, C, DIAK_1, DIAK_2, DIAK_3, F_3, MBH, MIX, OTP, T
+ *   A_K, BLUE, C, DIAK_1, DIAK_2, DIAK_3, F_3, MBH, MIX, OTP, T,
+ *   VALOREBASIS, TRENKWALDER, WORKCENTER
  */
 const TARGETS = [
   { name: "cron_jobs_A_K-background" },
@@ -22,10 +23,12 @@ const TARGETS = [
   { name: "cron_jobs_DIAK_2-background" },
   { name: "cron_jobs_DIAK_3-background" },
   { name: "cron_jobs_F_3-background", body: { startPage: 1 } },
-  // { name: "cron_jobs_MBH-background" },
   { name: "cron_jobs_MIX-background" },
   { name: "cron_jobs_OTP-background" },
   { name: "cron_jobs_T-background" },
+  { name: "cron_jobs_VALOREBASIS-background" },
+  { name: "cron_jobs_TRENKWALDER-background" },
+  { name: "cron_jobs_WORKCENTER-background" },
 ];
 
 export default withTimeout("cron_dispatcher", async () => {

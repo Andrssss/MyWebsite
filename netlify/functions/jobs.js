@@ -91,6 +91,13 @@ const FIXED = [
   { key: "cg-jobstream", label: "Capgemini" },
   { key: "wise", label: "Wise" },
   { key: "roland", label: "Roland Berger" },
+  { key: "eudiakok", label: "euDiákok" },
+  { key: "melodiak", label: "MelóDiák" },
+  { key: "atlasz", label: "Atlasz Munkák" },
+  { key: "pannondiak", label: "PannonDiák" },
+  { key: "valorebasis", label: "Valore Basis" },
+  { key: "trenkwalder", label: "Trenkwalder" },
+  { key: "workcenter", label: "WorkCenter" },
 ];
 
 // Parameterized query helper. Returns rows array.
@@ -173,7 +180,7 @@ exports.handler = async (event) => {
         const rows = await query(
           `SELECT source, title, url,
                   first_seen AS "firstSeen",
-                  experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                  experience, is_cross_duplicate AS "isCrossDuplicate"
            FROM job_posts
            WHERE id = $1`,
           [id]
@@ -191,7 +198,7 @@ exports.handler = async (event) => {
           timeRange === "24h"
             ? `SELECT source, title, url,
                       first_seen AS "firstSeen",
-                      experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                      experience, is_cross_duplicate AS "isCrossDuplicate"
                FROM job_posts
                WHERE source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '24 hours'
@@ -200,7 +207,7 @@ exports.handler = async (event) => {
             : timeRange === "7d"
             ? `SELECT source, title, url,
                       first_seen AS "firstSeen",
-                      experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                      experience, is_cross_duplicate AS "isCrossDuplicate"
                FROM job_posts
                WHERE source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '7 days'
@@ -208,7 +215,7 @@ exports.handler = async (event) => {
                LIMIT $2`
             : `SELECT source, title, url,
                       first_seen AS "firstSeen",
-                      experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                      experience, is_cross_duplicate AS "isCrossDuplicate"
                FROM job_posts
                WHERE source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '30 days'
@@ -225,7 +232,7 @@ exports.handler = async (event) => {
         timeRange === "24h"
           ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
-                    experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                    experience, is_cross_duplicate AS "isCrossDuplicate"
              FROM job_posts
              WHERE first_seen >= NOW() - INTERVAL '24 hours'
              ORDER BY first_seen DESC, id DESC
@@ -233,14 +240,14 @@ exports.handler = async (event) => {
           : timeRange === "7d"
           ? `SELECT source, title, url,
                     first_seen AS "firstSeen",
-                    experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                    experience, is_cross_duplicate AS "isCrossDuplicate"
              FROM job_posts
              WHERE first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : `SELECT source, title, url,
                     first_seen AS "firstSeen",
-                    experience, company, is_cross_duplicate AS "isCrossDuplicate"
+                    experience, is_cross_duplicate AS "isCrossDuplicate"
              FROM job_posts
              WHERE first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
