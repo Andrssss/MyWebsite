@@ -15,8 +15,8 @@ const TARGETS = [
 //   { name: "cron_jobs_ATLASZ-background" },
 //   { name: "cron_jobs_PANNONDIAK-background" },
 //   { name: "cron_jobs_VALOREBASIS-background" },
-  { name: "cron_jobs_TRENKWALDER-background" },
-//   { name: "cron_jobs_WORKCENTER-background" },
+//   { name: "cron_jobs_TRENKWALDER-background" },
+  { name: "cron_jobs_WORKCENTER-background" },
 ];
 
 export default withTimeout("cron_dispatcher_new_sources", async () => {

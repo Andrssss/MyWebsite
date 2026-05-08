@@ -2,29 +2,25 @@
   WorkCenter – informatikus kategória scraper
 
   List URL:
-    https://workcenter.hu/jobs/?filter_job_listing_category=informatikus
-    https://workcenter.hu/jobs/page/{N}/?filter_job_listing_category=informatikus
+    https://workcenter.hu/jobs/?s=Budapest&filter_job_listing_category=informatikus
+    https://workcenter.hu/jobs/page/{N}/?s=Budapest&filter_job_listing_category=informatikus
 
-  ⚠️ KRITIKUS KORLÁT: A detail oldalak (/munka/{slug}/) raw HTTP GET-tel
-  Google Maps-re irányítanak vissza (valószínűleg JS-alapú redirect).
-  A detail oldal tartalma headless browser nélkül nem érhető el.
+  WordPress WP Job Manager alapú site.
+  Raw HTTP GET-tel teljes HTML visszajön (nem JS-rendered).
 
   Stratégia: LISTING-ONLY
-    - Az anchor szövegből nyerjük a title-t és a helyszínt
-    - Budapest check az anchor szövegből (kötelező — a kategória nem Budapest-specifikus)
-    - experience = "-" mindig (detail nem elérhető)
-    - url = az anchor href (canonical_url = ugyanaz)
-
-  Anchor szöveg formátuma:
-    "{CÉGNÉV}  {JOB CÍM}  {HELYSZÍN}"
-    pl. "WORKCENTER Személyzeti Tanácsadó HÁLÓZATI TECHNIKUS  Budapest, XI. kerület"
+    - title: h3.job-listing-loop-job__title (listing-ből)
+    - location: .job-details-inner .job-location.location (listing-ből)
+    - s=Budapest server-side szűr, de location check is megmarad biztonsági hálóként
+    - experience: isInternshipTitle(title) — detail oldalon nincs strukturált tapasztalat mező
+    - url = az anchor href (/munka/{slug}/)
 
   Flow:
-    1. Fetch listing pages page=1,2,... — stop ha nincs /munka/ link
-    2. Budapest check az anchor szöveg helyszín részéből
-    3. Title parse az anchor szövegből
+    1. Fetch listing pages page=1,2,... — stop ha nincs li.job_listing
+    2. li.job_listing → title + location parse cheerio-val
+    3. Budapest check location-ből
     4. isSeniorLike filter
-    5. Upsert (source = "workcenter", experience = "-")
+    5. Upsert (source = "workcenter")
 */
 
 import { Pool } from "pg";
@@ -48,7 +44,7 @@ const pool = new Pool({
 
 const BASE = "https://workcenter.hu";
 const LIST_BASE = `${BASE}/jobs`;
-const CATEGORY_PARAM = "filter_job_listing_category=informatikus";
+const CATEGORY_PARAM = "s=Budapest&filter_job_listing_category=informatikus";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -143,58 +139,64 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
-/* ── list page parser ────────────────────────────────────────── */
+/* ── experience from detail page ─────────────────────────────── */
 
-// Anchor href: /munka/{slug}/  or  /?post_type=job_listing&p={ID}
-const JOB_HREF_RE = /^\/munka\/[^/?#]+\/?$|^\/?(?:\?.*)?post_type=job_listing/;
+const INTERN_TEXT_KEYWORDS = [
+  "gyakornok", "intern", "internship", "trainee",
+  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
+  "tehetségprogram", "tehetsegprogram",
+  "friss diplomás", "friss diplomas",
+  "nem szükséges tapasztalat", "tapasztalat nem szükséges",
+  "tapasztalat nélkül", "tapasztalat nelkul",
+  "belépő szintű", "belepo szintu",
+];
+
+function detectExperienceFromText(title, descText) {
+  const t = normalizeText(title);
+  const d = normalizeText(descText ?? "");
+  const combined = t + " " + d;
+  if (INTERN_TEXT_KEYWORDS.some(k => combined.includes(normalizeText(k)))) return "diákmunka";
+  return "-";
+}
+
+async function fetchDetailExperience(url, title) {
+  // 1. Title is enough — skip detail fetch
+  if (isInternshipTitle(title)) return "diákmunka";
+  // 2. Title inconclusive — check description text
+  try {
+    const html = await fetchText(url);
+    const $ = cheerioLoad(html);
+    const descText = $(".job_description").first().text();
+    return detectExperienceFromText(title, descText);
+  } catch {
+    return "-";
+  }
+}
+
+/* ── list page parser ────────────────────────────────────────── */
 
 function extractJobEntries(html) {
   const $ = cheerioLoad(html);
   const entries = [];
 
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href") ?? "";
-    let path;
-    try {
-      path = new URL(href, BASE).pathname;
-    } catch {
-      return;
-    }
+  // WP Job Manager structure: ul.job_listings > li.job_listing > a[href*="/munka/"]
+  // Title:    h3.job-listing-loop-job__title  (inside the anchor)
+  // Location: .job-location.location (first one, inside .job-details-inner)
+  $("li.job_listing").each((_, li) => {
+    const anchor = $(li).find("a[href*='/munka/']").first();
+    if (!anchor.length) return;
 
-    // Only job links
-    if (!href.includes("/munka/") && !href.includes("post_type=job_listing")) return;
-    if (!JOB_HREF_RE.test(href) && !JOB_HREF_RE.test(path)) return;
-
-    const rawText = normalizeWhitespace($(el).text());
-    if (!rawText || rawText.length < 5) return;
-
-    // Anchor format: "{COMPANY}  {TITLE}  {LOCATION}"
-    // Split on double-space
-    const parts = rawText.split(/  +/);
-
-    let title = "";
-    let location = "";
-
-    if (parts.length >= 3) {
-      // parts[0] = company name, parts[1] = title, parts[last] = location
-      title = normalizeWhitespace(parts.slice(1, parts.length - 1).join(" "));
-      location = normalizeWhitespace(parts[parts.length - 1]);
-    } else if (parts.length === 2) {
-      title = normalizeWhitespace(parts[0]);
-      location = normalizeWhitespace(parts[1]);
-    } else {
-      // No double-space — try known prefix removal
-      const m = rawText.match(
-        /^(?:WORKCENTER\s+Személyzeti\s+Tanácsadó|Work4You)\s+(.+)$/i
-      );
-      title = m ? normalizeWhitespace(m[1]) : rawText;
-    }
-
+    const href = anchor.attr("href") ?? "";
+    const title = normalizeWhitespace($(li).find("h3.job-listing-loop-job__title").first().text());
     if (!title || title.length < 2) return;
 
-    // Budapest check
-    if (!location.toLowerCase().includes("budapest") &&
-        !rawText.toLowerCase().includes("budapest")) return;
+    // Location: prefer the one inside job-details-inner (not meta duplicate)
+    const location = normalizeWhitespace(
+      $(li).find(".job-details-inner .job-location.location").first().text()
+        .replace(/^[\s\S]*?(?=[A-Za-záéíóöőúüűÁÉÍÓÖŐÚÜŰ])/, "") // strip icon text
+    );
+
+    if (!location.toLowerCase().includes("budapest")) return;
 
     const url = normalizeUrl(new URL(href, BASE).toString());
     entries.push({ title, url });
@@ -230,8 +232,9 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
 
   try {
     let page = 1;
+    const MAX_PAGES = 10;
 
-    while (true) {
+    while (page <= MAX_PAGES) {
       const listUrl =
         page === 1
           ? `${LIST_BASE}/?${CATEGORY_PARAM}`
@@ -266,7 +269,7 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
           continue;
         }
 
-        const experience = isInternshipTitle(entry.title) ? "diákmunka" : "-";
+        const experience = await fetchDetailExperience(entry.url, entry.title);
 
         const wasNew = await upsertJob(client, "workcenter", {
           title: entry.title,
