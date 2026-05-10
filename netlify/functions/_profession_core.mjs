@@ -68,6 +68,14 @@ function professionPageUrl(baseUrl, page) {
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
+
+    // Profession occasionally serves duplicate job URLs with an extra
+    // city slug just before the numeric job id (e.g. "-budapest-2895930").
+    // Normalize these to a single canonical path so dedupe/upsert works.
+    if (/^www\.profession\.hu$/i.test(u.hostname) && /^\/allas\//i.test(u.pathname)) {
+      u.pathname = u.pathname.replace(/-budapest-(\d+)(\/pro)?\/?$/i, "-$1$2");
+    }
+
     u.hash = "";
     [
       "utm_source", "utm_medium", "utm_campaign", "utm_term",

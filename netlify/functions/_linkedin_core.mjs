@@ -33,6 +33,10 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
+function hasLatinScript(title, minLetters = 2) {
+  return (normalizeText(title).match(/[a-z]/g) || []).length >= minLetters;
+}
+
 const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
@@ -369,6 +373,7 @@ export async function processLinkedInSources(sources, jobName) {
       }
 
       let items = rawItems.filter(it => {
+        if (!hasLatinScript(it.title)) return false;
         if (!levelNotBlacklisted(it.title, it.description)) return false;
         if (!titleNotBlacklisted(it.title)) return false;
         if (!isHungarianLinkedInUrl(it.url) && (!it.location || (!it.location.includes("budapest") && !it.location.includes("hungary")))) return false;
