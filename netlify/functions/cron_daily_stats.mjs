@@ -9,6 +9,7 @@ export const config = {
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadCategories } from "./load_categories.mjs";
+import { INTERNSHIP_KEYWORDS, INTERN_SOURCES } from "./_experience_core.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -18,20 +19,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const INTERN_SOURCES = [
-  "minddiak",
-  "muisz",
-  "zyntern",
-  "schonherz",
-  "prodiak",
-  "tudasdiak",
-  "tudatosdiak",
-  "ydiak",
-  "qdiak",
-  "frissdiplomas",
-];
+// INTERN_SOURCES / INTERNSHIP_KEYWORDS imported from _experience_core.mjs
 
-const INTERN_TITLE_KEYWORDS = ["tehetsegprogram","tehetségprogram","talent","intern", "gyakornok", "trainee", "diák", "diákmunka"];
 const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
 
 function kwRegex(kw) {

@@ -14,7 +14,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { enrichExperience, extractBodyExperience } from "./_experience_core.mjs";
+import { enrichExperience, extractBodyExperience, INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 const ENABLE_FETCH_ERROR_LOGGING = false;
@@ -108,23 +108,8 @@ function buildPagedUrl(baseUrl, page) {
 }
 
 // =====================
-// Keywords
+// Keywords (imported from _experience_core.mjs)
 // =====================
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent",
-];
-
-const INTERN_SOURCES = [
-  "minddiak", "muisz", "zyntern", "schonherz", "prodiak",
-  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas",
-];
-
-function isInternshipTitle(title) {
-  const n = normalizeText(title ?? "");
-  return INTERNSHIP_KEYWORDS.some((k) => n.includes(k));
-}
 
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

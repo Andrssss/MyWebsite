@@ -16,6 +16,7 @@ import {
   enrichExperience,
   extractBodyExperience,
   extractKukaExperience,
+  INTERNSHIP_KEYWORDS,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -222,11 +223,7 @@ function isBudapestLocation(location) {
   return normalized.includes("budapest") || /\b1\d{3}\b/.test(normalized);
 }
 
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent",
-];
+// INTERNSHIP_KEYWORDS imported from _experience_core.mjs
 
 
 function inferExperience(title, description) {

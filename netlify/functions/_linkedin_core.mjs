@@ -6,6 +6,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 const ENABLE_FETCH_ERROR_LOGGING = true;
@@ -37,15 +38,7 @@ function hasLatinScript(title, minLetters = 2) {
   return (normalizeText(title).match(/[a-z]/g) || []).length >= minLetters;
 }
 
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetsegprogram", "tehetségprogram", "talent",
-];
-function isInternshipTitle(title) {
-  const t = normalizeText(title);
-  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
-}
+// INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
 
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

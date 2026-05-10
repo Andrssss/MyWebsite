@@ -11,7 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { enrichExperience, extractTalentExperience } from "./_experience_core.mjs";
+import { enrichExperience, extractTalentExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 
 let _filters = [];
@@ -153,16 +153,7 @@ function isSeniorLike(title) {
   return _filters.some((kw) => _blacklistRegex(kw).test(normalized));
 }
 
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent",
-];
-
-function isInternshipTitle(title) {
-  const n = normalizeText(title ?? "");
-  return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
-}
+// INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
 
 function inferTalentExperience(title) {
   const normalized = normalizeText(title);

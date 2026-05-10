@@ -27,7 +27,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -141,19 +141,8 @@ const SOURCES = [
 ];
 
 // =====================
-// Keywords
+// Keywords (INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs)
 // =====================
-
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent",
-];
-
-function isInternshipTitle(title) {
-  const n = normalizeText(title ?? "");
-  return INTERNSHIP_KEYWORDS.some(k => n.includes(k));
-}
 
 
 

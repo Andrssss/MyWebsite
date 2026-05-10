@@ -5,6 +5,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, flushErrors } from "./_error-logger.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
 
@@ -33,15 +34,7 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent",
-];
-function isInternshipTitle(title) {
-  const t = normalizeText(title);
-  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
-}
+// INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
 
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();

@@ -11,7 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { enrichExperience, extractBodyExperience } from "./_experience_core.mjs";
+import { enrichExperience, extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -38,15 +38,7 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
-const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-    "tehetsegprogram", "tehetségprogram", "talent",
-];
-function isInternshipTitle(title) {
-  const t = normalizeText(title);
-  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
-}
+// INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
 
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
