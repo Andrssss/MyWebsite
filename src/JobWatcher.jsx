@@ -1089,7 +1089,7 @@ const JobWatcher = () => {
 
     {loading ? (
       <div className="job-status">Betöltés…</div>
-    ) : visibleJobs.length === 0 ? (
+    ) : visibleJobs.length === 0 && !showAppliedOnly ? (
       <div className="job-status">Nincs találat.</div>
     ) : (
       <ul className="job-list">
@@ -1174,13 +1174,24 @@ const JobWatcher = () => {
           );
         })}
 
+        {visibleJobs.length === 0 && showAppliedOnly && (
+          <li className="job-status">Még nincs mentett jelentkezés.</li>
+        )}
+
         {showAppliedOnly && (
-          <li className={`job-card job-card--manual-add${manualAddOpen ? " open" : ""}`}>
+          <li
+            className={`job-card job-card--manual-add${manualAddOpen ? " open" : ""}`}
+            onClick={!manualAddOpen ? () => { setManualAddOpen(true); setManualAppliedStatus(""); } : undefined}
+          >
             <span className="job-card-fold" aria-hidden="true" />
             <button
               type="button"
               className="job-manual-toggle"
-              onClick={() => { setManualAddOpen((v) => !v); setManualAppliedStatus(""); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setManualAddOpen((v) => !v);
+                setManualAppliedStatus("");
+              }}
             >
               <span className="job-manual-cta">
                 <strong>Kézileg hozzáadott jelentkezés</strong>
@@ -1189,7 +1200,7 @@ const JobWatcher = () => {
             </button>
 
             {manualAddOpen && (
-              <>
+              <div onClick={(e) => e.stopPropagation()}>
                 <div className="job-manual-fields">
                   <input
                     className="job-search"
@@ -1235,7 +1246,7 @@ const JobWatcher = () => {
                   <span style={{ color: manualAppliedStatus === "Hozzáadva" ? "#4ade80" : "#ef4444" }}>{manualAppliedStatus}</span>
                   <button className="job-btn" onClick={handleAddManualApplied}>Hozzáadás</button>
                 </div>
-              </>
+              </div>
             )}
           </li>
         )}
