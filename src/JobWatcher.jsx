@@ -256,13 +256,20 @@ const getCategoriesForJob = (job, jobCategories) => {
   if (matches.length > 1 && matches.includes("C++")) {
     return ["C++"];
   }
-  // Hálózat / Infra alacsony prioritású: ha más is matchelt, az nyerjen
-  if (matches.length > 1 && matches.includes("Hálózat / Infra")) {
-    const others = matches.filter((c) => c !== "Hálózat / Infra");
+  // Fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen (így Hálózat/Infra és Mérnöki/Gyártás is erősebb nála)
+  const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
+  const effective = withoutFallback.length > 0 ? withoutFallback : matches;
+  // Hálózat / Infra alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
+  if (effective.length > 1 && effective.includes("Hálózat / Infra")) {
+    const others = effective.filter((c) => c !== "Hálózat / Infra");
     return others;
   }
-  const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
-  return withoutFallback.length > 0 ? withoutFallback : matches;
+  // Mérnöki / Gyártás alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
+  if (effective.length > 1 && effective.includes("Mérnöki / Gyártás")) {
+    const others = effective.filter((c) => c !== "Mérnöki / Gyártás");
+    return others;
+  }
+  return effective;
 };
 
 const JobWatcher = () => {

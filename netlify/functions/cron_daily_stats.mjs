@@ -58,14 +58,18 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
       counts["C++"]++;
       continue;
     }
-    // Hálózat / Infra alacsony prioritású: ha más is matchelt, az nyerjen
-    if (matches.length > 1 && matches.includes("Hálózat / Infra")) {
-      const others = matches.filter((c) => c !== "Hálózat / Infra");
-      for (const cat of others) counts[cat]++;
-      continue;
-    }
+    // Fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen
     const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
-    const cats = withoutFallback.length > 0 ? withoutFallback : matches;
+    const effective = withoutFallback.length > 0 ? withoutFallback : matches;
+    // Hálózat / Infra alacsony prioritású (de Fejlesztőnél erősebb)
+    let cats;
+    if (effective.length > 1 && effective.includes("Hálózat / Infra")) {
+      cats = effective.filter((c) => c !== "Hálózat / Infra");
+    } else if (effective.length > 1 && effective.includes("Mérnöki / Gyártás")) {
+      cats = effective.filter((c) => c !== "Mérnöki / Gyártás");
+    } else {
+      cats = effective;
+    }
 
     if (cats.length > 0) {
       for (const cat of cats) counts[cat]++;
