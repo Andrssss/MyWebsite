@@ -20,6 +20,7 @@ const pool = new Pool({
 });
 
 // INTERN_SOURCES / INTERNSHIP_KEYWORDS imported from _experience_core.mjs
+const INTERN_TITLE_KEYWORDS = INTERNSHIP_KEYWORDS;
 
 const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
 
