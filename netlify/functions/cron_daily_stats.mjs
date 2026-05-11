@@ -43,6 +43,11 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
       counts["Elemző / Analyst"] = (counts["Elemző / Analyst"] || 0) + 1;
       continue;
     }
+    // Ha a title-ben különálló szóként szerepel "AI" → mindig Data / AI (keywords-től függetlenül)
+    if (/(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(row.title || "")) {
+      counts["Data / AI"] = (counts["Data / AI"] || 0) + 1;
+      continue;
+    }
     // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
     if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
       counts["Elemző / Analyst"]++;
