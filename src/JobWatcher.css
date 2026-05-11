@@ -751,6 +751,108 @@ html, body {
   font-weight: 600;
 }
 
+.bug-icon-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.bug-icon-btn:hover {
+  color: #e4e4e7;
+  transform: translateY(-1px);
+}
+
+.bug-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.bug-modal {
+  width: min(100%, 560px);
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+  color: #e5e7eb;
+}
+
+.bug-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bug-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.bug-modal-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.bug-modal-info {
+  margin: 12px 0;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.bug-modal-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 12px 14px;
+  font: inherit;
+}
+
+.bug-modal-textarea:focus {
+  outline: none;
+  border-color: #6aa9ff;
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.25);
+}
+
+.bug-modal-footer {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.bug-modal-chars {
+  margin-right: auto;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.bug-modal-status {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
 /* ====== DEVICE SYNC ====== */
 .job-sync {
   margin-bottom: 16px;

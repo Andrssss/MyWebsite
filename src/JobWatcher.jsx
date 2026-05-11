@@ -97,6 +97,9 @@ const saveAppliedKeys = (set) => {
 const APPLIED_CACHE_STORAGE = "jobWatcherAppliedCache";
 
 const SYNC_API = "/.netlify/functions/sync-data";
+const BUG_REPORT_API = "/.netlify/functions/bug-report";
+const BUG_REPORT_COOKIE = "jobWatcherLastBugReport";
+const BUG_REPORT_COOLDOWN_MS = 5 * 60 * 1000;
 
 const loadAppliedCache = () => {
   try {
@@ -354,6 +357,50 @@ const JobWatcher = () => {
     () => localStorage.getItem(IMPORT_ID_STORAGE) || ""
   );
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
+  const [bugOpen, setBugOpen] = useState(false);
+  const [bugMessage, setBugMessage] = useState("");
+  const [bugStatus, setBugStatus] = useState("");
+  const [bugSending, setBugSending] = useState(false);
+
+  const isBugCooldown = () => {
+    const val = readCookie(BUG_REPORT_COOKIE);
+    if (!val) return false;
+    return Date.now() - Number(val) < BUG_REPORT_COOLDOWN_MS;
+  };
+
+  const handleBugSubmit = async () => {
+    const msg = bugMessage.trim();
+    if (!msg) {
+      setBugStatus("Írj valamit a küldés előtt.");
+      return;
+    }
+    if (isBugCooldown()) {
+      setBugStatus("Már küldtél hibajelentést nemrég. Várj egy kicsit.");
+      return;
+    }
+    setBugSending(true);
+    setBugStatus("");
+    try {
+      const res = await fetch(BUG_REPORT_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg, visitorId: myVisitorId }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const serverError = typeof payload?.error === "string" ? payload.error : "";
+        throw new Error(serverError || `HTTP ${res.status}`);
+      }
+      writeCookie(BUG_REPORT_COOKIE, String(Date.now()), 1);
+      setBugMessage("");
+      setBugStatus("✔ Köszönjük a visszajelzést!");
+    } catch (err) {
+      const reason = err instanceof Error && err.message ? ` (${err.message})` : "";
+      setBugStatus(`✗ Hiba a küldés során. Próbáld újra.${reason}`);
+    } finally {
+      setBugSending(false);
+    }
+  };
 
   const handleSyncUpload = async () => {
     setSyncStatus("Feltöltés…");
@@ -1276,15 +1323,59 @@ const JobWatcher = () => {
         <FaLinkedin />
       </a>
 
+      <button
+        className="bug-icon-btn"
+        onClick={() => { setBugOpen(true); setBugStatus(""); }}
+        title="Visszajelzés / hibabejelentés"
+        aria-label="Visszajelzés küldése"
+      >
+        🐛
+      </button>
+
       {weeklyActiveUsers !== null && (
         <span
           className="wau-badge"
           title="Egyedi látogatók az elmúlt 7 napban (admin nélkül)"
         >
-          Active users : <strong>{weeklyActiveUsers}</strong>
+          👥 <strong>{weeklyActiveUsers}</strong>
         </span>
       )}
     </div>
+
+    {bugOpen && (
+      <div className="bug-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setBugOpen(false); }}>
+        <div className="bug-modal" role="dialog" aria-modal="true" aria-label="Hibabejelentő">
+          <div className="bug-modal-header">
+            <span className="bug-modal-title">Visszajelzés / hibabejelentés</span>
+            <button className="bug-modal-close" onClick={() => setBugOpen(false)} aria-label="Bezárás">✕</button>
+          </div>
+          <p className="bug-modal-info">
+            Teljesen anoním, csak az üzenetet és az időt menti el.
+          </p>
+          <textarea
+            className="bug-modal-textarea"
+            rows={5}
+            maxLength={2000}
+            placeholder="Írd le a hibát, hiányzó funkciót, vagy bármilyen visszajelzést…"
+            value={bugMessage}
+            onChange={(e) => setBugMessage(e.target.value)}
+            disabled={bugSending}
+            autoFocus
+          />
+          <div className="bug-modal-footer">
+            <span className="bug-modal-chars">{bugMessage.length}/2000</span>
+            {bugStatus && <span className="bug-modal-status">{bugStatus}</span>}
+            <button
+              className="job-btn"
+              onClick={handleBugSubmit}
+              disabled={bugSending || !bugMessage.trim()}
+            >
+              {bugSending ? "Küldés…" : "Küldés"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
 );
 
