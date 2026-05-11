@@ -1177,6 +1177,10 @@ const JobWatcher = () => {
                 <span className="job-source">{job.source}</span>
               </div>
 
+              {job.company && (
+                <div className="job-company">{job.company}</div>
+              )}
+
               {job.description && (
                 <div className="job-desc">{job.description}</div>
               )}
