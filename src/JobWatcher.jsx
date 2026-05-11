@@ -1176,7 +1176,7 @@ const JobWatcher = () => {
                     )}
                   </a>
                   {job.company && (
-                    <span className="job-company">[{job.company}]</span>
+                    <span className="job-company">[ {job.company} ]</span>
                   )}
                 </div>
                 <span className="job-source">{job.source}</span>
