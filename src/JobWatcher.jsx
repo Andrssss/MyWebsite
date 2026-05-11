@@ -1154,32 +1154,33 @@ const JobWatcher = () => {
           return (
             <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${job.isCrossDuplicate ? " job-card--crossdup" : ""}`}>
               <div className="job-row">
-                <a
-                  className="job-title"
-                  href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackClick(clickTarget, clickKeyBase, clickDate)}
-                  onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase, clickDate); }}
-                  onContextMenu={() => trackClick(clickTarget, clickKeyBase, clickDate)}
-                  onTouchStart={() => startLongPress(clickTarget, clickKeyBase, clickDate)}
-                  onTouchEnd={cancelLongPress}
-                  onTouchMove={cancelLongPress}
-                  onTouchCancel={cancelLongPress}
-                >
-                  {job.title}
-                  {debugMode && (
-                    <span style={{ color: "#f50b0b", marginLeft: 6, fontSize: "0.85em" }}>
-                      [{getCategoriesForJob(job, jobCategories).join(", ") || "Egyéb"}]
-                    </span>
+                <div className="job-title-group">
+                  <a
+                    className="job-title"
+                    href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackClick(clickTarget, clickKeyBase, clickDate)}
+                    onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase, clickDate); }}
+                    onContextMenu={() => trackClick(clickTarget, clickKeyBase, clickDate)}
+                    onTouchStart={() => startLongPress(clickTarget, clickKeyBase, clickDate)}
+                    onTouchEnd={cancelLongPress}
+                    onTouchMove={cancelLongPress}
+                    onTouchCancel={cancelLongPress}
+                  >
+                    {job.title}
+                    {debugMode && (
+                      <span style={{ color: "#f50b0b", marginLeft: 6, fontSize: "0.85em" }}>
+                        [{getCategoriesForJob(job, jobCategories).join(", ") || "Egyéb"}]
+                      </span>
+                    )}
+                  </a>
+                  {job.company && (
+                    <span className="job-company">[{job.company}]</span>
                   )}
-                </a>
+                </div>
                 <span className="job-source">{job.source}</span>
               </div>
-
-              {job.company && (
-                <div className="job-company">{job.company}</div>
-              )}
 
               {job.description && (
                 <div className="job-desc">{job.description}</div>
