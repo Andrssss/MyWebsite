@@ -98,6 +98,7 @@ const FIXED = [
   { key: "valorebasis", label: "Valore Basis" },
   { key: "trenkwalder", label: "Trenkwalder" },
   { key: "workcenter", label: "WorkCenter" },
+  { key: "random_email", label: "Random Email" },
 ];
 
 // Parameterized query helper. Returns rows array.
