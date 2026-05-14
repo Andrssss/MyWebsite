@@ -272,6 +272,48 @@
   transform: translateY(-1px);
 }
 
+.job-howto {
+  margin: 16px 0 20px;
+}
+
+.job-howto-toggle {
+  width: 100%;
+  justify-content: center;
+}
+
+.job-howto-panel {
+  margin-top: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.job-howto-text {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.job-howto-video {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.job-howto-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 /* ====== TABS ====== */
 .job-tabs {
   display: flex;

@@ -539,6 +539,7 @@ const JobWatcher = () => {
   const [commitsOpen, setCommitsOpen] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [weeklyActiveUsers, setWeeklyActiveUsers] = useState(null);
+  const [howToOpen, setHowToOpen] = useState(false);
 
   useEffect(() => {
     fetch(VISITOR_TRACK_API)
@@ -1005,6 +1006,32 @@ const JobWatcher = () => {
             Frissítés
           </button>
         </div>
+      </div>
+
+      <div className="job-howto">
+        <button
+          className="job-tabs-toggle job-howto-toggle"
+          onClick={() => setHowToOpen((v) => !v)}
+        >
+          {howToOpen ? "▲ How to elrejtése" : "▶ How to videó megjelenítése"}
+        </button>
+
+        {howToOpen && (
+          <div className="job-howto-panel">
+            <div className="job-howto-text">
+              Rövid útmutató a használathoz. A videó itt, ezen az oldalon nyílik meg.
+            </div>
+            <div className="job-howto-video">
+              <iframe
+                src="https://www.youtube-nocookie.com/embed/_zyuMfBVsVE"
+                title="JobWatcher how to"
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
 
