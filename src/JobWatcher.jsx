@@ -881,6 +881,13 @@ const JobWatcher = () => {
   return (
   <div className="job-watcher">
     <div className="job-watcher-header">
+      <button
+        className="job-howto-fab"
+        onClick={() => setHowToOpen((v) => !v)}
+        aria-label="How to megnyitása"
+      >
+        How to ❓
+      </button>
       <div>
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
@@ -1006,32 +1013,6 @@ const JobWatcher = () => {
             Frissítés
           </button>
         </div>
-      </div>
-
-      <div className="job-howto">
-        <button
-          className="job-tabs-toggle job-howto-toggle"
-          onClick={() => setHowToOpen((v) => !v)}
-        >
-          {howToOpen ? "▲ How to elrejtése" : "▶ How to videó megjelenítése"}
-        </button>
-
-        {howToOpen && (
-          <div className="job-howto-panel">
-            <div className="job-howto-text">
-              Rövid útmutató a használathoz. A videó itt, ezen az oldalon nyílik meg.
-            </div>
-            <div className="job-howto-video">
-              <iframe
-                src="https://www.youtube-nocookie.com/embed/_zyuMfBVsVE"
-                title="JobWatcher how to"
-                loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        )}
       </div>
     </div>
 
@@ -1404,6 +1385,34 @@ const JobWatcher = () => {
             >
               {bugSending ? "Küldés…" : "Küldés"}
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {howToOpen && (
+      <div
+        className="howto-modal-overlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setHowToOpen(false);
+        }}
+      >
+        <div className="howto-modal" role="dialog" aria-modal="true" aria-label="How to videó">
+          <div className="howto-modal-header">
+            <span className="howto-modal-title">How to ❓</span>
+            <button className="bug-modal-close" onClick={() => setHowToOpen(false)} aria-label="Bezárás">✕</button>
+          </div>
+          <p className="howto-modal-info">
+            Rövid útmutató a használathoz. A videó itt, ezen az oldalon marad.
+          </p>
+          <div className="howto-modal-video">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/_zyuMfBVsVE"
+              title="JobWatcher how to"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
           </div>
         </div>
       </div>
