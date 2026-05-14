@@ -40,7 +40,7 @@ const MELONJOBS_API_URL =
   "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
 
 const KUKA_API_URL =
-  "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
+  "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU";
 
 
 /* ── shared helpers ─────────────────────────────────────────── */
