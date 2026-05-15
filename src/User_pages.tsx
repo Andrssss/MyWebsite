@@ -14,11 +14,9 @@ const TABS: { key: OsKey; label: string }[] = [
 ];
 
 const OTHERS_LINKS = [
-  { name: "kozma ⚜️", url: "https://users.itk.ppke.hu/~kozma1/" },
   { name: "hakkeltamas 🖤", url: "https://itk.hakkeltamas.hu/" },
   { name: "hudes ☁️", url: "https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO" },
   { name: "vecha ☁️", url: "https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ" },
-  { name: "PPKE WIKI 🅦", url: "https://users.itk.ppke.hu/~marri1/" },
 ];
 
 const User_pages: React.FC = () => {
@@ -69,9 +67,9 @@ const User_pages: React.FC = () => {
 
       <div className="others-ll__noteWrap others-ll__noteWrap--compact" aria-live="polite">
         <section className="others-ll__note others-ll__note--compact" aria-labelledby="alt-links-title">
-          <h3 id="alt-links-title">Alternatív linkek</h3>
+          <h3 id="alt-links-title">Külső tárhelyek</h3>
           <p className="others-ll__compactLead">
-            Ezek a linkek nem mindig érhetők el a leírt felfedezős módszerrel.
+            Ezek a linkek nem érhetők el ezzel a módszerrel, mivel nem ITK-s szerveren vannak.
           </p>
 
           <ul className="others-ll__altButtons" aria-label="Alternatív linkek listája">

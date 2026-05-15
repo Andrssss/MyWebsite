@@ -11,7 +11,6 @@ import {
 import './App.css';
 import Home from './Home';
 import UniversityLinks from './UniversityLinks.jsx';
-import OthersLinks from './OthersLinks.tsx';
 import About from './About.jsx';
 import SubjectInfo from './SubjectInfo.jsx';
 import Particles from './Particles.jsx';
@@ -95,7 +94,6 @@ useEffect(() => {
               <li><Link to="/" onClick={() => setMenuOpen(false)}>Főoldal</Link></li>
               <li><Link to="/targy_info" onClick={() => setMenuOpen(false)}>Tárgy info</Link></li>
               <li><Link to="/egyetemi_linkek" onClick={() => setMenuOpen(false)}>Egyetemi Linkek</Link></li>
-              <li><Link to="/masok_oldalai" onClick={() => setMenuOpen(false)}>Mások oldalai</Link></li>
               <li><Link to="/User_oldalak" onClick={() => setMenuOpen(false)}>User oldalak</Link></li>
               <li><Link to="/allasfigyelo" onClick={() => setMenuOpen(false)}>Állásfigyelő</Link></li>
               <li><Link to="/rolam" onClick={() => setMenuOpen(false)}>Rólam</Link></li>
@@ -113,7 +111,6 @@ useEffect(() => {
                 <li><Link to="/">📂 Főoldal</Link></li>
                 <li><Link to="/targy_info">📘 Tárgy infok</Link></li>
                 <li><Link to="/egyetemi_linkek">🔗 Egyetemi linkek</Link></li>
-                <li><Link to="/masok_oldalai">🌐 Mások oldalai</Link></li>
                 <li><Link to="/User_oldalak">🧭 User oldalak</Link></li>
                 <li><Link to="/allasfigyelo">✨ Állásfigyelő</Link></li>
                 <li><Link to="/rolam">👤 Rólam</Link></li>
@@ -129,7 +126,6 @@ useEffect(() => {
           <Route path="/" element={<Home setContent={() => {}} setMenuOpen={setMenuOpen} />} />
           <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
-          <Route path="/masok_oldalai" element={<OthersLinks onNavigateAway={() => setHasNavigatedAway(true)} />} />
           <Route path="/User_oldalak" element={<User_pages />} />
           <Route path="/rolam" element={<About />} />
 
