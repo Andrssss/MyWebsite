@@ -13,6 +13,14 @@ const TABS: { key: OsKey; label: string }[] = [
   { key: "mac", label: "macOS" },
 ];
 
+const OTHERS_LINKS = [
+  { name: "kozma ⚜️", url: "https://users.itk.ppke.hu/~kozma1/" },
+  { name: "hakkeltamas 🖤", url: "https://itk.hakkeltamas.hu/" },
+  { name: "hudes ☁️", url: "https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO" },
+  { name: "vecha ☁️", url: "https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ" },
+  { name: "PPKE WIKI 🅦", url: "https://users.itk.ppke.hu/~marri1/" },
+];
+
 const User_pages: React.FC = () => {
   const [os, setOs] = useState<OsKey>(() => {
     const saved = localStorage.getItem("user_pages_os") as OsKey | null;
@@ -25,10 +33,35 @@ const User_pages: React.FC = () => {
 
   return (
 
-    
     <div className="others-ll">
 
-      
+      <div className="others-ll__noteWrap" aria-live="polite">
+        <section className="others-ll__note" aria-labelledby="alt-links-title">
+          <h3 id="alt-links-title">Alternatív linkek (külön gyűjtve)</h3>
+          <hr />
+          <p>
+            Ezek azok a linkek, amiket a leírt user-oldal felfedezős módszerrel általában nem lehet megtalálni,
+            ezért itt külön, kézzel összegyűjtve vannak.
+          </p>
+
+          <ul className="others-ll__grid" aria-label="Alternatív linkek listája">
+            {OTHERS_LINKS.map((item) => (
+              <li key={item.url} className="others-ll__card">
+                <a
+                  className="others-ll__cardLink"
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span className="others-ll__title">{item.name}</span>
+                  <span className="others-ll__meta">Megnyitás</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
       <div role="tablist" aria-label="OS választó" className="others-ll__tabs">
         {TABS.map(({ key, label }) => (
           <button

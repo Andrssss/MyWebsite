@@ -20,7 +20,6 @@ import JobWatcher from "./JobWatcher.jsx";
 import Filters from "./Filters.jsx";
 import Categories from "./Categories.jsx";
 import JobStats from "./JobStats.jsx";
-import TempPage from './temp.jsx';
 
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -174,14 +173,7 @@ useEffect(() => {
             }
           />
 
-          <Route
-            path="/temp"
-            element={
-              <div className="re-page">
-                <TempPage />
-              </div>
-            }
-          />
+       
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
