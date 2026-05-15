@@ -789,7 +789,8 @@ const JobWatcher = () => {
     if (nq) {
       list = list.filter((j) => {
         const t = (j.title || "").toLowerCase();
-        return t.includes(nq);
+        const c = (j.company || "").toLowerCase();
+        return t.includes(nq) || c.includes(nq);
       });
     }
 
@@ -935,7 +936,7 @@ const JobWatcher = () => {
           className="job-search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Keresés…"
+          placeholder="Keresés pozícióra vagy cégre…"
         />
 
         <div className="job-filters">
