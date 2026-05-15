@@ -35,33 +35,6 @@ const User_pages: React.FC = () => {
 
     <div className="others-ll">
 
-      <div className="others-ll__noteWrap" aria-live="polite">
-        <section className="others-ll__note" aria-labelledby="alt-links-title">
-          <h3 id="alt-links-title">Alternatív linkek (külön gyűjtve)</h3>
-          <hr />
-          <p>
-            Ezek azok a linkek, amiket a leírt user-oldal felfedezős módszerrel általában nem lehet megtalálni,
-            ezért itt külön, kézzel összegyűjtve vannak.
-          </p>
-
-          <ul className="others-ll__grid" aria-label="Alternatív linkek listája">
-            {OTHERS_LINKS.map((item) => (
-              <li key={item.url} className="others-ll__card">
-                <a
-                  className="others-ll__cardLink"
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span className="others-ll__title">{item.name}</span>
-                  <span className="others-ll__meta">Megnyitás</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
       <div role="tablist" aria-label="OS választó" className="others-ll__tabs">
         {TABS.map(({ key, label }) => (
           <button
@@ -94,7 +67,29 @@ const User_pages: React.FC = () => {
     </div>
   </div>
 
+      <div className="others-ll__noteWrap others-ll__noteWrap--compact" aria-live="polite">
+        <section className="others-ll__note others-ll__note--compact" aria-labelledby="alt-links-title">
+          <h3 id="alt-links-title">Alternatív linkek</h3>
+          <p className="others-ll__compactLead">
+            Ezek a linkek nem mindig érhetők el a leírt felfedezős módszerrel.
+          </p>
 
+          <ul className="others-ll__altButtons" aria-label="Alternatív linkek listája">
+            {OTHERS_LINKS.map((item) => (
+              <li key={item.url}>
+                <a
+                  className="others-ll__altButton"
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {item.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
 
       <div
         role="tabpanel"

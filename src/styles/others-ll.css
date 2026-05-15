@@ -366,3 +366,60 @@
   padding: 2rem;
   font-family: monospace;
 }
+
+.others-ll__noteWrap--compact {
+    margin-bottom: 12px;
+}
+
+.others-ll__note--compact {
+    padding: 10px 12px;
+}
+
+.others-ll__note--compact h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+}
+
+.others-ll__compactLead {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #4b5563;
+}
+
+.others-ll__altButtons {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.others-ll__altButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    background: #f8fafc;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    text-align: center;
+    transition: background .15s ease, border-color .15s ease, transform .08s ease;
+}
+
+.others-ll__altButton:hover {
+    background: #ffffff;
+    border-color: #9ca3af;
+    transform: translateY(-1px);
+}
+
+.others-ll__altButton:focus {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+}
