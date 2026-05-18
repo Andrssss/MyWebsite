@@ -482,6 +482,46 @@ async function fetchNofluffExperience(url) {
   }
 }
 
+function cleanMisziszListTitle(rawTitle) {
+  if (!rawTitle) return null;
+
+  let title = normalizeWhitespace(rawTitle);
+  const colonIdx = title.indexOf(":");
+  if (colonIdx >= 0) {
+    title = title.slice(0, colonIdx).trim();
+  }
+
+  const descMarker = title.match(/\s+Di[aá]kmunka\s*:/i);
+  if (descMarker && typeof descMarker.index === "number") {
+    title = title.slice(0, descMarker.index).trim();
+  }
+
+  title = title.replace(/^(?:di[aá]kmunka|gyakornok|mel[oó]di[aá]k|informatika|programoz[oó])\s+/i, "");
+  return normalizeWhitespace(title) || null;
+}
+
+async function fetchMisziszTitle(url, fallbackTitle = null) {
+  try {
+    const html = await fetchText(url);
+    const $ = cheerioLoad(html);
+
+    const h1 = normalizeWhitespace($("h1").first().text());
+    if (h1) return h1;
+
+    const ogTitle = normalizeWhitespace($("meta[property='og:title']").attr("content"));
+    if (ogTitle) return ogTitle;
+
+    const pageTitle = normalizeWhitespace($("title").first().text())
+      .replace(/\s*[|\-\u2013\u2014]\s*MISZISZ.*$/i, "")
+      .trim();
+    if (pageTitle) return pageTitle;
+  } catch (err) {
+    await logFetchError("cron_jobs_DIAK_3", { url, message: `miszisz title: ${err.message}` });
+  }
+
+  return cleanMisziszListTitle(fallbackTitle);
+}
+
 function cleanJobTitle(rawTitle) {
   if (!rawTitle) return null;
   // Cut at 'ÚJ' or similar markers
@@ -540,12 +580,20 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
       let merged = mergeCandidates(generic, ssr);
 
+      if (source === "miszisz") {
+        for (const item of merged) {
+          item.title = await fetchMisziszTitle(item.url, item.title);
+          await sleep(250);
+        }
+      }
+
       // =========================
       // FILTER & KEYWORD MATCH
       // =========================
       let matchedList = merged
         .map((c) => {
           if (source === "nofluffjobs") c.title = cleanJobTitle(c.title);
+          if (source === "miszisz") c.title = cleanMisziszListTitle(c.title);
           return c;
         })
         .filter((c) => !isSeniorLike(c.title, c.description));
