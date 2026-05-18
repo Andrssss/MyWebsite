@@ -148,7 +148,8 @@ const JUNIOR_EXCLUDED_SOURCES = [
   "vizmuvek",
   "tudatosdiak",
   "ydiak",
-  "qdiak"
+  "qdiak",
+  "miszisz"
 ];
 
 /* =======================

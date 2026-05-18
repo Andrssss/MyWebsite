@@ -9,6 +9,7 @@ const SOURCES = [
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
   { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
+  { key: "miszisz", label: "MISZISZ", url: "https://miszisz.hu/?post_type%5B%5D=munkaink&s=&mmin=0&mmax=8000&mvaros%5B%5D=0&mvaros%5B%5D=2&mvaros%5B%5D=3&mvaros%5B%5D=4&mvaros%5B%5D=6&mvaros%5B%5D=7&mvaros%5B%5D=8&mvaros%5B%5D=9&mvaros%5B%5D=10&mvaros%5B%5D=11&mvaros%5B%5D=12&mvaros%5B%5D=15&mvaros%5B%5D=17&mvaros%5B%5D=21&mvaros%5B%5D=68&mvaros%5B%5D=69&mvaros%5B%5D=368&mkat%5B%5D=231&mkat%5B%5D=40&mkat%5B%5D=257&mkat%5B%5D=41" },
   { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?utm_source=facebook&utm_medium=social_cpc&utm_campaign=hbp&utm_content=Instagram_Reels&utm_id=120239436336450697&utm_term=120239436336520697&fbclid=PAdGRleAP9v2xleHRuA2FlbQEwAGFkaWQBqy0hd5G9WXNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp-R_SE_c9O6KU5EqFghpD-ajuuKDtviyfnC4ISpI22VXvxQFO3UL-hd8sdBG_aem_9-6Oig3Ju0SERNEIrcg6kw&criteria=seniority%3Dtrainee,junior" },
   { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior" },
   { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior&sort=newest" },
@@ -301,6 +302,12 @@ function looksLikeJobUrl(sourceKey, url) {
 
   if (sourceKey === "wherewework" && !(url.startsWith("https://www.wherewework.hu/en/jobs/") && /\/\d+$/.test(u.pathname))) return false;
 
+  if (sourceKey === "miszisz") {
+    // MISZISZ detail pages are under /munkaink/<slug>/
+    if (!url.startsWith("https://miszisz.hu/munkaink/")) return false;
+    if (u.pathname === "/munkaink/" || u.pathname === "/munkaink") return false;
+  }
+
   return true;
 }
 
@@ -570,7 +577,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // DB UPSERT
       // =========================
       if (write && client) {
-        const DIAKMUNKA_SOURCES = ["otp", "vizmuvek"];
+        const DIAKMUNKA_SOURCES = ["otp", "vizmuvek", "miszisz"];
         for (const item of matchedList) {
           if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";

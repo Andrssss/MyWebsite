@@ -50,7 +50,7 @@ export function isInternshipTitle(title) {
 // Sources that are inherently student/intern focused
 export const INTERN_SOURCES = [
   "minddiak", "muisz", "zyntern", "schonherz", "prodiak",
-  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas",
+  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas", "miszisz",
 ];
 
 function sleep(ms) {

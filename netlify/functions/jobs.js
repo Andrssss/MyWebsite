@@ -73,6 +73,7 @@ const FIXED = [
   { key: "LinkedIn", label: "LinkedIn PAST 24H" },
   { key: "wherewework", label: "wherewework" },
   { key: "onejob", label: "onejob" },
+  { key: "miszisz", label: "MISZISZ" },
   { key: "nofluffjobs", label: "nofluffjobs" },
   { key: "dreamjobs", label: "DreamJobs" },
   { key: "melonjobs", label: "MelonJobs" },
