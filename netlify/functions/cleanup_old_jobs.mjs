@@ -14,7 +14,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-export default async () => {
+export default async (request) => {
+  const expected = process.env.CRON_SECRET;
+  const authHeader = (request?.headers?.get?.("authorization") || "").trim();
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!expected || token !== expected) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const client = await pool.connect();
   try {
     // LinkedIn: 60 nap, többi: 30 nap

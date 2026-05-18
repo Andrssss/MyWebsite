@@ -31,7 +31,7 @@ exports.handler = async (event) => {
       headers: {
         "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
         "Access-Control-Allow-Methods": "GET,POST,DELETE,PATCH,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },
       body: "",
     };
@@ -112,6 +112,13 @@ exports.handler = async (event) => {
       }
 
       // default: delete
+      const expected = process.env.CRON_SECRET;
+      const authHeader = String(event.headers?.authorization || event.headers?.Authorization || "").trim();
+      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+      if (!expected || token !== expected) {
+        return json(401, { error: "Unauthorized" });
+      }
+
       const result = await client.query(
         `DELETE FROM job_posts ${whereClause}`,
         [trimmed]

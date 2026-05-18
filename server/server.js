@@ -8,7 +8,7 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  connectionString: process.env.NETLIFY_DATABASE_URL, // env-ben állítod be
+  connectionString: process.env.NETLIFY_DATABASE_URL, // env-ben allitod be
 });
 
 app.get("/api/reviews", async (req, res) => {
@@ -83,7 +83,7 @@ app.put("/api/reviews/:id", async (req, res) => {
   } = req.body;
 
   try {
-    // opcionális: ellenőrzés, hogy user_id egyezik-e
+    // opcionalis: ellenorzes, hogy user_id egyezik-e
     const { rows } = await pool.query(
       `UPDATE subject_reviews
        SET name=$1,
@@ -111,7 +111,7 @@ app.put("/api/reviews/:id", async (req, res) => {
         user_id,
       ]
     );
-    if (!rows.length) return res.status(403).send("Nincs jogosultság / nincs ilyen sor");
+    if (!rows.length) return res.status(403).send("Nincs jogosultsag / nincs ilyen sor");
     res.json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -128,7 +128,7 @@ app.delete("/api/reviews/:id", async (req, res) => {
       `DELETE FROM subject_reviews WHERE id=$1 AND user_id=$2`,
       [id, user_id]
     );
-    if (!rowCount) return res.status(403).send("Nincs jogosultság / nincs ilyen sor");
+    if (!rowCount) return res.status(403).send("Nincs jogosultsag / nincs ilyen sor");
     res.status(204).end();
   } catch (err) {
     console.error(err);
