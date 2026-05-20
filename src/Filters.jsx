@@ -99,9 +99,14 @@ const Filters = () => {
     setPurging(p => ({ ...p, [item.uid]: "deleting" }));
     setError(null);
     try {
+      // TODO: Biztonságosan tárold a CRON_SECRET-et, ne hardcode-old! Itt csak példa:
+      const CRON_SECRET = process.env.REACT_APP_CRON_SECRET || "IDE_IRD_A_TOKENED";
       const res = await fetch(API, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${CRON_SECRET}`,
+        },
         body: JSON.stringify({ word: item.word, action: "delete" }),
       });
       const data = await res.json();
