@@ -44,7 +44,7 @@ const pool = new Pool({
 
 const BASE = "https://workcenter.hu";
 const LIST_BASE = `${BASE}/jobs`;
-const CATEGORY_PARAM = "s=Budapest&filter_job_listing_category=informatikus";
+const CATEGORY_PARAM = "search_location=Budapest&filter_job_listing_category=informatikus";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
