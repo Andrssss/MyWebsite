@@ -252,6 +252,16 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
         await sleep(800);
         listHtml = await fetchText(listUrl);
       } catch (err) {
+        if (err.message && err.message.includes("HTTP 404")) {
+          if (page === 1) {
+            fetchFailed++;
+            await logFetchError("cron_jobs_WORKCENTER-background", { url: listUrl, message: err.message });
+            console.error(`[workcenter] page 1 → 404, check URL`);
+          } else {
+            console.log(`[workcenter] page ${page} → 404, no more pages`);
+          }
+          break;
+        }
         fetchFailed++;
         await logFetchError("cron_jobs_WORKCENTER-background", { url: listUrl, message: err.message });
         console.error(`[workcenter] list page ${page} fetch failed: ${err.message}`);
