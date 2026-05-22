@@ -490,10 +490,6 @@ body {
   margin-left: 35px;
 }
 
-.sidebar:hover ~ .main-content {
-  margin-left: 100px;
-}
-
 .particles-wrapper {
   position: fixed;
   top: 0;
