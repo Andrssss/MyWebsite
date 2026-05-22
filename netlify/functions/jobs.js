@@ -63,7 +63,6 @@ const FIXED = [
   { key: "frissdiplomas", label: "Frissdiplomas" },
   { key: "minddiak", label: "Minddiák" },
   { key: "muisz", label: "Muisz" },
-  { key: "cvcentrum-gyakornok-it", label: "CV Centrum" },
   { key: "zyntern", label: "Zyntern" },
   { key: "profession-intern", label: "Profession" },
   { key: "schonherz", label: "Schönherz – Budapest" },

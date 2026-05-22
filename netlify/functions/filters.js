@@ -11,6 +11,13 @@ const pool = new Pool({
 const ALLOWED_ORIGIN =
   process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
+const ADMIN_VISITOR_IDS = new Set([
+  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
+  "69872482-1311-4702-a5e5-a782ca9f2669",
+  "82906f93-dfbb-4684-b2b1-a948b99553e0",
+  "b878ceed-55b7-47db-87ec-c4e2825246f8",
+]);
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -88,7 +95,7 @@ exports.handler = async (event) => {
 
     // PATCH – count or purge jobs matching a filter word (last 1 day only)
     if (method === "PATCH") {
-      const { word, action } = JSON.parse(event.body || "{}");
+      const { word, action, adminId } = JSON.parse(event.body || "{}");
       if (!word || typeof word !== "string") {
         return json(400, { error: "word kötelező." });
       }
@@ -112,6 +119,9 @@ exports.handler = async (event) => {
       }
 
       // default: delete
+      if (!ADMIN_VISITOR_IDS.has(String(adminId || ""))) {
+        return json(403, { error: "Forbidden" });
+      }
       const result = await client.query(
         `DELETE FROM job_posts ${whereClause}`,
         [trimmed]
