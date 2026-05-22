@@ -2,17 +2,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 220px;
+  width: 160px;
   background: #1e1e1e; /* sötét kártya */
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  padding: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .folder-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.5);
 }
 
 .folder-header {
@@ -20,17 +20,17 @@
   flex-direction: column;
   align-items: center;
   text-decoration: none;
-  margin-bottom: 10px;
+  margin-bottom: 7px;
 }
 
 .emoji-icon {
-  font-size: 50px;
+  font-size: 34px;
 }
 
 .folder-title {
-  margin-top: 6px;
+  margin-top: 4px;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 0.85rem;
   color: #ffcc66; /* sárga félév neve */
   text-align: center;
 }
@@ -41,17 +41,17 @@
   flex-direction: column;
   align-items: stretch;
   width: 100%;
-  gap: 6px;
+  gap: 4px;
 }
 
 .subject-item {
   display: block;
-  padding: 6px 8px;
+  padding: 4px 6px;
   background: #2a2a2a;
-  border-radius: 8px;
+  border-radius: 6px;
   text-decoration: none;
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.78rem;
   text-align: center;
   transition: background 0.2s ease, color 0.2s ease;
 }
@@ -66,7 +66,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 2rem;
+  gap: 1.2rem;
 }
 
 /* MOBILE */
