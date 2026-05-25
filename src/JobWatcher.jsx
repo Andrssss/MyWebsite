@@ -1421,7 +1421,7 @@ const JobWatcher = () => {
           </p>
           <div className="howto-modal-video">
             <iframe
-              src="https://www.youtube.com/watch?v=kuntXT2ASg4"
+              src="https://youtu.be/kuntXT2ASg4?si=FA3B7acyCp_liACo"
               title="JobWatcher how to"
               loading="lazy"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
