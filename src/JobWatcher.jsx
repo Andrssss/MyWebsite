@@ -893,7 +893,7 @@ const JobWatcher = () => {
       </button>
       <div>
           <h1>Automata scraper</h1>
-          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
+          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni. Sajnos az a feltételezés, hogy egyetem után rögtön találsz munkát az hibás. HA nem voltál gyakornok egyetem alatt, akkor nagy eséllyel munkanélküli leszel egyetem után !!!!</p>
           <div className="job-last-commit">
             <span>Elmúlt 1 hét git commitok:</span>
             {lastUpdates.length > 0 ? (
@@ -1421,7 +1421,7 @@ const JobWatcher = () => {
           </p>
           <div className="howto-modal-video">
             <iframe
-              src=""
+              src="https://www.youtube.com/watch?v=kuntXT2ASg4"
               title="JobWatcher how to"
               loading="lazy"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

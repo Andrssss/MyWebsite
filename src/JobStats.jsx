@@ -388,7 +388,7 @@ const JobStats = () => {
       */}
 
       <div className="stats-section">
-        <h2>További 2025-os statisztikák és bértábla</h2>
+        <h2>További 2026-os statisztikák és bértábla</h2>
         <div className="stats-pdf-links">
           <a
             href="https://cdn.penzcentrum.hu/files/h/hu-hays-hungary-salary-guide-2026.pdf"
