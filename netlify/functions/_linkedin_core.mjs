@@ -9,7 +9,7 @@ import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
-const ENABLE_FETCH_ERROR_LOGGING = true;
+const ENABLE_FETCH_ERROR_LOGGING = false;
 
 // =====================
 // DB

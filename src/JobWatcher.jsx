@@ -350,6 +350,7 @@ const JobWatcher = () => {
   const [manualAppliedExperience, setManualAppliedExperience] = useState("");
   const [manualAppliedStatus, setManualAppliedStatus] = useState("");
   const [manualAddOpen, setManualAddOpen] = useState(false);
+  const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
 
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncIdShown, setSyncIdShown] = useState(false);
@@ -1018,54 +1019,6 @@ const JobWatcher = () => {
       </div>
     </div>
 
-    {/* ===== ESZKÖZÖK KÖZÖTTI SZINKRON ===== */}
-    <div className="job-sync">
-      <button
-        className="job-tabs-toggle"
-        onClick={() => setSyncOpen((v) => !v)}
-      >
-        {syncOpen ? "▲ Szinkron elrejtése" : "🔄 Szinkron eszközök között"}
-      </button>
-      {syncOpen && (
-        <div className="job-sync-panel">
-          <div className="job-sync-section">
-            <strong>A te szinkron ID-d:</strong>
-            <code className="job-sync-id">
-              {syncIdShown ? myVisitorId : "•••••••• (rejtett)"}
-            </code>
-            <button className="job-btn job-btn--toggle" onClick={() => setSyncIdShown((v) => !v)}>
-              {syncIdShown ? "Elrejtés" : "Mutatás"}
-            </button>
-            <button className="job-btn job-btn--toggle" onClick={handleCopySyncId}>📋 Másolás</button>
-            <button className="job-btn job-btn-stats" onClick={handleSyncUpload}>
-              ⬆ Feltöltés
-            </button>
-          </div>
-          <div className="job-sync-section">
-            <strong>Importálás másik eszközről:</strong>
-            <input
-              className="job-search"
-              placeholder="Másik eszköz szinkron ID-ja"
-              value={importId}
-              onChange={(e) => {
-                const nextValue = e.target.value;
-                setImportId(nextValue);
-                localStorage.setItem(IMPORT_ID_STORAGE, nextValue);
-              }}
-            />
-            <button className="job-btn" onClick={handleSyncDownload}>
-              ⬇ Letöltés és összefésülés
-            </button>
-          </div>
-          {syncStatus && <div className="job-sync-status">{syncStatus}</div>}
-          <p className="job-sync-help">
-            ⚠️ Az ID-t senkinek ne add ki — aki ismeri, le tudja tölteni a megnézett és jelentkezett állásaid listáját.
-            Az importálás összefésüli az adatokat a meglevőkkel (nem felülírja).
-          </p>
-        </div>
-      )}
-    </div>
-
     {/* ===== FORRÁS TAB TOGGLE ===== */}
     <div className="job-tabs-header">
       <button
@@ -1306,7 +1259,66 @@ const JobWatcher = () => {
                 </div>
                 <div className="job-meta job-manual-submit-row">
                   <span style={{ color: manualAppliedStatus === "Hozzáadva" ? "#4ade80" : "#ef4444" }}>{manualAppliedStatus}</span>
-                  <button className="job-btn" onClick={handleAddManualApplied}>Hozzáadás</button>
+                  <button className="job-btn job-btn--green" onClick={handleAddManualApplied}>Hozzáadás</button>
+                </div>
+              </div>
+            )}
+          </li>
+        )}
+
+        {showAppliedOnly && (
+          <li
+            className={`job-card job-card--cloud-sync${cloudSyncOpen ? " open" : ""}`}
+            onClick={!cloudSyncOpen ? () => setCloudSyncOpen(true) : undefined}
+          >
+            <span className="job-card-fold job-card-fold--cloud" aria-hidden="true" />
+            <button
+              type="button"
+              className="job-manual-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCloudSyncOpen((v) => !v);
+              }}
+            >
+              <span className="job-manual-cta">
+                <strong>☁ Felhő szinkron</strong>
+              </span>
+              <span className="job-source">{cloudSyncOpen ? "Nyitva" : "Megnyitás"}</span>
+            </button>
+
+            {cloudSyncOpen && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <div className="job-sync-inline">
+                  <p className="job-sync-inline-desc">
+                    Mentsd a cloud-ba az összes jelentkezésedet, vagy töltsd le egy másik eszközről az ID megadásával. Most lokálisan van a böngésződben tárolva, de ha szeretnéd, hogy egy új gépen is meglegyen, használd ezt a funkciót a szinkronizáláshoz. Ha letöltesz egy másik eszközt akkor összefésüli a hirdetéseket és nem írja felül a meglévőket!
+                  </p>
+                  <div className="job-sync-inline-row">
+                    <button className="job-btn job-btn--green" onClick={handleSyncUpload}>
+                      ⬆ Upload to cloud
+                    </button>
+                  </div>
+                  <div className="job-sync-inline-id">
+                    <span className="job-sync-inline-id-label">🔑 A te szinkron ID-d:</span>
+                    <code className="job-sync-id">{myVisitorId}</code>
+                  </div>
+                  <div className="job-sync-inline-row">
+                    <input
+                      className="job-search"
+                      placeholder="Másik eszköz ID-ja (letöltéshez)"
+                      value={importId}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setImportId(nextValue);
+                        localStorage.setItem(IMPORT_ID_STORAGE, nextValue);
+                      }}
+                    />
+                  </div>
+                  <div className="job-sync-inline-row">
+                    <button className="job-btn job-btn--green" onClick={handleSyncDownload}>
+                      ⬇ Download from cloud
+                    </button>
+                  </div>
+                  {syncStatus && <div className="job-sync-status">{syncStatus}</div>}
                 </div>
               </div>
             )}
