@@ -126,10 +126,12 @@ async function fetchAllZynternJobs({ fields = "80,15,16", maxPages = 10 }) {
     }
 
     const pageItems = extractZynternFromApiPayload(payload);
+    const meta = payload?.meta;
+    console.log(`[zyntern] page ${page}/${meta?.last_page ?? '?'}: raw=${pageItems.length}  total_api=${meta?.total ?? '?'}`);
+    pageItems.forEach((c, i) => console.log(`[zyntern]   page${page}[${i+1}] "${c.title}" → ${c.url}`));
     all.push(...pageItems);
 
     // stop if we reached the last page
-    const meta = payload?.meta;
     if (meta && page >= (meta.last_page || page)) break;
     if (!pageItems.length) break;
   }
@@ -1374,8 +1376,13 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let matchedList;
       if (source === "minddiak" || source === "muisz" || source === "zyntern") {
         // API sources: already pre-filtered to IT jobs – only apply blacklist on title, no false positives from description
+        // Exception: zyntern jobs are field-filtered by the API (fields=80,15,16 = IT only), so skip blacklist entirely for zyntern
         matchedList = [];
         for (const c of merged) {
+          if (source === "zyntern") {
+            matchedList.push(c);
+            continue;
+          }
           const hit = findBlacklistHit(c.title, "");
           if (hit) {
             console.log(`[${source}] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
@@ -1384,10 +1391,13 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           }
         }
         console.log(`[${source}] after_filter=${matchedList.length}  skipped=${merged.length - matchedList.length}`);
+        matchedList.forEach((c, i) => console.log(`[${source}]   MATCH[${i+1}] "${c.title}" → ${c.url}`));
       } else {
         matchedList = merged
           .filter((c) => matchesKeywords(c.title, c.description))
           .filter((c) => !isSeniorLike(c.title, c.description));
+        console.log(`[${source}] matched=${matchedList.length}  total_before_filter=${merged.length}`);
+        matchedList.forEach((c, i) => console.log(`[${source}]   MATCH[${i+1}] "${c.title}" → ${c.url}`));
       }
 
 

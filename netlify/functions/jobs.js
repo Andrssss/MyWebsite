@@ -101,6 +101,10 @@ const FIXED = [
   { key: "random_email", label: "Random Email" },
 ];
 
+// Sources where ALL jobs are shown (no 30-day cutoff) when no timeRange is specified
+const EXEMPT_SOURCES = new Set(["schonherz", "zyntern", "onejob", "tudasdiak", "prodiak", "qdiak", "minddiak"]);
+const EXEMPT_SOURCES_ARRAY = [...EXEMPT_SOURCES];
+
 // Parameterized query helper. Returns rows array.
 async function query(text, params = []) {
   const { rows } = await sqlQuery.query(text, params);
@@ -195,6 +199,7 @@ exports.handler = async (event) => {
       if (source) {
         const fixedEntry = FIXED.find((s) => s.key === source);
         const dbKeys = fixedEntry?.keys || [source];
+        const isExempt = dbKeys.every((k) => EXEMPT_SOURCES.has(k));
         const sourceQuery =
           timeRange === "24h"
             ? `SELECT source, title, url, company,
@@ -212,6 +217,14 @@ exports.handler = async (event) => {
                FROM job_posts
                WHERE source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '7 days'
+               ORDER BY first_seen DESC, id DESC
+               LIMIT $2`
+            : isExempt
+            ? `SELECT source, title, url, company,
+                      first_seen AS "firstSeen",
+                      experience, is_cross_duplicate AS "isCrossDuplicate"
+               FROM job_posts
+               WHERE source = ANY($1)
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
             : `SELECT source, title, url, company,
@@ -250,11 +263,11 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience, is_cross_duplicate AS "isCrossDuplicate"
              FROM job_posts
-             WHERE first_seen >= NOW() - INTERVAL '30 days'
+             WHERE (source = ANY($2) OR first_seen >= NOW() - INTERVAL '30 days')
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`;
 
-      const rows = await query(allQuery, [limit]);
+      const rows = await query(allQuery, timeRange ? [limit] : [limit, EXEMPT_SOURCES_ARRAY]);
       cacheSet(cacheKey, rows);
       return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
     }
