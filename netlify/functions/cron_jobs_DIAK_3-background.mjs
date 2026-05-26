@@ -574,16 +574,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
   try {
     for (const p of listToProcess) {
       const source = p.key;
+      const tag = `[${source}]`;
 
-      console.log(`\n[DIAK_3] ── ${p.label} (${source}) ──`);
-      console.log(`[DIAK_3]   URL: ${p.url}`);
+      console.log(`\n${tag} ── ${p.label} ──`);
+      console.log(`${tag}   URL: ${p.url}`);
 
       let html = null;
       try {
         html = await fetchText(p.url);
-        console.log(`[DIAK_3]   Fetch OK – ${html.length} karakter`);
+        console.log(`${tag}   Fetch OK – ${html.length} karakter`);
       } catch (err) {
-        console.log(`[DIAK_3]   Fetch HIBA: ${err.message}`);
+        console.log(`${tag}   Fetch HIBA: ${err.message}`);
         await logFetchError("cron_jobs_DIAK_3", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
@@ -596,10 +597,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let generic = _rawGeneric.filter((c) => looksLikeJobUrl(source, c.url));
       const _rawSsr = extractSSR(html, p.url);
       let ssr = _rawSsr.filter((c) => looksLikeJobUrl(source, c.url));
-      console.log(`[DIAK_3]   extractCandidates: ${_rawGeneric.length} link → ${generic.length} job-like`);
-      console.log(`[DIAK_3]   extractSSR:        ${_rawSsr.length} link → ${ssr.length} job-like`);
+      console.log(`${tag}   extractCandidates: ${_rawGeneric.length} link → ${generic.length} job-like`);
+      console.log(`${tag}   extractSSR:        ${_rawSsr.length} link → ${ssr.length} job-like`);
       let merged = mergeCandidates(generic, ssr);
-      console.log(`[DIAK_3]   merged (dedupe): ${merged.length}`);
+      console.log(`${tag}   merged (dedupe): ${merged.length}`);
 
       // Paginate wherewework (follows [rel="next"] links until exhausted; 15-page cap against infinite loops)
       if (source === "wherewework") {
@@ -610,38 +611,38 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         while (safetyPagesLeft-- > 0) {
           const $pg = cheerioLoad(pageHtml);
           const nextHref = $pg('[rel="next"]').attr("href");
-          if (!nextHref) { console.log(`[DIAK_3]   wherewework: nincs több oldal (${pageNum} oldal után)`); break; }
+          if (!nextHref) { console.log(`${tag}   wherewework: nincs több oldal (${pageNum} oldal után)`); break; }
           const nextUrl = absolutize(nextHref, pageUrl);
           if (!nextUrl) break;
           pageNum++;
-          console.log(`[DIAK_3]   wherewework: oldal ${pageNum} → ${nextUrl}`);
+          console.log(`${tag}   wherewework: oldal ${pageNum} → ${nextUrl}`);
           try {
             pageHtml = await fetchText(nextUrl);
           } catch (err) {
-            console.log(`[DIAK_3]   wherewework oldal ${pageNum} HIBA: ${err.message}`);
+            console.log(`${tag}   wherewework oldal ${pageNum} HIBA: ${err.message}`);
             await logFetchError("cron_jobs_DIAK_3", { url: nextUrl, message: err.message });
             break;
           }
           if (pageHtml.includes("We are sorry you didn't find the job you were looking for!")) {
-            console.log(`[DIAK_3]   wherewework: "no jobs" oldal – megáll`);
+            console.log(`${tag}   wherewework: "no jobs" oldal – megáll`);
             break;
           }
           const pgGeneric = extractCandidates(pageHtml, nextUrl).filter((c) => looksLikeJobUrl(source, c.url));
           const pgSsr = extractSSR(pageHtml, nextUrl).filter((c) => looksLikeJobUrl(source, c.url));
           const prevCount = merged.length;
           merged = mergeCandidates(merged, pgGeneric, pgSsr);
-          console.log(`[DIAK_3]   wherewework oldal ${pageNum}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
+          console.log(`${tag}   wherewework oldal ${pageNum}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
           pageUrl = nextUrl;
           await sleep(300);
         }
       }
 
       if (source === "miszisz") {
-        console.log(`[DIAK_3]   miszisz: ${merged.length} oldal title-t tölt be...`);
+        console.log(`${tag}   miszisz: ${merged.length} oldal title-t tölt be...`);
         for (const item of merged) {
           const oldTitle = item.title;
           item.title = await fetchMisziszTitle(item.url, item.title);
-          console.log(`[DIAK_3]     miszisz title: "${oldTitle}" → "${item.title}"`);
+          console.log(`${tag}     miszisz title: "${oldTitle}" → "${item.title}"`);
           await sleep(250);
         }
       }
@@ -658,15 +659,15 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         })
         .filter((c) => {
           const filtered = isSeniorLike(c.title, c.description);
-          if (filtered) console.log(`[DIAK_3]   [seniorFilter] KISZŰRVE: "${c.title}"`);
+          if (filtered) console.log(`${tag}   [seniorFilter] KISZŰRVE: "${c.title}"`);
           return !filtered;
         });
-      console.log(`[DIAK_3]   seniorFilter: ${_beforeSeniorFilter} → ${matchedList.length} (kiszűrve: ${_beforeSeniorFilter - matchedList.length})`);
+      console.log(`${tag}   seniorFilter: ${_beforeSeniorFilter} → ${matchedList.length} (kiszűrve: ${_beforeSeniorFilter - matchedList.length})`);
 
       if (source === "vizmuvek") {
         const _beforeViz = matchedList.length;
         matchedList = matchedList.filter(c => normalizeText(c.title).includes("gyakornok"));
-        console.log(`[DIAK_3]   vizmuvek 'gyakornok' szűrő: ${_beforeViz} → ${matchedList.length}`);
+        console.log(`${tag}   vizmuvek 'gyakornok' szűrő: ${_beforeViz} → ${matchedList.length}`);
       }
 
       // =========================
@@ -686,17 +687,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         const _beforeBL = matchedList.length;
         matchedList = matchedList.filter(c => {
           if (BLACKLIST_URLS.includes(c.url)) {
-            console.log(`[DIAK_3]   [blacklist] KISZŰRVE: "${c.title}" – ${c.url}`);
+            console.log(`${tag}   [blacklist] KISZŰRVE: "${c.title}" – ${c.url}`);
             return false;
           }
           return true;
         });
         if (_beforeBL !== matchedList.length)
-          console.log(`[DIAK_3]   blacklist: ${_beforeBL} → ${matchedList.length} (kiszűrve: ${_beforeBL - matchedList.length})`);
+          console.log(`${tag}   blacklist: ${_beforeBL} → ${matchedList.length} (kiszűrve: ${_beforeBL - matchedList.length})`);
       }
 
-      console.log(`[DIAK_3]   VÉGEREDMÉNY: ${matchedList.length} állás – ${p.label}`);
-      matchedList.forEach((c, i) => console.log(`[DIAK_3]     [${i + 1}] "${c.title}" → ${c.url}`));
+      console.log(`${tag}   VÉGEREDMÉNY: ${matchedList.length} állás – ${p.label}`);
+      matchedList.forEach((c, i) => console.log(`${tag}     [${i + 1}] "${c.title}" → ${c.url}`));
 
       stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: matchedList.length });
 
@@ -704,7 +705,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // DB UPSERT
       // =========================
       if (write && client) {
-        console.log(`[DIAK_3]   DB upsert: ${matchedList.length} állás mentése...`);
+        console.log(`${tag}   DB upsert: ${matchedList.length} állás mentése...`);
         const DIAKMUNKA_SOURCES = ["otp", "vizmuvek", "miszisz", "onejob"];
         for (const item of matchedList) {
           if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
@@ -714,12 +715,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             if (exp) item.experience = exp;
             await sleep(400);
           }
-          console.log(`[DIAK_3]     upsert: [${item.experience ?? '-'}] "${item.title}"`);
+          console.log(`${tag}     upsert: [${item.experience ?? '-'}] "${item.title}"`);
           await upsertJob(client, source, item);
         }
-        console.log(`[DIAK_3]   DB upsert kész – ${p.label}`);
+        console.log(`${tag}   DB upsert kész – ${p.label}`);
       } else if (!write) {
-        console.log(`[DIAK_3]   (write=false – DB upsert kihagyva)`);
+        console.log(`${tag}   (write=false – DB upsert kihagyva)`);
       }
     }
   } finally {

@@ -1376,13 +1376,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let matchedList;
       if (source === "minddiak" || source === "muisz" || source === "zyntern") {
         // API sources: already pre-filtered to IT jobs – only apply blacklist on title, no false positives from description
-        // Exception: zyntern jobs are field-filtered by the API (fields=80,15,16 = IT only), so skip blacklist entirely for zyntern
         matchedList = [];
         for (const c of merged) {
-          if (source === "zyntern") {
-            matchedList.push(c);
-            continue;
-          }
           const hit = findBlacklistHit(c.title, "");
           if (hit) {
             console.log(`[${source}] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
