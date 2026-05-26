@@ -158,7 +158,7 @@ exports.handler = async (event) => {
           : onlyNew
           ? "24h"
           : null;
-      const limit = Math.min(parseInt(qs.limit || "500", 10) || 500, 5000);
+      const limit = Math.min(parseInt(qs.limit || "500", 10) || 5000, 5000);
 
       // GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
