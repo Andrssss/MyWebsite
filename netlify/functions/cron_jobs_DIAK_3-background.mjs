@@ -423,7 +423,7 @@ function extractCandidates(html, baseUrl) {
       normalizeWhitespace($(el).parent().find("h1,h2,h3,h4,h5,h6").first().text());
 
     let title = linkText;
-    if (headingText && (isCtaTitle(linkText) || headingText.length > linkText.length + 3)) {
+    if (headingText && !isCtaTitle(headingText) && (isCtaTitle(linkText) || linkText.length > headingText.length + 15)) {
       title = headingText;
     }
 
@@ -435,10 +435,16 @@ function extractCandidates(html, baseUrl) {
       normalizeWhitespace(card.find(".description, .job-desc, .job-description").first().text()) ||
       null;
 
+    const company =
+      normalizeWhitespace($(el).find('[class*="company-name"]').first().text()) ||
+      normalizeWhitespace(card.find('[class*="company-name"]').first().text()) ||
+      null;
+
     items.push({
       title: title.slice(0, 300),
       url,
       description: desc ? desc.slice(0, 800) : null,
+      company: company ? company.slice(0, 200) : null,
     });
   });
 
@@ -462,11 +468,11 @@ async function upsertJob(client, source, item) {
   const canonicalUrl = normalizeUrl(item.url);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, canonical_url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;`,
-    [source, item.title, item.url, canonicalUrl, item.experience ?? "-"]
+    [source, item.title, item.url, canonicalUrl, item.experience ?? "-", item.company || null]
   );
 }
 
@@ -580,6 +586,32 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let ssr = extractSSR(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
       let merged = mergeCandidates(generic, ssr);
 
+      // Paginate wherewework (follows [rel="next"] links until exhausted; 15-page cap against infinite loops)
+      if (source === "wherewework") {
+        let pageHtml = html;
+        let pageUrl = p.url;
+        let safetyPagesLeft = 25;
+        while (safetyPagesLeft-- > 0) {
+          const $pg = cheerioLoad(pageHtml);
+          const nextHref = $pg('[rel="next"]').attr("href");
+          if (!nextHref) break;
+          const nextUrl = absolutize(nextHref, pageUrl);
+          if (!nextUrl) break;
+          try {
+            pageHtml = await fetchText(nextUrl);
+          } catch (err) {
+            await logFetchError("cron_jobs_DIAK_3", { url: nextUrl, message: err.message });
+            break;
+          }
+          if (pageHtml.includes("We are sorry you didn't find the job you were looking for!")) break;
+          const pgGeneric = extractCandidates(pageHtml, nextUrl).filter((c) => looksLikeJobUrl(source, c.url));
+          const pgSsr = extractSSR(pageHtml, nextUrl).filter((c) => looksLikeJobUrl(source, c.url));
+          merged = mergeCandidates(merged, pgGeneric, pgSsr);
+          pageUrl = nextUrl;
+          await sleep(300);
+        }
+      }
+
       if (source === "miszisz") {
         for (const item of merged) {
           item.title = await fetchMisziszTitle(item.url, item.title);
@@ -626,7 +658,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // DB UPSERT
       // =========================
       if (write && client) {
-        const DIAKMUNKA_SOURCES = ["otp", "vizmuvek", "miszisz"];
+        const DIAKMUNKA_SOURCES = ["otp", "vizmuvek", "miszisz", "onejob"];
         for (const item of matchedList) {
           if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
