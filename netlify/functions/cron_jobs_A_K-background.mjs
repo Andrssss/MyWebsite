@@ -153,13 +153,21 @@ async function fetchKarrierPage(url, inertiaVersion) {
 }
 
 async function fetchKarrierJobs(categoryUrl, inertiaVersion) {
-  const data = await fetchKarrierPage(categoryUrl, inertiaVersion);
-  const positions = data.props?.positions?.data ?? [];
-  return positions.map(p => ({
-    title: p.title,
-    url: `${KARRIERHUNGARIA_BASE}/allasajanlat/${p.href}`,
-    description: p.content_company || null,
-  }));
+  let allJobs = [];
+  let nextUrl = categoryUrl;
+  let safetyPagesLeft = 20;
+  while (nextUrl && safetyPagesLeft-- > 0) {
+    const data = await fetchKarrierPage(nextUrl, inertiaVersion);
+    const positions = data.props?.positions;
+    const jobs = (positions?.data ?? []).map(p => ({
+      title: p.title,
+      url: `${KARRIERHUNGARIA_BASE}/allasajanlat/${p.href}`,
+      description: p.content_company || null,
+    }));
+    allJobs.push(...jobs);
+    nextUrl = positions?.next_page_url ?? null;
+  }
+  return allJobs;
 }
 
 
@@ -177,12 +185,12 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, canonical_url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl, experience]
+    [source, item.title, item.url, canonicalUrl, experience, item.company ?? null]
   );
 }
 
@@ -195,18 +203,18 @@ const _runJob = withTimeout("cron_jobs_A_K-background", async (request) => {
   _filters = await loadFilters();
 
 const SOURCES = [
-  "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/kontrolling/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto/budapest?em[]=1",
-  "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap/budapest?em[]=1",
+  "https://karrierhungaria.hu/allasajanlatok/it-programozas-fejlesztes",
+  "https://karrierhungaria.hu/allasajanlatok/it-uzemeltetes-telekommunikacio",
+  "https://karrierhungaria.hu/allasajanlatok/tesztelo-tesztmernok",
+  "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment2",
+  "https://karrierhungaria.hu/allasajanlatok/rendszerintegrator",
+  "https://karrierhungaria.hu/allasajanlatok/rendszeruzemelteto",
+  "https://karrierhungaria.hu/allasajanlatok/projektmenedzsment5",
+  "https://karrierhungaria.hu/allasajanlatok/halozati-es-rendszermernok",
+  "https://karrierhungaria.hu/allasajanlatok/adatbazisszakerto",
+  "https://karrierhungaria.hu/allasajanlatok/kontrolling",
+  "https://karrierhungaria.hu/allasajanlatok/programozo-fejleszto",
+  "https://karrierhungaria.hu/allasajanlatok/vallalatiranyitasi-rendszer-sap",
 ];
 
   let inertiaVersion;

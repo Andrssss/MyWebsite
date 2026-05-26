@@ -20,7 +20,7 @@ const pool = new Pool({
 });
 
 const YDIAK_URL =
-  "https://ydiak.hu/aktualis-diakmunkaink/it-munka?category=it-munka&region=pest#search-results";
+  "https://ydiak.hu/aktualis-diakmunkaink/it-munka#search-results";
 
 const QDIAK_API_URL =
   "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";

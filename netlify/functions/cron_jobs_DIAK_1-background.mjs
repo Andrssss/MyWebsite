@@ -190,7 +190,7 @@ const SOURCES = [
   { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
-  { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
+  { key: "tudasdiak", label: "Tudasdiak", url: "https://app.tudatosdiak.hu/hu/jobs?searchIndustry%5B0%5D=7&searchMinHourlyWage=1000" },
 ];
 
 // =====================
@@ -794,7 +794,7 @@ function looksLikeJobUrl(sourceKey, url) {
   }
 
   if (sourceKey === "tudasdiak") {
-    if (!normalizeUrl(url).startsWith("https://tudatosdiak.anyway.hu/hu/jobs/")) return false;
+    if (!normalizeUrl(url).startsWith("https://app.tudatosdiak.hu/hu/jobs/")) return false;
   }
 
   if (sourceKey === "schonherz") {
@@ -1135,6 +1135,120 @@ function fetchSchonherzPage(url, body) {
 }
 
 
+async function fetchAllTudasdiakJobs(html, listUrl, { maxPages = 20 } = {}) {
+  // Extract Inertia version from the already-fetched HTML
+  const inertiaRaw = html.match(/data-page="([^"]+)"/)?.[1];
+  if (!inertiaRaw) throw new Error("Tudasdiak: no Inertia data-page found in HTML");
+  const inertiaPage = JSON.parse(inertiaRaw.replace(/&quot;/g, '"').replace(/&amp;/g, '&'));
+  const inertiaVersion = inertiaPage.version;
+
+  const u = new URL(listUrl);
+  const all = [];
+
+  for (let page = 1; page <= maxPages; page++) {
+    if (page > 1) u.searchParams.set("page", String(page));
+    else u.searchParams.delete("page");
+
+    let txt;
+    try {
+      txt = await fetchTextWithHeaders(u.toString(), {
+        "X-Inertia": "true",
+        "X-Inertia-Version": inertiaVersion,
+        "X-Inertia-Partial-Data": "jobPostings",
+        "X-Inertia-Partial-Component": "Jobs/Index",
+        Accept: "application/json",
+      });
+    } catch (err) {
+      // 409 = Inertia version mismatch (new deploy between fetch and paginate)
+      if (/HTTP\s+409\b/i.test(err.message)) {
+        console.log(`[tudasdiak] 409 version mismatch on page ${page}, stopping`);
+        break;
+      }
+      throw err;
+    }
+
+    const data = JSON.parse(txt);
+    const jp = data.props?.jobPostings;
+    if (!jp) break;
+
+    const items = (jp.data || [])
+      .map((j) => {
+        const title = j.language_content?.title ? String(j.language_content.title).trim().slice(0, 300) : null;
+        const permalink = j.language_content?.permalink || "-";
+        const puuid = j.puuid;
+        const url = puuid ? `https://app.tudatosdiak.hu/hu/jobs/${permalink}/${puuid}` : null;
+        return { title, url, description: null };
+      })
+      .filter((x) => x.title && x.url);
+
+    console.log(`[tudasdiak] page ${page}: fetched=${items.length}`);
+    if (!items.length) break;
+    all.push(...items);
+
+    // Stop if no "Következő" link with a URL
+    const links = jp.meta?.links || jp.links || [];
+    const hasNext = Array.isArray(links) && links.some((l) => String(l.label || "").includes("Következő") && l.url);
+    if (!hasNext) break;
+  }
+
+  const deduped = dedupeByUrl(all);
+  console.log(`[tudasdiak] done: total=${deduped.length}`);
+  return deduped;
+}
+
+
+async function fetchAllMuiszJobs({ categories = [3], locations = [10], limit = 12, maxPages = 20 } = {}) {
+  const base = "https://merp.muisz.hu/api_v2_prod/jobs/filter";
+  const all = [];
+
+  for (let page = 0; page < maxPages; page++) {
+    const offset = page * limit;
+
+    const params = new URLSearchParams();
+    for (const c of categories) params.append("job_main_categories[]", String(c));
+    for (const l of locations)   params.append("locations[]", String(l));
+    params.set("offset", String(offset));
+    params.set("limit",  String(limit));
+
+    const url = `${base}?${params.toString()}`;
+
+    let payload;
+    try {
+      payload = await fetchJsonWithHeaders(url, {
+        Accept: "application/json",
+        Referer: "https://muisz.hu/",
+        Origin: "https://muisz.hu",
+      });
+    } catch (err) {
+      const msg = String(err?.message || "");
+      if (/HTTP\s+404\b/i.test(msg)) break;
+      throw err;
+    }
+
+    const list = Array.isArray(payload?.list) ? payload.list : [];
+    const total = payload?.count != null ? Number(payload.count) : null;
+
+    const items = list
+      .map((j) => {
+        const title = j?.job_name ? String(j.job_name).trim().slice(0, 300) : null;
+        const alias = j?.url_alias ? String(j.url_alias).trim() : null;
+        const url = alias ? `https://muisz.hu/hu/diakmunkaink/${alias}` : null;
+        return { title, url, description: null };
+      })
+      .filter((x) => x.title && x.url);
+
+    console.log(`[muisz] page ${page}: raw=${list.length}  parsed=${items.length}  total=${total ?? "?"}`);
+    all.push(...items);
+
+    const fetched = (page + 1) * limit;
+    if (!items.length || (total !== null && fetched >= total)) break;
+  }
+
+  const deduped = dedupeByUrl(all);
+  console.log(`[muisz] done: total=${deduped.length}`);
+  return deduped;
+}
+
 // ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
@@ -1224,12 +1338,28 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
           continue;
         }
+      } else if (source === "muisz") {
+        try {
+          merged = await fetchAllMuiszJobs({ categories: [3], locations: [10], limit: 12, maxPages: 20 });
+        } catch (e) {
+          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Muisz API error: ${e.message}` });
+          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Muisz API error: ${e.message}` });
+          continue;
+        }
       } else if (source === "schonherz") {
         try {
           merged = await fetchAllSchonherzJobs(html, p.url);
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Schönherz pagination error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Schönherz pagination error: ${e.message}` });
+          continue;
+        }
+      } else if (source === "tudasdiak") {
+        try {
+          merged = await fetchAllTudasdiakJobs(html, p.url);
+        } catch (e) {
+          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Tudasdiak Inertia error: ${e.message}` });
+          stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Tudasdiak Inertia error: ${e.message}` });
           continue;
         }
       } else {
@@ -1242,19 +1372,18 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // FILTER & KEYWORD MATCH
       // =========================
       let matchedList;
-      if (source === "minddiak") {
+      if (source === "minddiak" || source === "muisz" || source === "zyntern") {
+        // API sources: already pre-filtered to IT jobs – only apply blacklist on title, no false positives from description
         matchedList = [];
         for (const c of merged) {
-          // minddiaknál csak a címre szűrünk – a description gyakran tartalmaz
-          // ártatlan cégleírás-szavakat (pl. "support", "hr"), ami false positive-ot okoz
           const hit = findBlacklistHit(c.title, "");
           if (hit) {
-            console.log(`[minddiak] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
+            console.log(`[${source}] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
           } else {
             matchedList.push(c);
           }
         }
-        console.log(`[minddiak] after_filter=${matchedList.length}  skipped=${merged.length - matchedList.length}`);
+        console.log(`[${source}] after_filter=${matchedList.length}  skipped=${merged.length - matchedList.length}`);
       } else {
         matchedList = merged
           .filter((c) => matchesKeywords(c.title, c.description))
