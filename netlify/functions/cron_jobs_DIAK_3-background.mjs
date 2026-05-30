@@ -141,10 +141,7 @@ const SOURCES = [
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
   { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
   { key: "miszisz", label: "MISZISZ", url: "https://miszisz.hu/?post_type%5B%5D=munkaink&s=&mmin=0&mmax=8000&mvaros%5B%5D=0&mvaros%5B%5D=2&mvaros%5B%5D=3&mvaros%5B%5D=4&mvaros%5B%5D=6&mvaros%5B%5D=7&mvaros%5B%5D=8&mvaros%5B%5D=9&mvaros%5B%5D=10&mvaros%5B%5D=11&mvaros%5B%5D=12&mvaros%5B%5D=15&mvaros%5B%5D=17&mvaros%5B%5D=21&mvaros%5B%5D=68&mvaros%5B%5D=69&mvaros%5B%5D=368&mkat%5B%5D=231&mkat%5B%5D=40&mkat%5B%5D=257&mkat%5B%5D=41" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?utm_source=facebook&utm_medium=social_cpc&utm_campaign=hbp&utm_content=Instagram_Reels&utm_id=120239436336450697&utm_term=120239436336520697&fbclid=PAdGRleAP9v2xleHRuA2FlbQEwAGFkaWQBqy0hd5G9WXNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp-R_SE_c9O6KU5EqFghpD-ajuuKDtviyfnC4ISpI22VXvxQFO3UL-hd8sdBG_aem_9-6Oig3Ju0SERNEIrcg6kw&criteria=seniority%3Dtrainee,junior" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior&sort=newest" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other%20seniority%3Dtrainee,junior" },
+  // nofluffjobs → áttéve: cron_jobs_NOFLUFFJOBS-background.mjs
 ];
 
 // =====================
@@ -282,13 +279,6 @@ function looksLikeJobUrl(sourceKey, url) {
     "/category",
   ];
   if (bad.some(p => u.pathname.startsWith(p))) return false;
-
-  if (sourceKey === "nofluffjobs") {
-    if (!url.startsWith("https://nofluffjobs.com/hu/job/")) return false;
-    // szponzorált hirdetések más városokból is megjelenhetnek — csak budapest-i URL-eket engedünk
-    const slug = u.pathname.replace("/hu/job/", "");
-    if (!slug.includes("budapest")) return false;
-  }
 
   if (sourceKey === "otp") {
     // pozíció-oldalak: /otp/job/... vagy leányvállalati /leanyvallalatok/job/...
@@ -533,24 +523,6 @@ async function fetchMisziszTitle(url, fallbackTitle = null) {
   return cleanMisziszListTitle(fallbackTitle);
 }
 
-function cleanJobTitle(rawTitle) {
-  if (!rawTitle) return null;
-  // Cut at 'ÚJ' or similar markers
-  const cutMarkers = ["ÚJ", "NEW", "FRISS"]; // extend if needed
-  let title = rawTitle;
-  for (const marker of cutMarkers) {
-    const idx = title.indexOf(marker);
-    if (idx >= 0) {
-      title = title.slice(0, idx);
-      break;
-    }
-  }
-  // Trim extra spaces and punctuation at the end
-  return title.trim().replace(/[-–:]+$/g, "").trim();
-}
-
-// Example:
-
 // ✅ Fixed runBatch()
 async function runBatch({ batch, size, write, debug = false, bundleDebug = false }) {
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
@@ -653,7 +625,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       const _beforeSeniorFilter = merged.length;
       let matchedList = merged
         .map((c) => {
-          if (source === "nofluffjobs") c.title = cleanJobTitle(c.title);
           if (source === "miszisz") c.title = cleanMisziszListTitle(c.title);
           return c;
         })
@@ -710,7 +681,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         for (const item of matchedList) {
           if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
-          } else if (source === "nofluffjobs" || source === "wherewework") {
+          } else if (source === "wherewework") {
             const exp = await fetchNofluffExperience(item.url);
             if (exp) item.experience = exp;
             await sleep(400);
