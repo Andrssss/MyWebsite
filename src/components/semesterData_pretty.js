@@ -251,7 +251,7 @@ export const semesterData = {
       },
       {
         "name": "Szigorlat",
-        "url": "https://drive.google.com/drive/folders/1jSJix_l-QxY30e4KFBRfNBBBo9pr0bYn?usp=drive_link"
+        "url": "https://szigorlat.netlify.app/"
       },
     ]
   }
