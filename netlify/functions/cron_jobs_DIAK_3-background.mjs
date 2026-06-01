@@ -135,6 +135,7 @@ function dedupeByUrl(items) {
 const SOURCES = [
 
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=di%C3%A1kmunka&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=&optionsFacetsDD_title=" },
+    { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Üzletfejlesztés+és+innováció&optionsFacetsDD_title=&_gl=1*eqovvy*_up*MQ..*_ga*NDIyODM3NjU3LjE3ODAzMjUzMDY.*_ga_MS48V6C7P1*czE3ODAzMjUzMDYkbzEkZzEkdDE3ODAzMjU0MTgkajE0JGwwJGgw"},
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Informatika+és+digitalizáció&optionsFacetsDD_title=&_gl=1*1xvjrq1*_up*MQ..*_ga*MTA2NjU1MTQ3NS4xNzc5ODA3OTk5*_ga_MS48V6C7P1*czE3Nzk4MDc5OTkkbzEkZzAkdDE3Nzk4MDc5OTkkajYwJGwwJGgw" },
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
