@@ -4,7 +4,7 @@ console.log("CRON_JOBS LOADED");
 
 /* =========================
 const SOURCES = [
-  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=&q2=&alertId=&locationsearch=Budapest&title=GYAKORNOK&date=&location=&shifttype=" },
+  { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Informatika+%C3%A9s+digitaliz%C3%A1ci%C3%B3&optionsFacetsDD_title=&_gl=1*1tielcj*_up*MQ..*_ga*MTczNTU5MDI1Ni4xNzgwMzI1MTQ2*_ga_MS48V6C7P1*czE3ODAzMjUxNDYkbzEkZzAkdDE3ODAzMjUxNDYkajYwJGwwJGgw"},
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
