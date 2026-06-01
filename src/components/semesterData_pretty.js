@@ -250,7 +250,7 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/1mKfZilCJwCVkQiMxAKtJvuE03RAe_Xhr?usp=drive_link"
       },
       {
-        "name": "Szigorlat",
+        "name": "Záróvizsga C spec.",
         "url": "https://szigorlat.netlify.app/"
       },
     ]
