@@ -778,6 +778,11 @@ const JobWatcher = () => {
       // Ha az experience gyakornok/diák jellegű, akkor sem junior/medior
       const isInternExp = INTERN_KEYWORDS.some((k) => exp.includes(k));
 
+      // Ha az experience explicit junior, a cím-alapú intern szűrőket hagyjuk figyelmen kívül
+      if (hasJuniorLevelToken(job.experience)) {
+        return !isInternSource && !isInternExp;
+      }
+
       return !isInternSource && !isInternTitle && !internLike && !isInternExp;
     };
 
