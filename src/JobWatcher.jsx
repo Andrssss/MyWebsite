@@ -1128,7 +1128,7 @@ const JobWatcher = () => {
                 <div className="job-title-group">
                   <a
                     className="job-title"
-                    href={job.source === "minddiak" ? "https://minddiak.hu/diakmunka/work_type/10" : job.url}
+                    href={job.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => trackClick(clickTarget, clickKeyBase, clickDate)}
