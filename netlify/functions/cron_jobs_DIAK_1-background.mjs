@@ -1234,7 +1234,8 @@ async function fetchAllMuiszJobs({ categories = [3], locations = [10], limit = 1
       .map((j) => {
         const title = j?.job_name ? String(j.job_name).trim().slice(0, 300) : null;
         const alias = j?.url_alias ? String(j.url_alias).trim() : null;
-        const url = alias ? `https://muisz.hu/hu/diakmunkaink/${alias}` : null;
+        const jobIdC = j?.job_id_c ? String(j.job_id_c).trim() : null;
+        const url = alias && jobIdC ? `https://muisz.hu/hu/diakmunkaink/${alias}--${jobIdC}` : null;
         return { title, url, description: null };
       })
       .filter((x) => x.title && x.url);
