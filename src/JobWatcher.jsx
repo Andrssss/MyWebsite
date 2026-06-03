@@ -817,8 +817,8 @@ const JobWatcher = () => {
 
         const mediorInText = (j.title && j.title.toLowerCase().includes("medior")) || (j.description && j.description.toLowerCase().includes("medior"));
 
-        // Ha medior szót tartalmaz, CSAK medior szűrővel jelenjen meg
-        if (mediorInText) {
+        // Ha medior szót tartalmaz ÉS az experience NEM explicit junior, CSAK medior szűrővel jelenjen meg
+        if (mediorInText && !hasJuniorLevelToken(j.experience)) {
           return mediorMode;
         }
 

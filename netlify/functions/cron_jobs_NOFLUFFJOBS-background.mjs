@@ -213,7 +213,14 @@ function extractCandidates(html, baseUrl) {
     title = normalizeWhitespace(title);
     if (!title || title.length < 4) return;
 
-    items.push({ title: title.slice(0, 300), url });
+    const company =
+      normalizeWhitespace($(el).find('[class*="company"]').first().text()) ||
+      normalizeWhitespace(card.find('[class*="company"]').first().text()) ||
+      normalizeWhitespace($(el).find('[class*="employer"]').first().text()) ||
+      normalizeWhitespace(card.find('[class*="employer"]').first().text()) ||
+      null;
+
+    items.push({ title: title.slice(0, 300), url, company: company ? company.slice(0, 200) : null });
   });
 
   return dedupeByUrl(items);
@@ -258,7 +265,12 @@ function extractSSR(html, baseUrl) {
     title = normalizeWhitespace(title);
     if (!title || title.length < 4 || isCtaTitle(title)) return;
 
-    items.push({ title: title.slice(0, 300), url });
+    const company =
+      normalizeWhitespace($card.find('[class*="company"]').first().text()) ||
+      normalizeWhitespace($card.find('[class*="employer"]').first().text()) ||
+      null;
+
+    items.push({ title: title.slice(0, 300), url, company: company ? company.slice(0, 200) : null });
   });
 
   return dedupeByUrl(items);
