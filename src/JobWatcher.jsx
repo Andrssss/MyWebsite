@@ -1010,7 +1010,15 @@ const JobWatcher = () => {
             {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
           </button>
           <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
-            📊 Statisztikák 📊
+           📊 Statisztikák 
+          </button>
+          <button
+            className="job-btn"
+            onClick={() => { setBugOpen(true); setBugStatus(""); }}
+            title="Visszajelzés / hibabejelentés"
+            aria-label="Visszajelzés küldése"
+          >
+            🐛 Bug report
           </button>
           <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
             Frissítés
@@ -1349,15 +1357,6 @@ const JobWatcher = () => {
       >
         <FaLinkedin />
       </a>
-
-      <button
-        className="bug-icon-btn"
-        onClick={() => { setBugOpen(true); setBugStatus(""); }}
-        title="Visszajelzés / hibabejelentés"
-        aria-label="Visszajelzés küldése"
-      >
-        🐛
-      </button>
 
       {weeklyActiveUsers !== null && (
         <span

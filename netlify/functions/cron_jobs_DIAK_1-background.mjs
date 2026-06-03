@@ -807,6 +807,29 @@ function looksLikeJobUrl(sourceKey, url) {
 }
 
 
+// Minddiak slugify: megegyezik az Angular app slugify()-jával
+// options: { lower: true, remove: /[*+~.,\[\]\(\)\{\}\/'\"!:@]/g }
+function minddiakSlugify(str) {
+  if (!str) return "";
+  return str
+    .toString()
+    // Magyar ékezetes betűk
+    .replace(/[áÁ]/g, "a")
+    .replace(/[éÉ]/g, "e")
+    .replace(/[íÍ]/g, "i")
+    .replace(/[óÓöÖőŐ]/g, "o")
+    .replace(/[úÚüÜűŰ]/g, "u")
+    .toLowerCase()
+    // Angular slugify remove pattern
+    .replace(/[*+~.,\[\]\(\)\{\}\/'\"!:@]/g, "")
+    // maradék nem-alfanumerikus → dash
+    .replace(/[^\w\s-]/g, "")
+    // whitespace/underscore → dash
+    .replace(/[\s_]+/g, "-")
+    // trim dashes
+    .replace(/^-+|-+$/g, "");
+}
+
 function buildMinddiakDetailUrl(j) {
   const id = j?.id ?? null;
   const pf = j?.positionFrontend || {};
@@ -826,15 +849,24 @@ function buildMinddiakDetailUrl(j) {
 
     // ha valamiért csak slug jönne "logisztikus-...-52079", akkor tegyük elé a /diakmunka/-t
     if (!p.startsWith("/diakmunka/") && !p.startsWith("/diakmunka-")) {
-      // ha már tartalmaz id-t vagy slug-id formát, akkor is jó így
       p = "/diakmunka/" + p.replace(/^\/+/, "");
     }
 
     return normalizeUrl("https://minddiak.hu" + p);
   }
 
-  // 3) fallback, ha nincs frontend path/url (utolsó mentsvár)
-  if (id) return normalizeUrl(`https://minddiak.hu/diakmunka-${id}`);
+  // 3) Slug-alapú URL konstruálás – pontosan ahogy a minddiak.hu Angular app csinálja:
+  // /diakmunka/{slugify(name)}-{slugify(cityText)}-{id}
+  if (id) {
+    const name = j?.name || j?.title || "";
+    const city = j?.cityText || "";
+    const slugName = minddiakSlugify(name);
+    const slugCity = minddiakSlugify(city);
+    const slug = [slugName, slugCity].filter(Boolean).join("-");
+    if (slug) return normalizeUrl(`https://minddiak.hu/diakmunka/${slug}-${id}`);
+    // végső fallback: csak az ID, az Angular átirányítja
+    return normalizeUrl(`https://minddiak.hu/diakmunka/position-${id}`);
+  }
 
   return null;
 }
