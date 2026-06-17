@@ -39,12 +39,30 @@ function normalizeText(s) {
 export const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetsegprogram", "tehetségprogram", "talent",  "graduate", "student", "students", "early career", 
+  "tehetsegprogram", "tehetségprogram", "talent",  "graduate", "student", "students", "early career",
+];
+
+export const JUNIOR_KEYWORDS = [
+  "junior",
+];
+
+export const MID_KEYWORDS = [
+  "medior", "mid-level", "mid level",
 ];
 
 export function isInternshipTitle(title) {
   const t = normalizeText(title);
   return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
+}
+
+export function isJuniorTitle(title) {
+  const t = normalizeText(title);
+  return JUNIOR_KEYWORDS.some(k => t.includes(k));
+}
+
+export function isMidLevelTitle(title) {
+  const t = normalizeText(title);
+  return MID_KEYWORDS.some(k => t.includes(k));
 }
 
 // Sources that are inherently student/intern focused
@@ -303,6 +321,10 @@ export async function enrichExperience({
           extraInternKeywords?.some(k => normalizeText(row.title).includes(k))
         ) {
           experience = "diákmunka";
+        } else if (isJuniorTitle(row.title)) {
+          experience = "junior";
+        } else if (isMidLevelTitle(row.title)) {
+          experience = "medior";
         }
 
         await client.query(
