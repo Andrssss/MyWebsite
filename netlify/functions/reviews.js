@@ -94,13 +94,15 @@ exports.handler = async (event, context) => {
 
       const {
         name,
-        user = "anonim",
+        user: rawUser = "",
         general = null,
         duringSemester = null,
         exam = null,
         user_id,
         kepzes_fajtaja = "MI",
       } = body;
+
+      const user = (typeof rawUser === "string" ? rawUser.trim() : "") || "anonim";
 
       // Speciális: "Általános információ" tárgyra ne lehessen POST-olni
       if (name && name.trim() === "Általános információ") {
@@ -188,8 +190,12 @@ exports.handler = async (event, context) => {
 
       for (const [key, column] of Object.entries(map)) {
         if (body[key] !== undefined && body[key] !== "N/A") {
+          let value = body[key];
+          if (key === "user") {
+            value = (typeof value === "string" ? value.trim() : "") || "anonim";
+          }
           fields.push(`${column} = $${idx++}`);
-          values.push(body[key]);
+          values.push(value);
         }
       }
 
