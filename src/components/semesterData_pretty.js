@@ -137,10 +137,13 @@ export const semesterData = {
   "4. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1kLok9xiP5f-suibWluwykDZlqoP0k8r7?usp=drive_link",
     "videos": [
-      { "name": "Adatbázis", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0Vl_EhOknFnIMoM9lroRb5d" },
-      { "name": "Digjel", "url": "https://youtube.com/playlist?list=PLBLr6naxBD0WlQyBAm1f-VWN3pWyZo48j&si=Bgu2cMYqb6kCnd0d" },
+      { "name": "ADATBÁZIS", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0Vl_EhOknFnIMoM9lroRb5d" },
+      { "name": "DIG_JEL", "url": "https://youtube.com/playlist?list=PLBLr6naxBD0WlQyBAm1f-VWN3pWyZo48j&si=Bgu2cMYqb6kCnd0d" },
+      { "name": "DIG_SZÁM", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidjpdd-yGGrjAHYG24L4HiYY" },
+      { "name": "DIGSZAR", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr6inhWpb4kd8TM9goJhgA" },
       { "name": "EM", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi_l3-RjyriHwtNhkp13iLG&si=ISclybm95avW4Xme" },
-      { "name": "Játékelmélet", "url": "https://www.youtube.com/playlist?list=PLc7adpdMCAYdLK5JDQNIS13f8JVYpAKUS" },
+      { "name": "JÁTÉKELMÉLET", "url": "https://www.youtube.com/playlist?list=PLc7adpdMCAYdLK5JDQNIS13f8JVYpAKUS" },
+      { "name": "JAVA", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjrZz1IVAv2Xd21Zg2KknoQ" },
       { "name": "Sejtbiosz 2", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0XjPECHWn5JV2r8YF5KSjfp" },
       { "name": "STOCHA", "url": "https://www.youtube.com/watch?v=_6428hlJl1M&list=PLWlVP-FjnR2KcDE_kDMraHBHAereW1cs6&index=1" }
     ],
@@ -182,10 +185,12 @@ export const semesterData = {
   "5. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1EQWAV93Cg_9XAOGS8M2R7A-2QAGqXu8x?usp=sharing",
     "videos": [
-      { "name": "AI előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr4u0DkgtQoFBLuo9jBUm5&si=qSYI5pRP9XRmgStf" },
-      { "name": "AI gyak", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgqpBcHj_jB8RGk38pzGJod" },
-      { "name": "AI KONZI", "url": "https://youtu.be/6RRr5D-5zyI" },
-      { "name": "AI ZH", "url": "https://youtu.be/2Jq0ugusA8w" },
+      { "name": "AI", "group": [
+        { "name": "AI előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr4u0DkgtQoFBLuo9jBUm5&si=qSYI5pRP9XRmgStf" },
+        { "name": "AI gyak", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgqpBcHj_jB8RGk38pzGJod" },
+        { "name": "AI KONZI", "url": "https://youtu.be/6RRr5D-5zyI" },
+        { "name": "AI ZH", "url": "https://youtu.be/2Jq0ugusA8w" }
+      ]},
       { "name": "Basic of Mobile", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgkHZUK788tJrKwxN4gZaaw&si=sD_Ou4Z7PzukmV8v" },
       { "name": "CCS", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi6eQDI_bXiVy-dUYeEBxl6&si=55zf3QSm4jcppD5I" },
       { "name": "Mérés tech", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjDZBJjYX0BrzjIx0Cg3OYN&si=iwgMKEAij2CBLQbk" },
