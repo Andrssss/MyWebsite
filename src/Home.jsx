@@ -18,11 +18,12 @@ const Home = ({ setContent, setMenuOpen }) => {
       <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Anyagaim :</h2>
 
       <div className="folder-grid">
-        {Object.entries(semesterData).map(([semester, { link, subjects }]) => (
+        {Object.entries(semesterData).map(([semester, { link, subjects, videos }]) => (
           <SemesterPreview
             key={semester}
             title={semester}
             subjects={subjects}
+            videos={videos}
             link={link}
           />
         ))}

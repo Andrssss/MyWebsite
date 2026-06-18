@@ -1,6 +1,11 @@
 export const semesterData = {
   "1. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/15GaVm9O4usLBA7oBE9q0LHp0VyBdzTNZ?usp=drive_link",
+    "videos": [
+      { "name": "bevprog", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiDQJ7ILDf17-DwwaAnJwne" },
+      { "name": "Analízis", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiididyyNX6QwHv6qdTk0RcIhh" },
+      { "name": "bev-fizika", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidjWqpvoTQue1zFC1tozXS1i" }
+    ],
     "subjects": [
       {
         "name": "LA-DM_1",
@@ -47,6 +52,9 @@ export const semesterData = {
   },
   "2. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/17ZNNYjsdRlWOMY1Sib0ckboxlWtPGAOT?usp=drive_link",
+    "videos": [
+      { "name": "ANÁL 2", "url": "https://www.youtube.com/watch?v=T-Cm1fbUJ-4&list=PLvLI66ieiidiKOx5lySZn0_3_q_gX5Kba" }
+    ],
     "subjects": [
       {
         "name": "MATLAB",
@@ -84,6 +92,10 @@ export const semesterData = {
   },
   "3. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1qADHXKHCW4VbCu2paVo_FyV_FYkvH-Ta?usp=drive_link",
+    "videos": [
+      { "name": "NYELVTECH", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidhOULovlk35bwn9Dz6LGVFC" },
+      { "name": "ADATSZERK", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgwtb_56NDqaT6pHmLfdYIx&si=Q6fKhMgEa2ilD9I-" }
+    ],
     "subjects": [
       {
         "name": "VALSZÁM",
@@ -121,6 +133,12 @@ export const semesterData = {
   },
   "4. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1kLok9xiP5f-suibWluwykDZlqoP0k8r7?usp=drive_link",
+    "videos": [
+      { "name": "EM", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi_l3-RjyriHwtNhkp13iLG&si=ISclybm95avW4Xme" },
+      { "name": "ADATB", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidhr9wjgqGcW9T9jSd2PXHkv" },
+      { "name": "STOCHA", "url": "https://www.youtube.com/watch?v=_6428hlJl1M&list=PLWlVP-FjnR2KcDE_kDMraHBHAereW1cs6&index=1" },
+      { "name": "Sejtbiosz 2", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0XjPECHWn5JV2r8YF5KSjfp" }
+    ],
     "subjects": [
       {
         "name": "STOCHA",
@@ -158,6 +176,16 @@ export const semesterData = {
   },
   "5. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1EQWAV93Cg_9XAOGS8M2R7A-2QAGqXu8x?usp=sharing",
+    "videos": [
+      { "name": "AI előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr4u0DkgtQoFBLuo9jBUm5&si=qSYI5pRP9XRmgStf" },
+      { "name": "AI gyak", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgqpBcHj_jB8RGk38pzGJod" },
+      { "name": "AI ZH", "url": "https://youtu.be/2Jq0ugusA8w" },
+      { "name": "AI KONZI", "url": "https://youtu.be/6RRr5D-5zyI" },
+      { "name": "CCS", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi6eQDI_bXiVy-dUYeEBxl6&si=55zf3QSm4jcppD5I" },
+      { "name": "Basic of Mobile", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgkHZUK788tJrKwxN4gZaaw&si=sD_Ou4Z7PzukmV8v" },
+      { "name": "Mérés tech", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjDZBJjYX0BrzjIx0Cg3OYN&si=iwgMKEAij2CBLQbk" },
+      { "name": "Neurbiosz", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0W-zYLBcZQILCVTd1RKrZmV" }
+    ],
     "subjects": [
       {
         "name": "NEURHÁLÓ",
@@ -203,6 +231,10 @@ export const semesterData = {
   },
   "6. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1qYv5d6DLZqpZumIqRo776POMoxXXRRuS?usp=drive_link",
+    "videos": [
+      { "name": "PROG NYELVEK", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiXdiSrs8n0XKZey6iV7Zfm" },
+      { "name": "KRIPTO", "url": "https://youtube.com/playlist?list=PLvLI66ieiidh6TdEjouXcYFvWKdEZmQaz&si=emLJ_p5OWUydKvIS" }
+    ],
     "subjects": [
       {
         "name": "WEB_PROG",
@@ -240,6 +272,9 @@ export const semesterData = {
   },
   "7. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1-7a_4RjziDbxvGiG-_hRd665YcvAWjtB?usp=sharing",
+    "videos": [
+      { "name": "Op. rendszerek", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidia2FxYf-hN8450s43_6xhZ" }
+    ],
     "subjects": [
       {
         "name": "Jog",
