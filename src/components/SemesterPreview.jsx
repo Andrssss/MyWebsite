@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import './SemesterPreview.css';
 
+const toMobileYT = (url) =>
+  url.replace(/^https?:\/\/(www\.)?youtube\.com/, 'https://m.youtube.com');
+
 const SemesterPreview = ({ title, subjects, videos, link }) => {
   const [videosOpen, setVideosOpen] = useState(false);
 
@@ -45,7 +48,7 @@ const SemesterPreview = ({ title, subjects, videos, link }) => {
                 <a
                   key={i}
                   className="video-item"
-                  href={video.url}
+                  href={toMobileYT(video.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
