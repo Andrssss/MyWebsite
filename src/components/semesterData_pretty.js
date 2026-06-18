@@ -96,7 +96,8 @@ export const semesterData = {
     "videos": [
       { "name": "ADATSZERK", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgwtb_56NDqaT6pHmLfdYIx&si=Q6fKhMgEa2ilD9I-" },
       { "name": "Áramkörök", "url": "https://youtu.be/Xh1jPfwQYw0?si=8LzqxB5foUnuE3Lt" },
-      { "name": "NYELVTECH", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidhOULovlk35bwn9Dz6LGVFC" }
+      { "name": "NYELVTECH", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidhOULovlk35bwn9Dz6LGVFC" },
+      { "name": "SZÁMHÁLÓ", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjUptDZBEeYgQxFXIJ5DUT1" }
     ],
     "subjects": [
       {
