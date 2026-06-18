@@ -13,12 +13,6 @@ const TABS: { key: OsKey; label: string }[] = [
   { key: "mac", label: "macOS" },
 ];
 
-const OTHERS_LINKS = [
-    { name: "PPKE WIKI 👑", url: "https://users.itk.ppke.hu/~perpa4/" },
-  { name: "hakkeltamas 🖤", url: "https://itk.hakkeltamas.hu/" },
-  { name: "hudes ☁️", url: "https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO" },
-  { name: "vecha ☁️", url: "https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ" },
-];
 
 const User_pages: React.FC = () => {
   const [os, setOs] = useState<OsKey>(() => {
@@ -66,29 +60,6 @@ const User_pages: React.FC = () => {
     </div>
   </div>
 
-      <div className="others-ll__noteWrap others-ll__noteWrap--compact" aria-live="polite">
-        <section className="others-ll__note others-ll__note--compact" aria-labelledby="alt-links-title">
-          <h3 id="alt-links-title">Külső tárhelyek</h3>
-          <p className="others-ll__compactLead">
-            Ezek a linkek nem érhetők el ezzel a módszerrel, mivel nem ITK-s szerveren vannak.
-          </p>
-
-          <ul className="others-ll__altButtons" aria-label="Alternatív linkek listája">
-            {OTHERS_LINKS.map((item) => (
-              <li key={item.url}>
-                <a
-                  className="others-ll__altButton"
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {item.name}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
 
       <div
         role="tabpanel"

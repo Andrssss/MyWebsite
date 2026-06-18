@@ -29,3 +29,4 @@ backfill_daily_stats.mjs
 .netlify
 scripts/check_workcenter.mjs
 scripts/test_years.mjs
+/scripts
