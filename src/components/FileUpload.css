@@ -1,0 +1,133 @@
+.upload-section {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  width: min(100%, 420px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.upload-title {
+  color: #e5e7eb;
+  font-size: 14px;
+  letter-spacing: .3px;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.upload-zone {
+  border: 2px dashed rgba(255,255,255,.2);
+  border-radius: 12px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  background: rgba(255,255,255,.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.upload-zone:hover,
+.upload-zone.dragging {
+  border-color: rgba(255,204,102,.6);
+  background: rgba(255,204,102,.05);
+}
+
+.upload-zone.uploading {
+  cursor: default;
+  border-color: rgba(255,255,255,.1);
+}
+
+.upload-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.upload-text {
+  color: #e5e7eb;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.upload-sub {
+  color: rgba(255,255,255,.4);
+  font-size: 11px;
+}
+
+.upload-spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #e5e7eb;
+  font-size: 13px;
+}
+
+.upload-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255,255,255,.15);
+  border-top-color: #ffcc66;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.upload-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #86efac;
+  font-size: 14px;
+  text-align: center;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(134,239,172,.07);
+  border: 1px solid rgba(134,239,172,.2);
+}
+
+.upload-again-btn {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  color: #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.upload-again-btn:hover {
+  background: rgba(255,255,255,.14);
+}
+
+.upload-error {
+  margin-top: 8px;
+  color: #fca5a5;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.upload-retry-btn {
+  background: none;
+  border: 1px solid rgba(252,165,165,.4);
+  color: #fca5a5;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.upload-retry-btn:hover {
+  background: rgba(252,165,165,.1);
+}

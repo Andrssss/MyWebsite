@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SemesterPreview from './components/SemesterPreview';
+import FileUpload from './components/FileUpload';
 import { semesterData } from './components/semesterData_pretty';
 import './Home.css';
 
@@ -28,21 +29,7 @@ const Home = ({ setContent, setMenuOpen }) => {
           />
         ))}
       </div>
-      {/*<aside className="side-col">
-          <h3 className="side-title">Extra</h3>
-
-          <a
-            className="portfolio-tile"
-            href="https://bakanportf.netlify.app/"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Nyisd meg a portfóliómat új lapon"
-          >
-            <div className="portfolio-emoji" aria-hidden>🎓</div>
-            <div className="portfolio-title">Portfólióm</div>
-            <div className="portfolio-sub">külső oldal · új lapon nyílik</div>
-          </a>
-        </aside>*/}
+      {/* <FileUpload /> */}
     </div>
   );
 };

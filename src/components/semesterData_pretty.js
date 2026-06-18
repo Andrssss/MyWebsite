@@ -53,7 +53,8 @@ export const semesterData = {
   "2. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/17ZNNYjsdRlWOMY1Sib0ckboxlWtPGAOT?usp=drive_link",
     "videos": [
-      { "name": "ANÁL 2", "url": "https://www.youtube.com/watch?v=T-Cm1fbUJ-4&list=PLvLI66ieiidiKOx5lySZn0_3_q_gX5Kba" }
+      { "name": "ANÁL 2", "url": "https://www.youtube.com/watch?v=T-Cm1fbUJ-4&list=PLvLI66ieiidiKOx5lySZn0_3_q_gX5Kba" },
+      { "name": "MATLAB", "url": "https://youtu.be/tKAc21e8tBk?si=DOA5HO1MLQjKzV4L" }
     ],
     "subjects": [
       {
@@ -94,6 +95,7 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/1qADHXKHCW4VbCu2paVo_FyV_FYkvH-Ta?usp=drive_link",
     "videos": [
       { "name": "ADATSZERK", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgwtb_56NDqaT6pHmLfdYIx&si=Q6fKhMgEa2ilD9I-" },
+      { "name": "Áramkörök", "url": "https://youtu.be/Xh1jPfwQYw0?si=8LzqxB5foUnuE3Lt" },
       { "name": "NYELVTECH", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidhOULovlk35bwn9Dz6LGVFC" }
     ],
     "subjects": [
