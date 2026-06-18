@@ -415,11 +415,37 @@ body {
   transform: translateX(0);
 }
 
+/* Gomb kattintás utén: hover le van tiltva amíg el nem megy a mouse */
+.sidebar.collapsed.no-hover,
+.sidebar.collapsed.no-hover:hover {
+  transform: translateX(-190px);
+}
+
+
 .sidebar .logo {
   font-size: 1.3rem;
   font-weight: bold;
   margin-bottom: 2rem;
   color: #ffcc66;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-close-btn {
+  background: none;
+  border: none;
+  color: #ffcc66;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.sidebar-close-btn:hover {
+  opacity: 1;
 }
 
 .sidebar nav ul {
@@ -487,6 +513,10 @@ body {
 }
 
 .sidebar.collapsed ~ .main-content {
+  margin-left: 35px;
+}
+
+.layout:not(.on-home) .main-content {
   margin-left: 35px;
 }
 

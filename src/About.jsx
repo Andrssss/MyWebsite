@@ -23,11 +23,10 @@ const About = () => {
             Szia. Örülök, hogy ezt olvasod. :) 
           </p>
           <p>
-            Végzős Mérnökinformatikus hallgató vagyok, most el is kezdtem mellette dolgozni, mint <strong>teszt autómatizáció</strong>-s gyakornok.
-
-             Ami elég fun munka. Jó kis kreatív. Meg végre azt csinálom amit gyerekként is szerettem volna, mert lényegében 
-             nyomozó lettem. Mivel az IT munka nagyrésze kitalálni 3-4 emberen keresztűl, hogy akkor mit is szeretnének pontosan.
-              Szóval social skillek sok esetben fontosabbak, mint az IT-sok. Hiába vagy jó programozó, ha nem tudod kideríteni, hogy mi a feladatod.
+            2026-ban végeztem Mérnökinformatikus hallgatóként. </p><p> Még 2025-ben el is kezdtem mellette dolgozni, mint <strong>teszt autómatizáció</strong>-s gyakornok egy magyar bankban.
+           
+             Ami elég fun munka. Jó kis kreatív. Lényegesen többet tanulok itt, mint egyetem alatt.
+              Sajnos az egyik legfontosabb amit itt megtanultam, hogy a social skillek sok esetben fontosabbak, mint az IT-sok. Hiába vagy jó programozó, ha nem tudod kideríteni, hogy mi a feladatod.
           </p>
 
           <p>

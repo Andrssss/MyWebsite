@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -26,8 +26,12 @@ const AppContent = () => {
   const [initialPath, setInitialPath] = useState(null);
   const [hasNavigatedAway, setHasNavigatedAway] = useState(false);
   const [subjectInfoLoading, setSubjectInfoLoading] = useState(false);
+  const [manuallyCollapsed, setManuallyCollapsed] = useState(false);
+  const [noHover, setNoHover] = useState(false);
+  const sidebarRef = useRef(null);
 
-
+  const isHome = location.pathname === '/';
+  const sidebarCollapsed = (hasNavigatedAway || manuallyCollapsed) && !(location.pathname === '/targy_info' && subjectInfoLoading);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 800);
@@ -36,26 +40,19 @@ const AppContent = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-
-
-useEffect(() => {
-  /*setHasNavigatedAway(false);*/
-  if (initialPath === null) {
-    setInitialPath(location.pathname);
-  } else if (location.pathname !== initialPath && !hasNavigatedAway) {
-    setHasNavigatedAway(true);
-  }
-}, [location, initialPath, hasNavigatedAway]);
+  useEffect(() => {
+    if (initialPath === null) {
+      setInitialPath(location.pathname);
+    } else if (location.pathname !== initialPath && !hasNavigatedAway) {
+      setHasNavigatedAway(true);
+    }
+  }, [location, initialPath, hasNavigatedAway]);
 
 
   
 
   return (
-    <div className={`${isMobile ? 'container' : 'layout'} ${
-      !isMobile && hasNavigatedAway && !(location.pathname === '/targy_info' && subjectInfoLoading)
-        ? 'sb-collapsed'
-        : ''
-     }`}>
+    <div className={`${isMobile ? 'container' : 'layout'} ${!isMobile && sidebarCollapsed ? 'sb-collapsed' : ''} ${isHome ? 'on-home' : ''}`}>
       <div className="particles-wrapper">
         <video
           className={`background-video${location.pathname === '/targy_info' ? ' bg-hidden' : ''}`}
@@ -104,8 +101,23 @@ useEffect(() => {
       ) :  (
         //!isMobile => desktop nézet - itt jön az új aside blokk
         !isMobile && (
-          <aside className={`sidebar ${hasNavigatedAway && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
-            <div className="logo">bakan7</div>
+          <aside
+            ref={sidebarRef}
+            className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${noHover ? 'no-hover' : ''}`}
+            onMouseLeave={() => { if (noHover) setNoHover(false); }}
+          >
+            <div className="logo">
+              bakan7
+              {!sidebarCollapsed && (
+                <button
+                  className="sidebar-close-btn"
+                  onClick={() => {
+                    setManuallyCollapsed(true);
+                    setNoHover(true);
+                  }}
+                >‹</button>
+              )}
+            </div>
             <nav>
               <ul>
                 <li><Link to="/">📂 Főoldal</Link></li>
@@ -121,7 +133,7 @@ useEffect(() => {
         )
       )}
 
-      <main className={`${isMobile ? 'content' : 'main-content'} ${!isMobile && hasNavigatedAway  && !(location.pathname === '/targy_info' && subjectInfoLoading) ? 'collapsed' : ''}`}>
+      <main className={`${isMobile ? 'content' : 'main-content'} ${!isMobile && sidebarCollapsed ? 'collapsed' : ''} ${isHome ? 'pad-right' : ''}`}>
         <Routes>
           <Route path="/" element={<Home setContent={() => {}} setMenuOpen={setMenuOpen} />} />
           <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
