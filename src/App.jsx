@@ -13,7 +13,6 @@ import Home from './Home';
 import UniversityLinks from './UniversityLinks.jsx';
 import About from './About.jsx';
 import SubjectInfo from './SubjectInfo.jsx';
-import Particles from './Particles.jsx';
 import User_pages from './User_pages.tsx';
 import JobWatcher from "./JobWatcher.jsx";
 import Filters from "./Filters.jsx";
@@ -23,17 +22,11 @@ import JobStats from "./JobStats.jsx";
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [particlesActive, setParticlesActive] = useState(true);
   const location = useLocation();
   const [initialPath, setInitialPath] = useState(null);
   const [hasNavigatedAway, setHasNavigatedAway] = useState(false);
   const [subjectInfoLoading, setSubjectInfoLoading] = useState(false);
 
-
-
-  useEffect(() => {
-    setParticlesActive(!['/targy_info', '/allasfigyelo', '/allasok/filters', '/allasfigyelo/stats'].includes(location.pathname));
-  }, [location]);
 
 
   useEffect(() => {
@@ -64,8 +57,15 @@ useEffect(() => {
         : ''
      }`}>
       <div className="particles-wrapper">
-        {particlesActive && <div className="background-image"></div>} {/* Háttérkép */}
-        <Particles active={particlesActive} />
+        <video
+          className={`background-video${location.pathname === '/targy_info' ? ' bg-hidden' : ''}`}
+          autoPlay
+          loop
+          muted
+          playsInline
+        >
+          <source src="/IMG_0006_bg.mp4" type="video/mp4" />
+        </video>
       </div>
 
 

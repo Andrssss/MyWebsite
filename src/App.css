@@ -502,25 +502,30 @@ body {
 }
 
 
-.background-image {
+.background-video {
   position: fixed;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  /*background: url('/backgr.png') no-repeat right center;
-  background-size: auto 120vh;
-  background-attachment: fixed;*/
-  opacity: 0.2;
-  background-position: center center;
+  top: 50%;
+  left: 50%;
+  min-width: 100vw;
+  min-height: 100vh;
+  width: auto;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  opacity: 0.85;
   pointer-events: none;
   z-index: -1;
+  transition: opacity 0.8s ease;
 }
-/* 📱 Mobil nézet – középre igazítás */
+
+.background-video.bg-hidden {
+  opacity: 0;
+}
+/* 📱 Mobil nézet */
 @media (max-width: 600px) {
-  .background-image {
-      background: url('/background.png');
-    background-position: center center; /* <<< középre vízszintesen és függőlegesen */
-    background-size: auto 100vh; /* kicsit kisebb is lehet telefonon */
+  .background-video {
+    min-width: 100vw;
+    min-height: 100vh;
   }
   .content {
     margin-left: 0 !important;

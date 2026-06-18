@@ -14,10 +14,10 @@ const TABS: { key: OsKey; label: string }[] = [
 ];
 
 const OTHERS_LINKS = [
+    { name: "PPKE WIKI 👑", url: "https://users.itk.ppke.hu/~perpa4/" },
   { name: "hakkeltamas 🖤", url: "https://itk.hakkeltamas.hu/" },
   { name: "hudes ☁️", url: "https://drive.google.com/drive/folders/1Mcsi-VZUb1PcdKfhHFXn3JHNiRei28BO" },
   { name: "vecha ☁️", url: "https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ" },
-  { name: "PPKE WIKI 👑", url: "https://users.itk.ppke.hu/~perpa4/" },
 ];
 
 const User_pages: React.FC = () => {
