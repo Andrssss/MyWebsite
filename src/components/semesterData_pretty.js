@@ -137,7 +137,11 @@ export const semesterData = {
   "4. FÉLÉV": {
     "link": "https://drive.google.com/drive/folders/1kLok9xiP5f-suibWluwykDZlqoP0k8r7?usp=drive_link",
     "videos": [
-      { "name": "ADATBÁZIS", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0Vl_EhOknFnIMoM9lroRb5d" },
+      { "name": "ADATBÁZIS", "group": [
+        { "name": "2020", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjCs6_qEHUFkVYX1NdN4YJE&si=HKQ-I6S5MwLLOygh" },
+        { "name": "2022", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0Vl_EhOknFnIMoM9lroRb5d" },
+        { "name": "2024", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr9wjgqGcW9T9jSd2PXHkv&si=zJU9udYGFAoYUNEB" }
+      ]},
       { "name": "DIG_JEL", "url": "https://youtube.com/playlist?list=PLBLr6naxBD0WlQyBAm1f-VWN3pWyZo48j&si=Bgu2cMYqb6kCnd0d" },
       { "name": "DIG_SZÁM", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidjpdd-yGGrjAHYG24L4HiYY" },
       { "name": "DIGSZAR", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr6inhWpb4kd8TM9goJhgA" },
@@ -186,10 +190,12 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/1EQWAV93Cg_9XAOGS8M2R7A-2QAGqXu8x?usp=sharing",
     "videos": [
       { "name": "AI", "group": [
-        { "name": "AI előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr4u0DkgtQoFBLuo9jBUm5&si=qSYI5pRP9XRmgStf" },
-        { "name": "AI gyak", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgqpBcHj_jB8RGk38pzGJod" },
-        { "name": "AI KONZI", "url": "https://youtu.be/6RRr5D-5zyI" },
-        { "name": "AI ZH", "url": "https://youtu.be/2Jq0ugusA8w" }
+        { "name": "2024 előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhr4u0DkgtQoFBLuo9jBUm5&si=qSYI5pRP9XRmgStf" },
+        { "name": "2024 gyak", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgqpBcHj_jB8RGk38pzGJod" },
+        { "name": "2025 előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjLRcALUtInjSUCBulTJVOR&si=Q9Hdfp3lMKZ59N4f" },
+        { "name": "2025 gyak", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi1fQC93C8Y1EI8B8T1ApG1&si=txCUmv8ov6ItRo9x" },
+        { "name": "2024 konzi", "url": "https://youtu.be/6RRr5D-5zyI" },
+        { "name": "2024 zh", "url": "https://youtu.be/2Jq0ugusA8w" }
       ]},
       { "name": "Basic of Mobile", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgkHZUK788tJrKwxN4gZaaw&si=sD_Ou4Z7PzukmV8v" },
       { "name": "CCS", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi6eQDI_bXiVy-dUYeEBxl6&si=55zf3QSm4jcppD5I" },
@@ -243,7 +249,21 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/1qYv5d6DLZqpZumIqRo776POMoxXXRRuS?usp=drive_link",
     "videos": [
       { "name": "KRIPTO", "url": "https://youtube.com/playlist?list=PLvLI66ieiidh6TdEjouXcYFvWKdEZmQaz&si=emLJ_p5OWUydKvIS" },
-      { "name": "PROG NYELVEK", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiXdiSrs8n0XKZey6iV7Zfm" }
+      { "name": "PROG NYELVEK", "group": [
+        { "name": "2019", "url": "https://youtube.com/playlist?list=PLvLI66ieiidiKkWqY9zu4JYSkT-IWui6R&si=HDRtVpFoaoYiZifp" },
+        { "name": "2020", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiXdiSrs8n0XKZey6iV7Zfm" }
+      ]},
+      { "name": "WEBPROG", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhfbmEbAuv5ChtsMvtw0CXl&si=-lTc47BniYDrTp8E" },
+      { "name": "CNN", "url": "https://youtube.com/playlist?list=PLvLI66ieiidg3wYRxDtESUnmqi_L_HEwU&si=nIthJfiLVkMLoN4o" },
+      { "name": "ANDROID", "group": [
+        { "name": "2019", "url": "https://www.youtube.com/watch?v=fN1l4ZJ1xS8&list=PLvLI66ieiidiLv17eXMHZpXogItDcs3VJ" },
+        { "name": "2020", "url": "https://www.youtube.com/watch?v=8wNxuVfPuVw&list=PLvLI66ieiidhhVJ4Fc40Rho-o2ay6a2Vm" }
+      ]},
+      { "name": "INFO_ÉS_KÓD", "group": [
+        { "name": "2021 előadás", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgTlRI5AG7kYVV776QsK6Nf" },
+        { "name": "2021 gyak", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidgj6uSQJJTJPGnuZegozTzf" },
+        { "name": "2021 labor", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidi8R6dBSyVwIuOe99TD3mSp" }
+      ]}
     ],
     "subjects": [
       {
