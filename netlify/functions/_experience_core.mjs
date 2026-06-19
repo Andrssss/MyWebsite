@@ -316,13 +316,6 @@ export async function enrichExperience({
         const html = await fetchText(row.url);
         let experience = extract(html);
 
-        // If no years found, scan the HTML body text for level keywords
-        if (!experience) {
-          const lower = html.toLowerCase();
-          if (MID_KEYWORDS.some(k => lower.includes(k))) experience = "medior";
-          else if (JUNIOR_KEYWORDS.some(k => lower.includes(k))) experience = "junior";
-        }
-
         // Title always overrides (highest priority)
         if (
           isInternshipTitle(row.title) ||
