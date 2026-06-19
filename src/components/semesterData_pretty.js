@@ -198,7 +198,10 @@ export const semesterData = {
         { "name": "2024 zh", "url": "https://youtu.be/2Jq0ugusA8w" }
       ]},
       { "name": "Basic of Mobile", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgkHZUK788tJrKwxN4gZaaw&si=sD_Ou4Z7PzukmV8v" },
-      { "name": "CCS", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi6eQDI_bXiVy-dUYeEBxl6&si=55zf3QSm4jcppD5I" },
+      { "name": "CCS", "group": [
+        { "name": "előadás", "url": "https://youtube.com/playlist?list=PLvLI66ieiidi6eQDI_bXiVy-dUYeEBxl6&si=55zf3QSm4jcppD5I" },
+        { "name": "2024 konzi", "url": "https://youtube.com/playlist?list=PLvLI66ieiidiZ1vD9Erj1RYzK7BiVxlKM&si=IyZi2HlfHUyy_m10" }
+      ]},
       { "name": "Mérés tech", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjDZBJjYX0BrzjIx0Cg3OYN&si=iwgMKEAij2CBLQbk" },
       { "name": "Neurbiosz", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0W-zYLBcZQILCVTd1RKrZmV" }
     ],
