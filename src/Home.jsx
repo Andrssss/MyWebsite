@@ -75,7 +75,6 @@ const Home = ({ setContent, setMenuOpen }) => {
         <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           {[
             { name: 'PPKE WIKI 👑', url: 'https://users.itk.ppke.hu/~perpa4/' },
-            { name: 'hakkeltamas 🖤', url: 'https://itk.hakkeltamas.hu/' },
             { name: 'horre20 ☁️', url: 'https://drive.google.com/drive/u/2/folders/12Dp6uZE2x61kobMxHaZ3PrUliWr3v3qj' },
             { name: 'hudes ☁️', url: 'https://drive.google.com/drive/folders/1uRxTX6odfui_A27yBAGqesNkqFM46S9m' },
             { name: 'vecha ☁️', url: 'https://mega.nz/folder/kYEiST5A#tdOn3s5WDauUS1mkhUAgDQ' },
