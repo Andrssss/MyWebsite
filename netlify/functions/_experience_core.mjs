@@ -316,6 +316,14 @@ export async function enrichExperience({
         const html = await fetchText(row.url);
         let experience = extract(html);
 
+        // If no years found, scan the HTML body text for level keywords
+        if (!experience) {
+          const lower = html.toLowerCase();
+          if (MID_KEYWORDS.some(k => lower.includes(k))) experience = "medior";
+          else if (JUNIOR_KEYWORDS.some(k => lower.includes(k))) experience = "junior";
+        }
+
+        // Title always overrides (highest priority)
         if (
           isInternshipTitle(row.title) ||
           extraInternKeywords?.some(k => normalizeText(row.title).includes(k))
@@ -342,9 +350,16 @@ export async function enrichExperience({
         });
         console.error(`[experience:${tag}] FAILED ID:`, row.id, "|", err.message);
 
+        const fallback = (
+          isInternshipTitle(row.title) || extraInternKeywords?.some(k => normalizeText(row.title).includes(k))
+        ) ? "diákmunka"
+          : isJuniorTitle(row.title) ? "junior"
+          : isMidLevelTitle(row.title) ? "medior"
+          : "-";
+
         await client.query(
-          `UPDATE job_posts SET experience = '-' WHERE id = $1`,
-          [row.id]
+          `UPDATE job_posts SET experience = $1 WHERE id = $2`,
+          [fallback, row.id]
         );
 
         failed++;

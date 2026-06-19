@@ -6,7 +6,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 const ENABLE_FETCH_ERROR_LOGGING = false;
@@ -239,7 +239,10 @@ async function upsertJob(client, source, item) {
     source === "LinkedIn"
       ? canonicalizeLinkedInJobUrl(item.url)
       : item.url;
-  const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
+  const experience = isInternshipTitle(item.title) ? "diákmunka"
+    : isJuniorTitle(item.title) ? "junior"
+    : isMidLevelTitle(item.title) ? "medior"
+    : "-";
 
   await client.query(
     `INSERT INTO job_posts

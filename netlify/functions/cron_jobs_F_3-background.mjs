@@ -5,7 +5,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, flushErrors } from "./_error-logger.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
 
@@ -198,7 +198,10 @@ function isMatchingFrissdiplomasDetail(html) {
 
 async function upsertJob(client, source, item) {
   const canonicalUrl = item.url;
-  const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
+  const experience = isInternshipTitle(item.title) ? "diákmunka"
+    : isJuniorTitle(item.title) ? "junior"
+    : isMidLevelTitle(item.title) ? "medior"
+    : "-";
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, canonical_url, experience, first_seen)

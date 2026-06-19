@@ -24,7 +24,7 @@ import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { isInternshipTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -192,7 +192,10 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
 
         // Experience: check tags for "Student", otherwise check title
         const isStudent = hit.web?.tags?.some((t) => t.en === "Student");
-        const experience = isStudent || isInternshipTitle(title) ? "diákmunka" : "-";
+        const experience = isStudent || isInternshipTitle(title) ? "diákmunka"
+          : isJuniorTitle(title) ? "junior"
+          : isMidLevelTitle(title) ? "medior"
+          : "-";
 
         const wasNew = await upsertJob(client, "trenkwalder", { title, url, experience });
         if (wasNew) {

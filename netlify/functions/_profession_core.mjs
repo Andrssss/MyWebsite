@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
-import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -462,6 +462,8 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   if (client) {
     for (const item of matchedList) {
       if (isInternshipTitle(item.title)) item.experience = "diákmunka";
+      else if (isJuniorTitle(item.title)) item.experience = "junior";
+      else if (isMidLevelTitle(item.title)) item.experience = "medior";
 
       const prefixMatch = item.title.match(/^\s*[Dd]i[áa]kmunka\s*[-–—:]\s*(.+)$/);
       const suffixMatch = item.title.match(/^(.+?)\s*[-–—:]\s*[Dd]i[áa]kmunka\s*$/);
