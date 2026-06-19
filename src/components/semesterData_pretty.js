@@ -54,7 +54,9 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/17ZNNYjsdRlWOMY1Sib0ckboxlWtPGAOT?usp=drive_link",
     "videos": [
       { "name": "ANÁL 2", "url": "https://www.youtube.com/watch?v=T-Cm1fbUJ-4&list=PLvLI66ieiidiKOx5lySZn0_3_q_gX5Kba" },
-      { "name": "MATLAB", "url": "https://youtu.be/tKAc21e8tBk?si=DOA5HO1MLQjKzV4L" }
+      { "name": "MATLAB", "url": "https://youtu.be/tKAc21e8tBk?si=DOA5HO1MLQjKzV4L" },
+      { "name": "LA II. gyakorlat", "url": "https://www.youtube.com/channel/UC3xOGoVo7gzB2BsfCw_0ekQ/featured" },
+      { "name": "Szerv kémia", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0Uqguj7Xot1leFtNvmjG9V_" }
     ],
     "subjects": [
       {
@@ -97,7 +99,8 @@ export const semesterData = {
       { "name": "ADATSZERK", "url": "https://youtube.com/playlist?list=PLvLI66ieiidgwtb_56NDqaT6pHmLfdYIx&si=Q6fKhMgEa2ilD9I-" },
       { "name": "Áramkörök", "url": "https://youtu.be/Xh1jPfwQYw0?si=8LzqxB5foUnuE3Lt" },
       { "name": "NYELVTECH", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidhOULovlk35bwn9Dz6LGVFC" },
-      { "name": "SZÁMHÁLÓ", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjUptDZBEeYgQxFXIJ5DUT1" }
+      { "name": "SZÁMHÁLÓ", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjUptDZBEeYgQxFXIJ5DUT1" },
+      { "name": "Anál 3 - 2020", "url": "https://youtube.com/playlist?list=PLvLI66ieiidhbnLT_JsrcnyOrM6TtXXWt&si=bfoA8prV6RLR80Rd" }
     ],
     "subjects": [
       {

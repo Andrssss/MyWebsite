@@ -6,6 +6,7 @@ import './Home.css';
 
 const Home = ({ setContent, setMenuOpen }) => {
   const [isMobile, setIsMobile] = useState(false);
+  const [ytOpen, setYtOpen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 800);
@@ -100,6 +101,55 @@ const Home = ({ setContent, setMenuOpen }) => {
             </a>
           ))}
         </div>
+
+        <button
+          onClick={() => setYtOpen(o => !o)}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '8px',
+            color: '#aaa',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            padding: '0.35rem 0.9rem',
+            margin: '1rem 0 0.5rem',
+          }}
+        >
+          {ytOpen ? '▲' : '▼'} További YouTube linkek
+        </button>
+        {ytOpen && (
+          <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {[
+              { name: 'Bankinformatika 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidh16vrtefYMzlyL_VF-OngF&si=gDMIb5Q64iMyhRy5' },
+              { name: 'Basic image processing 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidhGlfMUGN_6BuDnuaDfl4CW&si=MzdUIP4q21OxRlIj' },
+              { name: 'Data mining 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidiYjSnmnD5eApKSyMr5qmBN&si=ctuJSM0bty0e6zoX' },
+              { name: 'Biometrics in person 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidg8vdkLCKyrqKhLm9-3sjy8&si=x07_VipOW943NfD4' },
+              { name: 'Optimalization methods 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidjDnp77x-Q2Q2dzmLy9onup&si=sHa6DjMzwJ7FUd4i' },
+              { name: 'Paralel programming 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidjfH8UqOtPVrPV033ABVF8k&si=mx6DU8dNIzmsHQLj' },
+              { name: 'Programming prep 3 2020', url: 'https://youtube.com/playlist?list=PLvLI66ieiidiPE8vCcdEU_oPM9WLUrGM_&si=Je9vEBDGCvKrSxdi' },
+            ].map(({ name, url }) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block',
+                  padding: '0.6rem 1.4rem',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {name}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* <FileUpload /> */}
