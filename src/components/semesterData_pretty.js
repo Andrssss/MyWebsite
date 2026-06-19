@@ -152,7 +152,10 @@ export const semesterData = {
       { "name": "JÁTÉKELMÉLET", "url": "https://www.youtube.com/playlist?list=PLc7adpdMCAYdLK5JDQNIS13f8JVYpAKUS" },
       { "name": "JAVA", "url": "https://youtube.com/playlist?list=PLvLI66ieiidjrZz1IVAv2Xd21Zg2KknoQ" },
       { "name": "Sejtbiosz 2", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0XjPECHWn5JV2r8YF5KSjfp" },
-      { "name": "STOCHA", "url": "https://www.youtube.com/watch?v=_6428hlJl1M&list=PLWlVP-FjnR2KcDE_kDMraHBHAereW1cs6&index=1" }
+      { "name": "STOCHA", "group": [
+        { "name": "előadás", "url": "https://www.youtube.com/watch?v=_6428hlJl1M&list=PLWlVP-FjnR2KcDE_kDMraHBHAereW1cs6&index=1" },
+        { "name": "2022 konzi", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiWP7H93gLbaqeOV03Tz3LE" }
+      ]}
     ],
     "subjects": [
       {
