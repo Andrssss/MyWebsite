@@ -17,7 +17,7 @@ const Home = ({ setContent, setMenuOpen }) => {
 
   return (
     <div className="home-container">
-      <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Anyagaim (most végeztem yey 🎉) : </h2>
+      <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Most végeztem és ezzel egyidőben elküldtek a gyakornoki helyemről yey  🎉 </h2>
 
       <div className="folder-grid">
         {Object.entries(semesterData).map(([semester, { link, subjects, videos }]) => (
