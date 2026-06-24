@@ -18,7 +18,7 @@ const Home = ({ setContent, setMenuOpen }) => {
 
   return (
     <div className="home-container">
-      <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Most végeztem és ezzel egyidőben elküldtek a gyakornoki helyemről yey  🎉 </h2>
+      <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Anyagaim. </h2>
 
       <div className={`folder-grid${activeSemester ? ' folder-grid--focused' : ''}`}>
         {Object.entries(semesterData).map(([semester, { link, subjects, videos }]) => (
@@ -35,7 +35,7 @@ const Home = ({ setContent, setMenuOpen }) => {
         ))}
       </div>
 
-      <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+      {!activeSemester && <div style={{ marginTop: '2rem', textAlign: 'center' }}>
         <p style={{ color: '#aaa', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Bionikás anyagok</p>
         <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <a
@@ -154,7 +154,7 @@ const Home = ({ setContent, setMenuOpen }) => {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* <FileUpload /> */}
     </div>

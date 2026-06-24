@@ -1,6 +1,8 @@
 {
   "type": "commonjs",
   "dependencies": {
-    "fast-xml-parser": "^5.5.8"
+    "@netlify/blobs": "^10.7.9",
+    "fast-xml-parser": "^5.5.8",
+    "jszip": "^3.10.1"
   }
 }

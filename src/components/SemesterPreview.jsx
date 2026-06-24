@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import JSZip from 'jszip';
 import './SemesterPreview.css';
 
 const toMobileYT = (url) =>
@@ -22,6 +24,18 @@ function fileIcon(mimeType) {
 
 const isFolder = (mimeType) => mimeType === 'application/vnd.google-apps.folder';
 
+const displayName = (name) => name.replace(/^\d+_/, '');
+
+const sortFiles = (files) => [...files].sort((a, b) => {
+  const aIsFolder = isFolder(a.mimeType) ? 0 : 1;
+  const bIsFolder = isFolder(b.mimeType) ? 0 : 1;
+  if (aIsFolder !== bIsFolder) return aIsFolder - bIsFolder;
+  const na = parseInt(a.name.match(/^(\d+)_/)?.[1] ?? '9999', 10);
+  const nb = parseInt(b.name.match(/^(\d+)_/)?.[1] ?? '9999', 10);
+  if (na !== nb) return na - nb;
+  return a.name.localeCompare(b.name);
+});
+
 const VideoGroup = ({ name, items }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -43,7 +57,7 @@ const VideoGroup = ({ name, items }) => {
   );
 };
 
-const PreviewModal = ({ file, onClose }) => (
+const PreviewModal = ({ file, onClose }) => createPortal(
   <div className="preview-overlay" onClick={onClose}>
     <div className="preview-modal" onClick={e => e.stopPropagation()}>
       <div className="preview-modal-header">
@@ -59,14 +73,62 @@ const PreviewModal = ({ file, onClose }) => (
       <iframe src={`https://drive.google.com/file/d/${file.id}/preview`}
         className="preview-iframe" title={file.name} allow="autoplay" />
     </div>
-  </div>
+  </div>,
+  document.body
 );
+
+async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
+  const check = () => { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); };
+  try {
+    setStatus('Fájlok listázása...');
+    const listRes = await fetch(`/.netlify/functions/list-files-recursive?folderId=${folderId}`, { signal });
+    if (!listRes.ok) throw new Error(`Lista hiba: HTTP ${listRes.status}`);
+    const { files, error } = await listRes.json();
+    if (error) throw new Error(error);
+    if (!files || files.length === 0) { alert('Nincs letölthető fájl.'); setStatus(null); return; }
+
+    const zip = new JSZip();
+    let done = 0;
+
+    for (const file of files) {
+      check();
+      setStatus(`Letöltés... (${done}/${files.length})`);
+      try {
+        const res = await fetch(`/.netlify/functions/proxy-file?fileId=${file.id}`, { signal });
+        if (res.ok) zip.file(file.path, await res.arrayBuffer());
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+      }
+      done++;
+    }
+
+    check();
+    setStatus('Zip készítése...');
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    check();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    setStatus(null);
+  } catch (e) {
+    if (e.name === 'AbortError') { setStatus(null); return; }
+    alert(`Hiba: ${e.message}\n\nMegnyitjuk Drive-ban.`);
+    window.open(fallbackUrl, '_blank', 'noopener');
+    setStatus(null);
+  }
+}
 
 const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) => {
   const [stack, setStack] = useState([{ id: rootId, name: rootName }]);
   const [cache, setCache] = useState({});
   const [loadingId, setLoadingId] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+  const abortRef = React.useRef(null);
 
   const currentFolder = stack[stack.length - 1];
   const isRoot = stack.length === 1;
@@ -81,7 +143,7 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then(data => { if (!cancelled) setCache(c => ({ ...c, [currentFolder.id]: data.files || [] })); })
+      .then(data => { if (!cancelled) setCache(c => ({ ...c, [currentFolder.id]: sortFiles(data.files || []) })); })
       .catch(e => {
         console.error('[drive-files]', e);
         if (!cancelled && isRoot) onRootError?.();
@@ -90,11 +152,17 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
     return () => { cancelled = true; };
   }, [currentFolder.id]);
 
-  const [videosOpen, setVideosOpen] = useState(false);
+  const ytLinks = isRoot && subjectVideos
+    ? subjectVideos.flatMap(v =>
+        v.group
+          ? v.group.map(g => ({ label: g.name, url: g.url }))
+          : [{ label: v.name, url: v.url }]
+      )
+    : [];
 
   return (
     <>
-      {/* Navigáció: vissza gomb + (breadcrumb) + YouTube gomb jobbra */}
+      {/* Navigáció */}
       <div className="file-nav">
         <button className="file-back-btn" onClick={isRoot ? onBack : () => setStack(s => s.slice(0, -1))}>
           ← {isRoot ? 'Vissza' : stack[stack.length - 2].name}
@@ -102,27 +170,55 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
         {!isRoot && (
           <span className="file-breadcrumb-current">{currentFolder.name}</span>
         )}
-        {isRoot && subjectVideos && subjectVideos.length > 0 && (
-          <button className="yt-toggle-btn" onClick={() => setVideosOpen(o => !o)}>
-            ▶ YouTube {subjectVideos.length > 1 ? `(${subjectVideos.length})` : ''}
-          </button>
-        )}
-      </div>
-
-      {isRoot && videosOpen && subjectVideos && subjectVideos.length > 0 && (
-        <div className="subject-videos-list">
-          {subjectVideos.map((video, i) =>
-            video.group ? (
-              <VideoGroup key={i} name={video.name} items={video.group} />
-            ) : (
-              <a key={i} className="video-item"
-                href={toMobileYT(video.url)} target="_blank" rel="noopener noreferrer">
-                ▶ {video.name}
-              </a>
-            )
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '3px' }}>
+          {downloading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <span style={{ fontSize: '0.68rem', color: '#aaa', textAlign: 'right' }}>{downloading}</span>
+              <button className="folder-download-btn" style={{ background: '#5a2a2a', borderColor: '#a04040' }}
+                onClick={() => abortRef.current?.abort()}>
+                ✕ Mégse
+              </button>
+            </div>
+          ) : (
+            <button
+              className="folder-download-btn"
+              onClick={() => {
+                const ctrl = new AbortController();
+                abortRef.current = ctrl;
+                downloadFolder(
+                  currentFolder.id,
+                  displayName(currentFolder.name),
+                  `https://drive.google.com/drive/folders/${currentFolder.id}`,
+                  setDownloading,
+                  ctrl.signal
+                );
+              }}
+            >
+              ⬇ Letöltés
+            </button>
+          )}
+          {ytLinks.length === 1 && (
+            <a className="yt-toggle-btn yt-single"
+              href={toMobileYT(ytLinks[0].url)} target="_blank" rel="noopener noreferrer">
+              ▶ {ytLinks[0].label}
+            </a>
           )}
         </div>
-      )}
+      </div>
+
+      {ytLinks.length > 1 && (() => {
+        const cols = ytLinks.length <= 3 ? ytLinks.length : Math.ceil(ytLinks.length / 2);
+        return (
+          <div className="yt-btn-group" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+            {ytLinks.map((item, i) => (
+              <a key={i} className="yt-toggle-btn"
+                href={toMobileYT(item.url)} target="_blank" rel="noopener noreferrer">
+                ▶ {item.label}
+              </a>
+            ))}
+          </div>
+        );
+      })()}
 
       <div className="file-list">
         {loadingId === currentFolder.id ? (
@@ -136,10 +232,10 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
               {isFolder(file.mimeType) ? (
                 <button className="file-name file-folder-btn"
                   onClick={() => setStack(s => [...s, { id: file.id, name: file.name }])}>
-                  {file.name}
+                  {displayName(file.name)}
                 </button>
               ) : (
-                <span className="file-name">{file.name}</span>
+                <span className="file-name">{displayName(file.name)}</span>
               )}
               {!isFolder(file.mimeType) && (
                 <div className="file-actions">
@@ -164,6 +260,7 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
   const [videosOpen, setVideosOpen] = useState(false);
   const [openSubject, setOpenSubject] = useState(null);
   const [direction, setDirection] = useState('forward');
+  const [semDownloading, setSemDownloading] = useState(false);
 
   const videoCount = videos ? videos.length : 0;
 
@@ -186,10 +283,10 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
     <div className={`folder-card${openSubject ? ' folder-card--open' : ''}${hidden ? ' folder-card--hidden' : ''}`}>
       {openSubject ? (
         <div className="card-slide animate-forward" key={openSubject.folderId}>
-          <div className="folder-header">
-            <div className="emoji-icon">🗄️</div>
-            <span className="folder-title">{title}</span>
-          </div>
+          <a className="folder-header" href={openSubject.url} target="_blank" rel="noopener noreferrer">
+            <div className="emoji-icon">📂</div>
+            <span className="folder-title">{openSubject.name}</span>
+          </a>
           <FileBrowser
             rootId={openSubject.folderId}
             rootName={openSubject.name}

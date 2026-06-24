@@ -12,6 +12,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@eslint/js@^9.17.0",
+        "npm:@neondatabase/serverless@^1.1.0",
         "npm:@netlify/blobs@^10.4.4",
         "npm:@sendgrid/mail@^8.1.6",
         "npm:@sparticuz/chromium@^143.0.4",
@@ -41,7 +42,8 @@
         "npm:react-router-dom@^7.5.3",
         "npm:react@^18.3.1",
         "npm:typescript@^5.9.3",
-        "npm:vite@^6.0.5"
+        "npm:vite@^6.0.5",
+        "npm:ws@^8.20.0"
       ]
     }
   }

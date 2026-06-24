@@ -9,6 +9,7 @@ import {
 } from 'react-router-dom';
 
 import './App.css';
+import BugReport from './components/BugReport';
 import Home from './Home';
 import UniversityLinks from './UniversityLinks.jsx';
 import About from './About.jsx';
@@ -187,6 +188,8 @@ const AppContent = () => {
         </Routes>
 
       </main>
+
+      <BugReport buttonClassName="bug-report-fab" />
     </div>
   );
 };

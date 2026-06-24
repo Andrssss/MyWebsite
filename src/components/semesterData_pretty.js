@@ -128,10 +128,6 @@ export const semesterData = {
         "url": "https://drive.google.com/drive/folders/1-JZO6Xv9iC9eg76wRHUfk8_EjCSiifTI?usp=drive_link"
       },
       {
-        "name": "MULTI_1",
-        "url": "https://drive.google.com/drive/folders/1851pcNfoxp2n-lJLYQ6OwgeWCws9c7DX?usp=drive_link"
-      },
-      {
         "name": "NYELVTECH_1",
         "url": "https://drive.google.com/drive/folders/1EzZFi2wn5BRgZlsHiJ9g7x4LsWCNh1ZS?usp=drive_link"
       },

@@ -88,28 +88,63 @@
   flex: 1;
 }
 
+.folder-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1e2d1e;
+  border: 1px solid #3a7a3a;
+  color: #6fcf6f;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 5px;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.folder-download-btn:hover {
+  background: #2d5a2d;
+  color: #9fef9f;
+}
+
+.semester-download-btn {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.yt-btn-group {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
 .yt-toggle-btn {
-  margin-left: auto;
-  flex-shrink: 0;
   background: #c4302b;
   border: none;
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  padding: 4px 9px;
+  padding: 3px 7px;
   border-radius: 5px;
   cursor: pointer;
   transition: background 0.2s;
   white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .yt-toggle-btn:hover { background: #e53935; }
 
-.subject-videos-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 4px;
+.yt-single {
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 0.72rem;
 }
 
 /* Tárgyak statikusan alatta, sötétebb kártyán */
@@ -266,7 +301,6 @@
   flex-direction: column;
   align-items: center;
   width: 100%;
-  overflow: hidden;
 }
 
 .folder-card--open .card-slide {
