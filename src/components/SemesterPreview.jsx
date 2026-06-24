@@ -200,7 +200,7 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
           {ytLinks.length === 1 && (
             <a className="yt-toggle-btn yt-single"
               href={toMobileYT(ytLinks[0].url)} target="_blank" rel="noopener noreferrer">
-              ▶ {ytLinks[0].label}
+              ▶ Youtube
             </a>
           )}
         </div>
@@ -259,7 +259,6 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
 const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen, onBackToAll }) => {
   const [videosOpen, setVideosOpen] = useState(false);
   const [openSubject, setOpenSubject] = useState(null);
-  const [direction, setDirection] = useState('forward');
   const [semDownloading, setSemDownloading] = useState(false);
 
   const videoCount = videos ? videos.length : 0;
@@ -268,13 +267,11 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
     const matchingVideos = (videos || []).filter(
       v => v.name.toLowerCase() === subject.name.toLowerCase()
     );
-    setDirection('forward');
     setOpenSubject({ ...subject, matchingVideos });
     onSubjectOpen?.();
   }
 
   function goBack() {
-    setDirection('back');
     setOpenSubject(null);
     onBackToAll?.();
   }
@@ -301,7 +298,7 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
           />
         </div>
       ) : (
-        <div className={`card-slide ${direction === 'back' ? 'animate-back' : ''}`} key="subjects">
+        <div className="card-slide" key="subjects">
           <a href={link} target="_blank" rel="noopener noreferrer" className="folder-header">
             <div className="emoji-icon">🗄️</div>
             <span className="folder-title">{title}</span>

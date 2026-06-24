@@ -43,8 +43,9 @@ const pool = new Pool({
 });
 
 const BASE = "https://workcenter.hu";
-const LIST_BASE = `${BASE}/jobs`;
-const CATEGORY_PARAM = "search_location=Budapest&filter_job_listing_category=informatikus";
+// The /jobs/?filter_job_listing_category=... URL is blocked (403) from Netlify IPs.
+// The taxonomy archive page is the same content without the WAF block.
+const LIST_BASE = `${BASE}/munka-kateg%C3%B3ria/informatikus`;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -254,8 +255,8 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
     while (page <= MAX_PAGES) {
       const listUrl =
         page === 1
-          ? `${LIST_BASE}/?${CATEGORY_PARAM}`
-          : `${LIST_BASE}/page/${page}/?${CATEGORY_PARAM}`;
+          ? `${LIST_BASE}/`
+          : `${LIST_BASE}/page/${page}/`;
 
       let listHtml;
       try {
