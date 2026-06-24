@@ -143,7 +143,7 @@ const JUNIOR_EXCLUDED_SOURCES = [
   "muisz",
   "zyntern",
   "schonherz",
-  "prodiak",
+
   "tudasdiak",
   "vizmuvek",
   "tudatosdiak",

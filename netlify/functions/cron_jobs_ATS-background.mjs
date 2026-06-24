@@ -64,7 +64,7 @@ function isSeniorLike(title) {
 
 function isHungaryLocation(loc) {
   if (!loc) return false;
-  if (loc.country === "hu") return true;
+  if (loc.country?.toLowerCase() === "hu") return true;
   const t = normalizeText(`${loc.city || ""} ${loc.fullLocation || ""}`);
   return t.includes("budapest") || t.includes("hungary") || t.includes("magyarorszag");
 }

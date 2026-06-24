@@ -5,15 +5,15 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, flushErrors } from "./_error-logger.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
+const SOURCE = "workly";
+const BASE = "https://workly.hu";
+const FILTER_PARAMS = "show_results=1&query=&location=Budapest&primary_expertise%5B%5D=it-digital-technology";
 
 let _filters = [];
 
-// ---------------------
-//   DB connection
-// ---------------------
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
@@ -22,22 +22,31 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// ---------------------
-//   Helper functions
-// ---------------------
+/* ── helpers ─────────────────────────────────────────────────── */
+
 function normalizeText(s) {
   return String(s ?? "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 
-// INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
-
 function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeUrl(raw) {
+  try {
+    const u = new URL(raw);
+    u.hash = "";
+    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"]
+      .forEach((p) => u.searchParams.delete(p));
+    return u.toString().replace(/\?$/, "");
+  } catch {
+    return raw;
+  }
 }
 
 function _blacklistRegex(k) {
@@ -45,34 +54,26 @@ function _blacklistRegex(k) {
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
 }
 
-function titleNotBlacklisted(title) {
-  const t = normalizeText(title);
-  return !_filters.some((word) => _blacklistRegex(word).test(t));
+function isSeniorLike(title) {
+  const t = normalizeText(title ?? "");
+  return _filters.some((kw) => _blacklistRegex(kw).test(t));
 }
 
-function dedupeByUrl(items) {
-  const seen = new Set();
-  return items.filter((x) => {
-    if (!x.url) return false;
-    const key = getDedupeKey(x.url);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function normalizeUrl(raw) {
+function isWorklyJobUrl(url) {
   try {
-    const u = new URL(raw);
-    u.hash = "";
-    [
-      "utm_source", "utm_medium", "utm_campaign", "utm_term",
-      "utm_content", "fbclid", "gclid", "trackingId", "pageNum", "position", "refId"
-    ].forEach((p) => u.searchParams.delete(p));
-    return u.toString().replace(/\?$/, "");
+    const u = new URL(url);
+    return u.hostname === "workly.hu" && u.pathname.startsWith("/allas/") && u.pathname.length > "/allas/".length;
   } catch {
-    return raw;
+    return false;
   }
+}
+
+function detectExperience(title, cardText) {
+  const c = normalizeText(cardText ?? "");
+  if (isInternshipTitle(title) || c.includes("szakmai gyakorlat")) return "diákmunka";
+  if (isJuniorTitle(title) || c.includes("junior")) return "junior";
+  if (isMidLevelTitle(title) || c.includes("medior")) return "medior";
+  return "-";
 }
 
 function fetchText(url, redirectLeft = 5) {
@@ -84,8 +85,8 @@ function fetchText(url, redirectLeft = 5) {
       {
         method: "GET",
         headers: {
-          "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip,deflate,br",
         },
@@ -97,9 +98,8 @@ function fetchText(url, redirectLeft = 5) {
           const loc = res.headers.location;
           if (!loc) return reject(new Error(`HTTP ${code} (no Location) for ${url}`));
           if (redirectLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
-          const nextUrl = new URL(loc, url).toString();
           res.resume();
-          return resolve(fetchText(nextUrl, redirectLeft - 1));
+          return resolve(fetchText(new URL(loc, url).toString(), redirectLeft - 1));
         }
         const enc = String(res.headers["content-encoding"] || "").toLowerCase();
         let stream = res;
@@ -122,105 +122,52 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
-function extractCandidates(html, baseUrl) {
+/* ── listing page parser ─────────────────────────────────────── */
+
+// Cards have no heading tags — title is the first text block inside <a>,
+// followed by location(s) then a work-type keyword (Jelenléti/Hibrid/etc.).
+function titleFromCardText(cardText) {
+  // Split at first work-type or experience-badge keyword — these come after title+location
+  const m = cardText.match(
+    /^([\s\S]+?)\s+(?:Jelenléti|Hibrid|Távmunka|Home\s*office|Részmunkaidő|Teljes\s+munkaidő|Junior\s*\(|Medior\s*\(|Senior\s*\(|Szakmai\s+gyakorlat)\b/i
+  );
+  if (!m) return normalizeWhitespace(cardText).slice(0, 120);
+
+  // m[1] = "Job Title [City, City, ...]" — strip trailing city names (capitalised proper nouns)
+  const withoutCities = normalizeWhitespace(m[1])
+    .replace(/(?:[,\s]+[A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüűA-ZÁÉÍÓÖŐÚÜŰ -]+)+\s*$/, "")
+    .trim();
+  return withoutCities || normalizeWhitespace(m[1]);
+}
+
+function extractJobEntries(html) {
   const $ = cheerioLoad(html);
-  const items = [];
+  const entries = [];
+  const seen = new Set();
+
   $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    const url = new URL(href, baseUrl).toString();
-    if (!/^https?:\/\//i.test(url)) return;
-    let card = $(el).closest("article, li, .job-list-item, .job, .position, .listing, .card, .item");
-    if (!card.length) card = $(el).closest("div");
-    const title =
-      normalizeWhitespace($(el).text()) ||
-      normalizeWhitespace(card.find("h1,h2,h3,h4,h5,h6").first().text());
-    if (!title || title.length < 4) return;
-    const desc = normalizeWhitespace(card.find("p").first().text()) || null;
-    items.push({ title: title.slice(0, 300), url, description: desc ? desc.slice(0, 800) : null });
+    const href = $(el).attr("href") ?? "";
+    let url;
+    try {
+      url = normalizeUrl(new URL(href, BASE).toString());
+    } catch {
+      return;
+    }
+    if (!isWorklyJobUrl(url)) return;
+    if (seen.has(url)) return;
+    seen.add(url);
+
+    const cardText = normalizeWhitespace($(el).text());
+    const title = titleFromCardText(cardText);
+    if (!title || title.length < 3) return;
+
+    entries.push({ title, url, cardText });
   });
-  return dedupeByUrl(items);
+
+  return entries;
 }
 
-function getDedupeKey(rawUrl) {
-  return normalizeUrl(rawUrl);
-}
-
-function isFrissdiplomasJobUrl(rawUrl) {
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    return host.includes("frissdiplomas.hu") && u.pathname.startsWith("/allasok");
-  } catch {
-    return false;
-  }
-}
-
-function isMatchingFrissdiplomasDetail(html) {
-  const $ = cheerioLoad(html);
-  const directLocation = normalizeText(
-    normalizeWhitespace(
-      $(".job-sidebar-content h4")
-        .filter((_, el) => normalizeText($(el).text()).includes("munkavegzes helye"))
-        .first()
-        .parent()
-        .find("span")
-        .first()
-        .text()
-    )
-  );
-  const directArea = normalizeText(
-    normalizeWhitespace(
-      $(".job-sidebar-content h4")
-        .filter((_, el) => normalizeText($(el).text()).includes("allas terulete(i)"))
-        .first()
-        .parent()
-        .find("span")
-        .first()
-        .text()
-    )
-  );
-  if (directLocation || directArea) {
-    const isBudapest = directLocation.includes("budapest");
-    const isInformatikai = directArea.includes("informatikai") || directArea.includes("mernoki");
-    return isBudapest && isInformatikai;
-  }
-  const pageText = normalizeText(normalizeWhitespace($("body").text()));
-  const locationMarker = "munkavegzes helye";
-  const areaMarker = "allas terulete(i)";
-  const idxLocation = pageText.indexOf(locationMarker);
-  const idxArea = pageText.indexOf(areaMarker);
-  if (idxLocation === -1 || idxArea === -1) return false;
-  const aroundLocation = pageText.slice(idxLocation, idxLocation + 220);
-  const aroundArea = pageText.slice(idxArea, idxArea + 220);
-  return aroundLocation.includes("budapest") && (aroundArea.includes("informatikai") || aroundArea.includes("mernoki"));
-}
-
-async function upsertJob(client, source, item) {
-  const canonicalUrl = item.url;
-  const experience = isInternshipTitle(item.title) ? "diákmunka"
-    : isJuniorTitle(item.title) ? "junior"
-    : isMidLevelTitle(item.title) ? "medior"
-    : "-";
-  await client.query(
-    `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
-     ON CONFLICT (source, url)
-        DO NOTHING;`,
-    [source, item.title, item.url, canonicalUrl, experience]
-  );
-}
-
-function levelNotBlacklisted(title, desc) {
-  const t = normalizeText(title ?? "");
-  return !_filters.some((w) => _blacklistRegex(w).test(t));
-}
-
-const FRISSDIPLOMAS_JOB_PREFIX = "https://www.frissdiplomas.hu/allasok";
-const URL_BLACKLIST = new Set([
-  normalizeUrl("https://www.frissdiplomas.hu/allasok"),
-]);
+/* ── handler ─────────────────────────────────────────────────── */
 
 export default async (request) => {
   const auth = (request.headers.get("authorization") || "").trim();
@@ -245,67 +192,68 @@ export default async (request) => {
   _filters = await loadFilters();
   const client = await pool.connect();
 
+  let newlyInserted = 0;
+  let alreadyExisted = 0;
+  let skippedSenior = 0;
+
   try {
-    async function processListingPage(html, sourceKey, baseUrl) {
-      const rawItems = extractCandidates(html, baseUrl);
-      const items = rawItems.filter((it) => {
-        if (URL_BLACKLIST.has(normalizeUrl(it.url))) {
-          console.log(`[SKIP url_blacklist] ${it.title} | ${it.url}`);
-          return false;
-        }
-        if (!isFrissdiplomasJobUrl(it.url) && !it.url.startsWith(FRISSDIPLOMAS_JOB_PREFIX)) {
-          console.log(`[SKIP not_job_url] ${it.title} | ${it.url}`);
-          return false;
-        }
-        if (!levelNotBlacklisted(it.title, it.description)) {
-          console.log(`[SKIP level_blacklist] ${it.title}`);
-          return false;
-        }
-        if (!titleNotBlacklisted(it.title)) {
-          console.log(`[SKIP title_blacklist] ${it.title}`);
-          return false;
-        }
-        return true;
-      });
-
-      for (const it of items) {
-        try {
-          let keep = true;
-          if (sourceKey === "frissdiplomas") {
-            const detailHtml = await fetchText(it.url);
-            keep = isMatchingFrissdiplomasDetail(detailHtml);
-            if (!keep) console.log(`[SKIP detail_check] ${it.title} | nem Budapest+informatikai`);
-          }
-          if (!keep) continue;
-          console.log(`[${sourceKey}] Mentés: ${it.title} | ${it.url}`);
-          await upsertJob(client, sourceKey, it);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      return items.length;
-    }
-
     let page = startPage;
     let pagesProcessed = 0;
+
     while (pagesProcessed < maxPages) {
-      const pageUrl = `https://www.frissdiplomas.hu/kereses/page:${page}`;
+      const pageUrl = page === 1
+        ? `${BASE}/allasok/?${FILTER_PARAMS}`
+        : `${BASE}/allasok/page/${page}/?${FILTER_PARAMS}`;
+
+      let html;
       try {
-        const html = await fetchText(pageUrl);
-        const count = await processListingPage(html, "frissdiplomas", pageUrl);
-        console.log(`frissdiplomas page ${page}: ${count} items processed.`);
-        page += 1;
-        pagesProcessed += 1;
+        html = await fetchText(pageUrl);
       } catch (err) {
         if (String(err?.message || "").includes("HTTP 404")) {
-          console.log(`frissdiplomas pagination stopped at page ${page} (404).`);
+          console.log(`[workly] pagination stopped at page ${page} (404)`);
           break;
         }
         await logFetchError(JOB_NAME, { url: pageUrl, message: err.message });
-        console.error(`frissdiplomas page ${page} fetch failed:`, err.message);
+        console.error(`[workly] page ${page} fetch failed: ${err.message}`);
         break;
       }
+
+      const entries = extractJobEntries(html);
+      console.log(`[workly] page ${page} → ${entries.length} job links`);
+
+      if (entries.length === 0) {
+        console.log(`[workly] page ${page} empty — stopping`);
+        break;
+      }
+
+      for (const entry of entries) {
+        if (isSeniorLike(entry.title)) {
+          skippedSenior++;
+          console.log(`[workly] SKIP senior "${entry.title}"`);
+          continue;
+        }
+
+        const experience = detectExperience(entry.title, entry.cardText);
+        const res = await client.query(
+          `INSERT INTO job_posts (source, title, url, canonical_url, experience, first_seen)
+           VALUES ($1,$2,$3,$4,$5,NOW())
+           ON CONFLICT (source, url) DO NOTHING
+           RETURNING id;`,
+          [SOURCE, entry.title, entry.url, entry.url, experience]
+        );
+        if (res.rowCount > 0) {
+          newlyInserted++;
+          console.log(`[workly] NEW "${entry.title}" → ${entry.url}`);
+        } else {
+          alreadyExisted++;
+        }
+      }
+
+      page++;
+      pagesProcessed++;
     }
+
+    console.log(`[workly] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}`);
   } finally {
     client.release();
     await flushErrors(JOB_NAME).catch(() => {});

@@ -2,7 +2,7 @@
   WorkCenter – informatikus kategória scraper
 
   List URL:
-    https://workcenter.hu/jobs/?s=Budapest&filter_job_listing_category=informatikus
+      
     https://workcenter.hu/jobs/page/{N}/?s=Budapest&filter_job_listing_category=informatikus
 
   WordPress WP Job Manager alapú site.
@@ -196,11 +196,14 @@ async function fetchDetailExperience(url, title) {
 function extractJobEntries(html) {
   const $ = cheerioLoad(html);
   const entries = [];
+  let totalListings = 0;
 
   // WP Job Manager structure: ul.job_listings > li.job_listing > a[href*="/munka/"]
   // Title:    h3.job-listing-loop-job__title  (inside the anchor)
   // Location: .job-location.location (first one, inside .job-details-inner)
   $("li.job_listing").each((_, li) => {
+    totalListings++;
+
     const anchor = $(li).find("a[href*='/munka/'], a[href*='post_type=job_listing']").first();
     if (!anchor.length) return;
 
@@ -208,10 +211,12 @@ function extractJobEntries(html) {
     const title = normalizeWhitespace($(li).find("h3.job-listing-loop-job__title").first().text());
     if (!title || title.length < 2) return;
 
-    // Location: prefer the one inside job-details-inner (not meta duplicate)
+    // Location: prefer the one inside job-details-inner, fall back to any .job-location
+    const locationEl =
+      $(li).find(".job-details-inner .job-location.location").first().text() ||
+      $(li).find(".job-location").first().text();
     const location = normalizeWhitespace(
-      $(li).find(".job-details-inner .job-location.location").first().text()
-        .replace(/^[\s\S]*?(?=[A-Za-záéíóöőúüűÁÉÍÓÖŐÚÜŰ])/, "") // strip icon text
+      locationEl.replace(/^[\s\S]*?(?=[A-Za-záéíóöőúüűÁÉÍÓÖŐÚÜŰ])/, "") // strip icon text
     );
 
     if (!location.toLowerCase().includes("budapest")) return;
@@ -220,7 +225,7 @@ function extractJobEntries(html) {
     entries.push({ title, url });
   });
 
-  return entries;
+  return { entries, totalListings };
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
@@ -279,15 +284,20 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
         break;
       }
 
-      const entries = extractJobEntries(listHtml);
-      console.log(`[workcenter] page ${page} → ${entries.length} Budapest IT jobs`);
+      const { entries, totalListings } = extractJobEntries(listHtml);
+      console.log(`[workcenter] page ${page} → ${entries.length} Budapest IT jobs (${totalListings} total listings)`);
+
+      if (totalListings === 0) {
+        // Truly empty page — no more pages
+        if (page === 1) console.warn("[workcenter] page 1 returned 0 listings — check selector or URL");
+        break;
+      }
 
       if (entries.length === 0) {
-        // Could be empty page or no more pages
-        if (page === 1) {
-          console.warn("[workcenter] page 1 returned 0 entries — check selector");
-        }
-        break;
+        // Page has jobs but none from Budapest — keep paginating
+        console.log(`[workcenter] page ${page} → skipping (no Budapest jobs on this page)`);
+        page++;
+        continue;
       }
 
       for (const entry of entries) {

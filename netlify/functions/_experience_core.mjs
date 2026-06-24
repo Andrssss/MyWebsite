@@ -67,8 +67,8 @@ export function isMidLevelTitle(title) {
 
 // Sources that are inherently student/intern focused
 export const INTERN_SOURCES = [
-  "minddiak", "muisz", "zyntern", "schonherz", "prodiak",
-  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "frissdiplomas", "miszisz",
+  "minddiak", "muisz", "zyntern", "schonherz",
+  "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "miszisz",
 ];
 
 function sleep(ms) {

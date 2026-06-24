@@ -6,9 +6,10 @@
   "kattints a részletekért !" link mutat a kategória oldalra.
 
   Flow:
-    1. Fetch /allasok/ → kategória URL-ek dinamikus kinyerése
-    2. Minden kategória URL fetch
-    3. h5 elemekből title + státusz parse
+    1. Hardkódolt kategória URL-ek fetch
+    2. h5 elemekből title + státusz parse
+       - cím h5: NEM tartalmaz "Jelentkezési határidő"-t
+       - státusz h5: tartalmaz "Jelentkezési határidő"-t
     4. Státusz "szünetel" → skip
     5. Munkavégzés helye → Budapest check
     6. extractBodyExperience az inline szövegből
@@ -163,24 +164,34 @@ function extractJobs(html, categoryUrl) {
   const jobs = [];
   const seen = new Set();
 
-  // Struktúra: h4 = job cím, következő h5 = státusz ("Jelentkezési határidő: ...")
-  const h4els = $("h4").toArray();
+  // Struktúra: h5 = job cím VAGY státusz ("Jelentkezési határidő: ...")
+  const h5els = $("h5").toArray();
 
-  for (const h4el of h4els) {
-    const titleText = normalizeWhitespace($(h4el).text());
+  for (const h5el of h5els) {
+    const titleText = normalizeWhitespace($(h5el).text());
     if (!titleText) continue;
+
+    // Státusz h5-öket kihagyjuk — csak a cím h5-öket dolgozzuk fel
+    if (titleText.toLowerCase().includes("jelentkezési határidő")) continue;
 
     // Duplikált cím kiszűrése (az oldal flip-kártya miatt többszöröz)
     if (seen.has(titleText)) continue;
 
     // Következő h5 — tartalmazza a státuszt
-    const statusEl = $(h4el).nextAll("h5").first();
+    const statusEl = $(h5el).nextAll("h5").first();
     if (!statusEl.length) continue;
     const statusText = normalizeWhitespace(statusEl.text());
     if (!statusText.toLowerCase().includes("jelentkezési határidő")) continue;
 
-    // Szövegtörzs h4 és következő h4 között
-    const nextSection = $(h4el).nextUntil("h4").text();
+    // Szövegtörzs: a cím h5-től a következő cím h5-ig (nem státusz h5)
+    const nextTitleH5 = $(h5el).nextAll("h5").filter((_, el) => {
+      const t = normalizeWhitespace($(el).text()).toLowerCase();
+      return !t.includes("jelentkezési határidő");
+    }).first();
+
+    const nextSection = nextTitleH5.length
+      ? $(h5el).nextUntil(nextTitleH5).text()
+      : $(h5el).nextAll().text();
 
     // Budapest validáció
     const locMatch = nextSection.match(/Munkavégzés helye[:\s]*([^\n•◦]+)/i);

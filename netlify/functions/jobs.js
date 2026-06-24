@@ -60,7 +60,7 @@ const CACHE_HEADERS = {
 // FIXED lista (key/label)
 const FIXED = [
   { key: "karrierhungaria", label: "Karrier Hungaria" },
-  { key: "frissdiplomas", label: "Frissdiplomas" },
+
   { key: "minddiak", label: "Minddiák" },
   { key: "muisz", label: "Muisz" },
   { key: "zyntern", label: "Zyntern" },
@@ -81,7 +81,7 @@ const FIXED = [
   { key: "bluebird", label: "bluebird" },
   { key: "ydiak", label: "Y Diák" },
   { key: "qdiak", label: "Q Diák" },
-  { key: "prodiak", label: "Prodiák" },
+
   { key: "mbh", label: "MBH Bank" },
   { key: "kh", label: "K&H Bank" },
   { key: "raiffeisen", label: "Raiffeisen Bank" },
@@ -98,11 +98,12 @@ const FIXED = [
   { key: "valorebasis", label: "Valore Basis" },
   { key: "trenkwalder", label: "Trenkwalder" },
   { key: "workcenter", label: "WorkCenter" },
+  { key: "workly", label: "Workly" },
   { key: "random_email", label: "Random Email" },
 ];
 
 // Sources where ALL jobs are shown (no 30-day cutoff) when no timeRange is specified
-const EXEMPT_SOURCES = new Set(["schonherz", "zyntern", "onejob", "tudasdiak", "prodiak", "qdiak", "minddiak"]);
+const EXEMPT_SOURCES = new Set(["schonherz", "zyntern", "onejob", "tudasdiak", "qdiak", "minddiak"]);
 const EXEMPT_SOURCES_ARRAY = [...EXEMPT_SOURCES];
 
 // Parameterized query helper. Returns rows array.
