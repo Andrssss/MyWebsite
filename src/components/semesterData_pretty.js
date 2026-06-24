@@ -4,7 +4,13 @@ export const semesterData = {
     "videos": [
       { "name": "Analízis", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiididyyNX6QwHv6qdTk0RcIhh" },
       { "name": "bev-fizika", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidjWqpvoTQue1zFC1tozXS1i" },
-      { "name": "bevprog", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiDQJ7ILDf17-DwwaAnJwne" }
+      { "name": "bevprog", "url": "https://www.youtube.com/playlist?list=PLvLI66ieiidiDQJ7ILDf17-DwwaAnJwne" },
+      { "name": "BEV_SZÁMTECH", "url": "https://www.youtube.com/watch?v=AAHqNpJX99w&list=PLiQA1-Ux9ABHbs6Dqwn-nSQpXFCtm4dcH&index=2" },
+      { "name": "DM_1", "url": "https://www.youtube.com/watch?v=gTSIfuYpugw&list=PLiQA1-Ux9ABEkVpk0KcPKzn6rLbn59B9E&index=2" },
+      { "name": "LA1", "group": [
+        { "name": "előadás", "url": "https://www.youtube.com/watch?v=x55o7gDRSBA&list=PLiQA1-Ux9ABHCmCMbFj928IuMoK9sNHoi&index=7" },
+        { "name": "gyak", "url": "https://www.youtube.com/watch?v=F-5kXgV-8gU&list=PLiQA1-Ux9ABE2iDr8-K9nt4x2GXUQ52Mj" }
+      ]}
     ],
     "subjects": [
       {
@@ -53,6 +59,9 @@ export const semesterData = {
     "link": "https://drive.google.com/drive/folders/17ZNNYjsdRlWOMY1Sib0ckboxlWtPGAOT?usp=drive_link",
     "videos": [
       { "name": "ANÁL 2", "url": "https://www.youtube.com/watch?v=T-Cm1fbUJ-4&list=PLvLI66ieiidiKOx5lySZn0_3_q_gX5Kba" },
+      { "name": "bev_meres", "url": "https://www.youtube.com/watch?v=-YDfkgbF-qo&list=PLiQA1-Ux9ABGDagzRxPlW7DnNyzGtqUHO&index=13" },
+      { "name": "bevprog 2", "url": "https://www.youtube.com/watch?v=-932pB1E6Dg&list=PLiQA1-Ux9ABFwTSPIznIcEmlWJ-UUIBA7&index=1" },
+      { "name": "DM2", "url": "https://www.youtube.com/watch?v=0WNFIRlPSjs&list=PLiQA1-Ux9ABGn0wKhbsFlQdKBp7pca6s0&index=6" },
       { "name": "LA II. gyakorlat", "url": "https://www.youtube.com/channel/UC3xOGoVo7gzB2BsfCw_0ekQ/featured" },
       { "name": "MATLAB", "url": "https://youtu.be/tKAc21e8tBk?si=DOA5HO1MLQjKzV4L" },
       { "name": "Szerv kémia", "url": "https://www.youtube.com/playlist?list=PLBLr6naxBD0Uqguj7Xot1leFtNvmjG9V_" }
