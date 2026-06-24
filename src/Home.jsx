@@ -18,6 +18,7 @@ const Home = ({ setContent, setMenuOpen }) => {
 
   return (
     <div className="home-container">
+      
       <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Anyagaim. </h2>
 
       <div className={`folder-grid${activeSemester ? ' folder-grid--focused' : ''}`}>
