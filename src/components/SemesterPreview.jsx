@@ -94,7 +94,7 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
 
   return (
     <>
-      {/* Navigáció: vissza gomb + breadcrumb */}
+      {/* Navigáció: vissza gomb + (breadcrumb) + YouTube gomb jobbra */}
       <div className="file-nav">
         <button className="file-back-btn" onClick={isRoot ? onBack : () => setStack(s => s.slice(0, -1))}>
           ← {isRoot ? 'Vissza' : stack[stack.length - 2].name}
@@ -102,26 +102,24 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
         {!isRoot && (
           <span className="file-breadcrumb-current">{currentFolder.name}</span>
         )}
+        {isRoot && subjectVideos && subjectVideos.length > 0 && (
+          <button className="yt-toggle-btn" onClick={() => setVideosOpen(o => !o)}>
+            ▶ YouTube {subjectVideos.length > 1 ? `(${subjectVideos.length})` : ''}
+          </button>
+        )}
       </div>
 
-      {isRoot && subjectVideos && subjectVideos.length > 0 && (
-        <div className="subject-videos">
-          <button className="videos-toggle" onClick={() => setVideosOpen(o => !o)}>
-            {videosOpen ? '▲' : '▶'} Videók ({subjectVideos.length})
-          </button>
-          {videosOpen && (
-            <div className="subject-videos-list">
-              {subjectVideos.map((video, i) =>
-                video.group ? (
-                  <VideoGroup key={i} name={video.name} items={video.group} />
-                ) : (
-                  <a key={i} className="video-item"
-                    href={toMobileYT(video.url)} target="_blank" rel="noopener noreferrer">
-                    ▶ {video.name}
-                  </a>
-                )
-              )}
-            </div>
+      {isRoot && videosOpen && subjectVideos && subjectVideos.length > 0 && (
+        <div className="subject-videos-list">
+          {subjectVideos.map((video, i) =>
+            video.group ? (
+              <VideoGroup key={i} name={video.name} items={video.group} />
+            ) : (
+              <a key={i} className="video-item"
+                href={toMobileYT(video.url)} target="_blank" rel="noopener noreferrer">
+                ▶ {video.name}
+              </a>
+            )
           )}
         </div>
       )}

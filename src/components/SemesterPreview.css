@@ -16,7 +16,7 @@
 }
 
 .folder-card--open {
-  width: 280px;
+  width: 380px;
   align-items: stretch;
 }
 
@@ -74,6 +74,7 @@
   cursor: pointer;
   transition: background 0.2s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .file-back-btn:hover { background: #3a3a3a; }
@@ -84,6 +85,31 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.yt-toggle-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: #c4302b;
+  border: none;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.yt-toggle-btn:hover { background: #e53935; }
+
+.subject-videos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
 }
 
 /* Tárgyak statikusan alatta, sötétebb kártyán */
@@ -512,7 +538,7 @@
   .folder-card,
   .folder-card--wide,
   .folder-card--open {
-    width: 90%;
+    width: 95%;
     padding: 10px;
   }
 
