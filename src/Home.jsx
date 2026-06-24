@@ -7,6 +7,7 @@ import './Home.css';
 const Home = ({ setContent, setMenuOpen }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [ytOpen, setYtOpen] = useState(false);
+  const [activeSemester, setActiveSemester] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 800);
@@ -19,7 +20,7 @@ const Home = ({ setContent, setMenuOpen }) => {
     <div className="home-container">
       <h2 style={{ color: '#fff', marginBottom: '1rem', textAlign: 'center' }}>Most végeztem és ezzel egyidőben elküldtek a gyakornoki helyemről yey  🎉 </h2>
 
-      <div className="folder-grid">
+      <div className={`folder-grid${activeSemester ? ' folder-grid--focused' : ''}`}>
         {Object.entries(semesterData).map(([semester, { link, subjects, videos }]) => (
           <SemesterPreview
             key={semester}
@@ -27,6 +28,9 @@ const Home = ({ setContent, setMenuOpen }) => {
             subjects={subjects}
             videos={videos}
             link={link}
+            hidden={activeSemester !== null && activeSemester !== semester}
+            onSubjectOpen={() => setActiveSemester(semester)}
+            onBackToAll={() => setActiveSemester(null)}
           />
         ))}
       </div>

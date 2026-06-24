@@ -3,7 +3,7 @@
   flex-direction: column;
   align-items: center;
   width: 160px;
-  background: #1e1e1e; /* sötét kártya */
+  background: #1e1e1e;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
   padding: 8px;
@@ -13,6 +13,15 @@
 .folder-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 18px rgba(0,0,0,0.5);
+}
+
+.folder-card--open {
+  width: 280px;
+  align-items: stretch;
+}
+
+.folder-card--hidden {
+  display: none;
 }
 
 .folder-header {
@@ -31,8 +40,50 @@
   margin-top: 4px;
   font-weight: 600;
   font-size: 0.85rem;
-  color: #ffcc66; /* sárga félév neve */
+  color: #ffcc66;
   text-align: center;
+}
+
+.subject-videos {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.subject-videos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 3px;
+}
+
+/* Navigáció a fájlböngészőben */
+.file-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.file-back-btn {
+  background: #2a2a2a;
+  border: none;
+  color: #ffcc66;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.file-back-btn:hover { background: #3a3a3a; }
+
+.file-breadcrumb-current {
+  font-size: 0.72rem;
+  color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Tárgyak statikusan alatta, sötétebb kártyán */
@@ -45,14 +96,17 @@
 }
 
 .subject-item {
+  flex: 1;
   display: block;
   padding: 4px 6px;
   background: #2a2a2a;
+  border: none;
   border-radius: 6px;
   text-decoration: none;
   color: #fff;
   font-size: 0.78rem;
   text-align: center;
+  cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
@@ -60,6 +114,19 @@
   background: #ffcc66;
   color: #222;
 }
+
+.subject-drive-link {
+  font-size: 0.78rem;
+  text-decoration: none;
+  padding: 3px 4px;
+  border-radius: 5px;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.subject-drive-link:hover { opacity: 1; }
 
 .videos-toggle {
   width: 100%;
@@ -153,6 +220,36 @@
   gap: 1.2rem;
 }
 
+.folder-grid--focused {
+  justify-content: center;
+}
+
+/* === SLIDE ANIMATIONS === */
+@keyframes slideInRight {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.card-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.folder-card--open .card-slide {
+  align-items: stretch;
+}
+
+.animate-forward { animation: slideInRight 0.22s ease; }
+.animate-back    { animation: slideInLeft  0.22s ease; }
+
 /* === FILE BROWSER === */
 .folder-card--wide {
   width: 280px;
@@ -195,6 +292,51 @@
   color: #222;
 }
 
+/* === FILE BROWSER === */
+.file-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.file-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  background: #1a1a1a;
+  border-radius: 5px;
+  font-size: 0.68rem;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.breadcrumb-sep {
+  color: #555;
+}
+
+.breadcrumb-link {
+  background: none;
+  border: none;
+  color: #ffcc66;
+  cursor: pointer;
+  font-size: 0.68rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.breadcrumb-link:hover { color: #ffe599; }
+
+.breadcrumb-current {
+  color: #aaa;
+  font-size: 0.68rem;
+}
+
 .file-list {
   display: flex;
   flex-direction: column;
@@ -232,6 +374,32 @@
   text-overflow: ellipsis;
   min-width: 0;
 }
+
+.file-row--folder {
+  background: #1e2233;
+  cursor: pointer;
+}
+
+.file-row--folder:hover {
+  background: #252d45;
+}
+
+.file-folder-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #7eb8f7;
+  font-size: 0.7rem;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.file-folder-btn:hover { color: #afd4ff; }
 
 .file-actions {
   display: flex;
@@ -342,7 +510,8 @@
 /* MOBILE */
 @media (max-width: 600px) {
   .folder-card,
-  .folder-card--wide {
+  .folder-card--wide,
+  .folder-card--open {
     width: 90%;
     padding: 10px;
   }
