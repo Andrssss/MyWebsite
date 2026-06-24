@@ -32,7 +32,7 @@ export default async (request) => {
     return json(400, { error: 'Invalid folderId' });
   }
 
-  const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+  const apiKey = process.env.GDRIVE_API_KEY_1 || process.env.GDRIVE_API_KEY_2 || process.env.GOOGLE_DRIVE_API_KEY;
   if (!apiKey) return json(500, { error: 'API key not configured' });
 
   try {
