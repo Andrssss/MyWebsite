@@ -44,7 +44,12 @@ const pool = new Pool({
 
 const BASE = "https://workcenter.hu";
 // The /jobs/?filter_job_listing_category=... URL is blocked (403) from Netlify IPs.
-// The taxonomy archive page is the same content without the WAF block.
+// Switched to the taxonomy archive URL — same content, lighter WAF rules.
+// As of 2026-06-25 the taxonomy URL also returns 403 from Netlify IPs (Cloudflare IP block).
+// Added Referer + Sec-Fetch-Site: same-origin headers — may bypass header-based WAF rules.
+// If 403 persists it is an IP-level block and headers won't help. Alternatives to try:
+//   1. WP REST API: GET /wp-json/wp/v2/job_listing?per_page=100&job_listing_category=informatikus
+//   2. Proxy service (ScraperAPI, Brightdata) to route through residential IPs
 const LIST_BASE = `${BASE}/munka-kateg%C3%B3ria/informatikus`;
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -105,9 +110,10 @@ function fetchText(url, redirectLeft = 5) {
           "Cache-Control": "max-age=0",
           "Connection": "keep-alive",
           "Upgrade-Insecure-Requests": "1",
+          "Referer": "https://workcenter.hu/",
           "Sec-Fetch-Dest": "document",
           "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
+          "Sec-Fetch-Site": "same-origin",
           "Sec-Fetch-User": "?1",
           "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
           "sec-ch-ua-mobile": "?0",

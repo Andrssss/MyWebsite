@@ -124,22 +124,6 @@ function fetchText(url, redirectLeft = 5) {
 
 /* ── listing page parser ─────────────────────────────────────── */
 
-// Cards have no heading tags — title is the first text block inside <a>,
-// followed by location(s) then a work-type keyword (Jelenléti/Hibrid/etc.).
-function titleFromCardText(cardText) {
-  // Split at first work-type or experience-badge keyword — these come after title+location
-  const m = cardText.match(
-    /^([\s\S]+?)\s+(?:Jelenléti|Hibrid|Távmunka|Home\s*office|Részmunkaidő|Teljes\s+munkaidő|Junior\s*\(|Medior\s*\(|Senior\s*\(|Szakmai\s+gyakorlat)\b/i
-  );
-  if (!m) return normalizeWhitespace(cardText).slice(0, 120);
-
-  // m[1] = "Job Title [City, City, ...]" — strip trailing city names (capitalised proper nouns)
-  const withoutCities = normalizeWhitespace(m[1])
-    .replace(/(?:[,\s]+[A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüűA-ZÁÉÍÓÖŐÚÜŰ -]+)+\s*$/, "")
-    .trim();
-  return withoutCities || normalizeWhitespace(m[1]);
-}
-
 function extractJobEntries(html) {
   const $ = cheerioLoad(html);
   const entries = [];
@@ -157,10 +141,10 @@ function extractJobEntries(html) {
     if (seen.has(url)) return;
     seen.add(url);
 
-    const cardText = normalizeWhitespace($(el).text());
-    const title = titleFromCardText(cardText);
+    const title = normalizeWhitespace($(el).find("p.job-title").first().text());
     if (!title || title.length < 3) return;
 
+    const cardText = normalizeWhitespace($(el).text());
     entries.push({ title, url, cardText });
   });
 
