@@ -12,16 +12,8 @@ import { withTimeout } from "./_error-logger.mjs";
  */
 const TARGETS = [
   { name: "cron_jobs_MBH-background" },
-  { name: "cron_jobs_KH-background" },
-  { name: "cron_jobs_RAIFFEISEN-background" },
-  { name: "cron_jobs_ERSTE-background" },
-  { name: "cron_jobs_MFB-background" },
-  { name: "cron_jobs_UNICREDIT-background" },
-  { name: "cron_jobs_CG-background" },
-  { name: "cron_jobs_ATS-background" },
-  { name: "cron_jobs_EUDIAKOK-background" },
-  { name: "cron_jobs_MELODIAK-background" },
-  { name: "cron_jobs_ATLASZ-background" },
+  { name: "cron_jobs_F_3-background", body: { startPage: 1 } },
+
 ];
 
 export default withTimeout("cron_dispatcher_test", async () => {

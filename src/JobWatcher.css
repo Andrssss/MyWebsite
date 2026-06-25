@@ -442,15 +442,6 @@
   font-weight: 500;
 }
 
-.job-badge--crossdup {
-  background: linear-gradient(135deg, #f59e0b, #b45309);
-  color: #1a1305;
-}
-
-.job-card--crossdup {
-  border-left: 3px solid #f59e0b;
-}
-
 .job-company {
   display: inline-flex;
   align-items: center;

@@ -23,7 +23,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -234,13 +234,17 @@ export default withTimeout("cron_jobs_OTP-background", async () => {
           continue;
         }
 
-        const experience = isInternshipTitle(title)
-          ? "diákmunka"
-          : isJuniorTitle(title)
-          ? "junior"
-          : isMidLevelTitle(title)
-          ? "medior"
-          : extractBodyExperience(html) || "-";
+        // OTP "Pályakezdő" list = adult entry-level IT jobs, not student interns.
+        // Student OTP jobs are scraped separately by DIAK_3, so skip isInternshipTitle here
+        // (it would falsely match "pályakezdő" in the title → "diákmunka").
+        let experience;
+        if (isJuniorTitle(title)) {
+          experience = "junior";
+        } else if (isMidLevelTitle(title)) {
+          experience = "medior";
+        } else {
+          experience = extractBodyExperience(html) || "-";
+        }
 
         const wasNew = await upsertJob(client, "otp", {
           title,

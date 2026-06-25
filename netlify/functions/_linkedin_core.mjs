@@ -5,7 +5,6 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
-import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -387,7 +386,6 @@ export async function processLinkedInSources(sources, jobName) {
       console.log(`${p.key}: ${items.length} items processed.`);
     }
 
-    await flagCrossDuplicates(client, { days: 2, label: jobName || "linkedin" });
   } finally {
     console.log(`Script finished at ${new Date().toISOString()}${blocked ? " (ABORTED: LinkedIn block)" : ""}`);
     client.release();

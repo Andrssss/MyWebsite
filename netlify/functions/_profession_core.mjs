@@ -6,7 +6,6 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
-import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -388,7 +387,6 @@ export async function processProfessionSources(sources, jobName, request, pageOp
         await processOneSource(client, p, jobName, pageOptions);
         await sleep(50);
       }
-      await flagCrossDuplicates(client, { days: 2, label: jobName || "profession" });
     } finally {
       client.release();
     }

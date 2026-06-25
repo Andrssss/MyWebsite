@@ -21,7 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -47,7 +47,7 @@ const LIST_SOURCES = [
   {
     listUrl: `${BASE}/DataCenter/Registration/JobAdvertisements/gyakornok`,
     regsite: "gyakornok",
-    positionGroupIdList: [64],
+    positionGroupIdList: [], // empty = all departments (not just IT) so cross-dept interns are found
   },
 ];
 
@@ -229,6 +229,10 @@ function parseDetailPage(html) {
   let experience;
   if (isInternshipTitle(title)) {
     experience = "diákmunka";
+  } else if (isJuniorTitle(title)) {
+    experience = "junior";
+  } else if (isMidLevelTitle(title)) {
+    experience = "medior";
   } else {
     experience = extractBodyExperience(html);
   }
