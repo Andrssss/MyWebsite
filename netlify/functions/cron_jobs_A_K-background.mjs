@@ -11,6 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { enrichExperience, extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -229,6 +230,8 @@ const SOURCES = [
 
   const client = await pool.connect();
   const seen = new Set();
+  const foundUrls = [];
+  let crawlError = false;
 
   try {
     /* --- Karrierhungaria (Inertia API) --- */
@@ -239,6 +242,7 @@ const SOURCES = [
       } catch (err) {
         await logFetchError("cron_jobs_A_K", { url, message: err.message });
         console.error("fetch failed:", url, err.message);
+        crawlError = true;
         continue;
       }
 
@@ -257,11 +261,14 @@ const SOURCES = [
         } catch (err) {
           console.error(err);
         }
+        foundUrls.push(it.url);
       }
 
       console.log(`karrierhungaria (${url.split("/")[4]}): ${items.length} items processed.`);
     }
 
+    const rc = await reconcileActive(client, "karrierhungaria", foundUrls, { complete: !crawlError });
+    console.log(`[karrierhungaria] active reconcile — complete=${!crawlError}, ${JSON.stringify(rc)}`);
   } finally {
     console.log(`Script finished at ${new Date().toISOString()}`);
     client.release();

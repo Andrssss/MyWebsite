@@ -20,6 +20,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -1463,6 +1464,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           }
         }
         if (source === "minddiak") console.log(`[minddiak] db_saved=${saved}/${matchedList.length}`);
+        const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: true });
+        console.log(`[diak1] active reconcile [${source}] — ${JSON.stringify(rc)}`);
       } else if (source === "minddiak") {
         console.log(`[minddiak] write=false, would save ${matchedList.length} items`);
       }

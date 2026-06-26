@@ -20,6 +20,7 @@ import https from "https";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -174,6 +175,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
   const seen = new Set();
 
   try {
+    const foundUrls = [];
     for (let page = 1; page <= 10; page++) {
       let result;
       try {
@@ -208,6 +210,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
         }
 
         const wasNew = await upsertJob(client, "pannondiak", job);
+        foundUrls.push(job.url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[pannondiak] NEW "${job.title}" → ${job.url}`);
@@ -222,6 +225,10 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
       `[pannondiak] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
+
+    const complete = fetchFailed === 0;
+    const rc = await reconcileActive(client, "pannondiak", foundUrls, { complete });
+    console.log(`[pannondiak] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

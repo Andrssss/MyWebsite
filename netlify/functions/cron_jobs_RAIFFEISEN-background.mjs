@@ -19,6 +19,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -192,6 +193,8 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    let crawlError = false;
+    const foundUrls = [];
     const allRows = [];
     let page = 0;
     let total = 0;
@@ -203,6 +206,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
       } catch (err) {
         await logFetchError("cron_jobs_RAIFFEISEN-background", { url: API, message: err.message });
         console.error(`[raiffeisen] page ${page} fetch failed: ${err.message}`);
+        crawlError = true;
         break;
       }
       total = res.total || 0;
@@ -274,6 +278,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         }
 
         const wasNew = await upsertJob(client, source, { title, url, experience });
+        foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[raiffeisen] NEW [${source}] "${title}" exp=${experience} → ${url}`);
@@ -291,6 +296,10 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}, ` +
       `fetch_failed=${detailFetchFailed}`
     );
+
+    const complete = !crawlError && detailFetchFailed === 0;
+    const rc = await reconcileActive(client, "raiffeisen", foundUrls, { complete });
+    console.log(`[raiffeisen] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

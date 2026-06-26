@@ -6,6 +6,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, flushErrors } from "./_error-logger.mjs";
 import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
 const SOURCE = "workly";
@@ -179,6 +180,8 @@ export default async (request) => {
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
+  const foundUrls = [];
+  let crawlError = false;
 
   try {
     let page = startPage;
@@ -199,6 +202,7 @@ export default async (request) => {
         }
         await logFetchError(JOB_NAME, { url: pageUrl, message: err.message });
         console.error(`[workly] page ${page} fetch failed: ${err.message}`);
+        crawlError = true;
         break;
       }
 
@@ -218,6 +222,7 @@ export default async (request) => {
         }
 
         const experience = detectExperience(entry.title, entry.cardText);
+        foundUrls.push(entry.url);
         const res = await client.query(
           `INSERT INTO job_posts (source, title, url, canonical_url, experience, first_seen)
            VALUES ($1,$2,$3,$4,$5,NOW())
@@ -238,6 +243,12 @@ export default async (request) => {
     }
 
     console.log(`[workly] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}`);
+
+    // Reconcile active flag only on a full, error-free crawl from page 1 — a
+    // partial/limited run would wrongly deactivate jobs on the unseen pages.
+    const complete = startPage === 1 && maxPages === Infinity && !crawlError;
+    const rc = await reconcileActive(client, SOURCE, foundUrls, { complete });
+    console.log(`[workly] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
     await flushErrors(JOB_NAME).catch(() => {});

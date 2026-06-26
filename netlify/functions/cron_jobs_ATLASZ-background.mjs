@@ -16,6 +16,7 @@ import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -143,6 +144,7 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
   let alreadyExisted = 0;
   let skippedSenior = 0;
   let skippedNonBudapest = 0;
+  const foundUrls = [];
 
   try {
     for (const job of jobs) {
@@ -168,6 +170,7 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
         url: jobUrl,
         experience: "diákmunka",
       });
+      foundUrls.push(jobUrl);
 
       if (wasNew) {
         newlyInserted++;
@@ -182,6 +185,10 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
       `[atlasz] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}`
     );
+
+    // Single API response = full current listing.
+    const rc = await reconcileActive(client, "atlasz", foundUrls, { complete: true });
+    console.log(`[atlasz] active reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

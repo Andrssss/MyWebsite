@@ -726,6 +726,31 @@ const JobWatcher = () => {
     });
   };
 
+  /* Bulk: minden forrást azonos állapotba (selected = zöld, excluded = piros, neutral = törlés) */
+  const setAllSources = (state) => {
+    setSourceStates(() => {
+      const updated = {};
+      if (state !== "neutral") {
+        for (const s of sources) updated[s.source] = state;
+      }
+      localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Bulk: minden kategóriát azonos állapotba */
+  const setAllCategories = (state) => {
+    setCategoryStates(() => {
+      const updated = {};
+      if (state !== "neutral") {
+        const cats = jobCategories.map(([cat]) => cat).concat("Egyéb");
+        for (const cat of cats) updated[cat] = state;
+      }
+      localStorage.setItem("jobWatcherCategoryStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const handleInternToggle = (checked) => {
     setInternMode(checked);
     localStorage.setItem("jobWatcherInternMode", checked);
@@ -1017,14 +1042,6 @@ const JobWatcher = () => {
           <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
            📊 Statisztikák 
           </button>
-          <button
-            className="job-btn"
-            onClick={() => { setBugOpen(true); setBugStatus(""); }}
-            title="Visszajelzés / hibabejelentés"
-            aria-label="Visszajelzés küldése"
-          >
-            🐛 Bug report
-          </button>
           <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
             Frissítés
           </button>
@@ -1040,6 +1057,13 @@ const JobWatcher = () => {
       >
         {sourcesOpen ? "▲ Források elrejtése" : "▼ Források kiválasztása"}
       </button>
+      {sourcesOpen && (
+        <div className="job-bulk-actions">
+          <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllSources("selected")}>Mind ✓</button>
+          <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllSources("excluded")}>Mind ✕</button>
+          <button className="job-bulk-btn" onClick={() => setAllSources("neutral")}>Törlés</button>
+        </div>
+      )}
     </div>
 
     {/* ===== FORRÁS TABOK ===== */}
@@ -1084,6 +1108,13 @@ const JobWatcher = () => {
       >
         {categoriesOpen ? "▲ Kategóriák elrejtése" : "▼ Kategóriák kiválasztása"}
       </button>
+      {categoriesOpen && (
+        <div className="job-bulk-actions">
+          <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllCategories("selected")}>Mind ✓</button>
+          <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllCategories("excluded")}>Mind ✕</button>
+          <button className="job-bulk-btn" onClick={() => setAllCategories("neutral")}>Törlés</button>
+        </div>
+      )}
     </div>
 
     <div className={`job-tabs-wrapper ${categoriesOpen ? "open" : ""}`}>

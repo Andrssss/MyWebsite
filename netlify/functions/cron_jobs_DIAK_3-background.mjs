@@ -28,6 +28,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -691,6 +692,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           await upsertJob(client, source, item);
         }
         console.log(`${tag}   DB upsert kész – ${p.label}`);
+        const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: true });
+        console.log(`${tag}   active reconcile [${source}] — ${JSON.stringify(rc)}`);
       } else if (!write) {
         console.log(`${tag}   (write=false – DB upsert kihagyva)`);
       }

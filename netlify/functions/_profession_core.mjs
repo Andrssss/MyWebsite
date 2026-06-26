@@ -6,6 +6,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -486,6 +487,9 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
 
       await upsertJob(client, source, item);
     }
+
+    const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: true });
+    console.log(`[${jobName}] ${source}: active reconcile ${JSON.stringify(rc)}`);
   }
 
   console.log(`[${jobName}] ${source}: ${matchedList.length} items processed for ${p.url}`);

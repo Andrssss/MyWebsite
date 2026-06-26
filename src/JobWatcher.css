@@ -662,6 +662,45 @@ html, body {
 
 .job-tabs-header {
   margin: 8px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ===== TÖMEGES KIJELÖLÉS GOMBOK ===== */
+.job-bulk-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.job-bulk-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.job-bulk-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.job-bulk-btn--green {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border-color: transparent;
+}
+
+.job-bulk-btn--red {
+  background: #ef4444;
+  color: #fff;
+  border-color: transparent;
 }
 
 /* ===== TOGGLE GOMB ===== */

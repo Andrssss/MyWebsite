@@ -30,6 +30,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { isInternshipTitle, extractYearsFromText } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -260,6 +261,7 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
   let fetchFailed = 0;
 
   try {
+    const foundUrls = [];
     let page = 1;
     const MAX_PAGES = 10;
 
@@ -320,6 +322,7 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
           url: entry.url,
           experience,
         });
+        foundUrls.push(entry.url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[workcenter] NEW "${entry.title}" → ${entry.url}`);
@@ -336,6 +339,10 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
       `[workcenter] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
+
+    const complete = fetchFailed === 0;
+    const rc = await reconcileActive(client, "workcenter", foundUrls, { complete });
+    console.log(`[workcenter] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

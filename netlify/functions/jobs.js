@@ -18,6 +18,23 @@ const sqlQuery = {
   query: (text, params) => sql.query(text, params),
 };
 
+// Make sure the active-flag column exists before we filter on it. Runs once per
+// warm container; the sweep + scrapers create it too, this just avoids a 500 if
+// the frontend is hit before the first sweep runs after a deploy.
+let schemaEnsured = globalThis.__jobsSchemaEnsured || false;
+async function ensureSchema() {
+  if (schemaEnsured) return;
+  try {
+    await sqlQuery.query(
+      `ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true`
+    );
+  } catch (err) {
+    console.error("ensureSchema failed:", err.message);
+  }
+  schemaEnsured = true;
+  globalThis.__jobsSchemaEnsured = true;
+}
+
 function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
     statusCode,
@@ -102,9 +119,12 @@ const FIXED = [
   { key: "random_email", label: "Random Email" },
 ];
 
-// Sources where ALL jobs are shown (no 30-day cutoff) when no timeRange is specified
-const EXEMPT_SOURCES = new Set(["schonherz", "zyntern", "onejob", "tudasdiak", "qdiak", "minddiak"]);
-const EXEMPT_SOURCES_ARRAY = [...EXEMPT_SOURCES];
+// Sources still shown by time window (NOT governed by the active flag). For now
+// only LinkedIn: it can only ever see a recent window, so "not seen this run"
+// never means "gone" and it can't be reconciled. Everything else defaults to
+// the active flag (no time limit) when no explicit timeRange is requested.
+const TIME_BASED_SOURCES = new Set(["LinkedIn"]);
+const TIME_BASED_SOURCES_ARRAY = [...TIME_BASED_SOURCES];
 
 // Parameterized query helper. Returns rows array.
 async function query(text, params = []) {
@@ -144,6 +164,8 @@ exports.handler = async (event) => {
   }
 
   try {
+    await ensureSchema();
+
     if (method === "GET") {
       const qs = event.queryStringParameters || {};
       const source = qs.source || null;
@@ -166,8 +188,10 @@ exports.handler = async (event) => {
         const rows = await query(
           `SELECT source, COUNT(*)::int AS count
            FROM job_posts
-           WHERE first_seen >= NOW() - INTERVAL '30 days'
-           GROUP BY source`
+           WHERE (source = ANY($1) AND first_seen >= NOW() - INTERVAL '30 days')
+              OR (source <> ALL($1) AND active = true)
+           GROUP BY source`,
+          [TIME_BASED_SOURCES_ARRAY]
         );
 
         const map = new Map(rows.map((r) => [r.source, r]));
@@ -200,7 +224,7 @@ exports.handler = async (event) => {
       if (source) {
         const fixedEntry = FIXED.find((s) => s.key === source);
         const dbKeys = fixedEntry?.keys || [source];
-        const isExempt = dbKeys.every((k) => EXEMPT_SOURCES.has(k));
+        const isTimeBased = dbKeys.every((k) => TIME_BASED_SOURCES.has(k));
         const sourceQuery =
           timeRange === "24h"
             ? `SELECT source, title, url, company,
@@ -220,12 +244,13 @@ exports.handler = async (event) => {
                  AND first_seen >= NOW() - INTERVAL '7 days'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
-            : isExempt
+            : isTimeBased
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
                       experience
                FROM job_posts
                WHERE source = ANY($1)
+                 AND first_seen >= NOW() - INTERVAL '30 days'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
             : `SELECT source, title, url, company,
@@ -233,7 +258,7 @@ exports.handler = async (event) => {
                       experience
                FROM job_posts
                WHERE source = ANY($1)
-                 AND first_seen >= NOW() - INTERVAL '30 days'
+                 AND active = true
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`;
 
@@ -264,11 +289,12 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience
              FROM job_posts
-             WHERE (source = ANY($2) OR first_seen >= NOW() - INTERVAL '30 days')
+             WHERE (source = ANY($2) AND first_seen >= NOW() - INTERVAL '30 days')
+                OR (source <> ALL($2) AND active = true)
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`;
 
-      const rows = await query(allQuery, timeRange ? [limit] : [limit, EXEMPT_SOURCES_ARRAY]);
+      const rows = await query(allQuery, timeRange ? [limit] : [limit, TIME_BASED_SOURCES_ARRAY]);
       cacheSet(cacheKey, rows);
       return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
     }

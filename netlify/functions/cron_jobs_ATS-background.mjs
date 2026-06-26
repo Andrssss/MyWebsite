@@ -10,6 +10,7 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -190,6 +191,8 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
   let alreadyExisted = 0;
 
   try {
+    let anyFetchFailed = false;
+    const foundBySource = new Map();
     const collected = [];
 
     for (const src of SR_SOURCES) {
@@ -199,6 +202,7 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
         console.log(`[ats] ${src.label}: raw=${raw} hu_mapped=${mapped.length}`);
         collected.push(...mapped);
       } catch (err) {
+        anyFetchFailed = true;
         await logFetchError("cron_jobs_ATS-background", { url: `SR:${src.company}`, message: err.message });
         console.error(`[ats] ${src.label} failed: ${err.message}`);
       }
@@ -217,12 +221,25 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
       const wasNew = await upsertJob(client, item);
       if (wasNew) newlyInserted += 1;
       else alreadyExisted += 1;
+      if (!foundBySource.has(item.source)) foundBySource.set(item.source, []);
+      foundBySource.get(item.source).push(item.url);
     }
 
     console.log(
       `[ats] DONE - raw=${fetchedRaw}, candidates=${candidates}, new=${newlyInserted}, ` +
       `existed=${alreadyExisted}, skipped_senior=${skippedSenior}`
     );
+
+    // Per-source reconcile, but only if every SmartRecruiters source loaded —
+    // a failed source would otherwise look like "all its jobs vanished".
+    if (!anyFetchFailed) {
+      for (const [src, urls] of foundBySource) {
+        const rc = await reconcileActive(client, src, urls, { complete: true });
+        console.log(`[ats] active reconcile [${src}] — ${JSON.stringify(rc)}`);
+      }
+    } else {
+      console.log(`[ats] active reconcile skipped — a source fetch failed`);
+    }
   } finally {
     client.release();
   }

@@ -17,6 +17,7 @@ import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -134,6 +135,7 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
   let fetchFailed = 0;
 
   try {
+    const foundUrls = [];
     for (let page = 1; page <= 20; page++) {
       let result;
       try {
@@ -175,6 +177,7 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
           url: jobUrl,
           experience: "diákmunka",
         });
+        foundUrls.push(jobUrl);
 
         if (wasNew) {
           newlyInserted++;
@@ -190,6 +193,10 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
       `[melodiak] DONE — fetched=${totalFetched}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
+
+    const complete = fetchFailed === 0;
+    const rc = await reconcileActive(client, "melodiak", foundUrls, { complete });
+    console.log(`[melodiak] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

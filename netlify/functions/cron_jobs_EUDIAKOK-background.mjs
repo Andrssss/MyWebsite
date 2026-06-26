@@ -21,6 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -234,6 +235,7 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
   let skippedNoTitle = 0;
   let notBudapest = 0;
   let detailFetchFailed = 0;
+  const foundUrls = [];
 
   try {
     for (const detailUrl of jobLinks) {
@@ -265,6 +267,7 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
           url: detailUrl,
           experience: parsed.experience,
         });
+        foundUrls.push(detailUrl);
 
         if (wasNew) {
           newlyInserted++;
@@ -287,6 +290,10 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, ` +
       `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
     );
+
+    const complete = detailFetchFailed === 0;
+    const rc = await reconcileActive(client, "eudiakok", foundUrls, { complete });
+    console.log(`[eudiakok] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

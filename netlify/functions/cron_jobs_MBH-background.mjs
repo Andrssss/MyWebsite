@@ -22,6 +22,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -263,6 +264,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
   try {
     // Collect unique detail URLs across all list sources; first wins on duplicate
     const jobSet = new Set();
+    let listFetchFailed = false;
 
     for (const { listUrl, regsite, positionGroupIdList } of LIST_SOURCES) {
       try {
@@ -294,6 +296,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
 
         await sleep(1000);
       } catch (err) {
+        listFetchFailed = true;
         await logFetchError("cron_jobs_MBH-background", { url: listUrl, message: err.message });
         console.error(`[mbh] list fetch failed ${listUrl}: ${err.message}`);
       }
@@ -307,6 +310,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
     let skippedNoTitle = 0;
     let notBudapest = 0;
     let detailFetchFailed = 0;
+    const foundUrls = [];
 
     for (const detailUrl of jobSet) {
       try {
@@ -337,6 +341,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
           url: detailUrl,
           experience: parsed.experience,
         });
+        foundUrls.push(detailUrl);
 
         if (wasNew) {
           newlyInserted++;
@@ -359,6 +364,12 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, ` +
       `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
     );
+
+    // Reconcile active flag: only deactivate when the crawl was complete (no
+    // list/detail fetch failures), so a transient failure can't hide real jobs.
+    const complete = !listFetchFailed && detailFetchFailed === 0;
+    const rc = await reconcileActive(client, "mbh", foundUrls, { complete });
+    console.log(`[mbh] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

@@ -6,6 +6,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -307,6 +308,8 @@ async function upsertJob(client, item) {
 async function scrapeNofluffjobs(client) {
   const seen = new Set();
   let totalUpserted = 0;
+  const foundUrls = [];
+  let crawlError = false;
 
   for (const sourceUrl of NOFLUFF_SOURCES) {
     console.log(`[nofluffjobs] Fetching: ${sourceUrl}`);
@@ -316,6 +319,7 @@ async function scrapeNofluffjobs(client) {
     } catch (err) {
       await logFetchError("cron_jobs_NOFLUFFJOBS", { url: sourceUrl, message: err.message });
       console.error(`[nofluffjobs] Fetch failed: ${err.message}`);
+      crawlError = true;
       continue;
     }
 
@@ -351,11 +355,15 @@ async function scrapeNofluffjobs(client) {
       await sleep(400);
       console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] "${item.title}"`);
       await upsertJob(client, item);
+      foundUrls.push(item.url);
       totalUpserted++;
     }
 
     await sleep(1000);
   }
+
+  const rc = await reconcileActive(client, "nofluffjobs", foundUrls, { complete: !crawlError });
+  console.log(`[nofluffjobs] active reconcile — complete=${!crawlError}, ${JSON.stringify(rc)}`);
 
   return totalUpserted;
 }

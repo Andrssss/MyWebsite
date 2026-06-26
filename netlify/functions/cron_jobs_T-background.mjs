@@ -11,6 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { enrichExperience, extractTalentExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -302,6 +303,8 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);
 
+    const rc = await reconcileActive(client, "talent", talentJobs.map((j) => j.url), { complete: true });
+    console.log(`[talent] active reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

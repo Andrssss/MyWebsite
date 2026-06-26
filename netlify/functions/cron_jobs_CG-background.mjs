@@ -14,6 +14,7 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -126,6 +127,7 @@ export default withTimeout("cron_jobs_CG-background", async () => {
   let fetched = 0;
 
   try {
+    let crawlError = false;
     const collected = [];
     const seenUrl = new Set();
 
@@ -139,6 +141,7 @@ export default withTimeout("cron_jobs_CG-background", async () => {
           message: err.message,
         });
         console.error(`[cg-jobstream] page ${page} fetch failed: ${err.message}`);
+        crawlError = true;
         break;
       }
 
@@ -182,6 +185,10 @@ export default withTimeout("cron_jobs_CG-background", async () => {
       `[cg-jobstream] DONE - fetched=${fetched}, candidates=${collected.length}, ` +
       `new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, skipped_invalid=${skippedInvalid}`
     );
+
+    const complete = !crawlError;
+    const rc = await reconcileActive(client, SOURCE_KEY, collected.map((c) => c.url), { complete });
+    console.log(`[cg-jobstream] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

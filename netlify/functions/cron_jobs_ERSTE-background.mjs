@@ -18,6 +18,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -140,6 +141,8 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    let crawlError = false;
+    const foundUrls = [];
     const allRows = [];
     let page = 0;
     let total = 0;
@@ -151,6 +154,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
       } catch (err) {
         await logFetchError("cron_jobs_ERSTE-background", { url: API, message: err.message });
         console.error(`[erste] page ${page} fetch failed: ${err.message}`);
+        crawlError = true;
         break;
       }
       total = res.total || 0;
@@ -224,6 +228,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
         let experience = isIntern ? "diákmunka" : expCombined || "-";
 
         const wasNew = await upsertJob(client, source, { title, url, experience });
+        foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[erste] NEW [${source}] "${title}" exp=${experience} → ${url}`);
@@ -240,6 +245,10 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
       `[erste] DONE — total=${dedup.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}`
     );
+
+    const complete = !crawlError;
+    const rc = await reconcileActive(client, "erste", foundUrls, { complete });
+    console.log(`[erste] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

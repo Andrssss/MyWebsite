@@ -10,6 +10,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -215,6 +216,8 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
       await upsertJob(client, "ydiak", job);
     }
     console.log(`ydiak: ${ydiakJobs.length} jobs processed`);
+    const rcY = await reconcileActive(client, "ydiak", ydiakJobs.map((j) => j.url), { complete: true });
+    console.log(`[ydiak] active reconcile — ${JSON.stringify(rcY)}`);
 
     /* Q Diák */
     const qdiakJobs = await fetchAllQdiakJobs();
@@ -222,6 +225,8 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
       await upsertJob(client, "qdiak", job);
     }
     console.log(`qdiak: ${qdiakJobs.length} jobs processed`);
+    const rcQ = await reconcileActive(client, "qdiak", qdiakJobs.map((j) => j.url), { complete: true });
+    console.log(`[qdiak] active reconcile — ${JSON.stringify(rcQ)}`);
 
     return new Response("OK");
   } finally {

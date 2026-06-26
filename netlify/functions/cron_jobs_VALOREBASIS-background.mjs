@@ -24,6 +24,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -249,6 +250,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
   let fetchFailed = 0;
 
   try {
+    const foundUrls = [];
     for (const catUrl of CATEGORY_URLS) {
       let html;
       try {
@@ -271,6 +273,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
           continue;
         }
         const wasNew = await upsertJob(client, "valorebasis", job);
+        foundUrls.push(job.url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[valorebasis] NEW "${job.title}" exp=${job.experience} → ${job.url}`);
@@ -284,6 +287,10 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
     console.log(
       `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
+
+    const complete = fetchFailed === 0;
+    const rc = await reconcileActive(client, "valorebasis", foundUrls, { complete });
+    console.log(`[valorebasis] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

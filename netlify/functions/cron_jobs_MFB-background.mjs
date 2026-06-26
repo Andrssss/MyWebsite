@@ -21,6 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -152,6 +153,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    const foundUrls = [];
     let html;
     try {
       html = await postJson(API, REQUEST_BODY);
@@ -214,6 +216,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
         }
 
         const wasNew = await upsertJob(client, source, { title, url, experience });
+        foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[mfb] NEW [${source}] "${title}" exp=${experience} → ${url}`);
@@ -230,6 +233,10 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
       `[mfb] DONE — total=${rows.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}`
     );
+
+    // Single API response = full current listing, so the crawl is complete.
+    const rc = await reconcileActive(client, "mfb", foundUrls, { complete: true });
+    console.log(`[mfb] active reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

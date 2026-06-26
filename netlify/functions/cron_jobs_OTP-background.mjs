@@ -23,6 +23,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -214,6 +215,7 @@ export default withTimeout("cron_jobs_OTP-background", async () => {
   let skippedSenior = 0;
   let skippedNoTitle = 0;
   let detailFetchFailed = 0;
+  const foundUrls = [];
 
   try {
     for (const detailUrl of jobLinks) {
@@ -251,6 +253,7 @@ export default withTimeout("cron_jobs_OTP-background", async () => {
           url: detailUrl,
           experience,
         });
+        foundUrls.push(detailUrl);
 
         if (wasNew) {
           newlyInserted++;
@@ -270,6 +273,10 @@ export default withTimeout("cron_jobs_OTP-background", async () => {
       `[otp] DONE — total=${jobLinks.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
+
+    const complete = detailFetchFailed === 0;
+    const rc = await reconcileActive(client, "otp", foundUrls, { complete });
+    console.log(`[otp] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

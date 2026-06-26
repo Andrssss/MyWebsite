@@ -18,6 +18,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -144,6 +145,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    const foundUrls = [];
     let listHtml;
     try {
       listHtml = await fetchText(LIST_URL);
@@ -210,6 +212,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           url: job.url,
           experience,
         });
+        foundUrls.push(job.url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[unicredit] NEW [${source}] "${job.title}" exp=${experience} → ${job.url}`);
@@ -226,6 +229,10 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
       `[unicredit] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
+
+    const complete = detailFetchFailed === 0;
+    const rc = await reconcileActive(client, "unicredit", foundUrls, { complete });
+    console.log(`[unicredit] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

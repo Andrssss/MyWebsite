@@ -24,6 +24,7 @@ import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -155,6 +156,7 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
   const seen = new Set();
 
   try {
+    const foundUrls = [];
     for (let page = 0; page < 10; page++) {
       let result;
       try {
@@ -198,6 +200,7 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
           : "-";
 
         const wasNew = await upsertJob(client, "trenkwalder", { title, url, experience });
+        foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
           console.log(`[trenkwalder] NEW "${title}" exp=${experience} → ${url}`);
@@ -215,6 +218,10 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
       `[trenkwalder] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
+
+    const complete = fetchFailed === 0;
+    const rc = await reconcileActive(client, "trenkwalder", foundUrls, { complete });
+    console.log(`[trenkwalder] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

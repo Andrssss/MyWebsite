@@ -12,6 +12,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import {
   enrichExperience,
   extractBodyExperience,
@@ -359,6 +360,8 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
+      const rc = await reconcileActive(client, "dreamjobs", dreamJobs.map((j) => j.url), { complete: true });
+      console.log(`[dreamjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "dreamjobs", message: err.message });
       console.error("dreamjobs fetch failed:", err.message);
@@ -373,6 +376,8 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "melonjobs", job);
       }
       console.log(`melonjobs: ${melonJobs.length} jobs processed`);
+      const rc = await reconcileActive(client, "melonjobs", melonJobs.map((j) => j.url), { complete: true });
+      console.log(`[melonjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "melonjobs", message: err.message });
       console.error("melonjobs fetch failed:", err.message);
@@ -387,6 +392,8 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);
+      const rc = await reconcileActive(client, "kuka", kukaJobs.map((j) => j.url), { complete: true });
+      console.log(`[kuka] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
       console.error("kuka fetch failed:", err.message);
