@@ -232,10 +232,10 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
               {isFolder(file.mimeType) ? (
                 <button className="file-name file-folder-btn"
                   onClick={() => setStack(s => [...s, { id: file.id, name: file.name }])}>
-                  {displayName(file.name)}
+                  {isRoot ? displayName(file.name) : file.name}
                 </button>
               ) : (
-                <span className="file-name">{displayName(file.name)}</span>
+                <span className="file-name">{file.name}</span>
               )}
               {!isFolder(file.mimeType) && (
                 <div className="file-actions">

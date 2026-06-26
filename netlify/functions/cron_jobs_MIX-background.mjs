@@ -156,13 +156,37 @@ async function upsertJob(client, sourceKey, item) {
 
 /* ── DreamJobs ──────────────────────────────────────────────── */
 
+// DreamJobs slugs come in several shapes: a plain string, a per-language map
+// like { en, hu, ro }, or (buggy API) a JSON-blob string of that map. Resolve to
+// one clean slug and NEVER let anything JSON-ish / whitespace into a URL.
+function resolveDreamSlug(raw, lang) {
+  if (raw == null) return "";
+  if (typeof raw === "object") {
+    return normalizeWhitespace(raw[lang] ?? raw.hu ?? raw.en ?? "");
+  }
+  let s = normalizeWhitespace(raw);
+  if (s.startsWith("{") && s.includes('"')) {
+    try {
+      const obj = JSON.parse(s);
+      s = normalizeWhitespace(obj?.[lang] ?? obj?.hu ?? obj?.en ?? "");
+    } catch {
+      return "";
+    }
+  }
+  // A real slug never contains JSON / URL-breaking characters.
+  return /[{}"\s]/.test(s) ? "" : s;
+}
+
 function buildDreamJobsUrl(job) {
   const lang = /^[a-z]{2}$/i.test(String(job?.primary_lang || "")) ? String(job.primary_lang).toLowerCase() : "hu";
-  const companySlug = normalizeWhitespace(job?.company?.slug);
+  const companySlug = resolveDreamSlug(job?.company?.slug, lang);
   const localizedSlug =
-    normalizeWhitespace(job?.slugs?.[`slug_${lang}`]) ||
-    normalizeWhitespace(job?.slugs?.slug_hu) ||
-    normalizeWhitespace(job?.slug);
+    resolveDreamSlug(job?.slugs?.[`slug_${lang}`], lang) ||
+    resolveDreamSlug(job?.slugs?.slug_hu, lang) ||
+    resolveDreamSlug(job?.slugs?.[lang], lang) ||
+    resolveDreamSlug(job?.slugs?.hu, lang) ||
+    resolveDreamSlug(job?.slugs, lang) ||
+    resolveDreamSlug(job?.slug, lang);
 
   if (!companySlug || !localizedSlug) return null;
 

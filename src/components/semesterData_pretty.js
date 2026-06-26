@@ -334,6 +334,10 @@ export const semesterData = {
       {
         "name": "Op_rendszer",
         "url": "https://drive.google.com/drive/folders/1mKfZilCJwCVkQiMxAKtJvuE03RAe_Xhr?usp=drive_link"
+      },
+      {
+        "name": "Szakdolgozat",
+        "url": "https://drive.google.com/drive/folders/1C5vLa7oUpSr_mrOQgPR-vkypoEA0fkRa?usp=sharing"
       }
     ]
   }

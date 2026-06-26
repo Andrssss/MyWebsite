@@ -29,7 +29,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -679,9 +679,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       if (write && client) {
         console.log(`${tag}   DB upsert: ${matchedList.length} állás mentése...`);
-        const DIAKMUNKA_SOURCES = ["otp", "vizmuvek", "miszisz", "onejob"];
+        const DIAKMUNKA_SOURCES = ["vizmuvek", "miszisz", "onejob"];
         for (const item of matchedList) {
-          if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
+          if (source === "otp") {
+            // OTP-nál valódi junior/medior IT/üzleti állások is vannak, ezért NEM
+            // címkézünk mindent diákmunkának: a tiszta junior/medior címeket
+            // előléptetjük, minden más marad diákmunka.
+            item.experience = isJuniorTitle(item.title) ? "junior"
+              : isMidLevelTitle(item.title) ? "medior"
+              : "diákmunka";
+          } else if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
           } else if (source === "wherewework") {
             const exp = await fetchNofluffExperience(item.url);
