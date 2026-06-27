@@ -916,7 +916,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories, showAppliedOnly, appliedKeys, appliedCache]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories, showAppliedOnly, appliedKeys, appliedCache, savedSearches, activeSavedSearches]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
@@ -1022,6 +1022,7 @@ const JobWatcher = () => {
                 nextActive.add(term);
                 setActiveSavedSearches(nextActive);
                 localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+                setQ("");
               }
             }
           }}
@@ -1078,6 +1079,7 @@ const JobWatcher = () => {
                 nextActive.add(term);
                 setActiveSavedSearches(nextActive);
                 localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+                setQ("");
               }}
               title="Keresési szó mentése"
             >
