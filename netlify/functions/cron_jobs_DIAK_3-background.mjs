@@ -545,6 +545,11 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
     portals: [],
   };
 
+  // Accumulate foundUrls per source key across all URLs — reconcile once per key after the loop.
+  // Without this, multiple URLs with the same key (e.g. 3x "otp") would each call reconcileActive
+  // and each subsequent call would deactivate what the previous call had just activated.
+  const foundBySource = new Map(); // key -> { urls: string[], allSucceeded: boolean }
+
   try {
     for (const p of listToProcess) {
       const source = p.key;
@@ -552,6 +557,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
       console.log(`\n${tag} ── ${p.label} ──`);
       console.log(`${tag}   URL: ${p.url}`);
+
+      // initialize source entry (mark incomplete on fetch failure)
+      if (!foundBySource.has(source)) foundBySource.set(source, { urls: [], allSucceeded: true });
 
       let html = null;
       try {
@@ -561,6 +569,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         console.log(`${tag}   Fetch HIBA: ${err.message}`);
         await logFetchError("cron_jobs_DIAK_3", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
+        foundBySource.get(source).allSucceeded = false;
         continue;
       }
 
@@ -699,10 +708,20 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           await upsertJob(client, source, item);
         }
         console.log(`${tag}   DB upsert kész – ${p.label}`);
-        const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: true });
-        console.log(`${tag}   active reconcile [${source}] — ${JSON.stringify(rc)}`);
+        // accumulate urls — reconcile happens once per source key after the whole loop
+        const entry = foundBySource.get(source);
+        for (const c of matchedList) entry.urls.push(c.url);
       } else if (!write) {
         console.log(`${tag}   (write=false – DB upsert kihagyva)`);
+      }
+    }
+
+    // reconcile once per source key — prevents multiple OTP (or any repeated-key) URLs
+    // from overwriting each other's reconcile results within the same batch
+    if (write && client) {
+      for (const [src, { urls, allSucceeded }] of foundBySource) {
+        const rc = await reconcileActive(client, src, urls, { complete: allSucceeded });
+        console.log(`[cron_jobs_DIAK_3] active reconcile [${src}] complete=${allSucceeded} — ${JSON.stringify(rc)}`);
       }
     }
   } finally {

@@ -24,7 +24,6 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -288,9 +287,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
       `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
 
-    const complete = fetchFailed === 0;
-    const rc = await reconcileActive(client, "valorebasis", foundUrls, { complete });
-    console.log(`[valorebasis] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
+    // Synthetic title-hash URLs — can't deactivate reliably, skip reconcile.
   } finally {
     client.release();
   }

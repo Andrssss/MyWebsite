@@ -14,7 +14,6 @@ import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -265,8 +264,7 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
       console.log(`${p.key}: ${items.length} items processed.`);
     }
 
-    const rc = await reconcileActive(client, "bluebird", foundUrls, { complete: !crawlError });
-    console.log(`[bluebird] active reconcile — complete=${!crawlError}, ${JSON.stringify(rc)}`);
+    // RSS feed only returns latest N items — can't deactivate reliably, skip reconcile.
   } finally {
     client.release();
   }

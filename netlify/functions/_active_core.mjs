@@ -59,37 +59,23 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
   const urls = [...new Set((foundUrls || []).filter(Boolean))];
 
   // Empty set ⇒ almost certainly a failed/blocked crawl. Never deactivate then.
-  if (urls.length === 0) {
-    return { deactivated: 0, reactivated: 0, skipped: true };
+  if (urls.length === 0 || !complete) {
+    return { deactivated: 0, skipped: true };
   }
 
-  // Reactivate anything that re-appeared (cheap: only flips currently-inactive rows).
-  const reactivated = await client.query(
+  // Deactivate aged jobs that vanished from the source.
+  const deactivated = await client.query(
     `UPDATE job_posts
-        SET active = true
+        SET active = false
       WHERE source = $1
-        AND active = false
-        AND url = ANY($2::text[])`,
-    [source, urls]
+        AND active = true
+        AND first_seen < NOW() - make_interval(days => $3::int)
+        AND url <> ALL($2::text[])`,
+    [source, urls, graceDays]
   );
-
-  let deactivated = { rowCount: 0 };
-  if (complete) {
-    // Deactivate aged jobs that vanished from the source.
-    deactivated = await client.query(
-      `UPDATE job_posts
-          SET active = false
-        WHERE source = $1
-          AND active = true
-          AND first_seen < NOW() - make_interval(days => $3::int)
-          AND url <> ALL($2::text[])`,
-      [source, urls, graceDays]
-    );
-  }
 
   return {
     deactivated: deactivated.rowCount ?? 0,
-    reactivated: reactivated.rowCount ?? 0,
     skipped: false,
   };
 }

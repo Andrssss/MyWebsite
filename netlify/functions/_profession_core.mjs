@@ -381,12 +381,27 @@ export async function processProfessionSources(sources, jobName, request, pageOp
   const write = url.searchParams.get("write") === "1";
 
   if (!debug) {
-    // Normal cron mode — process all sources
+    // Normal cron mode — process all sources, accumulate foundUrls per source key,
+    // then reconcile ONCE per key at the end so that multiple URLs sharing the same
+    // source key (e.g. all P_* tasks using "profession-intern") don't overwrite
+    // each other's reconcile results.
     const client = await pool.connect();
+    const foundBySource = new Map(); // source -> { urls: string[], allSucceeded: boolean }
     try {
       for (const p of sources) {
-        await processOneSource(client, p, jobName, pageOptions);
+        const result = await processOneSource(client, p, jobName, pageOptions);
+        const entry = foundBySource.get(result.source) || { urls: [], allSucceeded: true };
+        if (result.ok) {
+          entry.urls.push(...result.foundUrls);
+        } else {
+          entry.allSucceeded = false;
+        }
+        foundBySource.set(result.source, entry);
         await sleep(50);
+      }
+      for (const [source, { urls, allSucceeded }] of foundBySource) {
+        const rc = await reconcileActive(client, source, urls, { complete: allSucceeded });
+        console.log(`[${jobName}] ${source}: active reconcile complete=${allSucceeded} ${JSON.stringify(rc)}`);
       }
     } finally {
       client.release();
@@ -449,7 +464,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   } catch (err) {
     await logFetchError(jobName, { url: p.url, message: err.message });
     console.error(`[${jobName}] fetch failed for ${p.url}: ${err.message}`);
-    return { source, label: p.label, url: p.url, ok: false, error: err.message };
+    return { source, label: p.label, url: p.url, ok: false, error: err.message, foundUrls: [] };
   }
 
   let matchedList = merged.filter((c) => !isSeniorLike(c.title, c.description));
@@ -488,10 +503,9 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
       await upsertJob(client, source, item);
     }
 
-    const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: true });
-    console.log(`[${jobName}] ${source}: active reconcile ${JSON.stringify(rc)}`);
   }
 
+  const foundUrls = matchedList.map((c) => c.url);
   console.log(`[${jobName}] ${source}: ${matchedList.length} items processed for ${p.url}`);
-  return { source, label: p.label, url: p.url, ok: true, matched: matchedList.length };
+  return { source, label: p.label, url: p.url, ok: true, matched: matchedList.length, foundUrls };
 }

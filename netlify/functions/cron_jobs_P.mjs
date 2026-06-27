@@ -29,20 +29,18 @@ export default withTimeout("cron_jobs_P", async () => {
     return new Response("Missing env vars", { status: 500 });
   }
 
-  await Promise.all(
-    TASKS.map((task) =>
-      fetch(`${siteUrl}/.netlify/functions/cron_jobs_P-background`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${secret}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(task),
-      })
-        .then(() => console.log(`[cron_jobs_P] triggered ${task.jobName}`))
-        .catch((err) => console.error(`[cron_jobs_P] failed to trigger ${task.jobName}: ${err.message}`))
-    )
-  );
+  // All tasks in a single background call so foundUrls accumulates across all profession
+  // search URLs before reconcileActive runs — prevents each URL from overwriting the previous.
+  await fetch(`${siteUrl}/.netlify/functions/cron_jobs_P-background`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ tasks: TASKS }),
+  })
+    .then(() => console.log(`[cron_jobs_P] triggered all ${TASKS.length} tasks in one background call`))
+    .catch((err) => console.error(`[cron_jobs_P] failed to trigger background: ${err.message}`));
 
-  return new Response(`Triggered ${TASKS.length} background invocations`, { status: 200 });
+  return new Response(`Triggered ${TASKS.length} tasks in one background call`, { status: 200 });
 });

@@ -1157,9 +1157,10 @@ const JobWatcher = () => {
           const clickDate = getTodayLocalDateString();
           const isVisited = clickedKeys.has(clickKeyBase);
           const isApplied = appliedKeys.has(clickKeyBase);
+          const isInactive = job.active === false;
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}`}>
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInactive ? " job-card--inactive" : ""}`}>
               <div className="job-row">
                 <div className="job-title-group">
                   <a
@@ -1184,6 +1185,11 @@ const JobWatcher = () => {
                   </a>
                   {job.company && (
                     <span className="job-company">[ {job.company} ]</span>
+                  )}
+                  {isInactive && (
+                    <span className="job-inactive-badge" title="Ez az állás már nem szerepel a forrás listáján">
+                      Lejárt
+                    </span>
                   )}
                 </div>
                 <span className="job-source">{job.source}</span>

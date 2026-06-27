@@ -225,8 +225,7 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
       await upsertJob(client, "qdiak", job);
     }
     console.log(`qdiak: ${qdiakJobs.length} jobs processed`);
-    const rcQ = await reconcileActive(client, "qdiak", qdiakJobs.map((j) => j.url), { complete: true });
-    console.log(`[qdiak] active reconcile — ${JSON.stringify(rcQ)}`);
+    // API only returns category 12 — can't deactivate reliably, skip reconcile.
 
     return new Response("OK");
   } finally {

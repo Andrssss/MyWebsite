@@ -6,7 +6,11 @@ const BASE_JOB_NAME = "cron_jobs_P-background";
 
 /**
  * Unified Profession background worker.
- * Body: { jobName: "P_1", url: "https://www.profession.hu/..." }
+ * Body: { tasks: [{ jobName: "P_1", url: "https://..." }, ...] }
+ *
+ * All tasks share source key "profession-intern" — processProfessionSources
+ * accumulates foundUrls across all of them and reconciles once at the end,
+ * so no task overwrites the active-state set by any other task.
  */
 export default async (request) => {
   const auth = (request.headers.get("authorization") || "").trim();
@@ -23,20 +27,23 @@ export default async (request) => {
     return new Response("Invalid JSON body", { status: 400 });
   }
 
-  const { jobName, url } = body || {};
-  if (!jobName || !url) {
-    return new Response("Missing jobName or url", { status: 400 });
+  const { tasks } = body || {};
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return new Response("Missing or empty tasks array", { status: 400 });
   }
 
-  const fullJobName = `${BASE_JOB_NAME}-${jobName}`;
-  console.log(`[${fullJobName}] starting url=${url}`);
+  console.log(`[${BASE_JOB_NAME}] starting ${tasks.length} tasks`);
 
-  const sources = [{ key: "profession-intern", label: "Profession – Intern", url }];
-  const fakeRequest = new Request("https://localhost/.netlify/functions/" + fullJobName, { method: "GET" });
+  const sources = tasks.map((t) => ({
+    key: "profession-intern",
+    label: t.jobName,
+    url: t.url,
+  }));
+  const fakeRequest = new Request("https://localhost/.netlify/functions/" + BASE_JOB_NAME, { method: "GET" });
 
   let response;
   try {
-    response = await processProfessionSources(sources, fullJobName, fakeRequest);
+    response = await processProfessionSources(sources, BASE_JOB_NAME, fakeRequest);
 
     // Enrich experience for newly inserted profession-intern rows
     try {
@@ -44,13 +51,13 @@ export default async (request) => {
         sourceFilter: "source = 'profession-intern'",
         extract: extractProfessionExperience,
         label: "profession-intern",
-        jobName: fullJobName,
+        jobName: BASE_JOB_NAME,
       });
     } catch (err) {
-      console.error(`[${fullJobName}] experience enrichment failed:`, err.message);
+      console.error(`[${BASE_JOB_NAME}] experience enrichment failed:`, err.message);
     }
   } finally {
-    await flushErrors(fullJobName).catch(() => {});
+    await flushErrors(BASE_JOB_NAME).catch(() => {});
   }
   return response;
 };

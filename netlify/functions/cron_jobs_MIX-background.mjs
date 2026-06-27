@@ -416,8 +416,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);
-      const rc = await reconcileActive(client, "kuka", kukaJobs.map((j) => j.url), { complete: true });
-      console.log(`[kuka] active reconcile — ${JSON.stringify(rc)}`);
+      // Tile-search may not return all live jobs — can't deactivate reliably, skip reconcile.
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
       console.error("kuka fetch failed:", err.message);

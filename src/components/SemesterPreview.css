@@ -586,9 +586,45 @@
 
   .subject-item {
     font-size: 0.9rem;
+    padding: 7px 8px;
   }
 
   .video-item {
     font-size: 0.88rem;
+  }
+
+  /* FileBrowser mobile */
+  .file-back-btn {
+    font-size: 0.88rem;
+    padding: 7px 12px;
+  }
+
+  .folder-download-btn {
+    font-size: 0.85rem;
+    padding: 7px 12px;
+  }
+
+  .yt-toggle-btn,
+  .yt-single {
+    font-size: 0.85rem;
+    padding: 7px 12px;
+  }
+
+  .file-row {
+    padding: 7px 6px;
+  }
+
+  .file-folder-btn,
+  .file-name {
+    font-size: 0.88rem;
+  }
+
+  .file-icon {
+    font-size: 1rem;
+  }
+
+  .file-btn {
+    font-size: 0.85rem;
+    padding: 5px 8px;
   }
 }
