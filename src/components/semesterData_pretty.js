@@ -180,7 +180,8 @@ export const semesterData = {
       },
       {
         "name": "JAVA",
-        "url": "https://drive.google.com/drive/folders/1QmQ5UxwKEEDLAzbBS4BYr_TUF_XXjDXG?usp=drive_link"
+        "url": "https://drive.google.com/drive/folders/1QmQ5UxwKEEDLAzbBS4BYr_TUF_XXjDXG?usp=drive_link",
+        "moodleUrl": "https://java-moodle.netlify.app/"
       },
       {
         "name": "JÁTÉKELMÉLET",

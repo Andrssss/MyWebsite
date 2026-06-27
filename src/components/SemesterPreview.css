@@ -141,6 +141,9 @@
 
 .yt-toggle-btn:hover { background: #e53935; }
 
+.moodle-btn { background: #1a6b3a; }
+.moodle-btn:hover { background: #25a058; }
+
 .yt-single {
   justify-content: center;
   padding: 4px 10px;

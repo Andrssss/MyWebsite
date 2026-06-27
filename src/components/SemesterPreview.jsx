@@ -194,7 +194,7 @@ async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
   }
 }
 
-const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) => {
+const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, onBack }) => {
   const [stack, setStack] = useState([{ id: rootId, name: rootName }]);
   const [cache, setCache] = useState({});
   const [loadingId, setLoadingId] = useState(null);
@@ -273,6 +273,12 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
             <a className="yt-toggle-btn yt-single"
               href={toMobileYT(ytLinks[0].url)} target="_blank" rel="noopener noreferrer">
               ▶ Youtube
+            </a>
+          )}
+          {isRoot && moodleUrl && (
+            <a className="yt-toggle-btn moodle-btn"
+              href={moodleUrl} target="_blank" rel="noopener noreferrer">
+              🎓 Moodle
             </a>
           )}
         </div>
@@ -380,6 +386,7 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
             rootId={openSubject.folderId}
             rootName={openSubject.name}
             subjectVideos={openSubject.matchingVideos}
+            moodleUrl={openSubject.moodleUrl}
             onBack={goBack}
             onRootError={() => {
               const url = openSubject.url;
@@ -403,7 +410,7 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
                 <div key={i} className="subject-row">
                   {folderId ? (
                     <button className="subject-item"
-                      onClick={() => enterSubject({ folderId, name: subject.name, url: subject.url })}>
+                      onClick={() => enterSubject({ folderId, name: subject.name, url: subject.url, moodleUrl: subject.moodleUrl })}>
                       {subject.name}
                     </button>
                   ) : (
