@@ -1,5 +1,6 @@
 import "./SubjectInfo.css";
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, Link } from "react-router-dom";
 
 // Kezdetben csak ennyi tárgyat kérünk le az API-tól, a többit görgetésre/szűrésre
 const INITIAL_LIMIT = 5;
@@ -22,6 +23,9 @@ const mapRow = (row) => ({
 // Ékezetmentesítés
 const removeAccents = (str) =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+const toSlug = (name) =>
+  removeAccents(String(name ?? "")).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 const normalizeName = (str) =>
   String(str ?? "")
@@ -62,6 +66,7 @@ const initialNewEntry = {
 
 
 const SubjectInfo = () => {
+  const { subjectSlug } = useParams();
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(() => localStorage.getItem("userId") || null);
@@ -249,10 +254,10 @@ const SubjectInfo = () => {
 
   // Keresés / félév- vagy képzésszűrés a teljes adathalmazon működik → töltsük be
   useEffect(() => {
-    if (searchTerm.trim() !== "" || selectedSemester !== "all" || kepzesMode !== "BOTH") {
+    if (searchTerm.trim() !== "" || selectedSemester !== "all" || kepzesMode !== "BOTH" || subjectSlug) {
       loadAll();
     }
-  }, [searchTerm, selectedSemester, kepzesMode, loadAll]);
+  }, [searchTerm, selectedSemester, kepzesMode, subjectSlug, loadAll]);
 
   // A feltöltés modal autocomplete-jéhez az összes tárgynév kell
   useEffect(() => {
@@ -583,6 +588,9 @@ const handleDelete = async (id) => {
         ? (k === "MB" || k === "MIMB")
         : (k === "MI" || k === "MB" || k === "MIMB"); // BOTH
 
+    // URL slug szűrés
+    if (subjectSlug && toSlug(subject.name) !== subjectSlug) return false;
+
     // Itt ugyanúgy megtartod a régi logikádat, csak hozzáadod matchesKepzes-t:
     if (selectedSemester === "mine") {
       return matchesSearch && matchesKepzes && isMine;
@@ -753,6 +761,13 @@ const handleDelete = async (id) => {
                   >
                     {String(group.kepzes_fajtaja ?? "MI").toUpperCase() === "MIMB" ? "BOTH" : String(group.kepzes_fajtaja ?? "MI").toUpperCase()}
                   </span>
+                  <Link
+                    className="subject-link-icon"
+                    to={subjectSlug ? "/targy_info" : `/targy_info/${toSlug(group.name)}`}
+                    title={subjectSlug ? "Összes tárgy" : "Közvetlen link"}
+                  >
+                    {subjectSlug ? "✕" : "🔗"}
+                  </Link>
                 </h3>
               </div>
               <div className="subject-semester">

@@ -138,6 +138,7 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<Home setContent={() => {}} setMenuOpen={setMenuOpen} />} />
           <Route path="/targy_info" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
+          <Route path="/targy_info/:subjectSlug" element={<SubjectInfo setLoading={setSubjectInfoLoading} />} />
           <Route path="/egyetemi_linkek" element={<UniversityLinks />} />
           <Route path="/User_oldalak" element={<User_pages />} />
           <Route path="/rolam" element={<About />} />

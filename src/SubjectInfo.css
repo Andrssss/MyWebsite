@@ -58,6 +58,19 @@
 
 }
 
+.subject-link-icon {
+  font-size: 0.75rem;
+  margin-left: 8px;
+  opacity: 0.45;
+  text-decoration: none;
+  vertical-align: middle;
+  transition: opacity 0.15s;
+}
+
+.subject-link-icon:hover {
+  opacity: 1;
+}
+
 .request-subject-btn {
   background-color: #3b6fd4;
   color: #fff;
