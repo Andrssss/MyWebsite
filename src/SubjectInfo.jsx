@@ -95,6 +95,7 @@ const SubjectInfo = () => {
   // Tárgy kérés modal
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestSubjectName, setRequestSubjectName] = useState("");
+  const [requestSemester, setRequestSemester] = useState("");
   const [requestNote, setRequestNote] = useState("");
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestDone, setRequestDone] = useState(false);
@@ -110,7 +111,7 @@ const SubjectInfo = () => {
       const res = await fetch("/.netlify/functions/subject-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subjectName: name, note: requestNote.trim() }),
+        body: JSON.stringify({ subjectName: name, semester: requestSemester || null, note: requestNote.trim() }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -132,6 +133,7 @@ const SubjectInfo = () => {
     setRequestDone(false);
     setRequestError("");
     setRequestSubjectName("");
+    setRequestSemester("");
     setRequestNote("");
   };
 
@@ -873,6 +875,19 @@ const handleDelete = async (id) => {
                     required
                     autoFocus
                   />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="req-semester">Félév (opcionális):</label>
+                  <select
+                    id="req-semester"
+                    value={requestSemester}
+                    onChange={(e) => setRequestSemester(e.target.value)}
+                  >
+                    <option value="">— nem tudom —</option>
+                    {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                      <option key={n} value={n}>{n}. félév</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label htmlFor="req-note">Megjegyzés (opcionális):</label>

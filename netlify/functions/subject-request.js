@@ -19,6 +19,7 @@ const ensureTablePromise =
     CREATE TABLE IF NOT EXISTS subject_requests (
       id serial PRIMARY KEY,
       subject_name text NOT NULL,
+      semester integer,
       note text,
       created_at timestamptz NOT NULL DEFAULT now()
     )
@@ -86,13 +87,15 @@ exports.handler = async (event) => {
     return json(400, { error: "A tárgynév megadása kötelező." });
   }
 
+  const semesterRaw = parseInt(body.semester, 10);
+  const semester = Number.isInteger(semesterRaw) && semesterRaw >= 1 && semesterRaw <= 14 ? semesterRaw : null;
   const note = String(body.note || "").trim().slice(0, 1000) || null;
 
   try {
     await ensureTablePromise;
     await pool.query(
-      `INSERT INTO subject_requests (subject_name, note) VALUES ($1, $2)`,
-      [subjectName, note]
+      `INSERT INTO subject_requests (subject_name, semester, note) VALUES ($1, $2, $3)`,
+      [subjectName, semester, note]
     );
     return json(200, { ok: true });
   } catch (err) {
