@@ -292,14 +292,13 @@ async function fetchNofluffExperience(url) {
 /* ── DB ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, item) {
-  const canonicalUrl = normalizeUrl(item.url);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      (source, title, url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;`,
-    ["nofluffjobs", item.title, item.url, canonicalUrl, item.experience ?? "-", item.company || null]
+    ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null]
   );
 }
 

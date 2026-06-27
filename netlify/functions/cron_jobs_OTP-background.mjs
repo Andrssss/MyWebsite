@@ -180,13 +180,12 @@ function extractTitle(html) {
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
-  const canonicalUrl = normalizeUrl(item.url);
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, canonicalUrl, item.experience ?? "-"]
+    [source, item.title, item.url, item.experience ?? "-"]
   );
   return res.rowCount > 0;
 }

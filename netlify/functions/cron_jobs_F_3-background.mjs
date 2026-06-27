@@ -224,11 +224,11 @@ export default async (request) => {
         const experience = detectExperience(entry.title, entry.cardText);
         foundUrls.push(entry.url);
         const res = await client.query(
-          `INSERT INTO job_posts (source, title, url, canonical_url, experience, first_seen)
-           VALUES ($1,$2,$3,$4,$5,NOW())
+          `INSERT INTO job_posts (source, title, url, experience, first_seen)
+           VALUES ($1,$2,$3,$4,NOW())
            ON CONFLICT (source, url) DO NOTHING
            RETURNING id;`,
-          [SOURCE, entry.title, entry.url, entry.url, experience]
+          [SOURCE, entry.title, entry.url, experience]
         );
         if (res.rowCount > 0) {
           newlyInserted++;

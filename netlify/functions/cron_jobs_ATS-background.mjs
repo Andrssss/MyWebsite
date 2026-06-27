@@ -168,14 +168,13 @@ function dedupeBySourceUrl(items) {
 }
 
 async function upsertJob(client, item) {
-  const canonicalUrl = normalizeUrl(item.url);
   const res = await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, first_seen)
+     VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [item.source, item.title, item.url, canonicalUrl, item.experience ?? "-"]
+    [item.source, item.title, item.url, item.experience ?? "-"]
   );
   return res.rowCount > 0;
 }

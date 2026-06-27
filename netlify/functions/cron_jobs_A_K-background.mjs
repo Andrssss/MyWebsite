@@ -181,17 +181,16 @@ function getDedupeKey(rawUrl) {
    DB upsert
 --------------------- */
 async function upsertJob(client, source, item) {
-  const canonicalUrl = item.url;
   const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      (source, title, url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl, experience, item.company ?? null]
+    [source, item.title, item.url, experience, item.company ?? null]
   );
 }
 
