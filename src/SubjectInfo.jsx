@@ -92,6 +92,49 @@ const SubjectInfo = () => {
 
 
 
+  // Tárgy kérés modal
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestSubjectName, setRequestSubjectName] = useState("");
+  const [requestNote, setRequestNote] = useState("");
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestDone, setRequestDone] = useState(false);
+  const [requestError, setRequestError] = useState("");
+
+  const handleRequestSubmit = async (e) => {
+    e.preventDefault();
+    const name = requestSubjectName.trim();
+    if (!name) return;
+    setRequestSubmitting(true);
+    setRequestError("");
+    try {
+      const res = await fetch("/.netlify/functions/subject-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subjectName: name, note: requestNote.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setRequestError(data.error || "Hiba történt, próbáld újra.");
+      } else {
+        setRequestDone(true);
+        setRequestSubjectName("");
+        setRequestNote("");
+      }
+    } catch {
+      setRequestError("Hálózati hiba, próbáld újra.");
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const closeRequestModal = () => {
+    setIsRequestModalOpen(false);
+    setRequestDone(false);
+    setRequestError("");
+    setRequestSubjectName("");
+    setRequestNote("");
+  };
+
   // Kereső és félév
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("all");
@@ -607,6 +650,12 @@ const handleDelete = async (id) => {
           Feltöltés
         </button>
         <button
+          className="open-modal-button request-subject-btn"
+          onClick={() => setIsRequestModalOpen(true)}
+        >
+          Tárgy kérés
+        </button>
+        <button
           type="button"
           className={`kepzes-toggle ${kepzesMode.toLowerCase()}`}
           onClick={cycleKepzesMode}
@@ -797,6 +846,57 @@ const handleDelete = async (id) => {
           ))
       ) : (
         <p className="no-results">Nincs találat a keresett kifejezésre.</p>
+      )}
+
+      {/* Tárgy kérés modal */}
+      {isRequestModalOpen && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target.className === "modal-overlay") closeRequestModal(); }}>
+          <div className="modal-content">
+            <button className="close-button" onClick={closeRequestModal}>x</button>
+            <h2>Tárgy kérés</h2>
+            {requestDone ? (
+              <div className="request-success">
+                <p>Köszönjük a kérést! Megpróbáljuk felvenni a tárgyat.</p>
+                <button className="open-modal-button" onClick={closeRequestModal}>Bezárás</button>
+              </div>
+            ) : (
+              <form className="submission-form" onSubmit={handleRequestSubmit}>
+                <div className="form-group">
+                  <label htmlFor="req-subject">Tárgynév: *</label>
+                  <input
+                    id="req-subject"
+                    type="text"
+                    value={requestSubjectName}
+                    onChange={(e) => setRequestSubjectName(e.target.value)}
+                    placeholder="Pl. Operációs rendszerek"
+                    maxLength={200}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="req-note">Megjegyzés (opcionális):</label>
+                  <textarea
+                    id="req-note"
+                    value={requestNote}
+                    onChange={(e) => setRequestNote(e.target.value)}
+                    placeholder="Pl. melyik képzésen van, félév stb."
+                    maxLength={1000}
+                    rows={3}
+                  />
+                </div>
+                {requestError && <p className="request-error">{requestError}</p>}
+                <button
+                  type="submit"
+                  className="open-modal-button"
+                  disabled={requestSubmitting || !requestSubjectName.trim()}
+                >
+                  {requestSubmitting ? "Küldés..." : "Küldés"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Új vélemény modal */}
