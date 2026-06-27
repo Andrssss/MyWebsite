@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import './SemesterPreview.css';
@@ -8,6 +8,12 @@ const toMobileYT = (url) =>
 
 function extractFolderId(url) {
   return url?.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1] ?? null;
+}
+
+function toSlug(name) {
+  return String(name ?? '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function fileIcon(mimeType) {
@@ -354,12 +360,23 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
   );
 };
 
-const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen, onBackToAll }) => {
+const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen, onBackToAll, autoOpenSlug, onSubjectChange }) => {
   const [videosOpen, setVideosOpen] = useState(false);
   const [openSubject, setOpenSubject] = useState(null);
   const [semDownloading, setSemDownloading] = useState(false);
 
   const videoCount = videos ? videos.length : 0;
+
+  // Auto-open subject from URL slug
+  useEffect(() => {
+    if (!autoOpenSlug || openSubject) return;
+    const match = subjects?.find(s => toSlug(s.name) === autoOpenSlug);
+    if (match) {
+      const folderId = extractFolderId(match.url);
+      if (folderId) enterSubject({ folderId, name: match.name, url: match.url, moodleUrl: match.moodleUrl });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenSlug, subjects]);
 
   function enterSubject(subject) {
     const matchingVideos = (videos || []).filter(
@@ -367,11 +384,13 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
     );
     setOpenSubject({ ...subject, matchingVideos });
     onSubjectOpen?.();
+    onSubjectChange?.(toSlug(subject.name));
   }
 
   function goBack() {
     setOpenSubject(null);
     onBackToAll?.();
+    onSubjectChange?.(null);
   }
 
   return (
@@ -392,6 +411,7 @@ const SemesterPreview = ({ title, subjects, videos, link, hidden, onSubjectOpen,
               const url = openSubject.url;
               setOpenSubject(null);
               onBackToAll?.();
+              onSubjectChange?.(null);
               window.open(url, '_blank', 'noopener,noreferrer');
             }}
           />

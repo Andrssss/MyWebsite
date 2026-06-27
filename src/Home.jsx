@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SemesterPreview from './components/SemesterPreview';
 import FileUpload from './components/FileUpload';
 import { semesterData } from './components/semesterData_pretty';
@@ -8,6 +9,8 @@ const Home = ({ setContent, setMenuOpen }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [ytOpen, setYtOpen] = useState(false);
   const [activeSemester, setActiveSemester] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeSlug = searchParams.get('s') || null;
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 800);
@@ -32,6 +35,16 @@ const Home = ({ setContent, setMenuOpen }) => {
             hidden={activeSemester !== null && activeSemester !== semester}
             onSubjectOpen={() => setActiveSemester(semester)}
             onBackToAll={() => setActiveSemester(null)}
+            autoOpenSlug={activeSlug}
+            onSubjectChange={(slug) => {
+              if (slug) {
+                setActiveSemester(semester);
+                setSearchParams({ s: slug }, { replace: true });
+              } else {
+                setActiveSemester(null);
+                setSearchParams({}, { replace: true });
+              }
+            }}
           />
         ))}
       </div>
