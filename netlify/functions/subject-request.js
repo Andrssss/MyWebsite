@@ -23,7 +23,9 @@ const ensureTablePromise =
       note text,
       created_at timestamptz NOT NULL DEFAULT now()
     )
-  `);
+  `).then(() =>
+    pool.query(`ALTER TABLE subject_requests ADD COLUMN IF NOT EXISTS semester integer`)
+  );
 globalThis.__ensureSubjectRequestsTable = ensureTablePromise;
 
 function corsHeaders(extra = {}) {
