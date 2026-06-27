@@ -146,11 +146,11 @@ async function upsertJob(client, sourceKey, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, canonical_url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;`,
-    [sourceKey, item.title, item.url, canonicalUrl, item.experience ?? "-"]
+    [sourceKey, item.title, item.url, canonicalUrl, item.experience ?? "-", item.company || null]
   );
 }
 
@@ -206,6 +206,7 @@ function extractDreamJobs(payload) {
       title: pickJobTitle(job),
       url: buildDreamJobsUrl(job),
       experience: normalizeWhitespace(job?.tags?.job_level?.slug) || null,
+      company: (normalizeWhitespace(job?.company?.name) || null)?.slice(0, 200) ?? null,
     }))
     .filter((item) => item.title && item.url);
 }
@@ -282,12 +283,14 @@ function extractMelonJobs(payload) {
       const description = htmlToText(job?.content?.rendered);
       const url = normalizeUrl(job?.link || "");
       const location = normalizeWhitespace(job?.meta?._job_location);
+      const company = (normalizeWhitespace(job?.meta?._company_name) || null)?.slice(0, 200) ?? null;
 
       return {
         title,
         description,
         url,
         location,
+        company,
         experience: inferExperience(title, description),
       };
     })

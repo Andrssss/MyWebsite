@@ -101,6 +101,7 @@ function extractZynternFromApiPayload(payload) {
       title: j?.title ? String(j.title).slice(0, 300) : null,
       url: j?.url ? normalizeUrl(String(j.url)) : null,
       description: j?.description ? String(j.description).slice(0, 800) : null,
+      company: j?.company?.name ? normalizeWhitespace(String(j.company.name)).slice(0, 200) : null,
     }))
     .filter((x) => x.title && x.url);
 }
@@ -1042,11 +1043,11 @@ async function upsertJob(client, source, item) {
   const canonicalUrl = normalizeUrl(item.url);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, canonical_url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;`,
-    [source, item.title, item.url, canonicalUrl, item.experience ?? "-"]
+    [source, item.title, item.url, canonicalUrl, item.experience ?? "-", item.company || null]
   );
 }
 
