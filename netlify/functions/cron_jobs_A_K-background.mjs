@@ -162,7 +162,12 @@ async function fetchKarrierJobs(categoryUrl, inertiaVersion) {
     const positions = data.props?.positions;
     const jobs = (positions?.data ?? []).map(p => ({
       title: p.title,
-      url: `${KARRIERHUNGARIA_BASE}/allasajanlat/${p.href}`,
+      // href is "{id}-{slug}" but the slug is decorative — the site routes by the
+      // numeric id, and /allasajanlat/{id} alone serves the same job. The slug is
+      // derived from the title, so a title edit changes the url → active-reconcile
+      // (which matches the `url` column) would deactivate the old row and insert a
+      // duplicate. Key the url on the stable id so one job = one url.
+      url: `${KARRIERHUNGARIA_BASE}/allasajanlat/${p.id ?? p.href}`,
       description: p.content_company || null,
     }));
     allJobs.push(...jobs);

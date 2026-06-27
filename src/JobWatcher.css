@@ -1209,6 +1209,18 @@ html, body {
   box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
 }
 
+.job-btn--openall {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35);
+}
+
+.job-btn--openall:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  box-shadow: 0 6px 20px rgba(234, 88, 12, 0.5);
+}
+
 .job-sync-inline {
   display: flex;
   flex-direction: column;

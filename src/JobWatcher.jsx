@@ -908,6 +908,32 @@ const JobWatcher = () => {
     ? "24h"
     : "nincs";
 
+  // Csak azokat tudjuk megnyitni, amiknek van linkjük.
+  const openableJobs = useMemo(
+    () => visibleJobs.filter((j) => j.url),
+    [visibleJobs]
+  );
+
+  /* Bulk: az összes leszűrt állás megnyitása új lapokon + mindet "megtekintettnek"
+     jelöl — pontosan úgy, mintha egyenként rákattintottál volna (trackClick). */
+  const openAllFiltered = () => {
+    if (openableJobs.length === 0) return;
+    if (
+      openableJobs.length > 12 &&
+      !window.confirm(
+        `${openableJobs.length} állást nyitok meg új lapokon, és mindet „megtekintett” állapotba teszem. Biztos?\n\n(Lehet, hogy engedélyezned kell a felugró ablakokat ehhez az oldalhoz.)`
+      )
+    ) {
+      return;
+    }
+    const clickedDate = getTodayLocalDateString();
+    for (const job of openableJobs) {
+      const key = `job:${job.source}:${job.title}`;
+      window.open(job.url, "_blank", "noopener,noreferrer");
+      trackClick(key, key, clickedDate);
+    }
+  };
+
   /* =======================
      RENDER
   ======================= */
@@ -1045,6 +1071,14 @@ const JobWatcher = () => {
           <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
             Frissítés
           </button>
+          <button
+            className="job-btn job-btn--openall"
+            onClick={openAllFiltered}
+            disabled={openableJobs.length === 0}
+            title="Az összes leszűrt állást megnyitja új lapokon, és megtekintettnek jelöli (mintha egyenként rákattintottál volna)"
+          >
+            🚀 Mind megnyitása ({openableJobs.length})
+          </button>
         </div>
       </div>
     </div>
@@ -1158,7 +1192,6 @@ const JobWatcher = () => {
           const isVisited = clickedKeys.has(clickKeyBase);
           const isApplied = appliedKeys.has(clickKeyBase);
           const isInactive = job.active === false;
-          const isActive = job.active === true && job.source !== "LinkedIn";
 
           return (
             <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInactive ? " job-card--inactive" : ""}`}>
@@ -1190,11 +1223,6 @@ const JobWatcher = () => {
                   {isInactive && (
                     <span className="job-inactive-badge" title="Ez az állás már nem szerepel a forrás listáján">
                       Lejárt
-                    </span>
-                  )}
-                  {isActive && (
-                    <span className="job-active-badge" title="Az állás jelenleg aktív a forráson">
-                      Aktív
                     </span>
                   )}
                 </div>

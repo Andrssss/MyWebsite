@@ -63,6 +63,14 @@ function normalizeUrl(raw) {
     u.hash = "";
     ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"]
       .forEach((p) => u.searchParams.delete(p));
+    // SuccessFactors routes purely by the trailing numeric job-req id; the slug
+    // segment is decorative (any slug serves the same job) and can drift over time
+    // — title edits, the embedded location id ("…-1131"), encoding. If the slug
+    // changes, the same job gets a new url, so active-reconcile (which matches the
+    // `url` column) deactivates the old row and re-inserts a duplicate. Collapse to
+    // a stable, still-navigable canonical keyed on company + req id so one job = one url.
+    const m = u.pathname.match(/^\/(otp|leanyvallalatok)\/job\/.+\/(\d+)\/?$/);
+    if (m) u.pathname = `/${m[1]}/job/${m[2]}/${m[2]}/`;
     return u.toString().replace(/\?$/, "");
   } catch {
     return raw;

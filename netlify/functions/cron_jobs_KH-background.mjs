@@ -256,16 +256,20 @@ export default withTimeout("cron_jobs_KH-background", async () => {
           experience = "diákmunka";
         } else {
           await sleep(800);
-          let detailHtml;
           try {
-            detailHtml = await fetchText(url);
+            const detailHtml = await fetchText(url);
+            experience = extractBodyExperience(detailHtml) || "-";
           } catch (err) {
+            // The detail fetch only enriches experience; the job's existence is already
+            // known from the list. Keep it (experience "-") and still push to foundUrls —
+            // dropping it would let active-reconcile wrongly deactivate a live job, and
+            // gating `complete` on detail failures (below) disabled deactivation entirely
+            // on flaky bank sites.
             detailFetchFailed++;
             await logFetchError("cron_jobs_KH-background", { url, message: err.message });
             console.error(`[kh] detail fetch failed ${url}: ${err.message}`);
-            continue;
+            experience = "-";
           }
-          experience = extractBodyExperience(detailHtml) || "-";
         }
 
         const wasNew = await upsertJob(client, source, { title, url, experience });
@@ -287,7 +291,9 @@ export default withTimeout("cron_jobs_KH-background", async () => {
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
 
-    const complete = !crawlError && detailFetchFailed === 0;
+    // Detail-fetch failures don't threaten completeness: every listed job is in
+    // foundUrls regardless, so only a failed LIST crawl should block deactivation.
+    const complete = !crawlError;
     const rc = await reconcileActive(client, "kh", foundUrls, { complete });
     console.log(`[kh] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
