@@ -24,6 +24,15 @@ function fileIcon(mimeType) {
 
 const isFolder = (mimeType) => mimeType === 'application/vnd.google-apps.folder';
 
+const isUrlShortcut = (name) => name?.toLowerCase().endsWith('.url');
+
+async function openUrlShortcut(fileId) {
+  const res = await fetch(`/.netlify/functions/proxy-file?fileId=${fileId}`);
+  const text = await res.text();
+  const match = text.match(/^URL=(.+)$/im);
+  if (match) window.open(match[1].trim(), '_blank', 'noopener,noreferrer');
+}
+
 const displayName = (name) => name.replace(/^\d+_/, '');
 
 const sortFiles = (files) => [...files].sort((a, b) => {
@@ -57,14 +66,12 @@ const VideoGroup = ({ name, items }) => {
   );
 };
 
-const PreviewModal = ({ file, onClose }) => {
+const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
   const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
   const driveUrl = `https://drive.google.com/file/d/${file.id}/preview`;
   const openUrl = `https://drive.google.com/file/d/${file.id}/view`;
 
-  // Ha pár másodperc alatt nem tölt be (nagy PDF), kínáljunk fel külső megnyitást
-  // a beágyazott viewer helyett, ami lefagyaszthatja a lapot.
   React.useEffect(() => {
     setLoaded(false);
     setSlow(false);
@@ -72,19 +79,24 @@ const PreviewModal = ({ file, onClose }) => {
     return () => clearTimeout(t);
   }, [file.id]);
 
-  // Escape-pel mindig kiléptethető, ha a viewer beragad
   React.useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && hasPrev) onPrev();
+      if (e.key === 'ArrowRight' && hasNext) onNext();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, onPrev, onNext, hasPrev, hasNext]);
 
   return createPortal(
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-modal-header">
+          <button className="preview-nav-btn" onClick={onPrev} disabled={!hasPrev} title="Előző fájl (←)">‹</button>
           <span className="preview-modal-title">{file.name}</span>
           <div className="preview-modal-actions">
+            <button className="preview-nav-btn" onClick={onNext} disabled={!hasNext} title="Következő fájl (→)">›</button>
             <a href={openUrl} target="_blank" rel="noopener noreferrer"
               className="preview-modal-download" title="Megnyitás új lapon">↗ Új lapon</a>
             <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
@@ -289,11 +301,18 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
               )}
               {!isFolder(file.mimeType) && (
                 <div className="file-actions">
-                  <button className="file-btn file-btn-preview"
-                    onClick={() => setPreviewFile(file)} title="Előnézet">👁</button>
-                  <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="file-btn file-btn-download" title="Letöltés">⬇</a>
+                  {isUrlShortcut(file.name) ? (
+                    <button className="file-btn file-btn-download"
+                      onClick={() => openUrlShortcut(file.id)} title="Link megnyitása">🔗</button>
+                  ) : (
+                    <>
+                      <button className="file-btn file-btn-preview"
+                        onClick={() => setPreviewFile(file)} title="Előnézet">👁</button>
+                      <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="file-btn file-btn-download" title="Letöltés">⬇</a>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -301,7 +320,20 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
         )}
       </div>
 
-      {previewFile && <PreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />}
+      {previewFile && (() => {
+        const previewableFiles = files ? files.filter(f => !isFolder(f.mimeType)) : [];
+        const previewIdx = previewableFiles.findIndex(f => f.id === previewFile.id);
+        return (
+          <PreviewModal
+            file={previewFile}
+            onClose={() => setPreviewFile(null)}
+            hasPrev={previewIdx > 0}
+            hasNext={previewIdx < previewableFiles.length - 1}
+            onPrev={() => setPreviewFile(previewableFiles[previewIdx - 1])}
+            onNext={() => setPreviewFile(previewableFiles[previewIdx + 1])}
+          />
+        );
+      })()}
     </>
   );
 };

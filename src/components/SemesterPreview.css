@@ -561,6 +561,26 @@
 
 .preview-modal-close:hover { background: #e74c3c; }
 
+.preview-nav-btn {
+  background: #444;
+  border: none;
+  color: #fff;
+  border-radius: 5px;
+  padding: 2px 10px;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.preview-nav-btn:hover:not(:disabled) { background: #4a90d9; }
+
+.preview-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
 .preview-iframe-wrap {
   flex: 1;
   position: relative;

@@ -289,6 +289,10 @@ const JobWatcher = () => {
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
+  const [savedSearches, setSavedSearches] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherSavedSearches");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [jobCategories, setJobCategories] = useState([]);
 
   /* =======================
@@ -996,6 +1000,68 @@ const JobWatcher = () => {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Keresés pozícióra vagy cégre…"
         />
+        {savedSearches.length > 0 && (
+          <div className="job-saved-searches">
+            {savedSearches.map((s) => (
+              <span key={s} className="job-saved-chip">
+                <button
+                  className="job-saved-chip-label"
+                  onClick={() => setQ(s)}
+                  title={`Keresés: ${s}`}
+                >
+                  {s}
+                </button>
+                <button
+                  className="job-saved-chip-remove"
+                  onClick={() => {
+                    const next = savedSearches.filter((x) => x !== s);
+                    setSavedSearches(next);
+                    localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(next));
+                  }}
+                  title="Törlés"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="job-action-btns">
+          {q.trim() && !savedSearches.includes(q.trim()) && (
+            <button
+              className="job-btn job-btn--save-search"
+              onClick={() => {
+                const next = [...savedSearches, q.trim()];
+                setSavedSearches(next);
+                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(next));
+              }}
+              title="Keresési szó mentése"
+            >
+              + Mentés
+            </button>
+          )}
+          <button
+            className={`job-btn job-btn--toggle${showAppliedOnly ? " active" : ""}`}
+            onClick={() => setShowAppliedOnly((v) => !v)}
+          >
+            {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
+          </button>
+          <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
+           📊 Statisztikák 
+          </button>
+          <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
+            Frissítés
+          </button>
+          <button
+            className="job-btn job-btn--openall"
+            onClick={openAllFiltered}
+            disabled={openableJobs.length === 0}
+            title="Az összes leszűrt állást megnyitja új lapokon, és megtekintettnek jelöli (mintha egyenként rákattintottál volna)"
+          >
+            🚀 Mind megnyitása ({openableJobs.length})
+          </button>
+        </div>
 
         <div className="job-filters">
           <label className="job-checkbox">
@@ -1056,29 +1122,6 @@ const JobWatcher = () => {
             />
             Csak új (1 hét)
           </label>
-        </div>
-
-        <div className="job-action-btns">
-          <button
-            className={`job-btn job-btn--toggle${showAppliedOnly ? " active" : ""}`}
-            onClick={() => setShowAppliedOnly((v) => !v)}
-          >
-            {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
-          </button>
-          <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
-           📊 Statisztikák 
-          </button>
-          <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
-            Frissítés
-          </button>
-          <button
-            className="job-btn job-btn--openall"
-            onClick={openAllFiltered}
-            disabled={openableJobs.length === 0}
-            title="Az összes leszűrt állást megnyitja új lapokon, és megtekintettnek jelöli (mintha egyenként rákattintottál volna)"
-          >
-            🚀 Mind megnyitása ({openableJobs.length})
-          </button>
         </div>
       </div>
     </div>

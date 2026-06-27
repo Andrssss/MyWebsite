@@ -168,12 +168,17 @@
     grid-template-columns: 1fr auto;
     grid-template-areas:
       "search btns"
+      "saved saved"
       "filters filters";
     align-items: center;
   }
 
   .job-search {
     grid-area: search;
+  }
+
+  .job-saved-searches {
+    grid-area: saved;
   }
 
   .job-filters {
@@ -209,6 +214,71 @@
 
 .job-search::placeholder {
   color: #666;
+}
+
+/* ====== MENTETT KERESÉSEK ====== */
+.job-saved-searches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.job-saved-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(79, 140, 255, 0.15);
+  border: 1px solid rgba(79, 140, 255, 0.4);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.job-saved-chip-label {
+  background: none;
+  border: none;
+  color: #a8c4ff;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 3px 8px 3px 10px;
+}
+
+.job-saved-chip-label:hover {
+  color: #fff;
+}
+
+.job-saved-chip-remove {
+  background: none;
+  border: none;
+  border-left: 1px solid rgba(79, 140, 255, 0.4);
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 7px;
+}
+
+.job-saved-chip-remove:hover {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.job-btn--save-search {
+  background: rgba(79, 140, 255, 0.15);
+  border: 1px solid rgba(79, 140, 255, 0.5);
+  color: #a8c4ff;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.job-btn--save-search:hover {
+  background: rgba(79, 140, 255, 0.25);
+  color: #fff;
+}
+
+@media (min-width: 900px) {
+  .job-btn--save-search {
+    width: auto;
+  }
 }
 
 .job-checkbox {
@@ -1219,6 +1289,12 @@ html, body {
 .job-btn--openall:hover:not(:disabled) {
   background: linear-gradient(135deg, #ea580c, #c2410c);
   box-shadow: 0 6px 20px rgba(234, 88, 12, 0.5);
+}
+
+@media (max-width: 700px) {
+  .job-btn--openall {
+    display: none;
+  }
 }
 
 .job-sync-inline {
