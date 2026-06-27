@@ -30,8 +30,8 @@ const sortFiles = (files) => [...files].sort((a, b) => {
   const aIsFolder = isFolder(a.mimeType) ? 0 : 1;
   const bIsFolder = isFolder(b.mimeType) ? 0 : 1;
   if (aIsFolder !== bIsFolder) return aIsFolder - bIsFolder;
-  const na = parseInt(a.name.match(/^(\d+)_/)?.[1] ?? '9999', 10);
-  const nb = parseInt(b.name.match(/^(\d+)_/)?.[1] ?? '9999', 10);
+  const na = parseInt(a.name.match(/^(\d+)/)?.[1] ?? '9999', 10);
+  const nb = parseInt(b.name.match(/^(\d+)/)?.[1] ?? '9999', 10);
   if (na !== nb) return na - nb;
   return a.name.localeCompare(b.name);
 });
@@ -57,25 +57,65 @@ const VideoGroup = ({ name, items }) => {
   );
 };
 
-const PreviewModal = ({ file, onClose }) => createPortal(
-  <div className="preview-overlay" onClick={onClose}>
-    <div className="preview-modal" onClick={e => e.stopPropagation()}>
-      <div className="preview-modal-header">
-        <span className="preview-modal-title">{file.name}</span>
-        <div className="preview-modal-actions">
-          <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
-            target="_blank" rel="noopener noreferrer" className="preview-modal-download">
-            ⬇ Letöltés
-          </a>
-          <button className="preview-modal-close" onClick={onClose}>✕</button>
+const PreviewModal = ({ file, onClose }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const driveUrl = `https://drive.google.com/file/d/${file.id}/preview`;
+  const openUrl = `https://drive.google.com/file/d/${file.id}/view`;
+
+  // Ha pár másodperc alatt nem tölt be (nagy PDF), kínáljunk fel külső megnyitást
+  // a beágyazott viewer helyett, ami lefagyaszthatja a lapot.
+  React.useEffect(() => {
+    setLoaded(false);
+    setSlow(false);
+    const t = setTimeout(() => setSlow(true), 6000);
+    return () => clearTimeout(t);
+  }, [file.id]);
+
+  // Escape-pel mindig kiléptethető, ha a viewer beragad
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={e => e.stopPropagation()}>
+        <div className="preview-modal-header">
+          <span className="preview-modal-title">{file.name}</span>
+          <div className="preview-modal-actions">
+            <a href={openUrl} target="_blank" rel="noopener noreferrer"
+              className="preview-modal-download" title="Megnyitás új lapon">↗ Új lapon</a>
+            <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
+              target="_blank" rel="noopener noreferrer" className="preview-modal-download">
+              ⬇ Letöltés
+            </a>
+            <button className="preview-modal-close" onClick={onClose}>✕</button>
+          </div>
+        </div>
+        <div className="preview-iframe-wrap">
+          {!loaded && (
+            <div className="preview-loading">
+              <span>⏳ Betöltés...</span>
+              {slow && (
+                <div className="preview-loading-slow">
+                  <span>Nagy fájl? A beágyazott előnézet lassú lehet.</span>
+                  <a href={openUrl} target="_blank" rel="noopener noreferrer"
+                    className="preview-modal-download">↗ Megnyitás új lapon</a>
+                </div>
+              )}
+            </div>
+          )}
+          <iframe src={driveUrl}
+            className="preview-iframe" title={file.name} allow="autoplay"
+            onLoad={() => setLoaded(true)} />
         </div>
       </div>
-      <iframe src={`https://drive.google.com/file/d/${file.id}/preview`}
-        className="preview-iframe" title={file.name} allow="autoplay" />
-    </div>
-  </div>,
-  document.body
-);
+    </div>,
+    document.body
+  );
+};
 
 async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
   const check = () => { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); };
@@ -89,18 +129,28 @@ async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
 
     const zip = new JSZip();
     let done = 0;
+    setStatus(`Letöltés... (0/${files.length})`);
 
-    for (const file of files) {
-      check();
-      setStatus(`Letöltés... (${done}/${files.length})`);
-      try {
-        const res = await fetch(`/.netlify/functions/proxy-file?fileId=${file.id}`, { signal });
-        if (res.ok) zip.file(file.path, await res.arrayBuffer());
-      } catch (e) {
-        if (e.name === 'AbortError') throw e;
+    // Párhuzamos letöltés korlátozott számú egyidejű kéréssel
+    const CONCURRENCY = 6;
+    let next = 0;
+    const worker = async () => {
+      while (true) {
+        check();
+        const i = next++;
+        if (i >= files.length) return;
+        const file = files[i];
+        try {
+          const res = await fetch(`/.netlify/functions/proxy-file?fileId=${file.id}`, { signal });
+          if (res.ok) zip.file(file.path, await res.arrayBuffer());
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+        }
+        done++;
+        setStatus(`Letöltés... (${done}/${files.length})`);
       }
-      done++;
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker));
 
     check();
     setStatus('Zip készítése...');

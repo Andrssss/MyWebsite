@@ -26,7 +26,7 @@ const About = () => {
             2026-ban végeztem Mérnökinformatikus hallgatóként. </p><p> Még 2025-ben el is kezdtem mellette dolgozni, mint <strong>teszt autómatizáció</strong>-s gyakornok egy magyar bankban.
            
              Ami elég fun munka. Jó kis kreatív. Lényegesen többet tanulok itt, mint egyetem alatt.
-              Sajnos az egyik legfontosabb amit itt megtanultam, hogy a social skillek sok esetben fontosabbak, mint az IT-sok. Hiába vagy jó programozó, ha nem tudod kideríteni, hogy mi a feladatod.
+              Sajnos az egyik legfontosabb amit itt megtanultam, hogy a social skillek sok esetben fontosabbak, mint az IT-sok. Ez menedzser függő. Sajnos ennél a cégnél ez a skill fontosabb így hamarosan munkát váltok. (nem véletlenűl olyan amilyenek a szolgáltatásai) 
           </p>
 
           <p>

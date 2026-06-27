@@ -1158,6 +1158,7 @@ const JobWatcher = () => {
           const isVisited = clickedKeys.has(clickKeyBase);
           const isApplied = appliedKeys.has(clickKeyBase);
           const isInactive = job.active === false;
+          const isActive = job.active === true && job.source !== "LinkedIn";
 
           return (
             <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInactive ? " job-card--inactive" : ""}`}>
@@ -1189,6 +1190,11 @@ const JobWatcher = () => {
                   {isInactive && (
                     <span className="job-inactive-badge" title="Ez az állás már nem szerepel a forrás listáján">
                       Lejárt
+                    </span>
+                  )}
+                  {isActive && (
+                    <span className="job-active-badge" title="Az állás jelenleg aktív a forráson">
+                      Aktív
                     </span>
                   )}
                 </div>
