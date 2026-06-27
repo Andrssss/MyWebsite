@@ -34,9 +34,14 @@
   box-sizing: border-box;
 }
 
-/* Feltöltés gomb */
+/* Feltöltés / Tárgy kérés gombok */
+.subject-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-left: 15px;
+}
+
 .open-modal-button {
-  margin-left: 15px; /* 15px távolságra kerül a legördülő menütől */
   padding: 10px 15px;
   font-size: 1rem;
   background-color: #d1d1d1;
@@ -44,6 +49,7 @@
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .open-modal-button:hover {
@@ -469,11 +475,15 @@ button[type="button"].close-modal-button:hover {
     padding: 10px 0;
   }
 
-  /* Feltöltés full width on row 2 */
-  .open-modal-button {
+  /* Gombok sor full width on row 2 */
+  .subject-btn-row {
     grid-area: upload;
-    width: 100%;
     margin-left: 0;
+    width: 100%;
+  }
+
+  .subject-btn-row .open-modal-button {
+    flex: 1;
   }
 }
 

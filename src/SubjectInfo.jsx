@@ -645,18 +645,20 @@ const handleDelete = async (id) => {
         </select>
 
 
-        <button
-          className="open-modal-button"
-          onClick={() => setIsModalOpen(true)}
-        >
-          Feltöltés
-        </button>
-        <button
-          className="open-modal-button request-subject-btn"
-          onClick={() => setIsRequestModalOpen(true)}
-        >
-          Tárgy kérés
-        </button>
+        <div className="subject-btn-row">
+          <button
+            className="open-modal-button"
+            onClick={() => setIsModalOpen(true)}
+          >
+            Feltöltés
+          </button>
+          <button
+            className="open-modal-button request-subject-btn"
+            onClick={() => setIsRequestModalOpen(true)}
+          >
+            Tárgy kérés
+          </button>
+        </div>
         <button
           type="button"
           className={`kepzes-toggle ${kepzesMode.toLowerCase()}`}
