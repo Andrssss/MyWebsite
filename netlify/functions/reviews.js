@@ -88,6 +88,8 @@ exports.handler = async (event, context) => {
              kepzes_fajtaja`;
 
         if (limit) {
+          // Az "Általános információ" mindig kerüljön be (és legyen elöl),
+          // a maradék helyet töltsük fel félév/név szerint.
           const { rows } = await client.query(
             `SELECT ${selectCols}
                FROM subject_reviews
@@ -95,7 +97,8 @@ exports.handler = async (event, context) => {
                 SELECT name
                   FROM subject_reviews
                  GROUP BY name
-                 ORDER BY MIN(semester) NULLS LAST, name
+                 ORDER BY (lower(btrim(name)) = lower('Általános információ')) DESC,
+                          MIN(semester) NULLS LAST, name
                  LIMIT $1
               )
               ORDER BY semester, name, id`,
