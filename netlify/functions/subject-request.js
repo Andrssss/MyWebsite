@@ -13,20 +13,17 @@ const RATE_LIMIT_MAX = 3;
 const hits = globalThis.__subjectRequestHits || new Map();
 globalThis.__subjectRequestHits = hits;
 
-const ensureTablePromise =
-  globalThis.__ensureSubjectRequestsTable ||
-  pool.query(`
-    CREATE TABLE IF NOT EXISTS subject_requests (
+async function ensureTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS targy_kerelem (
       id serial PRIMARY KEY,
       subject_name text NOT NULL,
       semester integer,
       note text,
       created_at timestamptz NOT NULL DEFAULT now()
     )
-  `).then(() =>
-    pool.query(`ALTER TABLE subject_requests ADD COLUMN IF NOT EXISTS semester integer`)
-  );
-globalThis.__ensureSubjectRequestsTable = ensureTablePromise;
+  `);
+}
 
 function corsHeaders(extra = {}) {
   return {
@@ -94,9 +91,9 @@ exports.handler = async (event) => {
   const note = String(body.note || "").trim().slice(0, 1000) || null;
 
   try {
-    await ensureTablePromise;
+    await ensureTable();
     await pool.query(
-      `INSERT INTO subject_requests (subject_name, semester, note) VALUES ($1, $2, $3)`,
+      `INSERT INTO targy_kerelem (subject_name, semester, note) VALUES ($1, $2, $3)`,
       [subjectName, semester, note]
     );
     return json(200, { ok: true });
