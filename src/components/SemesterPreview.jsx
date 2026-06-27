@@ -79,6 +79,14 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
     return () => clearTimeout(t);
   }, [file.id]);
 
+  // Ha az iframe magához veszi a fókuszt (pl. görgetés után), azonnal visszaszerezzük,
+  // hogy a billentyűzetes navigáció mindig működjön.
+  React.useEffect(() => {
+    const refocus = () => requestAnimationFrame(() => window.focus());
+    window.addEventListener('blur', refocus);
+    return () => window.removeEventListener('blur', refocus);
+  }, []);
+
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
@@ -93,12 +101,8 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-modal-header">
-          <button className="preview-nav-btn" onClick={onPrev} disabled={!hasPrev} title="Előző fájl (←)">‹</button>
           <span className="preview-modal-title">{file.name}</span>
           <div className="preview-modal-actions">
-            <button className="preview-nav-btn" onClick={onNext} disabled={!hasNext} title="Következő fájl (→)">›</button>
-            <a href={openUrl} target="_blank" rel="noopener noreferrer"
-              className="preview-modal-download" title="Megnyitás új lapon">↗ Új lapon</a>
             <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
               target="_blank" rel="noopener noreferrer" className="preview-modal-download">
               ⬇ Letöltés
@@ -122,6 +126,12 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
           <iframe src={driveUrl}
             className="preview-iframe" title={file.name} allow="autoplay"
             onLoad={() => setLoaded(true)} />
+          {hasPrev && (
+            <button className="preview-side-nav preview-side-nav--prev" onClick={onPrev} title="Előző fájl (←)">‹</button>
+          )}
+          {hasNext && (
+            <button className="preview-side-nav preview-side-nav--next" onClick={onNext} title="Következő fájl (→)">›</button>
+          )}
         </div>
       </div>
     </div>,
@@ -321,7 +331,7 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, onRootError, onBack }) =
       </div>
 
       {previewFile && (() => {
-        const previewableFiles = files ? files.filter(f => !isFolder(f.mimeType)) : [];
+        const previewableFiles = files ? files.filter(f => !isFolder(f.mimeType) && !isUrlShortcut(f.name)) : [];
         const previewIdx = previewableFiles.findIndex(f => f.id === previewFile.id);
         return (
           <PreviewModal

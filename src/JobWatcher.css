@@ -227,10 +227,18 @@
 .job-saved-chip {
   display: inline-flex;
   align-items: center;
-  background: rgba(79, 140, 255, 0.15);
-  border: 1px solid rgba(79, 140, 255, 0.4);
+  background: rgba(79, 140, 255, 0.08);
+  border: 1px solid rgba(79, 140, 255, 0.25);
   border-radius: 20px;
   overflow: hidden;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.job-saved-chip.active {
+  background: rgba(79, 140, 255, 0.22);
+  border-color: rgba(79, 140, 255, 0.7);
+  opacity: 1;
 }
 
 .job-saved-chip-label {
@@ -240,6 +248,12 @@
   cursor: pointer;
   font-size: 13px;
   padding: 3px 8px 3px 10px;
+  user-select: none;
+}
+
+.job-saved-chip.active .job-saved-chip-label {
+  color: #d0e4ff;
+  font-weight: 600;
 }
 
 .job-saved-chip-label:hover {

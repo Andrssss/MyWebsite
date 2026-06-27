@@ -293,6 +293,10 @@ const JobWatcher = () => {
     const saved = localStorage.getItem("jobWatcherSavedSearches");
     return saved ? JSON.parse(saved) : [];
   });
+  const [activeSavedSearches, setActiveSavedSearches] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherActiveSavedSearches");
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
   const [jobCategories, setJobCategories] = useState([]);
 
   /* =======================
@@ -822,11 +826,19 @@ const JobWatcher = () => {
     }
 
     const nq = q.trim().toLowerCase();
-    if (nq) {
+    const activeSearchTerms = [...activeSavedSearches].filter((s) => savedSearches.includes(s));
+    if (nq || activeSearchTerms.length > 0) {
       list = list.filter((j) => {
         const t = (j.title || "").toLowerCase();
         const c = (j.company || "").toLowerCase();
-        return t.includes(nq) || c.includes(nq);
+        const matchesSaved =
+          activeSearchTerms.length === 0 ||
+          activeSearchTerms.some((s) => {
+            const sl = s.toLowerCase();
+            return t.includes(sl) || c.includes(sl);
+          });
+        const matchesQ = !nq || t.includes(nq) || c.includes(nq);
+        return matchesSaved && matchesQ;
       });
     }
 
@@ -999,31 +1011,57 @@ const JobWatcher = () => {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Keresés pozícióra vagy cégre…"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              const term = q.trim();
+              if (term && !savedSearches.includes(term)) {
+                const nextSaved = [...savedSearches, term];
+                setSavedSearches(nextSaved);
+                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
+                const nextActive = new Set(activeSavedSearches);
+                nextActive.add(term);
+                setActiveSavedSearches(nextActive);
+                localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+              }
+            }
+          }}
         />
         {savedSearches.length > 0 && (
           <div className="job-saved-searches">
-            {savedSearches.map((s) => (
-              <span key={s} className="job-saved-chip">
-                <button
-                  className="job-saved-chip-label"
-                  onClick={() => setQ(s)}
-                  title={`Keresés: ${s}`}
-                >
-                  {s}
-                </button>
-                <button
-                  className="job-saved-chip-remove"
-                  onClick={() => {
-                    const next = savedSearches.filter((x) => x !== s);
-                    setSavedSearches(next);
-                    localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(next));
-                  }}
-                  title="Törlés"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
+            {savedSearches.map((s) => {
+              const isActive = activeSavedSearches.has(s);
+              return (
+                <span key={s} className={`job-saved-chip${isActive ? " active" : ""}`}>
+                  <button
+                    className="job-saved-chip-label"
+                    onClick={() => {
+                      const next = new Set(activeSavedSearches);
+                      if (isActive) next.delete(s); else next.add(s);
+                      setActiveSavedSearches(next);
+                      localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...next]));
+                    }}
+                    title={isActive ? "Szűrő kikapcsolása" : "Szűrő bekapcsolása"}
+                  >
+                    {s}
+                  </button>
+                  <button
+                    className="job-saved-chip-remove"
+                    onClick={() => {
+                      const nextSaved = savedSearches.filter((x) => x !== s);
+                      setSavedSearches(nextSaved);
+                      localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
+                      const nextActive = new Set(activeSavedSearches);
+                      nextActive.delete(s);
+                      setActiveSavedSearches(nextActive);
+                      localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+                    }}
+                    title="Törlés"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -1032,9 +1070,14 @@ const JobWatcher = () => {
             <button
               className="job-btn job-btn--save-search"
               onClick={() => {
-                const next = [...savedSearches, q.trim()];
-                setSavedSearches(next);
-                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(next));
+                const term = q.trim();
+                const nextSaved = [...savedSearches, term];
+                setSavedSearches(nextSaved);
+                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
+                const nextActive = new Set(activeSavedSearches);
+                nextActive.add(term);
+                setActiveSavedSearches(nextActive);
+                localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
               }}
               title="Keresési szó mentése"
             >
