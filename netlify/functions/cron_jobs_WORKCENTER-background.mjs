@@ -1,29 +1,43 @@
 /*
   WorkCenter – informatikus kategória scraper
 
-  Forrás: a taxonómia RSS feed
-    https://workcenter.hu/munka-kategória/informatikus/feed/   (page N: ?paged=N)
+  Forrás: WordPress REST API
+    https://workcenter.hu/wp-json/wp/v2/job-listings?job-categories=755&per_page=100&page=N
+    (755 = "informatikus" job-category term id; lekérve a /wp/v2/job-categories?slug=informatikus-ból)
 
-  MIÉRT FEED, NEM HTML?
-    A site Apache + IP-reputáció alapú WAF (nem Cloudflare, ahogy korábban
-    feltételeztük). A HTML listaoldalakat és a /munka/ detail oldalakat a
-    Netlify (AWS Lambda) datacenter IP-ről 403-mal tiltja. Lakossági IP-ről
-    minden 200 — tehát NEM header-, hanem IP-szintű blokk, header-tuning nem segít.
-    Az RSS feed más WP handler, amit a botvédelem kihagy → átmegy a Netlify IP-ről.
-    A detail oldalak ugyanúgy blokkoltak, ezért NINCS detail-fetch: minden a feedből jön.
+  MIÉRT REST, NEM FEED/HTML?
+    A site Apache + IP-reputáció alapú WAF (nem Cloudflare). A Netlify (AWS Lambda)
+    datacenter IP-ről a HTML lista/detail oldalakat 403-mal tiltja. Lakossági IP-ről
+    minden 200 — tehát IP-szintű blokk, header-tuning NEM segít.
+    Korábban az RSS feed (más WP handler) átment a Netlify IP-ről, de a WAF ezt is
+    elkezdte 403-azni. A WP REST API (/wp-json/wp/v2/...) megint másik handler —
+    erre váltottunk. A logból derül ki, hogy átmegy-e: ha "page 1 → N IT listings"
+    jön, működik; ha a wp-json/... is 403, akkor a blokk már ÁLTALÁNOS (minden path).
 
-  Stratégia: FEED-ONLY
-    - title:    item > title
-    - url:      item > link  (/munka/{slug}/)
-    - location: a feedben nincs strukturált location mező → a város a poszt
-                törzsében (content:encoded) szerepel; Budapest-szűrés szövegből
-    - experience: detectExperienceFromText(title, content:encoded) — title + törzsszöveg
-                  kulcsszó-detektálás, detail oldal lekérés nélkül
+    DIAGNOSZTIKA (2026-06-27): lakossági IP-ről MINDEN endpoint 200 (feed, HTML,
+    /wp-json/...), Netlify datacenter IP-ről 403. Tehát IP-szintű blokk —
+    header/User-Agent tuning BIZTOSAN nem segít, ne is próbáld.
+
+    HA A REST IS 403 NETLIFY-RÓL, a lehetőségek (sorrendben):
+      1. Proxy / scraping-szolgáltatás (ScraperAPI, ScrapingBee, Bright Data) —
+         lakossági / nem-datacenter IP-ről kéri le helyettünk; kell hozzá API kulcs.
+      2. Ezt az egy scrapert nem-datacenter hostról futtatni.
+      3. Elengedni a workcentert.
+    A _company_name itt MINDIG "WORKCENTER Személyzeti Tanácsadó" (a kölcsönző saját
+    neve, nem a tényleges munkáltató), ezért céget NEM mentünk.
+
+  Stratégia: REST-ONLY (nincs detail-fetch, minden a list endpointból jön)
+    - title:    item.title.rendered
+    - url:      item.link  (/munka/{slug}/)
+    - location: item.meta._job_location → Budapest-szűrés
+    - content:  item.content.rendered → experience kulcsszó-detektálás
+    - company:  item.meta._company_name MINDIG "WORKCENTER Személyzeti Tanácsadó"
+                (a kölcsönző saját neve, nem a tényleges munkáltató) → NEM mentjük.
 
   Flow:
-    1. Fetch feed page=1,2,... — stop ha HTTP 404 (paged túl a végén) vagy 0 item
-    2. item → title + link + content:encoded parse cheerio xmlMode-dal
-    3. Budapest check a content szövegéből
+    1. GET REST page=1,2,… (per_page=100) — stop ha üres oldal / <per_page / HTTP 400
+    2. item → title + link + location + content
+    3. Budapest check a _job_location mezőből (üresnél body-fallback)
     4. isSeniorLike filter
     5. Upsert (source = "workcenter")
 */
@@ -49,10 +63,12 @@ const pool = new Pool({
 });
 
 const BASE = "https://workcenter.hu";
-// HTML list/detail pages are 403 from Netlify IPs (Apache IP-reputation WAF, not Cloudflare).
-// The taxonomy RSS feed is a different handler that the WAF lets through. See header comment.
-// WP REST API is not an option: /wp-json/wp/v2/job_listing → 404 (post type not REST-exposed).
-const FEED_BASE = `${BASE}/munka-kateg%C3%B3ria/informatikus/feed`;
+// HTML list/detail pages and the RSS feed are 403 from Netlify IPs (Apache IP-reputation WAF).
+// The WP REST API is a different handler — see header comment.
+const API_BASE = `${BASE}/wp-json/wp/v2/job-listings`;
+const IT_CATEGORY_ID = 755; // "informatikus" term id
+const PER_PAGE = 100;
+const MAX_PAGES = 10;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -63,10 +79,15 @@ function normalizeWhitespace(v) {
 function normalizeText(v) {
   return String(v ?? "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function htmlToText(html) {
+  if (!html) return "";
+  return normalizeWhitespace(cheerioLoad(`<div>${html}</div>`).text());
 }
 
 function normalizeUrl(raw) {
@@ -106,17 +127,15 @@ function fetchText(url, redirectLeft = 5) {
         method: "GET",
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+          "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
           "Accept-Language": "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7",
           "Accept-Encoding": "gzip, deflate, br",
           "Cache-Control": "max-age=0",
           "Connection": "keep-alive",
-          "Upgrade-Insecure-Requests": "1",
           "Referer": "https://workcenter.hu/",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
           "Sec-Fetch-Site": "same-origin",
-          "Sec-Fetch-User": "?1",
           "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
           "sec-ch-ua-mobile": "?0",
           "sec-ch-ua-platform": '"Windows"',
@@ -158,7 +177,12 @@ function fetchText(url, redirectLeft = 5) {
   });
 }
 
-/* ── experience from detail page ─────────────────────────────── */
+async function fetchJson(url) {
+  const body = await fetchText(url);
+  return JSON.parse(body);
+}
+
+/* ── experience from listing text ────────────────────────────── */
 
 const INTERN_TEXT_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
@@ -185,41 +209,13 @@ function detectExperienceFromText(title, descText) {
   return "-";
 }
 
-// Experience comes straight from the feed's content:encoded — detail pages are
-// IP-blocked from Netlify, so there is no detail fetch.
+/* ── listing parser ──────────────────────────────────────────── */
 
-/* ── list page parser ────────────────────────────────────────── */
-
-function extractJobEntries(xml) {
-  const $ = cheerioLoad(xml, { xmlMode: true });
-  const entries = [];
-  let totalListings = 0;
-
-  // RSS structure: rss > channel > item { title, link, content:encoded, description }
-  $("item").each((_, item) => {
-    totalListings++;
-
-    const title = normalizeWhitespace($(item).find("title").first().text());
-    const href = normalizeWhitespace($(item).find("link").first().text());
-    if (!title || title.length < 2 || !href) return;
-
-    // No structured location in the feed — the city lives in the post body.
-    // content:encoded = full post HTML; fall back to <description> excerpt.
-    // (css-select can't select the namespaced "content:encoded" tag, so scan children.)
-    let content = "";
-    $(item).children().each((_, c) => {
-      if ((c.tagName || c.name || "").toLowerCase() === "content:encoded") content = $(c).text();
-    });
-    if (!content) content = $(item).find("description").first().text();
-
-    // Budapest filter from body text (matches "Budapest", "Budapesti", … after accent strip)
-    if (!normalizeText(`${title} ${content}`).includes("budapest")) return;
-
-    const url = normalizeUrl(new URL(href, BASE).toString());
-    entries.push({ title, url, content });
-  });
-
-  return { entries, totalListings };
+function isBudapest(location, title, content) {
+  const loc = normalizeText(location);
+  if (loc) return loc.includes("budapest");
+  // No structured location → fall back to body text.
+  return normalizeText(`${title} ${content}`).includes("budapest");
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
@@ -244,89 +240,93 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
+  let skippedNonBudapest = 0;
   let fetchFailed = 0;
 
   try {
+    // Timing-jitter: a cron mindig ugyanakkor fut, ami szabályos mintát ad a forrásnak.
+    // Egy random várakozás eltolja a kérés idejét. (Megj.: a 403 a mérések szerint
+    // IP-alapú — lásd a header-kommentet —, ezt a jitter valószínűleg NEM oldja meg,
+    // de ártalmatlan és olcsó kipróbálni.)
+    const jitterMs = Math.floor(Math.random() * 30000); // 0–30 s
+    console.log(`[workcenter] timing jitter: várok ${Math.round(jitterMs / 1000)} s`);
+    await sleep(jitterMs);
+
     const foundUrls = [];
     let page = 1;
-    const MAX_PAGES = 10;
 
     while (page <= MAX_PAGES) {
-      const listUrl =
-        page === 1
-          ? `${FEED_BASE}/`
-          : `${FEED_BASE}/?paged=${page}`;
+      const apiUrl =
+        `${API_BASE}?job-categories=${IT_CATEGORY_ID}&per_page=${PER_PAGE}` +
+        `&page=${page}&_fields=id,link,title,content,meta`;
 
-      let listHtml;
+      let listings;
       try {
-        await sleep(800);
-        listHtml = await fetchText(listUrl);
+        await sleep(500);
+        listings = await fetchJson(apiUrl);
       } catch (err) {
-        if (err.message && err.message.includes("HTTP 404")) {
-          if (page === 1) {
-            fetchFailed++;
-            await logFetchError("cron_jobs_WORKCENTER-background", { url: listUrl, message: err.message });
-            console.error(`[workcenter] page 1 → 404, check URL`);
-          } else {
-            console.log(`[workcenter] page ${page} → 404, no more pages`);
-          }
+        // WP returns HTTP 400 (rest_post_invalid_page_number) past the last page.
+        if (/HTTP 400/.test(err.message) && page > 1) {
+          console.log(`[workcenter] page ${page} → 400 (past last page), done`);
           break;
         }
         fetchFailed++;
-        await logFetchError("cron_jobs_WORKCENTER-background", { url: listUrl, message: err.message });
-        console.error(`[workcenter] list page ${page} fetch failed: ${err.message}`);
+        await logFetchError("cron_jobs_WORKCENTER-background", { url: apiUrl, message: err.message });
+        console.error(`[workcenter] page ${page} fetch failed: ${err.message}`);
         break;
       }
 
-      const { entries, totalListings } = extractJobEntries(listHtml);
-      console.log(`[workcenter] page ${page} → ${entries.length} Budapest IT jobs (${totalListings} total listings)`);
-
-      if (totalListings === 0) {
-        // Truly empty page — no more pages
-        if (page === 1) console.warn("[workcenter] page 1 returned 0 listings — check selector or URL");
+      if (!Array.isArray(listings) || listings.length === 0) {
+        if (page === 1) console.warn("[workcenter] page 1 returned 0 listings — check category id or API");
         break;
       }
 
-      if (entries.length === 0) {
-        // Page has jobs but none from Budapest — keep paginating
-        console.log(`[workcenter] page ${page} → skipping (no Budapest jobs on this page)`);
-        page++;
-        continue;
-      }
+      console.log(`[workcenter] page ${page} → ${listings.length} IT listings`);
 
-      for (const entry of entries) {
-        if (isSeniorLike(entry.title)) {
-          skippedSenior++;
-          console.log(`[workcenter] SKIP senior "${entry.title}"`);
+      for (const item of listings) {
+        const title = htmlToText(item?.title?.rendered);
+        const href = item?.link;
+        if (!title || title.length < 2 || !href) continue;
+
+        const location = item?.meta?._job_location ?? "";
+        const content = htmlToText(item?.content?.rendered);
+
+        if (!isBudapest(location, title, content)) {
+          skippedNonBudapest++;
           continue;
         }
 
-        // Title-based internship marker takes priority, then text-based detection.
-        const experience = isInternshipTitle(entry.title)
-          ? "diákmunka"
-          : detectExperienceFromText(entry.title, entry.content);
+        if (isSeniorLike(title)) {
+          skippedSenior++;
+          console.log(`[workcenter] SKIP senior "${title}"`);
+          continue;
+        }
 
-        const wasNew = await upsertJob(client, "workcenter", {
-          title: entry.title,
-          url: entry.url,
-          experience,
-        });
-        foundUrls.push(entry.url);
+        const url = normalizeUrl(new URL(href, BASE).toString());
+
+        // Title-based internship marker takes priority, then text-based detection.
+        const experience = isInternshipTitle(title)
+          ? "diákmunka"
+          : detectExperienceFromText(title, content);
+
+        const wasNew = await upsertJob(client, "workcenter", { title, url, experience });
+        foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
-          console.log(`[workcenter] NEW "${entry.title}" → ${entry.url}`);
+          console.log(`[workcenter] NEW "${title}" → ${url}`);
         } else {
           alreadyExisted++;
-          console.log(`[workcenter] EXISTS "${entry.title}"`);
+          console.log(`[workcenter] EXISTS "${title}"`);
         }
       }
 
+      if (listings.length < PER_PAGE) break;
       page++;
     }
 
     console.log(
       `[workcenter] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
+      `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}, fetch_failed=${fetchFailed}`
     );
 
     const complete = fetchFailed === 0;
