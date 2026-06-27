@@ -827,18 +827,20 @@ const JobWatcher = () => {
 
     const nq = q.trim().toLowerCase();
     const activeSearchTerms = [...activeSavedSearches].filter((s) => savedSearches.includes(s));
-    if (nq || activeSearchTerms.length > 0) {
+    if (nq) {
       list = list.filter((j) => {
         const t = (j.title || "").toLowerCase();
         const c = (j.company || "").toLowerCase();
-        const matchesSaved =
-          activeSearchTerms.length === 0 ||
-          activeSearchTerms.some((s) => {
-            const sl = s.toLowerCase();
-            return t.includes(sl) || c.includes(sl);
-          });
-        const matchesQ = !nq || t.includes(nq) || c.includes(nq);
-        return matchesSaved && matchesQ;
+        return t.includes(nq) || c.includes(nq);
+      });
+    } else if (activeSearchTerms.length > 0) {
+      list = list.filter((j) => {
+        const t = (j.title || "").toLowerCase();
+        const c = (j.company || "").toLowerCase();
+        return activeSearchTerms.some((s) => {
+          const sl = s.toLowerCase();
+          return t.includes(sl) || c.includes(sl);
+        });
       });
     }
 
