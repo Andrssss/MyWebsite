@@ -1,5 +1,23 @@
 import "./SubjectInfo.css";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+
+// Kezdetben csak ennyi tárgyat kérünk le az API-tól, a többit görgetésre/szűrésre
+const INITIAL_LIMIT = 5;
+
+// DB sor → frontend objektum
+const mapRow = (row) => ({
+  user: row.user ?? "N/A",
+  name: row.name ?? "N/A",
+  difficulty: row.difficulty ?? "N/A",
+  general: row.general ?? "",
+  duringSemester: row.duringSemester ?? "N/A",
+  exam: row.exam ?? "N/A",
+  year: row.year ?? "N/A",
+  semester: row.semester ?? null,
+  user_id: row.user_id ?? "N/A",
+  id: row.id ?? null,
+  kepzes_fajtaja: row.kepzes_fajtaja ?? "MI",
+});
 
 // Ékezetmentesítés
 const removeAccents = (str) =>
@@ -50,6 +68,10 @@ const SubjectInfo = () => {
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [kepzesMode, setKepzesMode] = useState("BOTH");
+
+  // Teljes lista betöltve-e már (külön API-hívással)
+  const [allLoaded, setAllLoaded] = useState(false);
+  const loadingAllRef = useRef(false);
 
   const cycleKepzesMode = () => {
     setKepzesMode((prev) => {
@@ -108,28 +130,12 @@ const SubjectInfo = () => {
 
     const fetchTable = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/reviews`);
+        const response = await fetch(`${API_BASE_URL}/reviews?limit=${INITIAL_LIMIT}`);
         if (!response.ok) {
           throw new Error("Nem sikerült betölteni az adatokat");
         }
         const data = await response.json();
-
-        setSubjects(
-          data.map((row) => ({
-            user: row.user ?? "N/A",
-            name: row.name ?? "N/A",
-            difficulty: row.difficulty ?? "N/A",
-            general: row.general ?? "",
-            duringSemester: row.duringSemester ?? "N/A",
-            exam: row.exam ?? "N/A",
-            year: row.year ?? "N/A",
-            semester: row.semester ?? null,
-            user_id: row.user_id ?? "N/A",
-            id: row.id ?? null,
-            kepzes_fajtaja: row.kepzes_fajtaja ?? "MI",
-
-          }))
-        );
+        setSubjects(data.map(mapRow));
       } catch (err) {
         console.error("Hiba történt az adatok lekérésekor:", err);
       } finally {
@@ -139,6 +145,22 @@ const SubjectInfo = () => {
 
     fetchTable();
   }, []);
+
+  // A teljes lista betöltése külön API-hívással (egyszer, igény szerint)
+  const loadAll = useCallback(async () => {
+    if (allLoaded || loadingAllRef.current) return;
+    loadingAllRef.current = true;
+    try {
+      const response = await fetch(`${API_BASE_URL}/reviews`);
+      if (!response.ok) throw new Error("Nem sikerült betölteni a teljes listát");
+      const data = await response.json();
+      setSubjects(data.map(mapRow));
+      setAllLoaded(true);
+    } catch (err) {
+      console.error("Teljes lista betöltése sikertelen:", err);
+      loadingAllRef.current = false; // hiba esetén újrapróbálható
+    }
+  }, [allLoaded]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -155,6 +177,42 @@ const SubjectInfo = () => {
     };
   }, [isModalOpen]);
 
+
+  // Első görgetésre (le vagy fel) betöltjük a teljes listát egy külön API-hívással.
+  // wheel = egér/touchpad, touchmove = telefon, scroll = görgetősáv/billentyű.
+  // A wheel/touchmove akkor is elsül, ha a tartalom még nem görgethető.
+  useEffect(() => {
+    if (allLoaded || loading) return;
+    const reveal = () => loadAll();
+    const onKey = (e) => {
+      if (!["ArrowDown", "ArrowUp", "PageDown", "PageUp", " ", "Spacebar"].includes(e.key)) return;
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || isModalOpen) return;
+      reveal();
+    };
+    window.addEventListener("wheel", reveal, { passive: true });
+    window.addEventListener("touchmove", reveal, { passive: true });
+    window.addEventListener("scroll", reveal, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("wheel", reveal);
+      window.removeEventListener("touchmove", reveal);
+      window.removeEventListener("scroll", reveal);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [allLoaded, loading, isModalOpen, loadAll]);
+
+  // Keresés / félév- vagy képzésszűrés a teljes adathalmazon működik → töltsük be
+  useEffect(() => {
+    if (searchTerm.trim() !== "" || selectedSemester !== "all" || kepzesMode !== "BOTH") {
+      loadAll();
+    }
+  }, [searchTerm, selectedSemester, kepzesMode, loadAll]);
+
+  // A feltöltés modal autocomplete-jéhez az összes tárgynév kell
+  useEffect(() => {
+    if (isModalOpen) loadAll();
+  }, [isModalOpen, loadAll]);
 
   // Keresés és félév szűrés
   const handleSemesterChange = (e) => {

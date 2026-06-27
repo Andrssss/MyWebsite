@@ -67,8 +67,13 @@ exports.handler = async (event, context) => {
         }
         return jsonResponse(200, rows[0]);
       } else {
-        const { rows } = await client.query(
-          `SELECT
+        // Opcionális ?limit=N → csak az első N tárgy összes véleménye.
+        // Tárgyanként (név szerint) limitálunk, nem soronként, hogy a
+        // kártyák csoportosítása ne törjön ketté a határon.
+        const limitRaw = event.queryStringParameters?.limit;
+        const limit = /^\d+$/.test(limitRaw || "") ? parseInt(limitRaw, 10) : null;
+
+        const selectCols = `
              id,
              name,
              user_name AS "user",
@@ -80,9 +85,29 @@ exports.handler = async (event, context) => {
              year,
              semester,
              user_id,
-             kepzes_fajtaja
-           FROM subject_reviews
-           ORDER BY semester, name, id`
+             kepzes_fajtaja`;
+
+        if (limit) {
+          const { rows } = await client.query(
+            `SELECT ${selectCols}
+               FROM subject_reviews
+              WHERE name IN (
+                SELECT name
+                  FROM subject_reviews
+                 GROUP BY name
+                 ORDER BY MIN(semester) NULLS LAST, name
+                 LIMIT $1
+              )
+              ORDER BY semester, name, id`,
+            [limit]
+          );
+          return jsonResponse(200, rows);
+        }
+
+        const { rows } = await client.query(
+          `SELECT ${selectCols}
+             FROM subject_reviews
+            ORDER BY semester, name, id`
         );
         return jsonResponse(200, rows);
       }
