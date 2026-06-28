@@ -329,7 +329,7 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
                   ) : (
                     <>
                       <button className="file-btn file-btn-preview"
-                        onClick={() => setPreviewFile(file)} title="Előnézet">👁</button>
+                        onClick={() => setPreviewFile(file)} title="Előnézet">👁️‍🗨️</button>
                       <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
                         target="_blank" rel="noopener noreferrer"
                         className="file-btn file-btn-download" title="Letöltés">⬇</a>
