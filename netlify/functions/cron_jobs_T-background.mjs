@@ -24,20 +24,23 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// NO &date=1 filter: the active-model reconcile needs the FULL current listing
+// per source (see _active_core.mjs). With date=1 we'd only see the last-24h
+// window, so every still-open job older than the grace window would be wrongly
+// deactivated. We fetch the whole list and let ON CONFLICT DO NOTHING dedupe.
 const TALENT_SEARCH_URLS = [
-  "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU&date=1",
-  "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU&date=1",
-  "https://hu.talent.com/jobs?k=tesztel%C5%91&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=tester&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=programmer&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=developer&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=qa&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=data&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=devops&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=support&l=Budapest%2C+HU&date=1",
-    "https://hu.talent.com/jobs?k=c%2B%2B&l=Budapest%2C+HU&date=1",
-
+  "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=tesztel%C5%91&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=tester&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=programmer&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=developer&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=qa&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=data&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=devops&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=support&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=c%2B%2B&l=Budapest%2C+HU",
 ];
 
 /* ── shared helpers ─────────────────────────────────────────── */
@@ -162,12 +165,12 @@ function inferTalentExperience(title) {
   return null;
 }
 
-const TALENT_NO_RESULTS_RE = /nincsenek\s+tal[áa]latok\s+a\s+k[öo]vetkez[őo]re/i;
 const TALENT_MAX_PAGES = 30;
 
-function isTalentNoResults(html) {
-  return TALENT_NO_RESULTS_RE.test(html);
-}
+// NOTE: no text-based "no results" check. talent.com is a Next.js SPA that ships
+// the "nincsenek találatok" / "Már nem fogadnak jelentkezéseket" strings in its
+// i18n dictionary on EVERY page, so matching them yields false positives. We stop
+// paging on an empty extraction (jobs.length === 0) instead.
 
 function buildTalentPagedUrl(baseUrl, page) {
   const u = new URL(baseUrl);
@@ -225,6 +228,9 @@ function extractTalentJobs(html) {
 async function fetchAllTalentJobs() {
   const allJobs = [];
   const seen = new Set();
+  // If any keyword crawl hits a fetch error we can't trust the URL set to be
+  // complete, so we tell reconcileActive to skip deactivation this run.
+  let complete = true;
 
   for (const searchUrl of TALENT_SEARCH_URLS) {
     const keyword = searchUrl.match(/k=([^&]+)/)?.[1] || "?";
@@ -241,15 +247,11 @@ async function fetchAllTalentJobs() {
         await logFetchError("cron_jobs_T", { url: pageUrl, message: err.message, extra: { source: "talent" } });
         console.log(`talent: failed ${pageUrl}: ${err.message}`);
         stopReason = "fetch-error";
+        complete = false;
         break;
       }
 
       pagesVisited = page;
-
-      if (isTalentNoResults(html)) {
-        stopReason = "no-results";
-        break;
-      }
 
       const jobs = extractTalentJobs(html);
       if (jobs.length === 0) {
@@ -282,7 +284,7 @@ async function fetchAllTalentJobs() {
     await sleep(1000);
   }
 
-  return allJobs;
+  return { jobs: allJobs, complete };
 }
 
 /* ── handler ────────────────────────────────────────────────── */
@@ -293,15 +295,16 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
 
   try {
     /* talent.com */
-    const talentJobs = (await fetchAllTalentJobs()).filter((job) => !isSeniorLike(job.title));
-    console.log(`talent: ${talentJobs.length} unique jobs found (after senior filter)`);
+    const { jobs: rawJobs, complete } = await fetchAllTalentJobs();
+    const talentJobs = rawJobs.filter((job) => !isSeniorLike(job.title));
+    console.log(`talent: ${talentJobs.length} unique jobs found (after senior filter), complete=${complete}`);
 
     for (const job of talentJobs) {
       await upsertJob(client, "talent", job);
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);
 
-    const rc = await reconcileActive(client, "talent", talentJobs.map((j) => j.url), { complete: true });
+    const rc = await reconcileActive(client, "talent", talentJobs.map((j) => j.url), { complete });
     console.log(`[talent] active reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();

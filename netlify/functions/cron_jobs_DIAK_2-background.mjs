@@ -223,7 +223,12 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
       await upsertJob(client, "qdiak", job);
     }
     console.log(`qdiak: ${qdiakJobs.length} jobs processed`);
-    // API only returns category 12 — can't deactivate reliably, skip reconcile.
+    // The API returns the full active IT (category 12) set — exactly the subset we
+    // store — under stable numeric-id URLs, so the bucket is complete. On a fetch
+    // error fetchAllQdiakJobs returns [], which reconcileActive treats as an empty
+    // crawl and skips deactivation. So this is safe.
+    const rcQ = await reconcileActive(client, "qdiak", qdiakJobs.map((j) => j.url), { complete: true });
+    console.log(`[qdiak] active reconcile — ${JSON.stringify(rcQ)}`);
 
     return new Response("OK");
   } finally {

@@ -32,9 +32,13 @@ const pool = new Pool({
 
 const MAX_PAGES = 20;
 
+// 2026-07-01: the API moved the locale into the path — `/api/v1/jobs` now 404s,
+// the live endpoint is `/api/v1/{locale}/jobs`. Same query filters still work.
+// (The job shape also renamed `slugs` → `slug` as a {en,hu,ro} map, but
+// buildDreamJobsUrl already falls back to `job.slug`, so no change needed there.)
 const DREAMJOBS_API_URLS = [
-  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
-  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=22381&tags%5Boffice-location%5D%5B%5D=2925&tags%5Boffice-location%5D%5B%5D=15990&scope%5B%5D=isNotBlue&per_page=50",
+  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
+  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=22381&tags%5Boffice-location%5D%5B%5D=2925&tags%5Boffice-location%5D%5B%5D=15990&scope%5B%5D=isNotBlue&per_page=50",
 ];
 
 const MELONJOBS_API_URL =
@@ -360,9 +364,29 @@ function extractKukaJobs(html) {
   return jobs;
 }
 
+// SAP tile-search caps at 25 tiles per response and pages via ?startrow=N.
+// A single call only returns the first 25, so we page until a short/empty page.
+// Getting the FULL listing is what makes reconcileActive safe for kuka.
+const KUKA_PAGE_SIZE = 25;
+const KUKA_MAX_PAGES = 20;
+
 async function fetchAllKukaJobs() {
-  const html = await fetchText(KUKA_API_URL);
-  return extractKukaJobs(html);
+  const jobs = [];
+  const seen = new Set();
+  for (let page = 0; page < KUKA_MAX_PAGES; page += 1) {
+    const startrow = page * KUKA_PAGE_SIZE;
+    const url = startrow === 0 ? KUKA_API_URL : `${KUKA_API_URL}&startrow=${startrow}`;
+    const pageJobs = extractKukaJobs(await fetchText(url));
+    let added = 0;
+    for (const job of pageJobs) {
+      if (seen.has(job.url)) continue;
+      seen.add(job.url);
+      jobs.push(job);
+      added += 1;
+    }
+    if (pageJobs.length < KUKA_PAGE_SIZE || added === 0) break;
+  }
+  return jobs;
 }
 /* ── handler ────────────────────────────────────────────────── */
 
@@ -410,14 +434,20 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
     /* KUKA */
     try {
-      const kukaJobs = (await fetchAllKukaJobs()).filter((job) => !isSeniorLike(job.title, ""));
-      console.log(`kuka: ${kukaJobs.length} jobs found`);
+      // Full paginated listing — the bucket for reconcile. Any fetch error throws
+      // out to the catch below, so a partial crawl never reaches reconcileActive.
+      const allKukaJobs = await fetchAllKukaJobs();
+      const kukaJobs = allKukaJobs.filter((job) => !isSeniorLike(job.title, ""));
+      console.log(`kuka: ${kukaJobs.length} jobs found (of ${allKukaJobs.length} listed)`);
 
       for (const job of kukaJobs) {
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);
-      // Tile-search may not return all live jobs — can't deactivate reliably, skip reconcile.
+      // Reconcile against the FULL listing (incl. senior) so a still-listed job is
+      // never wrongly deactivated just because it now matches the senior filter.
+      const rc = await reconcileActive(client, "kuka", allKukaJobs.map((j) => j.url), { complete: true });
+      console.log(`[kuka] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
       console.error("kuka fetch failed:", err.message);

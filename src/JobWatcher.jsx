@@ -56,7 +56,31 @@ const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
 
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
 const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
+const INTERVIEW_KEYS_STORAGE = "jobWatcherInterviewKeys";
 const IMPORT_ID_STORAGE = "jobWatcherImportId";
+
+// Shared admin applied/interview list lives in the DB (see job-applied.js).
+const JOB_APPLIED_API = "/.netlify/functions/job-applied";
+const ADMIN_VISITOR_IDS = new Set([
+  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
+  "69872482-1311-4702-a5e5-a782ca9f2669",
+  "82906f93-dfbb-4684-b2b1-a948b99553e0",
+  "b878ceed-55b7-47db-87ec-c4e2825246f8",
+]);
+
+// Trim a job to just the fields the applied/interview list needs to render.
+const compactJob = (job) =>
+  job
+    ? {
+        source: job.source,
+        title: job.title,
+        url: job.url,
+        firstSeen: job.firstSeen,
+        experience: job.experience,
+        company: job.company,
+        description: job.description,
+      }
+    : undefined;
 
 const loadClickedKeys = () => {
   try {
@@ -89,6 +113,22 @@ const loadAppliedKeys = () => {
 const saveAppliedKeys = (set) => {
   try {
     localStorage.setItem(APPLIED_KEYS_STORAGE, JSON.stringify([...set]));
+  } catch {
+    // silent
+  }
+};
+
+const loadInterviewKeys = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(INTERVIEW_KEYS_STORAGE) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
+const saveInterviewKeys = (set) => {
+  try {
+    localStorage.setItem(INTERVIEW_KEYS_STORAGE, JSON.stringify([...set]));
   } catch {
     // silent
   }
@@ -348,6 +388,7 @@ const JobWatcher = () => {
 
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
+  const [interviewKeys, setInterviewKeys] = useState(() => loadInterviewKeys());
   const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
   const [showAppliedOnly, setShowAppliedOnly] = useState(false);
 
@@ -367,6 +408,53 @@ const JobWatcher = () => {
     () => localStorage.getItem(IMPORT_ID_STORAGE) || ""
   );
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
+  const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
+
+  // Admins share a single applied/interview list stored in the DB.
+  // Load it on mount and make the DB the source of truth for them.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${JOB_APPLIED_API}?adminId=${encodeURIComponent(myVisitorId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data) return;
+        const applied = new Set(data.applied || []);
+        const interview = new Set(data.interview || []);
+        const cache = data.appliedCache || {};
+        setAppliedKeys(applied);
+        setInterviewKeys(interview);
+        setAppliedCache(cache);
+        saveAppliedKeys(applied);
+        saveInterviewKeys(interview);
+        saveAppliedCache(cache);
+      } catch {
+        // keep whatever is in localStorage
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, myVisitorId]);
+
+  // Persist an applied/interview change to the shared DB (admins only).
+  const persistAdminApplied = (jobKey, applied, interview, job) => {
+    if (!isAdmin) return;
+    fetch(JOB_APPLIED_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        adminId: myVisitorId,
+        jobKey,
+        applied,
+        interview,
+        job: compactJob(job),
+      }),
+    }).catch(() => {});
+  };
+
   const [bugOpen, setBugOpen] = useState(false);
   const [bugMessage, setBugMessage] = useState("");
   const [bugStatus, setBugStatus] = useState("");
@@ -482,6 +570,15 @@ const JobWatcher = () => {
           saveAppliedCache(rest);
           return rest;
         });
+        // Unapplying also clears the interview flag (interview ⊆ applied).
+        setInterviewKeys((iv) => {
+          if (!iv.has(key)) return iv;
+          const n = new Set(iv);
+          n.delete(key);
+          saveInterviewKeys(n);
+          return n;
+        });
+        persistAdminApplied(key, false, false, job);
       } else {
         next.add(key);
         if (job) {
@@ -491,8 +588,22 @@ const JobWatcher = () => {
             return updated;
           });
         }
+        persistAdminApplied(key, true, false, job);
       }
       saveAppliedKeys(next);
+      return next;
+    });
+  };
+
+  const toggleInterview = (key, job) => {
+    setInterviewKeys((prev) => {
+      const next = new Set(prev);
+      const nowInterview = !next.has(key);
+      if (nowInterview) next.add(key);
+      else next.delete(key);
+      saveInterviewKeys(next);
+      // Interview is only tickable on applied jobs, so applied stays true.
+      persistAdminApplied(key, true, nowInterview, job);
       return next;
     });
   };
@@ -509,6 +620,7 @@ const JobWatcher = () => {
     const manualJob = { source, title, url, firstSeen, experience: manualAppliedExperience.trim() || undefined };
     setAppliedKeys((prev) => { const next = new Set(prev); next.add(key); saveAppliedKeys(next); return next; });
     setAppliedCache((prev) => { const updated = { ...prev, [key]: manualJob }; saveAppliedCache(updated); return updated; });
+    persistAdminApplied(key, true, false, manualJob);
     setManualAppliedTitle("");
     setManualAppliedSource("");
     setManualAppliedUrl("");
@@ -1281,10 +1393,11 @@ const JobWatcher = () => {
           const clickDate = getTodayLocalDateString();
           const isVisited = clickedKeys.has(clickKeyBase);
           const isApplied = appliedKeys.has(clickKeyBase);
+          const isInterview = interviewKeys.has(clickKeyBase);
           const isInactive = job.active === false;
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInactive ? " job-card--inactive" : ""}`}>
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInterview ? " job-card--interview" : ""}${isInactive ? " job-card--inactive" : ""}`}>
               <div className="job-row">
                 <div className="job-title-group">
                   <a
@@ -1352,6 +1465,19 @@ const JobWatcher = () => {
                   >
                     {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
                   </button>
+                )}
+                {isApplied && (
+                  <label
+                    className={`job-interview-check${isInterview ? " checked" : ""}`}
+                    title={isInterview ? "Interjú visszavonása" : "Megjelölés: Interjú"}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isInterview}
+                      onChange={() => toggleInterview(clickKeyBase, job)}
+                    />
+                    {isInterview ? "✓ Interjú" : "Interjú"}
+                  </label>
                 )}
               </div>
             </li>

@@ -782,6 +782,44 @@ html, body {
   font-weight: 600;
 }
 
+/* ====== INTERVIEW CHECKBOX ====== */
+.job-interview-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.job-interview-check:hover {
+  border-color: #a855f7;
+  color: #a855f7;
+}
+
+.job-interview-check input {
+  margin: 0;
+  cursor: pointer;
+  accent-color: #a855f7;
+}
+
+.job-interview-check.checked {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.job-card--interview {
+  border-left: 3px solid #a855f7;
+}
+
 .active-filter {
   background: #6c5ce7;
   color: white;

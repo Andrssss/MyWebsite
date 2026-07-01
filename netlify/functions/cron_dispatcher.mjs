@@ -12,8 +12,12 @@ import { withTimeout } from "./_error-logger.mjs";
  * independently — keeping its own scraping logic intact.
  *
  * Targets:
- *   A_K, BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MBH, MIX, OTP, T,
- *   VALOREBASIS, TRENKWALDER, WORKCENTER
+ *   A_K, BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, OTP, T, PANNONDIAK,
+ *   VALOREBASIS, TRENKWALDER, NOFLUFFJOBS,
+ *   ERSTE, KH, MFB, RAIFFEISEN, UNICREDIT, CG, ATLASZ, EUDIAKOK, MELODIAK, ATS
+ *
+ * NOT here (run via their own schedule): MBH (cron_dispatcher_test),
+ * WORKCENTER (cron_dispatcher_new_sources), P, L_1..L_11.
  */
 const TARGETS = [
   { name: "cron_jobs_A_K-background" },
@@ -29,6 +33,19 @@ const TARGETS = [
   { name: "cron_jobs_VALOREBASIS-background" },
   { name: "cron_jobs_TRENKWALDER-background" },
   { name: "cron_jobs_NOFLUFFJOBS-background" },
+  // Re-added 2026-07-01: these had silently dropped out of every dispatcher, so
+  // they stopped running entirely (no inserts, no active-reconcile) and their
+  // job_posts froze at 100% active. None of them run via another dispatcher.
+  { name: "cron_jobs_ERSTE-background" },
+  { name: "cron_jobs_KH-background" },
+  { name: "cron_jobs_MFB-background" },
+  { name: "cron_jobs_RAIFFEISEN-background" },
+  { name: "cron_jobs_UNICREDIT-background" },
+  { name: "cron_jobs_CG-background" },
+  { name: "cron_jobs_ATLASZ-background" },
+  { name: "cron_jobs_EUDIAKOK-background" },
+  { name: "cron_jobs_MELODIAK-background" },
+  { name: "cron_jobs_ATS-background" },
 ];
 
 export default withTimeout("cron_dispatcher", async () => {
