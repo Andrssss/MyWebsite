@@ -79,3 +79,70 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
     skipped: false,
   };
 }
+
+/**
+ * 404 sweep — the cross-source safety net for reconcileActive.
+ *
+ * reconcileActive only works when a scraper can enumerate its source's FULL
+ * current listing. Windowed / synthetic-URL sources (RSS "latest N", hash URLs)
+ * can't, so their dead jobs never fall out of the set. This sweep instead asks
+ * each active job's OWN URL whether it still exists, and deactivates the ones
+ * that return HTTP 404 (gone).
+ *
+ * Network-agnostic: the caller injects `checkStatus(url) => Promise<number>`
+ * returning the final HTTP status (after redirects). Negative / non-404 values
+ * are treated as "still alive" — only a real 404 proves the posting is gone.
+ * Each 404 is re-checked once to drop transients before it deactivates.
+ *
+ * LinkedIn is excluded: bot-blocked (no clean 404s) and shown time-based on the
+ * frontend, so its `active` flag is irrelevant.
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {(url: string) => Promise<number>} checkStatus
+ * @param {object} [opts]
+ * @param {number} [opts.concurrency=12]
+ * @returns {Promise<{checked:number, first404:number, deactivated:number}>}
+ */
+export async function sweepActive404(client, checkStatus, opts = {}) {
+  const concurrency = Math.max(1, opts.concurrency ?? 12);
+
+  await ensureActiveSchema(client);
+
+  const { rows } = await client.query(
+    `SELECT url FROM job_posts WHERE active = true AND source <> 'LinkedIn'`
+  );
+  if (rows.length === 0) return { checked: 0, first404: 0, deactivated: 0 };
+
+  // Round-robin the URLs across `concurrency` workers.
+  const status = new Map();
+  const lanes = Array.from({ length: concurrency }, (_, i) =>
+    rows.filter((_, idx) => idx % concurrency === i)
+  );
+  await Promise.all(
+    lanes.map(async (list) => {
+      for (const { url } of list) status.set(url, await checkStatus(url));
+    })
+  );
+
+  // Re-check first-pass 404s once; only a still-404 deactivates.
+  const suspects = rows.filter((r) => status.get(r.url) === 404).map((r) => r.url);
+  const confirmed = [];
+  for (const url of suspects) {
+    if ((await checkStatus(url)) === 404) confirmed.push(url);
+  }
+
+  let deactivated = 0;
+  if (confirmed.length) {
+    const res = await client.query(
+      `UPDATE job_posts
+          SET active = false
+        WHERE active = true
+          AND source <> 'LinkedIn'
+          AND url = ANY($1::text[])`,
+      [confirmed]
+    );
+    deactivated = res.rowCount ?? 0;
+  }
+
+  return { checked: rows.length, first404: suspects.length, deactivated };
+}

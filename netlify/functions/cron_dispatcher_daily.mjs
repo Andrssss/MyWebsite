@@ -30,6 +30,10 @@ const TARGETS = [
   { name: "cron_jobs_PANNONDIAK-background" },
   { name: "cron_jobs_TRENKWALDER-background" },
   { name: "cron_jobs_WORKCENTER-background" },
+  // Cross-source safety net: deactivates any active non-LinkedIn job whose URL
+  // now returns HTTP 404 (see _active_core.mjs sweepActive404). Once/day is
+  // plenty — the per-source reconcile handles the common case hourly.
+  { name: "cron_404sweep-background" },
 ];
 
 export default withTimeout("cron_dispatcher_daily", async () => {

@@ -57,7 +57,6 @@ const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
 const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
 const INTERVIEW_KEYS_STORAGE = "jobWatcherInterviewKeys";
-const IMPORT_ID_STORAGE = "jobWatcherImportId";
 
 // Shared admin applied/interview list lives in the DB (see job-applied.js).
 const JOB_APPLIED_API = "/.netlify/functions/job-applied";
@@ -136,7 +135,6 @@ const saveInterviewKeys = (set) => {
 
 const APPLIED_CACHE_STORAGE = "jobWatcherAppliedCache";
 
-const SYNC_API = "/.netlify/functions/sync-data";
 const BUG_REPORT_API = "/.netlify/functions/bug-report";
 const BUG_REPORT_COOKIE = "jobWatcherLastBugReport";
 const BUG_REPORT_COOLDOWN_MS = 5 * 60 * 1000;
@@ -399,14 +397,6 @@ const JobWatcher = () => {
   const [manualAppliedCompany, setManualAppliedCompany] = useState("");
   const [manualAppliedStatus, setManualAppliedStatus] = useState("");
   const [manualAddOpen, setManualAddOpen] = useState(false);
-  const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
-
-  const [syncOpen, setSyncOpen] = useState(false);
-  const [syncIdShown, setSyncIdShown] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("");
-  const [importId, setImportId] = useState(
-    () => localStorage.getItem(IMPORT_ID_STORAGE) || ""
-  );
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
   const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
 
@@ -497,66 +487,6 @@ const JobWatcher = () => {
       setBugStatus(`✗ Hiba a küldés során. Próbáld újra.${reason}`);
     } finally {
       setBugSending(false);
-    }
-  };
-
-  const handleSyncUpload = async () => {
-    setSyncStatus("Feltöltés…");
-    try {
-      const data = {
-        clicked: [...loadClickedKeys()],
-        applied: [...loadAppliedKeys()],
-        appliedCache: loadAppliedCache(),
-      };
-      const res = await fetch(SYNC_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visitorId: myVisitorId, data }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const respJson = await res.json();
-      setSyncStatus(`✔ Feltöltve (${respJson.counts.clicked} megtekintve, ${respJson.counts.applied} jelentkezés)`);
-    } catch {
-      setSyncStatus("✗ Hiba a feltöltés során");
-    }
-  };
-
-  const handleSyncDownload = async () => {
-    const id = importId.trim();
-    if (!id) {
-      setSyncStatus("Adj meg egy szinkron ID-t");
-      return;
-    }
-    setSyncStatus("Letöltés…");
-    try {
-      const res = await fetch(`${SYNC_API}?visitorId=${encodeURIComponent(id)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { data } = await res.json();
-      if (!data) {
-        setSyncStatus("✗ Nincs ilyen szinkron ID-hez tartozó adat");
-        return;
-      }
-      const mergedClicked = new Set([...loadClickedKeys(), ...(data.clicked || [])]);
-      const mergedApplied = new Set([...loadAppliedKeys(), ...(data.applied || [])]);
-      const mergedCache = { ...loadAppliedCache(), ...(data.appliedCache || {}) };
-      localStorage.setItem(CLICKED_KEYS_STORAGE, JSON.stringify([...mergedClicked].slice(-500)));
-      localStorage.setItem(APPLIED_KEYS_STORAGE, JSON.stringify([...mergedApplied]));
-      localStorage.setItem(APPLIED_CACHE_STORAGE, JSON.stringify(mergedCache));
-      setClickedKeys(mergedClicked);
-      setAppliedKeys(mergedApplied);
-      setAppliedCache(mergedCache);
-      setSyncStatus(`✔ Importálva (${data.clicked?.length || 0} megtekintve, ${data.applied?.length || 0} jelentkezés)`);
-    } catch {
-      setSyncStatus("✗ Hiba a letöltés során");
-    }
-  };
-
-  const handleCopySyncId = async () => {
-    try {
-      await navigator.clipboard.writeText(myVisitorId);
-      setSyncStatus("✔ ID másolva");
-    } catch {
-      setSyncStatus("✗ Másolás nem sikerült");
     }
   };
 
@@ -1555,65 +1485,6 @@ const JobWatcher = () => {
                 <div className="job-meta job-manual-submit-row">
                   <span style={{ color: manualAppliedStatus === "Hozzáadva" ? "#4ade80" : "#ef4444" }}>{manualAppliedStatus}</span>
                   <button className="job-btn job-btn--green" onClick={handleAddManualApplied}>Hozzáadás</button>
-                </div>
-              </div>
-            )}
-          </li>
-        )}
-
-        {showAppliedOnly && (
-          <li
-            className={`job-card job-card--cloud-sync${cloudSyncOpen ? " open" : ""}`}
-            onClick={!cloudSyncOpen ? () => setCloudSyncOpen(true) : undefined}
-          >
-            <span className="job-card-fold job-card-fold--cloud" aria-hidden="true" />
-            <button
-              type="button"
-              className="job-manual-toggle"
-              onClick={(e) => {
-                e.stopPropagation();
-                setCloudSyncOpen((v) => !v);
-              }}
-            >
-              <span className="job-manual-cta">
-                <strong>☁ Felhő szinkron</strong>
-              </span>
-              <span className="job-source">{cloudSyncOpen ? "Nyitva" : "Megnyitás"}</span>
-            </button>
-
-            {cloudSyncOpen && (
-              <div onClick={(e) => e.stopPropagation()}>
-                <div className="job-sync-inline">
-                  <p className="job-sync-inline-desc">
-                    Mentsd a cloud-ba az összes jelentkezésedet, vagy töltsd le egy másik eszközről az ID megadásával. Most lokálisan van a böngésződben tárolva, de ha szeretnéd, hogy egy új gépen is meglegyen, használd ezt a funkciót a szinkronizáláshoz. Ha letöltesz egy másik eszközt akkor összefésüli a hirdetéseket és nem írja felül a meglévőket!
-                  </p>
-                  <div className="job-sync-inline-row">
-                    <button className="job-btn job-btn--green" onClick={handleSyncUpload}>
-                      ⬆ Upload to cloud
-                    </button>
-                  </div>
-                  <div className="job-sync-inline-id">
-                    <span className="job-sync-inline-id-label">🔑 A te szinkron ID-d:</span>
-                    <code className="job-sync-id">{myVisitorId}</code>
-                  </div>
-                  <div className="job-sync-inline-row">
-                    <input
-                      className="job-search"
-                      placeholder="Másik eszköz ID-ja (letöltéshez)"
-                      value={importId}
-                      onChange={(e) => {
-                        const nextValue = e.target.value;
-                        setImportId(nextValue);
-                        localStorage.setItem(IMPORT_ID_STORAGE, nextValue);
-                      }}
-                    />
-                  </div>
-                  <div className="job-sync-inline-row">
-                    <button className="job-btn job-btn--green" onClick={handleSyncDownload}>
-                      ⬇ Download from cloud
-                    </button>
-                  </div>
-                  {syncStatus && <div className="job-sync-status">{syncStatus}</div>}
                 </div>
               </div>
             )}
