@@ -11,16 +11,18 @@ import { withTimeout } from "./_error-logger.mjs";
  * Each background function gets the 15 min Netlify limit and runs
  * independently — keeping its own scraping logic intact.
  *
- * Targets:
- *   A_K, BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, OTP, T, PANNONDIAK,
- *   VALOREBASIS, TRENKWALDER, NOFLUFFJOBS,
- *   ERSTE, KH, MFB, RAIFFEISEN, UNICREDIT, CG, ATLASZ, EUDIAKOK, MELODIAK, ATS
+ * Hourly targets (≥10 active, or mixed scrapers):
+ *   BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, OTP, T, VALOREBASIS, NOFLUFFJOBS,
+ *   ERSTE, KH, RAIFFEISEN
  *
- * NOT here (run via their own schedule): MBH (cron_dispatcher_test),
- * WORKCENTER (cron_dispatcher_new_sources), P, L_1..L_11.
+ * Elsewhere: MBH (cron_dispatcher_test); low-volume <10 single-source scrapers
+ * (A_K, CG, ATS, MFB, UNICREDIT, EUDIAKOK, MELODIAK, ATLASZ, PANNONDIAK,
+ * TRENKWALDER, WORKCENTER) run once/day via cron_dispatcher_daily; P, L_1..L_11.
  */
+// Hourly targets: sources with ≥10 active postings, or mixed scrapers that also
+// feed a large source. Low-volume single-source scrapers (all <10) run once/day
+// via cron_dispatcher_daily.mjs instead.
 const TARGETS = [
-  { name: "cron_jobs_A_K-background" },
   { name: "cron_jobs_BLUE-background" },
   { name: "cron_jobs_DIAK_1-background" },
   { name: "cron_jobs_DIAK_2-background" },
@@ -29,23 +31,14 @@ const TARGETS = [
   { name: "cron_jobs_MIX-background" },
   { name: "cron_jobs_OTP-background" },
   { name: "cron_jobs_T-background" },
-  { name: "cron_jobs_PANNONDIAK-background" },
   { name: "cron_jobs_VALOREBASIS-background" },
-  { name: "cron_jobs_TRENKWALDER-background" },
   { name: "cron_jobs_NOFLUFFJOBS-background" },
   // Re-added 2026-07-01: these had silently dropped out of every dispatcher, so
   // they stopped running entirely (no inserts, no active-reconcile) and their
-  // job_posts froze at 100% active. None of them run via another dispatcher.
+  // job_posts froze at 100% active. Only the ≥10 banks stay hourly.
   { name: "cron_jobs_ERSTE-background" },
   { name: "cron_jobs_KH-background" },
-  { name: "cron_jobs_MFB-background" },
   { name: "cron_jobs_RAIFFEISEN-background" },
-  { name: "cron_jobs_UNICREDIT-background" },
-  { name: "cron_jobs_CG-background" },
-  { name: "cron_jobs_ATLASZ-background" },
-  { name: "cron_jobs_EUDIAKOK-background" },
-  { name: "cron_jobs_MELODIAK-background" },
-  { name: "cron_jobs_ATS-background" },
 ];
 
 export default withTimeout("cron_dispatcher", async () => {
