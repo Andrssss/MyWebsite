@@ -396,7 +396,7 @@ const JobWatcher = () => {
   const [manualAppliedSource, setManualAppliedSource] = useState("");
   const [manualAppliedUrl, setManualAppliedUrl] = useState("");
   const [manualAppliedDate, setManualAppliedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [manualAppliedExperience, setManualAppliedExperience] = useState("");
+  const [manualAppliedCompany, setManualAppliedCompany] = useState("");
   const [manualAppliedStatus, setManualAppliedStatus] = useState("");
   const [manualAddOpen, setManualAddOpen] = useState(false);
   const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
@@ -617,7 +617,7 @@ const JobWatcher = () => {
     const firstSeen = manualAppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(manualAppliedDate)
       ? new Date(manualAppliedDate + "T00:00:00").toISOString()
       : new Date().toISOString();
-    const manualJob = { source, title, url, firstSeen, experience: manualAppliedExperience.trim() || undefined };
+    const manualJob = { source, title, url, firstSeen, company: manualAppliedCompany.trim() || undefined };
     setAppliedKeys((prev) => { const next = new Set(prev); next.add(key); saveAppliedKeys(next); return next; });
     setAppliedCache((prev) => { const updated = { ...prev, [key]: manualJob }; saveAppliedCache(updated); return updated; });
     persistAdminApplied(key, true, false, manualJob);
@@ -625,7 +625,7 @@ const JobWatcher = () => {
     setManualAppliedSource("");
     setManualAppliedUrl("");
     setManualAppliedDate(new Date().toISOString().slice(0, 10));
-    setManualAppliedExperience("");
+    setManualAppliedCompany("");
     setManualAppliedStatus("Hozzáadva");
   };
 
@@ -1532,9 +1532,9 @@ const JobWatcher = () => {
                   />
                   <input
                     className="job-search"
-                    value={manualAppliedExperience}
-                    onChange={(e) => setManualAppliedExperience(e.target.value)}
-                    placeholder="Tapasztalat szint (opcionális)"
+                    value={manualAppliedCompany}
+                    onChange={(e) => setManualAppliedCompany(e.target.value)}
+                    placeholder="Cégnév (opcionális)"
                   />
                   <label className="job-manual-date-label">
                     <span>Jelentkezés dátuma</span>
