@@ -12,8 +12,8 @@ import { withTimeout } from "./_error-logger.mjs";
  */
 const TARGETS = [
   { name: "cron_jobs_MBH-background" },
-  { name: "cron_jobs_F_3-background", body: { startPage: 1 } },
-
+  // F_3 (workly) removed 2026-07-02: it already runs hourly via cron_dispatcher,
+  // so listing it here too fired it 2×/hour. Keep it in the main dispatcher only.
 ];
 
 export default withTimeout("cron_dispatcher_test", async () => {

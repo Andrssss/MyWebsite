@@ -37,14 +37,21 @@ const pool = new Pool({
 
 
  
-const _runStart = Date.now();
-const TIME_BUDGET_MS = 26000; // stop starting new sources after 26s to avoid 29s timeout
+// Reset per-invocation inside runAllBatches (see below). Must NOT stay at module
+// scope: on a warm Netlify instance the module is reused, so a module-load timestamp
+// makes timeLeft() immediately negative and skips EVERY batch.
+let _runStart = Date.now();
+// This is a *background* function → 14 min Netlify limit (see withTimeout). The old
+// 26s budget was copied from a non-background (29s) context and cut the run after the
+// 1st batch, so the 2nd batch (tudasdiak) never crawled and froze. Give it real room.
+const TIME_BUDGET_MS = 12 * 60 * 1000; // 12 min, margin under the 14 min hard limit
 
 function timeLeft() {
   return TIME_BUDGET_MS - (Date.now() - _runStart);
 }
 
 async function runAllBatches() {
+  _runStart = Date.now(); // per-invocation start, so the budget is measured from now
   const size = 4;
   const totalBatches = Math.ceil(SOURCES.length / size);
 
@@ -1024,12 +1031,14 @@ function extractScriptSrcs(html, baseUrl) {
 
 
 function buildMinddiakWhere_UI() {
-  const today = new Date().toISOString().slice(0, 10) + " 00:00:00";
-
+  // NOTE: no `date` filter. Previously `date: today` restricted results to jobs
+  // posted *today* only — same bug class as talent's `&date=1`: the active-model
+  // reconcile needs the FULL current IT/Budapest listing, else it wrongly
+  // deactivates still-open jobs older than today (and misses most current jobs).
+  // `status: 30` already scopes to active positions.
   return {
     type: 20,
     status: 30,                 // aktív pozíciók
-    date: today,                // csak a mai napon feladott állások
     work_type_md_id: [null, 10],// IT mérnök
     distance: 20,               // UI szerint
     county: [null, 13],         // Budapest

@@ -95,10 +95,34 @@ function extractSrDescription(detail) {
     .join(" ") || null;
 }
 
+// SmartRecruiters /postings caps a response at 100 items and pages via ?offset=N.
+// A single limit=100 call only returns the first 100 postings — e.g. Wise has ~367
+// and RolandBerger ~202, whose Budapest jobs sit past offset 100 — so we page until
+// the full listing (totalFound) is fetched. Getting the complete set is what makes
+// reconcileActive safe: a partial crawl would wrongly deactivate still-open jobs.
+const SR_PAGE_SIZE = 100;
+const SR_MAX_PAGES = 30; // safety cap (~3000 postings); totalFound normally stops sooner
+
+async function fetchAllSrPostings(company) {
+  const all = [];
+  for (let page = 0; page < SR_MAX_PAGES; page += 1) {
+    const offset = page * SR_PAGE_SIZE;
+    const listUrl =
+      `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(company)}/postings` +
+      `?limit=${SR_PAGE_SIZE}&offset=${offset}`;
+    const payload = await fetchJson(listUrl);
+    const content = Array.isArray(payload?.content) ? payload.content : [];
+    all.push(...content);
+
+    const totalFound = Number(payload?.totalFound ?? 0);
+    if (content.length < SR_PAGE_SIZE) break;          // short/last page
+    if (totalFound && all.length >= totalFound) break; // fetched the whole listing
+  }
+  return all;
+}
+
 async function fetchSmartRecruiters(src) {
-  const listUrl = `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(src.company)}/postings?limit=100`;
-  const payload = await fetchJson(listUrl);
-  const all = Array.isArray(payload?.content) ? payload.content : [];
+  const all = await fetchAllSrPostings(src.company);
 
   const nonHu = all.filter((it) => !isHungaryLocation(it?.location));
   const huItems = all.filter((it) => isHungaryLocation(it?.location));
