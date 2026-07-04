@@ -20,7 +20,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -1046,6 +1046,32 @@ function buildMinddiakWhere_UI() {
 }
 
 // =====================
+// URL-churn (volatilis id) minták — migrateVolatileUrl-hez.
+// Ezeknél a forrásoknál a job-URL-be ágyazott numerikus id ROTÁL, amikor a
+// hirdetést frissítik (DB-bizonyíték: zyntern 21700→21894, schonherz
+// 41362→41679, muisz 27873→28726 azonos slug mellett). A minta ugyanazt a
+// slugot bármilyen id alatt megtalálja, így a régi sor átnevezhető az új
+// URL-re deaktiválás + duplikátum helyett.
+// =====================
+const VOLATILE_URL_PATTERNS = {
+  // https://zyntern.com/job/{id}-{slug}
+  zyntern: (url) => {
+    const m = url.match(/^(https:\/\/zyntern\.com\/job\/)\d+-(.+)$/);
+    return m ? `^${escapeRegex(m[1])}\\d+-${escapeRegex(m[2])}$` : null;
+  },
+  // https://schonherz.hu/diakmunka/{város}/{kategória}/{id}-{slug}
+  schonherz: (url) => {
+    const m = url.match(/^(.*\/)\d+-([^/]+)$/);
+    return m ? `^${escapeRegex(m[1])}\\d+-${escapeRegex(m[2])}$` : null;
+  },
+  // https://muisz.hu/hu/diakmunkaink/{alias}--{id}
+  muisz: (url) => {
+    const m = url.match(/^(.*)--\d+$/);
+    return m ? `^${escapeRegex(m[1])}--\\d+$` : null;
+  },
+};
+
+// =====================
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
@@ -1099,9 +1125,14 @@ function extractSchonherz(html, baseUrl) {
   return dedupeByUrl(extractSchonherzFromHtml(html, baseUrl));
 }
 
+// Returns { jobs, complete } — complete=false when pagination broke mid-way
+// (page error) or the maxPages cap was hit while pages still had items. The
+// caller MUST pass this to reconcileActive: a partial list with complete=true
+// would wrongly deactivate every job on the unseen pages.
 async function fetchAllSchonherzJobs(initialHtml, baseUrl, { maxPages = 5 } = {}) {
   const all = extractSchonherzFromHtml(initialHtml, baseUrl);
   console.log(`[schonherz] page 0: ${all.length} items`);
+  let complete = false;
 
   for (let page = 1; page <= maxPages; page++) {
     try {
@@ -1117,20 +1148,26 @@ async function fetchAllSchonherzJobs(initialHtml, baseUrl, { maxPages = 5 } = {}
         body
       );
 
-      if (!ajaxHtml || ajaxHtml.trim().length === 0) break;
+      if (!ajaxHtml || ajaxHtml.trim().length === 0) {
+        complete = true; // natural end of listing
+        break;
+      }
 
       const pageItems = extractSchonherzFromHtml(ajaxHtml, baseUrl);
       console.log(`[schonherz] page ${page}: ${pageItems.length} items`);
 
-      if (!pageItems.length) break;
+      if (!pageItems.length) {
+        complete = true; // natural end of listing
+        break;
+      }
       all.push(...pageItems);
     } catch (err) {
       console.error(`[schonherz] page ${page} failed:`, err.message);
-      break;
+      break; // partial listing — complete stays false
     }
   }
 
-  return dedupeByUrl(all);
+  return { jobs: dedupeByUrl(all), complete };
 }
 
 function fetchSchonherzPage(url, body) {
@@ -1275,7 +1312,10 @@ async function fetchAllMuiszJobs({ categories = [3], locations = [10], limit = 1
     const items = list
       .map((j) => {
         const title = j?.job_name ? String(j.job_name).trim().slice(0, 300) : null;
-        const alias = j?.url_alias ? String(j.url_alias).trim() : null;
+        // encodeURIComponent: a raw "#" in the alias (e.g. "C#" titles) would be
+        // parsed as a fragment by new URL() and truncate the stored url to
+        // ".../diakmunkaink/C" — a broken link (real DB casualty).
+        const alias = j?.url_alias ? encodeURIComponent(String(j.url_alias).trim()) : null;
         const jobIdC = j?.job_id_c ? String(j.job_id_c).trim() : null;
         const url = alias && jobIdC ? `https://muisz.hu/hu/diakmunkaink/${alias}--${jobIdC}` : null;
         return { title, url, description: null };
@@ -1365,6 +1405,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // MERGE JOBS
       // =========================
       let merged = [];
+      // false → reconcileActive skips deactivation (partial crawl protection).
+      // Only schonherz can currently produce a partial-but-nonempty list.
+      let sourceComplete = true;
 
       if (source === "zyntern") {
         try {
@@ -1393,7 +1436,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       } else if (source === "schonherz") {
         try {
-          merged = await fetchAllSchonherzJobs(html, p.url);
+          const r = await fetchAllSchonherzJobs(html, p.url);
+          merged = r.jobs;
+          sourceComplete = r.complete;
+          if (!r.complete) console.log(`[schonherz] PARTIAL listing — deactivation will be skipped`);
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Schönherz pagination error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Schönherz pagination error: ${e.message}` });
@@ -1462,9 +1508,18 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // =========================
       if (write && client) {
         let saved = 0;
+        // Full current listing (pre-filter) — a url in this set is live on the
+        // source, so migrateVolatileUrl must never rename its row away.
+        const currentUrls = merged.map((c) => c.url);
+        const patternFor = VOLATILE_URL_PATTERNS[source];
         for (const item of matchedList) {
           item.experience = "diákmunka";
           try {
+            const pattern = patternFor ? patternFor(item.url) : null;
+            if (pattern) {
+              const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
+              if (migrated) console.log(`[${source}] MIGRATED url → ${item.url}`);
+            }
             await upsertJob(client, source, item);
             if (source === "minddiak") console.log(`[minddiak] SAVED: "${item.title}"  url=${item.url}`);
             saved++;
@@ -1473,8 +1528,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           }
         }
         if (source === "minddiak") console.log(`[minddiak] db_saved=${saved}/${matchedList.length}`);
-        const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: true });
-        console.log(`[diak1] active reconcile [${source}] — ${JSON.stringify(rc)}`);
+        const rc = await reconcileActive(client, source, matchedList.map((c) => c.url), { complete: sourceComplete });
+        console.log(`[diak1] active reconcile [${source}] complete=${sourceComplete} — ${JSON.stringify(rc)}`);
       } else if (source === "minddiak") {
         console.log(`[minddiak] write=false, would save ${matchedList.length} items`);
       }

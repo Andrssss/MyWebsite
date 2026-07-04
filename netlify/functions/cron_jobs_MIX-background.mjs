@@ -12,7 +12,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import {
   enrichExperience,
   extractBodyExperience,
@@ -193,6 +193,15 @@ function buildDreamJobsUrl(job) {
   if (!companySlug || !localizedSlug) return null;
 
   return normalizeUrl(`https://dreamjobs.hu/${lang}/job/${companySlug}/${localizedSlug}`);
+}
+
+// /{lang}/job/{company}/{slug}-{n} — the trailing counter BUMPS when the
+// company reposts the ad (DB evidence: artofinfo m365-engineer-1 → -2), so the
+// url alone can't be the row identity. Company is part of the prefix, so only
+// the same company's same slug matches.
+function dreamjobsVolatileUrlPattern(url) {
+  const m = url.match(/^(https:\/\/dreamjobs\.hu\/[a-z]{2}\/job\/[^/]+\/.+)-\d+$/);
+  return m ? `^${escapeRegex(m[1])}-\\d+$` : null;
 }
 
 function pickJobTitle(job) {
@@ -397,7 +406,11 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
   try {
     /* DreamJobs */
     try {
-      const dreamJobs = (await fetchAllDreamJobs()).filter((job) => {
+      const allDreamJobs = await fetchAllDreamJobs();
+      // Full current listing (pre-filter) — a url in this set is live on the
+      // source, so migrateVolatileUrl must never rename its row away.
+      const currentUrls = allDreamJobs.map((j) => j.url);
+      const dreamJobs = allDreamJobs.filter((job) => {
         if (isSeniorLike(job.title, "")) return false;
         const exp = String(job.experience || "").toLowerCase();
         if (/\bsenior\b/.test(exp)) return false;
@@ -406,6 +419,11 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
 
       for (const job of dreamJobs) {
+        const pattern = dreamjobsVolatileUrlPattern(job.url);
+        if (pattern) {
+          const migrated = await migrateVolatileUrl(client, "dreamjobs", job.url, pattern, currentUrls);
+          if (migrated) console.log(`[dreamjobs] MIGRATED url → ${job.url}`);
+        }
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);

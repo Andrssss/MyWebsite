@@ -21,7 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -79,6 +79,15 @@ function normalizeUrl(raw) {
   } catch {
     return raw;
   }
+}
+
+// /JobAdvertisement/{id}/{slug}/allasok — the embedded numeric id ROTATES when
+// the posting is refreshed (DB evidence: /339/linux-rendszermernok → /345/…),
+// so the url alone can't be the row identity. Pattern matches the same slug
+// under any id.
+function volatileUrlPattern(url) {
+  const m = url.match(/^(.*\/JobAdvertisement\/)\d+(\/.+)$/);
+  return m ? `^${escapeRegex(m[1])}\\d+${escapeRegex(m[2])}$` : null;
 }
 
 function _blacklistRegex(k) {
@@ -166,7 +175,14 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
     const rows = $("[data-position-url]").toArray();
     console.log(`[mfb] list: ${rows.length} jobs found`);
 
+    // Full current listing (pre-filter) — a url in this set is live on the
+    // source, so migrateVolatileUrl must never rename its row away.
+    const currentUrls = rows
+      .map((el) => normalizeWhitespace($(el).attr("data-position-url")))
+      .filter(Boolean);
+
     let newlyInserted = 0;
+    let migratedUrls = 0;
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
@@ -214,9 +230,16 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           experience = m ? m[1].trim() : (careerLevel || "-");
         }
 
+        const pattern = volatileUrlPattern(url);
+        const migrated = pattern
+          ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
+          : false;
         const wasNew = await upsertJob(client, source, { title, url, experience });
         foundUrls.push(url);
-        if (wasNew) {
+        if (migrated) {
+          migratedUrls++;
+          console.log(`[mfb] MIGRATED [${source}] "${title}" → ${url}`);
+        } else if (wasNew) {
           newlyInserted++;
           console.log(`[mfb] NEW [${source}] "${title}" exp=${experience} → ${url}`);
         } else {
@@ -229,7 +252,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
     }
 
     console.log(
-      `[mfb] DONE — total=${rows.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
+      `[mfb] DONE — total=${rows.length}, new=${newlyInserted}, migrated=${migratedUrls}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}`
     );
 

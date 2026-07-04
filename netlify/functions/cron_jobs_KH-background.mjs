@@ -18,7 +18,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -64,6 +64,14 @@ function normalizeUrl(raw) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// /allas/{slug}-{id} — the trailing numeric id ROTATES when the posting is
+// refreshed (DB evidence: …mobilbank-14912 → -15167), so the url alone can't be
+// the row identity. Pattern matches the same slug under any id.
+function volatileUrlPattern(url) {
+  const m = url.match(/^(.*)-\d+$/);
+  return m ? `^${escapeRegex(m[1])}-\\d+$` : null;
 }
 
 function _blacklistRegex(k) {
@@ -223,7 +231,12 @@ export default withTimeout("cron_jobs_KH-background", async () => {
     }
     console.log(`[kh] total unique rows: ${dedup.length}`);
 
+    // Full current listing (pre-filter) — a url in this set is live on the
+    // source, so migrateVolatileUrl must never rename its row away.
+    const currentUrls = dedup.map((r) => `${BASE}${r.url}`);
+
     let newlyInserted = 0;
+    let migratedUrls = 0;
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
@@ -272,9 +285,16 @@ export default withTimeout("cron_jobs_KH-background", async () => {
           }
         }
 
+        const pattern = volatileUrlPattern(url);
+        const migrated = pattern
+          ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
+          : false;
         const wasNew = await upsertJob(client, source, { title, url, experience });
         foundUrls.push(url);
-        if (wasNew) {
+        if (migrated) {
+          migratedUrls++;
+          console.log(`[kh] MIGRATED [${source}] "${title}" → ${url}`);
+        } else if (wasNew) {
           newlyInserted++;
           console.log(`[kh] NEW [${source}] "${title}" exp=${experience} → ${url}`);
         } else {
@@ -287,7 +307,7 @@ export default withTimeout("cron_jobs_KH-background", async () => {
     }
 
     console.log(
-      `[kh] DONE — total=${dedup.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
+      `[kh] DONE — total=${dedup.length}, new=${newlyInserted}, migrated=${migratedUrls}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
 

@@ -28,7 +28,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl } from "./_active_core.mjs";
 import { extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -107,6 +107,19 @@ function absolutize(href, base) {
     return null;
   }
 }
+
+// OTP (SuccessFactors) — a /job/{slug}/{reqId}/ url-ben a reqId a STABIL rész,
+// a slug dekoratív és driftel (cím-szerkesztés, "-1131" lokáció-kód, encoding,
+// sőt a path-prefix is változott már: /job/ ↔ /otp/job/). DB-bizonyíték: azonos
+// reqId két különböző slug alatt. A minta ugyanazt a reqId-t találja meg
+// bármilyen slug/prefix alatt, így migrateVolatileUrl a régi sort átnevezi az
+// aktuális url-re deaktiválás + duplikátum helyett.
+const VOLATILE_URL_PATTERNS = {
+  otp: (url) => {
+    const m = url.match(/^https:\/\/karrier\.otpbank\.hu(?:\/otp|\/leanyvallalatok)?\/job\/[^/]+\/(\d+)\/?$/);
+    return m ? `^https://karrier\\.otpbank\\.hu(/otp|/leanyvallalatok)?/job/[^/]+/${m[1]}/?$` : null;
+  },
+};
 
 function mergeCandidates(...lists) {
   // flatten + dedupe URL alapján
@@ -690,7 +703,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (write && client) {
         console.log(`${tag}   DB upsert: ${matchedList.length} állás mentése...`);
         const DIAKMUNKA_SOURCES = ["vizmuvek", "miszisz", "onejob"];
+        // Full current listing (pre-filter) of THIS list-url — a url in this set
+        // is live on the source, so migrateVolatileUrl must never rename its row away.
+        const currentUrls = merged.map((c) => c.url);
+        const patternFor = VOLATILE_URL_PATTERNS[source];
         for (const item of matchedList) {
+          const pattern = patternFor ? patternFor(item.url) : null;
+          if (pattern) {
+            const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
+            if (migrated) console.log(`${tag}   MIGRATED url → ${item.url}`);
+          }
           if (source === "otp") {
             // OTP itt már nem csak diákmunkát ad vissza: az IT / üzletfejlesztés
             // kategóriák minden szintet tartalmaznak. Ezért — ahogy a professionnél —

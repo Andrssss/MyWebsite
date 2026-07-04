@@ -6,7 +6,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -291,6 +291,17 @@ async function fetchNofluffExperience(url) {
 
 /* ── DB ──────────────────────────────────────────────────────── */
 
+// /hu/job/{slug} — reposts of the same ad get a SMALL trailing counter
+// (…siemens-mobility-kft--budapest → …--budapest-1; DB shows -1…-13), so the
+// counterless and countered slugs are the same posting over time. Only tails of
+// 1-3 digits count as counters — a 4-digit tail like "-2026" is part of the
+// title (graduate programs) and must NOT be merged across years.
+function volatileUrlPattern(url) {
+  const m = url.match(/^(.*)-\d{1,3}$/);
+  const base = m ? m[1] : url;
+  return `^${escapeRegex(base)}(-\\d{1,3})?$`;
+}
+
 async function upsertJob(client, item) {
   await client.query(
     `INSERT INTO job_posts
@@ -308,6 +319,7 @@ async function scrapeNofluffjobs(client) {
   const seen = new Set();
   let totalUpserted = 0;
   const foundUrls = [];
+  const allItems = [];
   let crawlError = false;
 
   for (const sourceUrl of NOFLUFF_SOURCES) {
@@ -347,18 +359,26 @@ async function scrapeNofluffjobs(client) {
       });
 
     console.log(`[nofluffjobs]   after filters: ${merged.length}`);
-
-    for (const item of merged) {
-      const exp = await fetchNofluffExperience(item.url);
-      if (exp) item.experience = exp;
-      await sleep(400);
-      console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] "${item.title}"`);
-      await upsertJob(client, item);
-      foundUrls.push(item.url);
-      totalUpserted++;
-    }
+    allItems.push(...merged);
 
     await sleep(1000);
+  }
+
+  // Upsert AFTER all list pages are collected, so migrateVolatileUrl knows the
+  // FULL current listing (a url still listed must never be renamed away).
+  const currentUrls = allItems.map((c) => c.url);
+  for (const item of allItems) {
+    const exp = await fetchNofluffExperience(item.url);
+    if (exp) item.experience = exp;
+    await sleep(400);
+    const migrated = await migrateVolatileUrl(
+      client, "nofluffjobs", item.url, volatileUrlPattern(item.url), currentUrls
+    );
+    if (migrated) console.log(`[nofluffjobs]   MIGRATED url → ${item.url}`);
+    console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] "${item.title}"`);
+    await upsertJob(client, item);
+    foundUrls.push(item.url);
+    totalUpserted++;
   }
 
   const rc = await reconcileActive(client, "nofluffjobs", foundUrls, { complete: !crawlError });

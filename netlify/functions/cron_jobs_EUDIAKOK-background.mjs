@@ -278,7 +278,13 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
           console.log(`[eudiakok] EXISTS "${parsed.title}" → ${detailUrl}`);
         }
       } catch (err) {
+        // The job's EXISTENCE is proven by the list page (jobLinks); the detail
+        // fetch only supplies title/experience. Still push the url to foundUrls,
+        // otherwise a single flaky detail would let reconcile deactivate a live
+        // job — and gating `complete` on detail failures (the old behavior)
+        // blocked ALL deactivation whenever one detail hiccuped.
         detailFetchFailed++;
+        foundUrls.push(detailUrl);
         await logFetchError("cron_jobs_EUDIAKOK-background", { url: detailUrl, message: err.message });
         console.error(`[eudiakok] detail fetch failed ${detailUrl}: ${err.message}`);
       }
@@ -290,7 +296,9 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
       `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
     );
 
-    const complete = detailFetchFailed === 0;
+    // List fetch succeeded (we returned early otherwise), so the crawl is
+    // complete: detail failures no longer threaten any listed job's row.
+    const complete = true;
     const rc = await reconcileActive(client, "eudiakok", foundUrls, { complete });
     console.log(`[eudiakok] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {

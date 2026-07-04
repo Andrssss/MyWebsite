@@ -59,8 +59,24 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
   const urls = [...new Set((foundUrls || []).filter(Boolean))];
 
   // Empty set ⇒ almost certainly a failed/blocked crawl. Never deactivate then.
-  if (urls.length === 0 || !complete) {
-    return { deactivated: 0, skipped: true };
+  if (urls.length === 0) {
+    return { deactivated: 0, reactivated: 0, skipped: true };
+  }
+
+  // Reactivate rows that re-appeared on the source. Being in foundUrls proves the
+  // posting is live, so this is safe even on a partial (complete=false) crawl.
+  // Steady state (everything already active) touches zero rows.
+  const reactivated = await client.query(
+    `UPDATE job_posts
+        SET active = true
+      WHERE source = $1
+        AND active = false
+        AND url = ANY($2::text[])`,
+    [source, urls]
+  );
+
+  if (!complete) {
+    return { deactivated: 0, reactivated: reactivated.rowCount ?? 0, skipped: true };
   }
 
   // Deactivate aged jobs that vanished from the source.
@@ -76,8 +92,52 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
 
   return {
     deactivated: deactivated.rowCount ?? 0,
+    reactivated: reactivated.rowCount ?? 0,
     skipped: false,
   };
+}
+
+/** Escape a literal string for use inside a POSIX/Postgres regex. */
+export function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * URL-churn healer for sources whose job URLs embed a VOLATILE id: the site
+ * re-serves the same posting under a new id (`/allas/{slug}-{id}`,
+ * `/job/{id}-{slug}`, `…-{counter}`), so url-keyed reconcile would deactivate
+ * the old row and insert a duplicate. Call this right BEFORE upserting a job:
+ * if `newUrl` is not stored yet but exactly one older row matches
+ * `oldUrlPattern` (same stable part, different id) AND that row's url is no
+ * longer on the source (not in `currentUrls`), the row is renamed to `newUrl`
+ * in place — first_seen (and thus the grace window) is preserved, no duplicate
+ * is created, and the fresh url stays navigable.
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {string} source
+ * @param {string} newUrl          url built from the current listing
+ * @param {string} oldUrlPattern   Postgres regex matching the volatile-id variants
+ * @param {string[]} currentUrls   ALL urls seen on the source this run (a row
+ *                                  still listed must never be renamed away)
+ * @returns {Promise<boolean>}     true if an old row was renamed to newUrl
+ */
+export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, currentUrls) {
+  await ensureActiveSchema(client);
+  const res = await client.query(
+    `UPDATE job_posts
+        SET url = $2, active = true
+      WHERE id = (
+        SELECT id FROM job_posts
+         WHERE source = $1
+           AND url ~ $3
+           AND url <> $2
+           AND url <> ALL($4::text[])
+           AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = $1 AND url = $2)
+         ORDER BY active DESC, first_seen DESC
+         LIMIT 1)`,
+    [source, newUrl, oldUrlPattern, (currentUrls || []).filter(Boolean)]
+  );
+  return (res.rowCount ?? 0) > 0;
 }
 
 /**

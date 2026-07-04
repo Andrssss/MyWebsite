@@ -6,7 +6,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -338,6 +338,17 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
   };
 }
 
+// /allas/{title-company-slug}-{id} — profession re-posts expiring ads under a
+// NEW numeric id (DB evidence: net-fejleszto-mortoff-…-2875224 → -2899456 →
+// -2925021), which used to reset first_seen and pile up duplicate rows. Only
+// 4+ digit tails count (real ids are 7 digits); a shorter numeric tail could be
+// part of the title. The still-listed guard (currentUrls) protects concurrent
+// same-title postings.
+function volatileUrlPattern(url) {
+  const m = url.match(/^(.*)-\d{4,}$/);
+  return m ? `^${escapeRegex(m[1])}-\\d{4,}$` : null;
+}
+
 // =====================
 // DB upsert
 // =====================
@@ -474,6 +485,9 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   }
 
   if (client) {
+    // Full current listing (pre-filter) — a url in this set is live on the
+    // source, so migrateVolatileUrl must never rename its row away.
+    const currentUrls = merged.map((c) => c.url);
     for (const item of matchedList) {
       if (isInternshipTitle(item.title)) item.experience = "diákmunka";
       else if (isJuniorTitle(item.title)) item.experience = "junior";
@@ -500,6 +514,11 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         }
       }
 
+      const pattern = volatileUrlPattern(item.url);
+      if (pattern) {
+        const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
+        if (migrated) console.log(`[${source}] MIGRATED url → ${item.url}`);
+      }
       await upsertJob(client, source, item);
     }
 

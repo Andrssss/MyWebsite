@@ -22,9 +22,18 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 
 let _filters = [];
+
+// /JobAdvertisement/{id}/{slug}/{cat} — same HRmaster platform as MFB, where the
+// embedded numeric id ROTATES when the posting is refreshed (confirmed on MFB:
+// /339/linux-rendszermernok → /345/…). No MBH churn pair in the DB yet, but the
+// mechanism is identical, so guard proactively.
+function volatileUrlPattern(url) {
+  const m = url.match(/^(.*\/JobAdvertisement\/)\d+(\/.+)$/);
+  return m ? `^${escapeRegex(m[1])}\\d+${escapeRegex(m[2])}$` : null;
+}
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -335,6 +344,11 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
           continue;
         }
 
+        const pattern = volatileUrlPattern(detailUrl);
+        const migrated = pattern
+          ? await migrateVolatileUrl(client, "mbh", detailUrl, pattern, [...jobSet])
+          : false;
+        if (migrated) console.log(`[mbh] MIGRATED url → ${detailUrl}`);
         const wasNew = await upsertJob(client, "mbh", {
           title: parsed.title,
           url: detailUrl,
@@ -352,7 +366,11 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
           console.log(`[mbh] EXISTS "${parsed.title}" → ${detailUrl}`);
         }
       } catch (err) {
+        // The job's EXISTENCE is proven by the list (jobSet); the detail fetch
+        // only supplies title/experience. Still push the url to foundUrls so a
+        // flaky detail can't get a live job deactivated by reconcile.
         detailFetchFailed++;
+        foundUrls.push(detailUrl);
         await logFetchError("cron_jobs_MBH-background", { url: detailUrl, message: err.message });
         console.error(`[mbh] detail fetch failed ${detailUrl}: ${err.message}`);
       }
@@ -364,9 +382,9 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
       `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
     );
 
-    // Reconcile active flag: only deactivate when the crawl was complete (no
-    // list/detail fetch failures), so a transient failure can't hide real jobs.
-    const complete = !listFetchFailed && detailFetchFailed === 0;
+    // Reconcile active flag: detail failures no longer block deactivation (the
+    // failed url stays in foundUrls), only a failed LIST fetch does.
+    const complete = !listFetchFailed;
     const rc = await reconcileActive(client, "mbh", foundUrls, { complete });
     console.log(`[mbh] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {

@@ -10,10 +10,19 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
+
+// jobs.smartrecruiters.com/{Company}/{id}-{slug} — the long numeric id ROTATES
+// when the posting is refreshed (DB evidence: Wise backend-engineer-risk-…
+// 744000133288855 → 744000134983949), so the url alone can't be the row
+// identity. Pattern matches the same company+slug under any id.
+function volatileUrlPattern(url) {
+  const m = url.match(/^(https:\/\/jobs\.smartrecruiters\.com\/[^/]+\/)\d+-(.+)$/);
+  return m ? `^${escapeRegex(m[1])}\\d+-${escapeRegex(m[2])}$` : null;
+}
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -234,6 +243,14 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
     const deduped = dedupeBySourceUrl(collected);
     candidates = deduped.length;
 
+    // Full current listing per source (pre-senior-filter) — a url in this set is
+    // live on the source, so migrateVolatileUrl must never rename its row away.
+    const currentBySource = new Map();
+    for (const item of deduped) {
+      if (!currentBySource.has(item.source)) currentBySource.set(item.source, []);
+      currentBySource.get(item.source).push(item.url);
+    }
+
     for (const item of deduped) {
       if (isSeniorLike(item.title)) {
         console.log(`[ats] skip senior: "${item.title}" (${item.source})`);
@@ -241,6 +258,13 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
         continue;
       }
 
+      const pattern = volatileUrlPattern(item.url);
+      if (pattern) {
+        const migrated = await migrateVolatileUrl(
+          client, item.source, item.url, pattern, currentBySource.get(item.source) || []
+        );
+        if (migrated) console.log(`[ats] MIGRATED url → ${item.url} (${item.source})`);
+      }
       const wasNew = await upsertJob(client, item);
       if (wasNew) newlyInserted += 1;
       else alreadyExisted += 1;

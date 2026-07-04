@@ -12,7 +12,7 @@ import { withTimeout } from "./_error-logger.mjs";
  * independently — keeping its own scraping logic intact.
  *
  * Hourly targets (≥10 active, or mixed scrapers):
- *   BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, OTP, T, VALOREBASIS, NOFLUFFJOBS,
+ *   BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, T, VALOREBASIS, NOFLUFFJOBS,
  *   ERSTE, KH, RAIFFEISEN
  *
  * Elsewhere: MBH (cron_dispatcher_test); low-volume <10 single-source scrapers
@@ -29,7 +29,11 @@ const TARGETS = [
   { name: "cron_jobs_DIAK_3-background" },
   { name: "cron_jobs_F_3-background", body: { startPage: 1 } },
   { name: "cron_jobs_MIX-background" },
-  { name: "cron_jobs_OTP-background" },
+  // cron_jobs_OTP-background REMOVED 2026-07-04: DIAK_3 also scrapes source
+  // "otp" (3 OTP lists, superset of OTP-background's Pályakezdő∩IT slice) and
+  // both called reconcileActive("otp") with DIFFERENT url formats — the two
+  // reconciles kept deactivating each other's rows, so only <3-day-old jobs
+  // survived (38 total / 2 active). DIAK_3 is the single "otp" writer now.
   { name: "cron_jobs_T-background" },
   { name: "cron_jobs_VALOREBASIS-background" },
   { name: "cron_jobs_NOFLUFFJOBS-background" },

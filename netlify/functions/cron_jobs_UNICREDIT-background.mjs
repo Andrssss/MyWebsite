@@ -192,18 +192,21 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           experience = "diákmunka";
         } else {
           await sleep(800);
-          let detailHtml;
           try {
-            detailHtml = await fetchText(job.url);
+            const detailHtml = await fetchText(job.url);
+            // Body uses em-dash ("1–3 év") which extractBodyExperience may not match
+            const normalizedHtml = detailHtml.replace(/–/g, "-");
+            experience = extractBodyExperience(normalizedHtml) || "-";
           } catch (err) {
+            // The job's existence is already known from the LIST (title too) —
+            // keep it (experience "-") and still upsert + push to foundUrls.
+            // The old `continue` dropped it from foundUrls, so active-reconcile
+            // could wrongly deactivate a live job on a flaky detail fetch.
             detailFetchFailed++;
             await logFetchError("cron_jobs_UNICREDIT-background", { url: job.url, message: err.message });
             console.error(`[unicredit] detail fetch failed ${job.url}: ${err.message}`);
-            continue;
+            experience = "-";
           }
-          // Body uses em-dash ("1–3 év") which extractBodyExperience may not match
-          const normalizedHtml = detailHtml.replace(/–/g, "-");
-          experience = extractBodyExperience(normalizedHtml) || "-";
         }
 
         const wasNew = await upsertJob(client, source, {
@@ -229,7 +232,9 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
 
-    const complete = detailFetchFailed === 0;
+    // List fetch succeeded (we returned early otherwise) and detail failures no
+    // longer drop jobs from foundUrls, so the crawl is complete.
+    const complete = true;
     const rc = await reconcileActive(client, "unicredit", foundUrls, { complete });
     console.log(`[unicredit] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
