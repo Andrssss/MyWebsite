@@ -20,6 +20,8 @@
 // LinkedIn never calls this (it only sees a recent window); it stays time-based
 // on the frontend instead.
 
+import { logRecovery } from "./_error-logger.mjs";
+
 // How long after first_seen a job is unconditionally active before it becomes
 // eligible for "is it still on the source?" checking.
 export const ACTIVE_GRACE_DAYS = 3;
@@ -71,9 +73,18 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
         SET active = true
       WHERE source = $1
         AND active = false
-        AND url = ANY($2::text[])`,
+        AND url = ANY($2::text[])
+      RETURNING url`,
     [source, urls]
   );
+  if (reactivated.rows.length > 0) {
+    logRecovery({
+      type: "reactivated",
+      source,
+      count: reactivated.rows.length,
+      urls: reactivated.rows.map((r) => r.url),
+    });
+  }
 
   if (!complete) {
     return { deactivated: 0, reactivated: reactivated.rowCount ?? 0, skipped: true };
@@ -123,21 +134,65 @@ export function escapeRegex(s) {
  */
 export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, currentUrls) {
   await ensureActiveSchema(client);
+  // CTE keeps hold of the pre-rename url so the recovery log can show from→to.
   const res = await client.query(
-    `UPDATE job_posts
-        SET url = $2, active = true
-      WHERE id = (
-        SELECT id FROM job_posts
+    `WITH victim AS (
+        SELECT id, url FROM job_posts
          WHERE source = $1
            AND url ~ $3
            AND url <> $2
            AND url <> ALL($4::text[])
            AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = $1 AND url = $2)
          ORDER BY active DESC, first_seen DESC
-         LIMIT 1)`,
+         LIMIT 1)
+     UPDATE job_posts
+        SET url = $2, active = true
+       FROM victim
+      WHERE job_posts.id = victim.id
+      RETURNING victim.url AS old_url`,
     [source, newUrl, oldUrlPattern, (currentUrls || []).filter(Boolean)]
   );
-  return (res.rowCount ?? 0) > 0;
+  const migrated = (res.rowCount ?? 0) > 0;
+  if (migrated) {
+    logRecovery({
+      type: "url-migrated",
+      source,
+      from: res.rows[0].old_url,
+      to: newUrl,
+    });
+  }
+  return migrated;
+}
+
+// Sources whose sites answer a DEAD job url with a 200 redirect to a generic
+// listing page instead of a 404 (ydiak → /aktualis-diakmunkaink), so the plain
+// 404 rule never fires. For these, "redirected to a DIFFERENT path" counts as
+// dead. Kept per-source: many healthy sites redirect http→https or add a
+// trailing slash, which keeps the path and stays alive under this rule.
+export const REDIRECT_DEAD_SOURCES = new Set(["ydiak"]);
+
+function _pathOf(u) {
+  try {
+    const p = new URL(u).pathname.replace(/\/+$/, "");
+    return p || "/";
+  } catch {
+    return null;
+  }
+}
+
+function _isDeadResult(row, res) {
+  if (!res) return false;
+  if (res.status === 404) return true;
+  if (
+    REDIRECT_DEAD_SOURCES.has(row.source) &&
+    res.status >= 200 && res.status < 400 &&
+    res.finalUrl
+  ) {
+    const a = _pathOf(row.url);
+    const b = _pathOf(res.finalUrl);
+    return a !== null && b !== null && a !== b;
+  }
+  return false;
 }
 
 /**
@@ -147,48 +202,50 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
  * current listing. Windowed / synthetic-URL sources (RSS "latest N", hash URLs)
  * can't, so their dead jobs never fall out of the set. This sweep instead asks
  * each active job's OWN URL whether it still exists, and deactivates the ones
- * that return HTTP 404 (gone).
+ * that are provably gone: final HTTP 404, or — for REDIRECT_DEAD_SOURCES — a
+ * 200 that landed on a different path (listing-page redirect).
  *
- * Network-agnostic: the caller injects `checkStatus(url) => Promise<number>`
- * returning the final HTTP status (after redirects). Negative / non-404 values
- * are treated as "still alive" — only a real 404 proves the posting is gone.
- * Each 404 is re-checked once to drop transients before it deactivates.
+ * Network-agnostic: the caller injects
+ * `checkFinal(url) => Promise<{status:number, finalUrl:string|null}>` returning
+ * the final status and final URL after redirects. Negative statuses (local
+ * failure) and 403/429/5xx are treated as "still alive". Each dead verdict is
+ * re-checked once to drop transients before it deactivates.
  *
  * LinkedIn is excluded: bot-blocked (no clean 404s) and shown time-based on the
  * frontend, so its `active` flag is irrelevant.
  *
  * @param {import("pg").PoolClient} client
- * @param {(url: string) => Promise<number>} checkStatus
+ * @param {(url: string) => Promise<{status:number, finalUrl:string|null}>} checkFinal
  * @param {object} [opts]
  * @param {number} [opts.concurrency=12]
- * @returns {Promise<{checked:number, first404:number, deactivated:number}>}
+ * @returns {Promise<{checked:number, suspects:number, deactivated:number}>}
  */
-export async function sweepActive404(client, checkStatus, opts = {}) {
+export async function sweepActive404(client, checkFinal, opts = {}) {
   const concurrency = Math.max(1, opts.concurrency ?? 12);
 
   await ensureActiveSchema(client);
 
   const { rows } = await client.query(
-    `SELECT url FROM job_posts WHERE active = true AND source <> 'LinkedIn'`
+    `SELECT url, source FROM job_posts WHERE active = true AND source <> 'LinkedIn'`
   );
-  if (rows.length === 0) return { checked: 0, first404: 0, deactivated: 0 };
+  if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0 };
 
   // Round-robin the URLs across `concurrency` workers.
-  const status = new Map();
+  const results = new Map();
   const lanes = Array.from({ length: concurrency }, (_, i) =>
     rows.filter((_, idx) => idx % concurrency === i)
   );
   await Promise.all(
     lanes.map(async (list) => {
-      for (const { url } of list) status.set(url, await checkStatus(url));
+      for (const row of list) results.set(row.url, await checkFinal(row.url));
     })
   );
 
-  // Re-check first-pass 404s once; only a still-404 deactivates.
-  const suspects = rows.filter((r) => status.get(r.url) === 404).map((r) => r.url);
+  // Re-check first-pass dead verdicts once; only a still-dead row deactivates.
+  const suspects = rows.filter((r) => _isDeadResult(r, results.get(r.url)));
   const confirmed = [];
-  for (const url of suspects) {
-    if ((await checkStatus(url)) === 404) confirmed.push(url);
+  for (const row of suspects) {
+    if (_isDeadResult(row, await checkFinal(row.url))) confirmed.push(row.url);
   }
 
   let deactivated = 0;
@@ -204,5 +261,26 @@ export async function sweepActive404(client, checkStatus, opts = {}) {
     deactivated = res.rowCount ?? 0;
   }
 
-  return { checked: rows.length, first404: suspects.length, deactivated };
+  return { checked: rows.length, suspects: suspects.length, deactivated };
+}
+
+/**
+ * Time-based expiry for push-only sources (no scraper → reconcileActive never
+ * runs, so their rows would stay active forever). Deactivates rows older than
+ * `days` by first_seen. Used for `random_email` (10 days, per user decision
+ * 2026-07-04). One-way: a re-pushed job arrives as a fresh insert.
+ *
+ * @returns {Promise<number>} rows deactivated
+ */
+export async function expireAgedPushSource(client, source, days) {
+  await ensureActiveSchema(client);
+  const res = await client.query(
+    `UPDATE job_posts
+        SET active = false
+      WHERE source = $1
+        AND active = true
+        AND first_seen < NOW() - make_interval(days => $2::int)`,
+    [source, days]
+  );
+  return res.rowCount ?? 0;
 }

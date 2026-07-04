@@ -4,7 +4,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, flushErrors } from "./_error-logger.mjs";
+import { logFetchError, flushErrors, flushRecoveries } from "./_error-logger.mjs";
 import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 
@@ -252,6 +252,7 @@ export default async (request) => {
   } finally {
     client.release();
     await flushErrors(JOB_NAME).catch(() => {});
+    await flushRecoveries(JOB_NAME).catch(() => {});
   }
 
   return new Response("OK");

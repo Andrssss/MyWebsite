@@ -1,5 +1,5 @@
 import { processProfessionSources } from "./_profession_core.mjs";
-import { flushErrors } from "./_error-logger.mjs";
+import { flushErrors, flushRecoveries } from "./_error-logger.mjs";
 import { enrichExperience, extractProfessionExperience } from "./_experience_core.mjs";
 
 const BASE_JOB_NAME = "cron_jobs_P-background";
@@ -58,6 +58,7 @@ export default async (request) => {
     }
   } finally {
     await flushErrors(BASE_JOB_NAME).catch(() => {});
+    await flushRecoveries(BASE_JOB_NAME).catch(() => {});
   }
   return response;
 };

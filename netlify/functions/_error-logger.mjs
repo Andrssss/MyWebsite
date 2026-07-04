@@ -1,9 +1,54 @@
 import { getStore } from "@netlify/blobs";
 
 const STORE_NAME = "fetch-error-logs";
+const RECOVERY_STORE_NAME = "recovery-logs";
 
 /* ── per-run error queue (flushed automatically by withTimeout) ── */
 const pendingErrors = new Map();
+
+/* ── per-run recovery queue (url-migrations / reactivations) ──────
+   Same lifecycle as pendingErrors: collected in memory during the run and
+   flushed into ONE Netlify Blob at the end — zero blob writes when nothing
+   was recovered. A container runs one invocation at a time, so a module-level
+   array is safe. */
+const pendingRecoveries = [];
+
+/**
+ * Queue a recovery event (a DB write that healed state rather than ingesting):
+ *   { type: "url-migrated",  source, from, to }
+ *   { type: "reactivated",   source, count, urls }
+ * Flushed by withTimeout (or an explicit flushRecoveries call) into the
+ * "recovery-logs" blob store so DB-side healing stays auditable without any
+ * extra DB writes.
+ */
+export function logRecovery(event) {
+  pendingRecoveries.push({ ...event, time: new Date().toISOString() });
+  console.log(`[recovery-logger] queued ${event.type} [${event.source}]`);
+}
+
+/** Flush queued recovery events into one "recovery-logs" blob for this run. */
+export async function flushRecoveries(cronJob) {
+  if (pendingRecoveries.length === 0) return;
+  try {
+    const store = getStore(RECOVERY_STORE_NAME);
+    const now = new Date();
+    const ts = now.toISOString().replace(/[:.]/g, "-");
+    const key = `${cronJob}/${ts}.json`;
+
+    const entry = {
+      cronJob,
+      date: now.toISOString(),
+      eventCount: pendingRecoveries.length,
+      events: pendingRecoveries.slice(),
+    };
+
+    await store.set(key, JSON.stringify(entry, null, 2));
+    console.log(`[recovery-logger] ${cronJob}: flushed ${entry.eventCount} recovery event(s)`);
+    pendingRecoveries.length = 0;
+  } catch (logErr) {
+    console.error(`[recovery-logger] flush failed: ${logErr.message}`);
+  }
+}
 
 /**
  * Queue a fetch / network error for batch logging.
@@ -91,6 +136,7 @@ export function withTimeout(cronJob, handler, limitMs) {
       try {
         const result = await handler(...args);
         await flushErrors(cronJob);
+        await flushRecoveries(cronJob);
         return result;
       } catch (err) {
         const elapsed = Date.now() - start;
@@ -100,6 +146,7 @@ export function withTimeout(cronJob, handler, limitMs) {
           extra: { elapsedMs: elapsed, stack: err.stack },
         });
         await flushErrors(cronJob);
+        await flushRecoveries(cronJob);
         throw err;
       }
     })();
@@ -115,6 +162,7 @@ export function withTimeout(cronJob, handler, limitMs) {
       });
       console.error(`[${cronJob}] TIMEOUT after ${(elapsed / 1000).toFixed(1)}s`);
       await flushErrors(cronJob);
+      await flushRecoveries(cronJob);
 
       // Kill the process so the zombie handler doesn't keep running
       setTimeout(() => process.exit(0), 500);
