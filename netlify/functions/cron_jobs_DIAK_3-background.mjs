@@ -473,13 +473,15 @@ async function upsertJob(client, source, item) {
 }
 
 
-async function fetchNofluffExperience(url) {
+// Let\u00f6lti a hirdet\u00e9s-oldalt \u00e9s kiolvassa, h\u00e1ny \u00e9vet v\u00e1rnak el a t\u00f6rzssz\u00f6vegb\u0151l.
+// (wherewework + otp "egy\u00e9b" \u00e1gon haszn\u00e1ljuk.)
+async function fetchDetailExperience(url) {
   try {
     const html = await fetchText(url);
     const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
     return extractBodyExperience(normalizedHtml) || null;
   } catch (err) {
-    await logFetchError("cron_jobs_DIAK_3", { url, message: `nofluff experience: ${err.message}` });
+    await logFetchError("cron_jobs_DIAK_3", { url, message: `detail experience: ${err.message}` });
     return null;
   }
 }
@@ -690,16 +692,27 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         const DIAKMUNKA_SOURCES = ["vizmuvek", "miszisz", "onejob"];
         for (const item of matchedList) {
           if (source === "otp") {
-            // OTP-nál valódi junior/medior IT/üzleti állások is vannak, ezért NEM
-            // címkézünk mindent diákmunkának: a tiszta junior/medior címeket
-            // előléptetjük, minden más marad diákmunka.
-            item.experience = isJuniorTitle(item.title) ? "junior"
-              : isMidLevelTitle(item.title) ? "medior"
-              : "diákmunka";
+            // OTP itt már nem csak diákmunkát ad vissza: az IT / üzletfejlesztés
+            // kategóriák minden szintet tartalmaznak. Ezért — ahogy a professionnél —
+            // a névből döntünk, és ha a név nem árulkodik, letöltjük a hirdetést:
+            //   • junior/medior a névben → junior/medior
+            //   • gyakornoki keyword a névben → diákmunka
+            //   • egyébként fetch + hány évet várnak el (extractBodyExperience)
+            if (isJuniorTitle(item.title)) {
+              item.experience = "junior";
+            } else if (isMidLevelTitle(item.title)) {
+              item.experience = "medior";
+            } else if (isInternshipTitle(item.title)) {
+              item.experience = "diákmunka";
+            } else {
+              const exp = await fetchDetailExperience(item.url);
+              item.experience = exp || "-";
+              await sleep(400);
+            }
           } else if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
           } else if (source === "wherewework") {
-            const exp = await fetchNofluffExperience(item.url);
+            const exp = await fetchDetailExperience(item.url);
             if (exp) item.experience = exp;
             await sleep(400);
           }
