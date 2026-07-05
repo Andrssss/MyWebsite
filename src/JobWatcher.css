@@ -405,7 +405,7 @@
 }
 
 .job-tab.active {
-  background: linear-gradient(135deg, #4f8cff, #6aa9ff);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
   border-color: transparent;
 }
@@ -640,20 +640,8 @@
   white-space: nowrap;
 }
 
-.job-meta {
-  font-size: 18px; /* vagy akár 18px */
-  line-height: 1.6; /* jobb olvashatóság */
-  color: #ccc; /* ha túl sötét, világosítsd */
-}
-
 .job-tab.highlighted {
   background: #ef4444;
-  color: #fff;
-  border-color: transparent;
-}
-
-.job-tab.active {
-  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
   border-color: transparent;
 }
