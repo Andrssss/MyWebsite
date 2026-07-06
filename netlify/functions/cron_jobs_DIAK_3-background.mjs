@@ -634,6 +634,38 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       }
 
+      // Paginate otp (SAP SuccessFactors): a kereső 25 soronként lapoz
+      // (?startrow=N), az első válasz CSAK az 1. oldal. E nélkül a 2+. oldal
+      // állásai sosem kerülnek a foundUrls-be → a grace után tévesen
+      // deaktiválódnak (élőben bizonyítva 2026-07-06: IT-lista 26 állás,
+      // "Alkalmazás üzemeltető" a 2. oldalon). Ugyanaz a platform-hiba, mint a
+      // kuka 2026-07-01-es fixe. Lapozási hiba → allSucceeded=false, hogy a
+      // reconcile ne deaktiváljon részleges lista alapján.
+      if (source === "otp") {
+        let startrow = 25;
+        let safetyPagesLeft = 8;
+        while (safetyPagesLeft-- > 0) {
+          const pageUrl = `${p.url}${p.url.includes("?") ? "&" : "?"}startrow=${startrow}`;
+          let pageHtml;
+          try {
+            pageHtml = await fetchText(pageUrl);
+          } catch (err) {
+            console.log(`${tag}   otp lapozás HIBA (startrow=${startrow}): ${err.message}`);
+            await logFetchError("cron_jobs_DIAK_3", { url: pageUrl, message: err.message });
+            foundBySource.get(source).allSucceeded = false;
+            break;
+          }
+          const pgGeneric = extractCandidates(pageHtml, pageUrl).filter((c) => looksLikeJobUrl(source, c.url));
+          const pgSsr = extractSSR(pageHtml, pageUrl).filter((c) => looksLikeJobUrl(source, c.url));
+          const prevCount = merged.length;
+          merged = mergeCandidates(merged, pgGeneric, pgSsr);
+          console.log(`${tag}   otp startrow=${startrow}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
+          if (merged.length === prevCount) break; // nincs új találat → utolsó oldal után járunk
+          startrow += 25;
+          await sleep(300);
+        }
+      }
+
       if (source === "miszisz") {
         console.log(`${tag}   miszisz: ${merged.length} oldal title-t tölt be...`);
         for (const item of merged) {

@@ -165,11 +165,23 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 }
 
 // Sources whose sites answer a DEAD job url with a 200 redirect to a generic
-// listing page instead of a 404 (ydiak → /aktualis-diakmunkaink), so the plain
-// 404 rule never fires. For these, "redirected to a DIFFERENT path" counts as
-// dead. Kept per-source: many healthy sites redirect http→https or add a
-// trailing slash, which keeps the path and stays alive under this rule.
-export const REDIRECT_DEAD_SOURCES = new Set(["ydiak"]);
+// listing page instead of a 404 (ydiak → /aktualis-diakmunkaink, eudiakok →
+// /404), so the plain 404 rule never fires. For these, "redirected to a
+// DIFFERENT path" counts as dead. Kept per-source: many healthy sites redirect
+// http→https or add a trailing slash, which keeps the path and stays alive
+// under this rule.
+export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok"]);
+
+// Sources whose sites answer a DEAD job url with a plain 200 page carrying a
+// closed-banner (bluebird: "Az álláshirdetés lejárt") — no 404, no redirect, so
+// neither sweep rule above can see it. For these the sweep also fetches the
+// BODY and a case-insensitive banner match counts as dead. Only add a source
+// here after verifying on a LIVE listed job that its page does NOT contain the
+// marker (SPA bundles often ship such strings as templates on every page —
+// talent/trenkwalder/qdiak do, so they must never be listed here).
+export const BANNER_DEAD_SOURCES = {
+  bluebird: "az álláshirdetés lejárt",
+};
 
 function _pathOf(u) {
   try {
@@ -192,6 +204,15 @@ function _isDeadResult(row, res) {
     const b = _pathOf(res.finalUrl);
     return a !== null && b !== null && a !== b;
   }
+  const banner = BANNER_DEAD_SOURCES[row.source];
+  if (
+    banner &&
+    res.status === 200 &&
+    typeof res.body === "string" &&
+    res.body.toLowerCase().includes(banner)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -202,20 +223,23 @@ function _isDeadResult(row, res) {
  * current listing. Windowed / synthetic-URL sources (RSS "latest N", hash URLs)
  * can't, so their dead jobs never fall out of the set. This sweep instead asks
  * each active job's OWN URL whether it still exists, and deactivates the ones
- * that are provably gone: final HTTP 404, or — for REDIRECT_DEAD_SOURCES — a
- * 200 that landed on a different path (listing-page redirect).
+ * that are provably gone: final HTTP 404, for REDIRECT_DEAD_SOURCES a 200 that
+ * landed on a different path (listing-page redirect), or for
+ * BANNER_DEAD_SOURCES a 200 whose body carries the source's closed-banner.
  *
  * Network-agnostic: the caller injects
- * `checkFinal(url) => Promise<{status:number, finalUrl:string|null}>` returning
- * the final status and final URL after redirects. Negative statuses (local
- * failure) and 403/429/5xx are treated as "still alive". Each dead verdict is
- * re-checked once to drop transients before it deactivates.
+ * `checkFinal(url, {wantBody}) => Promise<{status:number, finalUrl:string|null, body?:string}>`
+ * returning the final status and final URL after redirects — plus the response
+ * body when `wantBody` is set (only requested for BANNER_DEAD_SOURCES rows).
+ * Negative statuses (local failure) and 403/429/5xx are treated as "still
+ * alive". Each dead verdict is re-checked once to drop transients before it
+ * deactivates.
  *
  * LinkedIn is excluded: bot-blocked (no clean 404s) and shown time-based on the
  * frontend, so its `active` flag is irrelevant.
  *
  * @param {import("pg").PoolClient} client
- * @param {(url: string) => Promise<{status:number, finalUrl:string|null}>} checkFinal
+ * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
  * @param {object} [opts]
  * @param {number} [opts.concurrency=12]
  * @returns {Promise<{checked:number, suspects:number, deactivated:number}>}
@@ -230,14 +254,16 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
   );
   if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0 };
 
-  // Round-robin the URLs across `concurrency` workers.
+  // Round-robin the URLs across `concurrency` workers. Body is only fetched
+  // where a banner rule needs it.
+  const wantBody = (row) => ({ wantBody: BANNER_DEAD_SOURCES[row.source] !== undefined });
   const results = new Map();
   const lanes = Array.from({ length: concurrency }, (_, i) =>
     rows.filter((_, idx) => idx % concurrency === i)
   );
   await Promise.all(
     lanes.map(async (list) => {
-      for (const row of list) results.set(row.url, await checkFinal(row.url));
+      for (const row of list) results.set(row.url, await checkFinal(row.url, wantBody(row)));
     })
   );
 
@@ -245,7 +271,7 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
   const suspects = rows.filter((r) => _isDeadResult(r, results.get(r.url)));
   const confirmed = [];
   for (const row of suspects) {
-    if (_isDeadResult(row, await checkFinal(row.url))) confirmed.push(row.url);
+    if (_isDeadResult(row, await checkFinal(row.url, wantBody(row)))) confirmed.push(row.url);
   }
 
   let deactivated = 0;

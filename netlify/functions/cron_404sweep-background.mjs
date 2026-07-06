@@ -2,11 +2,13 @@
   Active-job 404 sweep (scheduled entry point).
 
   Thin wrapper: provides an HTTP checker (final status + final URL after
-  redirects) and hands it to `sweepActive404` in _active_core.mjs, which owns
-  the "which rows / deactivate" logic: final 404 = dead, and for
-  REDIRECT_DEAD_SOURCES (ydiak) a 200 landing on a different path = dead.
-  Also expires the push-only `random_email` source (10-day TTL — no scraper,
-  so reconcile can never clean it). Triggered by cron_dispatcher_daily.
+  redirects, optionally the body) and hands it to `sweepActive404` in
+  _active_core.mjs, which owns the "which rows / deactivate" logic: final 404 =
+  dead, for REDIRECT_DEAD_SOURCES (ydiak, eudiakok) a 200 landing on a
+  different path = dead, and for BANNER_DEAD_SOURCES (bluebird) a 200 whose
+  body carries the source's closed-banner = dead. Also expires the push-only
+  `random_email` source (10-day TTL — no scraper, so reconcile can never clean
+  it). Triggered by cron_dispatcher_daily.
 */
 
 import { Pool } from "pg";
@@ -25,11 +27,19 @@ const pool = new Pool({
 
 const REQUEST_TIMEOUT_MS = 15000;
 
+// Cap for banner-rule bodies — enough for any closed-banner, bounded memory.
+const BODY_CAP_BYTES = 400_000;
+
 // Final HTTP status + final URL after following redirects. Negative status =
 // local failure (-1 bad/non-http URL, -2 timeout, -3 network error) — never
 // treated as dead. finalUrl lets the sweep detect "dead job → 200 redirect to
-// a listing page" sources (REDIRECT_DEAD_SOURCES in _active_core.mjs).
-function fetchFinal(url, redirectLeft = 5) {
+// a listing page" sources (REDIRECT_DEAD_SOURCES in _active_core.mjs). With
+// `opts.wantBody` the response body is also returned (uncompressed via
+// Accept-Encoding: identity) so BANNER_DEAD_SOURCES rules can match on it.
+// Exported so ad-hoc maintenance scripts can drive sweepActive404 with the
+// exact same checker the scheduled run uses.
+export function fetchFinal(url, opts = {}, redirectLeft = 5) {
+  const wantBody = opts.wantBody === true;
   return new Promise((resolve) => {
     let parsed;
     try { parsed = new URL(url); } catch { return resolve({ status: -1, finalUrl: null }); }
@@ -45,19 +55,31 @@ function fetchFinal(url, redirectLeft = 5) {
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
         Accept: "text/html,application/xhtml+xml,application/json,*/*;q=0.8",
         "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip,deflate,br",
+        "Accept-Encoding": wantBody ? "identity" : "gzip,deflate,br",
       },
       timeout: REQUEST_TIMEOUT_MS,
     }, (res) => {
       const code = res.statusCode || 0;
-      res.resume(); // drain; we only need the status line
       if ([301, 302, 303, 307, 308].includes(code)) {
+        res.resume();
         const loc = res.headers.location;
         if (!loc || redirectLeft <= 0) return resolve({ status: code, finalUrl: url });
-        try { return resolve(fetchFinal(new URL(loc, url).toString(), redirectLeft - 1)); }
+        try { return resolve(fetchFinal(new URL(loc, url).toString(), opts, redirectLeft - 1)); }
         catch { return resolve({ status: code, finalUrl: url }); }
       }
-      resolve({ status: code, finalUrl: url });
+      if (!wantBody) {
+        res.resume(); // drain; we only need the status line
+        return resolve({ status: code, finalUrl: url });
+      }
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        if (body.length < BODY_CAP_BYTES) body += chunk;
+        else res.destroy(); // triggers 'close'; we already have enough
+      });
+      res.on("end", () => resolve({ status: code, finalUrl: url, body }));
+      res.on("close", () => resolve({ status: code, finalUrl: url, body }));
+      res.on("error", () => resolve({ status: code, finalUrl: url, body }));
     });
     req.on("timeout", () => { req.destroy(); resolve({ status: -2, finalUrl: null }); });
     req.on("error", () => resolve({ status: -3, finalUrl: null }));
