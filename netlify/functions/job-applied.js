@@ -8,7 +8,9 @@
 //   interview → "Interjú" (a sub-state; only meaningful while applied)
 //
 // GET  ?adminId=xxx
-//   → { applied: ['job:src:title', ...], interview: [...], appliedCache: { 'job:src:title': {job}, ... } }
+//   → { applied: ['job:src:url', ...], interview: [...], appliedCache: { 'job:src:url': {job}, ... } }
+//   (Key = jobKeyFor() in JobWatcher.jsx: url-keyed; title-keyed only when the
+//   entry has no url. Legacy 'job:src:title' rows are migrated by the frontend.)
 // POST { adminId, jobKey, applied: bool, interview: bool, job? }
 //   Sends the FULL desired state. If both flags are false → row is deleted.
 const { Pool } = require("pg");

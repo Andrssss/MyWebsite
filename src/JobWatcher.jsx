@@ -81,6 +81,46 @@ const compactJob = (job) =>
       }
     : undefined;
 
+// Identity of an applied/interview mark. Two postings can share a title
+// (same position at another company), so key on the url — the job_posts row
+// identity — whenever we have one. The title form only remains for url-less
+// entries (manual adds without link).
+const jobKeyFor = (job) =>
+  job?.url
+    ? `job:${job.source}:${job.url}`
+    : `job:${job?.source}:${job?.title}`;
+
+// One-time upgrade of legacy title-keyed marks ("job:src:title") to the
+// url-keyed format, using the cached job objects to learn each mark's url.
+// Entries without a cached url keep their legacy key. Returns null when
+// everything is already in the current format.
+const migrateAppliedKeys = (applied, interview, cache) => {
+  const moves = [];
+  for (const [key, job] of Object.entries(cache || {})) {
+    if (!job || !job.url || !job.source) continue;
+    const newKey = jobKeyFor(job);
+    if (newKey === key) continue;
+    moves.push({
+      oldKey: key,
+      newKey,
+      job,
+      applied: applied.has(key),
+      interview: interview.has(key),
+    });
+  }
+  if (moves.length === 0) return null;
+  const appliedNext = new Set(applied);
+  const interviewNext = new Set(interview);
+  const cacheNext = { ...cache };
+  for (const m of moves) {
+    delete cacheNext[m.oldKey];
+    cacheNext[m.newKey] = m.job;
+    if (appliedNext.delete(m.oldKey)) appliedNext.add(m.newKey);
+    if (interviewNext.delete(m.oldKey)) interviewNext.add(m.newKey);
+  }
+  return { applied: appliedNext, interview: interviewNext, cache: cacheNext, moves };
+};
+
 const loadClickedKeys = () => {
   try {
     return new Set(JSON.parse(localStorage.getItem(CLICKED_KEYS_STORAGE) || "[]"));
@@ -400,6 +440,19 @@ const JobWatcher = () => {
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
   const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
 
+  // One-time local migration of legacy title-keyed marks to url keys
+  // (matters for non-admins, whose marks live only in localStorage).
+  useEffect(() => {
+    const migrated = migrateAppliedKeys(loadAppliedKeys(), loadInterviewKeys(), loadAppliedCache());
+    if (!migrated) return;
+    setAppliedKeys(migrated.applied);
+    setInterviewKeys(migrated.interview);
+    setAppliedCache(migrated.cache);
+    saveAppliedKeys(migrated.applied);
+    saveInterviewKeys(migrated.interview);
+    saveAppliedCache(migrated.cache);
+  }, []);
+
   // Admins share a single applied/interview list stored in the DB.
   // Load it on mount and make the DB the source of truth for them.
   useEffect(() => {
@@ -411,15 +464,53 @@ const JobWatcher = () => {
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled || !data) return;
-        const applied = new Set(data.applied || []);
-        const interview = new Set(data.interview || []);
-        const cache = data.appliedCache || {};
+        let applied = new Set(data.applied || []);
+        let interview = new Set(data.interview || []);
+        let cache = data.appliedCache || {};
+        const migrated = migrateAppliedKeys(applied, interview, cache);
+        if (migrated) {
+          ({ applied, interview, cache } = migrated);
+        }
         setAppliedKeys(applied);
         setInterviewKeys(interview);
         setAppliedCache(cache);
         saveAppliedKeys(applied);
         saveInterviewKeys(interview);
         saveAppliedCache(cache);
+        if (migrated) {
+          // Rename the rows in the shared DB too: insert the url-keyed row
+          // first and delete the legacy one only once that succeeded, so a
+          // failure just leaves the old row for the next load to retry.
+          for (const m of migrated.moves) {
+            try {
+              const resNew = await fetch(JOB_APPLIED_API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  adminId: myVisitorId,
+                  jobKey: m.newKey,
+                  applied: m.applied,
+                  interview: m.interview,
+                  job: m.job,
+                }),
+              });
+              if (resNew.ok) {
+                await fetch(JOB_APPLIED_API, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    adminId: myVisitorId,
+                    jobKey: m.oldKey,
+                    applied: false,
+                    interview: false,
+                  }),
+                });
+              }
+            } catch {
+              // legacy row stays; retried on the next load
+            }
+          }
+        }
       } catch {
         // keep whatever is in localStorage
       }
@@ -543,11 +634,11 @@ const JobWatcher = () => {
     const source = manualAppliedSource.trim() || "manual";
     const url = manualAppliedUrl.trim();
     if (!title) { setManualAppliedStatus("Adj meg legalább egy pozíció nevet"); return; }
-    const key = `job:${source}:${title}`;
     const firstSeen = manualAppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(manualAppliedDate)
       ? new Date(manualAppliedDate + "T00:00:00").toISOString()
       : new Date().toISOString();
-    const manualJob = { source, title, url, firstSeen, company: manualAppliedCompany.trim() || undefined };
+    const manualJob = { source, title, url: url || undefined, firstSeen, company: manualAppliedCompany.trim() || undefined };
+    const key = jobKeyFor(manualJob);
     setAppliedKeys((prev) => { const next = new Set(prev); next.add(key); saveAppliedKeys(next); return next; });
     setAppliedCache((prev) => { const updated = { ...prev, [key]: manualJob }; saveAppliedCache(updated); return updated; });
     persistAdminApplied(key, true, false, manualJob);
@@ -950,10 +1041,13 @@ const JobWatcher = () => {
     }
 
     if (showAppliedOnly) {
-      const cachedJobs = Object.values(appliedCache);
-      const apiKeys = new Set(list.map((j) => `job:${j.source}:${j.title}`));
-      const onlyCached = cachedJobs.filter((j) => !apiKeys.has(`job:${j.source}:${j.title}`) && appliedKeys.has(`job:${j.source}:${j.title}`));
-      list = [...list.filter((j) => appliedKeys.has(`job:${j.source}:${j.title}`)), ...onlyCached];
+      const apiKeys = new Set(list.map(jobKeyFor));
+      // Applied jobs no longer in the API list (expired / manual adds) come
+      // from the cache, matched by their STORED key so legacy entries render.
+      const onlyCached = Object.entries(appliedCache)
+        .filter(([key]) => appliedKeys.has(key) && !apiKeys.has(key))
+        .map(([, j]) => j);
+      list = [...list.filter((j) => appliedKeys.has(jobKeyFor(j))), ...onlyCached];
     }
 
     return [...list].sort(
@@ -1321,9 +1415,13 @@ const JobWatcher = () => {
           const clickKeyBase = `job:${job.source}:${job.title}`;
           const clickTarget = clickKeyBase;
           const clickDate = getTodayLocalDateString();
+          // Applied/interview marks are url-keyed (title alone collides when
+          // two companies post the same position); visited stays title-keyed
+          // because the analytics targets already use that format.
+          const appliedKey = jobKeyFor(job);
           const isVisited = clickedKeys.has(clickKeyBase);
-          const isApplied = appliedKeys.has(clickKeyBase);
-          const isInterview = interviewKeys.has(clickKeyBase);
+          const isApplied = appliedKeys.has(appliedKey);
+          const isInterview = interviewKeys.has(appliedKey);
           const isInactive = job.active === false;
 
           return (
@@ -1390,7 +1488,7 @@ const JobWatcher = () => {
                 {(isVisited || isApplied) && (
                   <button
                     className={`job-applied-btn${isApplied ? " applied" : ""}`}
-                    onClick={() => toggleApplied(clickKeyBase, job)}
+                    onClick={() => toggleApplied(appliedKey, job)}
                     title={isApplied ? "Jelentkezés visszavonása" : "Megjelölés: Jelentkeztem"}
                   >
                     {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
@@ -1404,7 +1502,7 @@ const JobWatcher = () => {
                     <input
                       type="checkbox"
                       checked={isInterview}
-                      onChange={() => toggleInterview(clickKeyBase, job)}
+                      onChange={() => toggleInterview(appliedKey, job)}
                     />
                     {isInterview ? "✓ Interjú" : "Interjú"}
                   </label>
