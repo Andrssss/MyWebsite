@@ -448,6 +448,8 @@ function extractCandidates(html, baseUrl) {
     const company =
       normalizeWhitespace($(el).find('[class*="company-name"]').first().text()) ||
       normalizeWhitespace(card.find('[class*="company-name"]').first().text()) ||
+      // wherewework: a kártyán a cégnév a céges /overview-... linkbe ágyazott h5-ben van
+      normalizeWhitespace(card.find('a[href*="/overview-"] h5').first().text()) ||
       null;
 
     items.push({
@@ -475,12 +477,15 @@ function extractCandidates(html, baseUrl) {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
+  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
+  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;`,
+        DO UPDATE SET company = EXCLUDED.company
+        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
     [source, item.title, item.url, item.experience ?? "-", item.company || null]
   );
 }

@@ -163,20 +163,32 @@ async function upsertJob(client, source, item) {
     : isMidLevelTitle(item.title) ? "medior"
     : "-";
 
+  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
+  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, experience, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;
+        DO UPDATE SET company = EXCLUDED.company
+        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;
         `,
-    [source, item.title, item.url, experience]
+    [source, item.title, item.url, experience, item.company || null]
   );
 }
 
 function levelNotBlacklisted(title, desc) {
   const t = normalizeText(title ?? "");
   return !_filters.some((w) => _blacklistRegex(w).test(t));
+}
+
+// XMLParser-érték → trimmelt szöveg (CDATA sima stringként jön; attribútumos
+// node esetén objektum lenne, abból a #text kell)
+function xmlText(v) {
+  if (v == null) return null;
+  if (typeof v === "object") v = v["#text"] ?? "";
+  const s = String(v).trim();
+  return s || null;
 }
 
 // Bluebird RSS feldolgozó
@@ -191,10 +203,12 @@ async function fetchRssJobs(url) {
     [];
   // Ha csak egy item van, akkor nem tömb, hanem objektum
   const arr = Array.isArray(items) ? items : [items];
-  // Minden itemből: csak title, link
+  // Minden itemből: title, link, company (a feedben ma minden item cége
+  // "Bluebird" — az ügyfél anonim, de ha valaha kiírják, magától bejön)
   return arr.map(it => ({
     title: it.title || null,
     url: it.link || null,
+    company: xmlText(it["job_listing:company"]),
   }));
 }
 

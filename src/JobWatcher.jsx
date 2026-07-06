@@ -90,6 +90,26 @@ const jobKeyFor = (job) =>
     ? `job:${job.source}:${job.url}`
     : `job:${job?.source}:${job?.title}`;
 
+// A beillesztett linkből kitalálja a forrás nevet: a TLD előtti domain-tag
+// (hu.talent.com -> talent, career.greehill.com -> greehill,
+// profession.hu -> profession). Üres stringet ad, ha nem értelmezhető.
+const sourceFromUrl = (raw) => {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "";
+  try {
+    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const parts = new URL(withScheme).hostname.toLowerCase().split(".").filter(Boolean);
+    if (parts.length < 2) return "";
+    // Összetett TLD-k (co.uk, com.au, ...) második tagját átugorjuk.
+    const secondLevelTlds = new Set(["co", "com", "org", "net", "gov", "edu"]);
+    let i = parts.length - 2;
+    if (i > 0 && secondLevelTlds.has(parts[i])) i -= 1;
+    return parts[i];
+  } catch {
+    return "";
+  }
+};
+
 // One-time upgrade of legacy title-keyed marks ("job:src:title") to the
 // url-keyed format, using the cached job objects to learn each mark's url.
 // Entries without a cached url keep their legacy key. Returns null when
@@ -433,6 +453,9 @@ const JobWatcher = () => {
   const [manualAppliedTitle, setManualAppliedTitle] = useState("");
   const [manualAppliedSource, setManualAppliedSource] = useState("");
   const [manualAppliedUrl, setManualAppliedUrl] = useState("");
+  // A linkből automatikusan kitöltött forrás értéke — amíg a mező ezzel
+  // egyezik (vagy üres), a link változása frissítheti; kézi átírást nem bánt.
+  const autoAppliedSourceRef = useRef("");
   const [manualAppliedDate, setManualAppliedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [manualAppliedCompany, setManualAppliedCompany] = useState("");
   const [manualAppliedStatus, setManualAppliedStatus] = useState("");
@@ -644,6 +667,7 @@ const JobWatcher = () => {
     persistAdminApplied(key, true, false, manualJob);
     setManualAppliedTitle("");
     setManualAppliedSource("");
+    autoAppliedSourceRef.current = "";
     setManualAppliedUrl("");
     setManualAppliedDate(new Date().toISOString().slice(0, 10));
     setManualAppliedCompany("");
@@ -1555,7 +1579,19 @@ const JobWatcher = () => {
                   <input
                     className="job-search"
                     value={manualAppliedUrl}
-                    onChange={(e) => setManualAppliedUrl(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setManualAppliedUrl(v);
+                      const derived = sourceFromUrl(v);
+                      if (
+                        derived &&
+                        (!manualAppliedSource.trim() ||
+                          manualAppliedSource === autoAppliedSourceRef.current)
+                      ) {
+                        setManualAppliedSource(derived);
+                        autoAppliedSourceRef.current = derived;
+                      }
+                    }}
                     placeholder="Link (opcionális)"
                   />
                   <input

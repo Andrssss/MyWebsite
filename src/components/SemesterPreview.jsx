@@ -319,22 +319,17 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
                   {isRoot ? displayName(file.name) : file.name}
                 </button>
               ) : (
-                <span className="file-name">{file.name}</span>
+                <button className="file-name file-name-btn"
+                  onClick={() => isUrlShortcut(file.name) ? openUrlShortcut(file.id) : setPreviewFile(file)}
+                  title={isUrlShortcut(file.name) ? 'Link megnyitása' : 'Előnézet'}>
+                  {file.name}
+                </button>
               )}
-              {!isFolder(file.mimeType) && (
+              {!isFolder(file.mimeType) && !isUrlShortcut(file.name) && (
                 <div className="file-actions">
-                  {isUrlShortcut(file.name) ? (
-                    <button className="file-btn file-btn-download"
-                      onClick={() => openUrlShortcut(file.id)} title="Link megnyitása">🔗</button>
-                  ) : (
-                    <>
-                      <button className="file-btn file-btn-preview"
-                        onClick={() => setPreviewFile(file)} title="Előnézet">👁️‍🗨️</button>
-                      <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="file-btn file-btn-download" title="Letöltés">⬇</a>
-                    </>
-                  )}
+                  <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="file-btn file-btn-download" title="Letöltés">⬇</a>
                 </div>
               )}
             </div>

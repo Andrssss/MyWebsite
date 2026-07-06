@@ -464,6 +464,17 @@
 
 .file-folder-btn:hover { color: #afd4ff; }
 
+.file-name-btn {
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.file-name-btn:hover { color: #ffcc66; }
+
 .file-actions {
   display: flex;
   gap: 2px;
@@ -485,7 +496,6 @@
   line-height: 1;
 }
 
-.file-btn-preview:hover { background: #4a90d9; }
 .file-btn-download:hover { background: #3a9e5a; }
 
 /* === PREVIEW MODAL === */
