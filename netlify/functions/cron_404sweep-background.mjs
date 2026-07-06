@@ -5,10 +5,11 @@
   redirects, optionally the body) and hands it to `sweepActive404` in
   _active_core.mjs, which owns the "which rows / deactivate" logic: final 404 =
   dead, for REDIRECT_DEAD_SOURCES (ydiak, eudiakok) a 200 landing on a
-  different path = dead, and for BANNER_DEAD_SOURCES (bluebird) a 200 whose
-  body carries the source's closed-banner = dead. Also expires the push-only
-  `random_email` source (10-day TTL — no scraper, so reconcile can never clean
-  it). Triggered by cron_dispatcher_daily.
+  different path = dead, and for BANNER_DEAD_SOURCES a 200 whose body proves
+  the posting closed = dead (bluebird: banner string; talent: the url-id's own
+  job object has system_status=2). Also expires the push-only `random_email`
+  source (10-day TTL — no scraper, so reconcile can never clean it).
+  Triggered by cron_dispatcher_daily.
 */
 
 import { Pool } from "pg";
@@ -27,8 +28,10 @@ const pool = new Pool({
 
 const REQUEST_TIMEOUT_MS = 15000;
 
-// Cap for banner-rule bodies — enough for any closed-banner, bounded memory.
-const BODY_CAP_BYTES = 400_000;
+// Cap for banner-rule bodies — bounded memory, but must NOT truncate the
+// signal: talent's flight-payload job object sits around the 360–420 KB mark
+// of a ~400 KB page, so anything under ~0.5 MB cuts it off.
+const BODY_CAP_BYTES = 1_500_000;
 
 // Final HTTP status + final URL after following redirects. Negative status =
 // local failure (-1 bad/non-http URL, -2 timeout, -3 network error) — never

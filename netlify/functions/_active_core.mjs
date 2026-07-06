@@ -172,15 +172,39 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 // under this rule.
 export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok"]);
 
-// Sources whose sites answer a DEAD job url with a plain 200 page carrying a
-// closed-banner (bluebird: "Az álláshirdetés lejárt") — no 404, no redirect, so
-// neither sweep rule above can see it. For these the sweep also fetches the
-// BODY and a case-insensitive banner match counts as dead. Only add a source
-// here after verifying on a LIVE listed job that its page does NOT contain the
-// marker (SPA bundles often ship such strings as templates on every page —
-// talent/trenkwalder/qdiak do, so they must never be listed here).
+// Sources whose sites answer a DEAD job url with a plain 200 page — no 404,
+// no redirect — so neither sweep rule above can see it. For these the sweep
+// also fetches the BODY; the rule is either
+//   • a string: case-insensitive banner match counts as dead (bluebird:
+//     "Az álláshirdetés lejárt"), or
+//   • a predicate (row, body) => boolean for sources where a plain substring
+//     can't discriminate.
+// Only add a string marker after verifying on a LIVE listed job that its page
+// does NOT contain it — SPA bundles ship such texts as i18n templates on EVERY
+// page (talent/trenkwalder/qdiak/nofluffjobs all do).
+//
+// talent: the visible "Már nem fogadnak jelentkezéseket" banner is rendered
+// from the job object's `system_status` (2 = expired, 1 = live) in the
+// Next.js flight payload. The page embeds SEVERAL job objects (related jobs
+// too!), so the status MUST be read from the object anchored at the url's own
+// id — a global regex grabs some other job's status. Validated 2026-07-06 on
+// 14/14 browser-rendered truth pages; purged jobs turn HTTP 404 (plain rule
+// catches those). Missing anchor/field → fail-safe alive. Secondary signal:
+// when talent SSR-renders the banner (2026-07-01 behaviour), it appears as
+// element text `>Már nem fogadnak…<` — the i18n dict form is always
+// `:"Már nem fogadnak…"`, so the tag boundary keeps it false-positive-free.
 export const BANNER_DEAD_SOURCES = {
   bluebird: "az álláshirdetés lejárt",
+  talent: (row, body) => {
+    if (/>\s*Már nem fogadnak jelentkezéseket\s*</i.test(body)) return true;
+    const id = (row.url.match(/[?&]id=(\d+)/) || [])[1];
+    if (!id) return false;
+    let i = body.indexOf(`\\"id\\":\\"${id}\\"`); // flight-payload (escaped) form
+    if (i < 0) i = body.indexOf(`"id":"${id}"`); // plain-JSON fallback
+    if (i < 0) return false;
+    const m = body.slice(i, i + 3000).match(/system_status\\?"\s*:\s*(\d+)/);
+    return !!m && m[1] === "2";
+  },
 };
 
 function _pathOf(u) {
@@ -204,14 +228,13 @@ function _isDeadResult(row, res) {
     const b = _pathOf(res.finalUrl);
     return a !== null && b !== null && a !== b;
   }
-  const banner = BANNER_DEAD_SOURCES[row.source];
-  if (
-    banner &&
-    res.status === 200 &&
-    typeof res.body === "string" &&
-    res.body.toLowerCase().includes(banner)
-  ) {
-    return true;
+  const rule = BANNER_DEAD_SOURCES[row.source];
+  if (rule && res.status === 200 && typeof res.body === "string") {
+    if (typeof rule === "function") {
+      if (rule(row, res.body)) return true;
+    } else if (res.body.toLowerCase().includes(rule)) {
+      return true;
+    }
   }
   return false;
 }
