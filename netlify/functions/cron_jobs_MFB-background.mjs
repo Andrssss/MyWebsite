@@ -213,8 +213,16 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           continue;
         }
 
+        // The site renders multi-selected career levels concatenated with no
+        // separator (e.g. "Medior (2-5 év)Szenior (5-10 év)" for a posting open
+        // to both bands) — a bare "szenior" substring check wrongly treated
+        // those as senior-only and excluded them. Only skip when szenior is the
+        // SOLE level (live evidence: id 341 "IT Rendszerszervező" was mislabeled
+        // senior-only and false-deactivated, but is open to medior too).
         const levelLower = careerLevel.toLowerCase();
-        if (levelLower.includes("szenior") || isSeniorLike(title)) {
+        const seniorOnly =
+          levelLower.includes("szenior") && !/gyakornok|junior|medior/.test(levelLower);
+        if (seniorOnly || isSeniorLike(title)) {
           skippedSenior++;
           console.log(`[mfb] SKIP senior "${title}" level="${careerLevel}" → ${url}`);
           continue;

@@ -25,6 +25,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
 
@@ -288,7 +289,14 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
       `[valorebasis] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
     );
 
-    // Synthetic title-hash URLs — can't deactivate reliably, skip reconcile.
+    // The synthetic title-hash URL is deterministic per title+category, so it's
+    // just as stable a row identity as a real per-posting URL — reconcile is
+    // safe. (Previously skipped on the assumption the 404-sweep covered this
+    // source instead; live-verified 2026-07-08 that it does NOT, because the
+    // site ignores the query string and always answers 200 regardless of
+    // whether that specific posting is still listed.)
+    const rc = await reconcileActive(client, "valorebasis", foundUrls, { complete: fetchFailed === 0 });
+    console.log(`[valorebasis] active reconcile — complete=${fetchFailed === 0}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

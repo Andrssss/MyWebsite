@@ -6,7 +6,8 @@
       "Bash(npx netlify env:get *)",
       "Bash(netlify env:list *)",
       "Bash(npx netlify env:list *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(node scripts/check-env.mjs)"
     ]
   }
 }
