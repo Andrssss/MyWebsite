@@ -893,6 +893,12 @@ html, body {
   max-height: 600px;
 }
 
+/* A tech-lista jóval több chipet adhat, mint a források/kategóriák —
+   magasabb plafon, hogy nyitva ne vágja le a sorokat. */
+.job-tabs-wrapper--tech.open {
+  max-height: 2000px;
+}
+
 
 .job-experience {
   margin-left: 1rem;
@@ -910,8 +916,8 @@ html, body {
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.12);
-  color: #ddd;
+  background: rgba(37, 99, 235, 0.18);
+  color: #7fb1ff;
   white-space: nowrap;
 }
 

@@ -350,20 +350,64 @@ function techBoundaryRegex(keyword) {
 // Extracts a comma-joined list of recognized technology keywords from an
 // already-fetched job detail page — piggybacks on whatever html a source
 // fetched for extractBodyExperience/etc, no extra network call.
+//
+// Scanning the whole page body is unsafe on sites that render unrelated job
+// cards on the same page (LinkedIn's "people also viewed", talent.com's
+// related-search widgets, Next.js RSC payloads embedded in <script> tags):
+// their titles/descriptions false-positive match tech keywords that were
+// never in *this* posting. So prefer a scoped description container/blob
+// when the markup gives us one, and only fall back to the full body text.
 export function extractTechnologies(html) {
   const $ = cheerioLoad(html);
+  $("script, style, noscript").remove();
   $("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
     $(el).prepend(" ").append(" ");
   });
-  let text = normalizeWhitespace($("body").text());
 
-  // JS-rendered pages (e.g. talent.com) keep the description in a data blob
-  // instead of visible DOM text — scan those too, still zero extra fetches.
-  const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-  if (nextDataMatch) text += " " + nextDataMatch[1];
-  for (const m of html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)) {
-    text += " " + m[1];
+  // LinkedIn: same container used by extractLinkedInExperience.
+  let text = normalizeWhitespace(
+    $(".description, .job-description, #job-details, .show-more-less-html__markup").first().text()
+  );
+
+  if (!text) {
+    // talent.com (Next.js): description lives in JSON-LD JobPosting.description,
+    // not in the visible body — everything else on the page (related listings,
+    // RSC data chunks) is noise for this posting.
+    for (const m of html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)) {
+      try {
+        const obj = JSON.parse(m[1]);
+        const graph = Array.isArray(obj["@graph"]) ? obj["@graph"] : [obj];
+        const posting = graph.find(n => n && n["@type"] === "JobPosting");
+        if (posting?.description) {
+          const $desc = cheerioLoad(posting.description);
+          $desc("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+            $desc(el).prepend(" ").append(" ");
+          });
+          text = normalizeWhitespace($desc.text());
+          break;
+        }
+      } catch {
+        // ignore malformed JSON-LD
+      }
+    }
   }
+
+  if (!text) {
+    // Legacy talent.com (pages router) fallback, scoped to the job object
+    // rather than the whole pageProps blob (which also carries related jobs).
+    const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+    if (nextDataMatch) {
+      try {
+        const data = JSON.parse(nextDataMatch[1]);
+        const job = data?.props?.pageProps?.job;
+        if (job) text = JSON.stringify(job);
+      } catch {
+        // ignore malformed JSON
+      }
+    }
+  }
+
+  if (!text) text = normalizeWhitespace($("body").text());
 
   const found = new Set();
   for (const [key, label] of TECH_KEYWORDS) {

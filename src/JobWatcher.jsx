@@ -444,6 +444,19 @@ const JobWatcher = () => {
     return saved !== null ? saved === "true" : true;
   });
 
+  // Technológia-szűrő állapotok — a mentett state AKKOR IS megmarad, ha az
+  // adott tech épp eltűnt a listából (0 találat): olyankor se chip, se szűrés,
+  // de amint újra lesz ilyen munka, a cache-elt állapot magától érvényesül.
+  const [techStates, setTechStates] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherTechStates");
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [techOpen, setTechOpen] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherTechOpen");
+    return saved !== null ? saved === "true" : false;
+  });
+
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
   const [interviewKeys, setInterviewKeys] = useState(() => loadInterviewKeys());
@@ -916,6 +929,63 @@ const JobWatcher = () => {
     });
   };
 
+  /* =======================
+     TECHNOLÓGIA SZŰRŐ
+  ======================= */
+  const splitTechnologies = (technologies) =>
+    technologies
+      ? String(technologies).split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
+
+  /* Tech counts — CSAK a betöltött listában ténylegesen előforduló technológiák */
+  const techCounts = useMemo(() => {
+    const counts = {};
+    for (const job of jobs) {
+      for (const tech of splitTechnologies(job.technologies)) {
+        counts[tech] = (counts[tech] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [jobs]);
+
+  const techList = useMemo(
+    () =>
+      Object.keys(techCounts).sort(
+        (a, b) => techCounts[b] - techCounts[a] || a.localeCompare(b)
+      ),
+    [techCounts]
+  );
+
+  /* Tech toggle (3-state) — csak látható (létező) chipre hívódik */
+  const handleTechClick = (key) => {
+    setTechStates((prev) => {
+      const current = prev[key] || "neutral";
+      const next =
+        current === "neutral" ? "selected"
+          : current === "selected" ? "excluded"
+          : "neutral";
+      const updated = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Bulk: Mind ✓/✕ csak a LÉTEZŐ techekre áll be (a 0 találatos cache-elt
+     state-eket nem bántja); Törlés viszont a teljes cache-t üríti. */
+  const setAllTechs = (state) => {
+    setTechStates((prev) => {
+      let updated;
+      if (state === "neutral") {
+        updated = {};
+      } else {
+        updated = { ...prev };
+        for (const tech of techList) updated[tech] = state;
+      }
+      localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const handleInternToggle = (checked) => {
     setInternMode(checked);
     localStorage.setItem("jobWatcherInternMode", checked);
@@ -1064,6 +1134,26 @@ const JobWatcher = () => {
       });
     }
 
+    // Technológia-szűrés — a cache-elt state-ekből CSAK a most is létező
+    // (techCounts > 0) technológiák szűrnek; a többi alszik, amíg újra nem
+    // lesz olyan munka.
+    const selectedTechs = Object.keys(techStates).filter(
+      (k) => techStates[k] === "selected" && techCounts[k] > 0
+    );
+    const excludedTechs = Object.keys(techStates).filter(
+      (k) => techStates[k] === "excluded" && techCounts[k] > 0
+    );
+
+    if (selectedTechs.length) {
+      list = list.filter((j) =>
+        splitTechnologies(j.technologies).some((t) => selectedTechs.includes(t))
+      );
+    } else if (excludedTechs.length) {
+      list = list.filter(
+        (j) => !splitTechnologies(j.technologies).some((t) => excludedTechs.includes(t))
+      );
+    }
+
     if (showAppliedOnly) {
       const apiKeys = new Set(list.map(jobKeyFor));
       // Applied jobs no longer in the API list (expired / manual adds) come
@@ -1078,7 +1168,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories, showAppliedOnly, appliedKeys, appliedCache, savedSearches, activeSavedSearches]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, techStates, techCounts, jobCategories, showAppliedOnly, appliedKeys, appliedCache, savedSearches, activeSavedSearches]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
@@ -1417,6 +1507,49 @@ const JobWatcher = () => {
         })}
       </div>
     </div>
+
+    {/* ===== TECHNOLÓGIÁK ===== */}
+    {techList.length > 0 && (
+      <>
+        <div className="job-tabs-header">
+          <button
+            className="job-tabs-toggle"
+            onClick={() =>
+              setTechOpen((prev) => {
+                localStorage.setItem("jobWatcherTechOpen", String(!prev));
+                return !prev;
+              })
+            }
+          >
+            {techOpen ? "▲ Technológiák elrejtése" : "▼ Technológiák kiválasztása"}
+          </button>
+          {techOpen && (
+            <div className="job-bulk-actions">
+              <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllTechs("selected")}>Mind ✓</button>
+              <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllTechs("excluded")}>Mind ✕</button>
+              <button className="job-bulk-btn" onClick={() => setAllTechs("neutral")}>Törlés</button>
+            </div>
+          )}
+        </div>
+
+        <div className={`job-tabs-wrapper job-tabs-wrapper--tech ${techOpen ? "open" : ""}`}>
+          <div className="job-tabs">
+            {techList.map((tech) => {
+              const state = techStates[tech] || "neutral";
+              let cls = "job-tab";
+              if (state === "selected") cls += " active";
+              if (state === "excluded") cls += " highlighted";
+              return (
+                <button key={tech} className={cls} onClick={() => handleTechClick(tech)}>
+                  {tech}
+                  <span className="job-tab-count">{techCounts[tech]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    )}
 
     {/* ===== TALÁLATOK ===== */}
     {!loading && (
