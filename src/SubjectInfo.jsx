@@ -636,14 +636,20 @@ const handleDelete = async (id) => {
         <select
           value={selectedSemester}
           onChange={handleSemesterChange}
+          onFocus={() => loadAll()}
           className="semester-filter"
         >
           <option value="all">Összes félév</option>
           <option value="mine">Saját vélemények</option>
           <option value="none">Nincs félév</option>
-          {[...new Set(subjects.map((s) => s.semester))]
-            .filter((sem) => sem !== null && sem !== undefined && sem !== "" && sem !== "N/A")
-            .sort((a, b) => Number(a) - Number(b))
+          {/* Fix 1–7 (tantervi félévek) + ami az adatokban ezen felül előfordul,
+              hogy részleges betöltésnél is teljes legyen a lista */}
+          {[...new Set([
+            ...Array.from({ length: 7 }, (_, i) => i + 1),
+            ...subjects.map((s) => Number(s.semester)),
+          ])]
+            .filter((sem) => Number.isFinite(sem) && sem > 0)
+            .sort((a, b) => a - b)
             .map((sem) => (
               <option key={sem} value={sem}>
                 {sem}. félév
