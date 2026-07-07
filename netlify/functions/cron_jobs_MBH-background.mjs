@@ -21,7 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 
 let _filters = [];
@@ -246,19 +246,20 @@ function parseDetailPage(html) {
   } else {
     experience = extractBodyExperience(html);
   }
+  const technologies = extractTechnologies(html);
 
-  return { title, experience };
+  return { title, experience, technologies };
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0; // true = newly inserted, false = duplicate
 }
@@ -270,6 +271,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
   const client = await pool.connect();
 
   try {
+    await ensureTechnologiesColumn(client);
     // Collect unique detail URLs across all list sources; first wins on duplicate
     const jobSet = new Set();
     let listFetchFailed = false;
@@ -353,6 +355,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
           title: parsed.title,
           url: detailUrl,
           experience: parsed.experience,
+          technologies: parsed.technologies,
         });
         foundUrls.push(detailUrl);
 

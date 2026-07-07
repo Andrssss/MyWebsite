@@ -900,6 +900,21 @@ html, body {
   color: #ffcc66;
 }
 
+.job-tech-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.job-tech-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  color: #ddd;
+  white-space: nowrap;
+}
+
 /* ===== SOCIAL ICONS ===== */
 .social-icons {
   display: flex;

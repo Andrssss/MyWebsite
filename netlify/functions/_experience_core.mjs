@@ -281,6 +281,107 @@ export function extractKukaExperience(html) {
 }
 
 /* ======================
+   Technology keyword extraction — shared core
+   Runs on the SAME html a source already fetched for experience, no extra
+   fetch. Curated for junior/entry-level programming job ads: languages,
+   web/backend frameworks, databases, cloud/devops, tools, data/AI, mobile.
+   Very short/ambiguous tokens that collide with ordinary English/Hungarian
+   words (bare "r", bare "go") are intentionally left out to keep false
+   positives low.
+====================== */
+export const TECH_KEYWORDS = [
+  // languages
+  ["javascript", "JavaScript"], ["typescript", "TypeScript"], ["python", "Python"],
+  ["java", "Java"], ["c++", "C++"], ["c#", "C#"], ["golang", "Go"], ["kotlin", "Kotlin"],
+  ["swift", "Swift"], ["php", "PHP"], ["ruby", "Ruby"], ["scala", "Scala"], ["rust", "Rust"],
+  ["matlab", "MATLAB"], ["perl", "Perl"], ["sql", "SQL"], ["pl/sql", "PL/SQL"], ["bash", "Bash"],
+  ["objective-c", "Objective-C"], ["dart", "Dart"], ["elixir", "Elixir"], ["haskell", "Haskell"],
+  ["vba", "VBA"], ["abap", "ABAP"], ["cobol", "COBOL"], ["groovy", "Groovy"],
+
+  // web / frontend
+  ["html", "HTML"], ["css", "CSS"], ["sass", "Sass"], ["scss", "SCSS"], ["react", "React"],
+  ["react native", "React Native"], ["angular", "Angular"], ["vue", "Vue"], ["svelte", "Svelte"],
+  ["next.js", "Next.js"], ["nuxt", "Nuxt"], ["jquery", "jQuery"], ["webpack", "Webpack"],
+  ["vite", "Vite"], ["tailwind", "Tailwind"], ["bootstrap", "Bootstrap"],
+
+  // backend / frameworks
+  ["node.js", "Node.js"], ["nodejs", "Node.js"], ["express", "Express"], ["nestjs", "NestJS"],
+  [".net", ".NET"], ["asp.net", "ASP.NET"], ["spring boot", "Spring Boot"], ["spring", "Spring"],
+  ["django", "Django"], ["flask", "Flask"], ["fastapi", "FastAPI"], ["laravel", "Laravel"],
+  ["symfony", "Symfony"], ["rails", "Ruby on Rails"], ["hibernate", "Hibernate"],
+
+  // data / databases
+  ["postgresql", "PostgreSQL"], ["postgres", "PostgreSQL"], ["mysql", "MySQL"],
+  ["mssql", "MSSQL"], ["sql server", "SQL Server"], ["oracle", "Oracle"], ["mongodb", "MongoDB"],
+  ["redis", "Redis"], ["elasticsearch", "Elasticsearch"], ["cassandra", "Cassandra"],
+  ["sqlite", "SQLite"], ["dynamodb", "DynamoDB"], ["snowflake", "Snowflake"],
+  ["power bi", "Power BI"], ["tableau", "Tableau"], ["spark", "Spark"], ["hadoop", "Hadoop"],
+  ["kafka", "Kafka"], ["rabbitmq", "RabbitMQ"], ["airflow", "Airflow"],
+
+  // cloud / devops
+  ["aws", "AWS"], ["azure", "Azure"], ["gcp", "GCP"], ["google cloud", "Google Cloud"],
+  ["docker", "Docker"], ["kubernetes", "Kubernetes"], ["terraform", "Terraform"],
+  ["ansible", "Ansible"], ["jenkins", "Jenkins"], ["gitlab ci", "GitLab CI"],
+  ["github actions", "GitHub Actions"], ["ci/cd", "CI/CD"], ["linux", "Linux"],
+  ["nginx", "Nginx"], ["microservices", "Microservices"],
+
+  // tools / practices
+  ["git", "Git"], ["jira", "Jira"], ["confluence", "Confluence"], ["figma", "Figma"],
+  ["rest api", "REST API"], ["graphql", "GraphQL"], ["grpc", "gRPC"], ["soap", "SOAP"],
+  ["agile", "Agile"], ["scrum", "Scrum"], ["kanban", "Kanban"], ["tdd", "TDD"],
+  ["unit test", "Unit Test"], ["junit", "JUnit"], ["selenium", "Selenium"],
+  ["cypress", "Cypress"], ["jest", "Jest"],
+
+  // data / AI
+  ["machine learning", "Machine Learning"], ["deep learning", "Deep Learning"],
+  ["tensorflow", "TensorFlow"], ["pytorch", "PyTorch"], ["pandas", "Pandas"],
+  ["numpy", "NumPy"], ["scikit-learn", "scikit-learn"], ["nlp", "NLP"], ["llm", "LLM"],
+  ["opencv", "OpenCV"],
+
+  // mobile
+  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"], ["xamarin", "Xamarin"],
+];
+
+function techBoundaryRegex(keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
+// Extracts a comma-joined list of recognized technology keywords from an
+// already-fetched job detail page — piggybacks on whatever html a source
+// fetched for extractBodyExperience/etc, no extra network call.
+export function extractTechnologies(html) {
+  const $ = cheerioLoad(html);
+  $("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+    $(el).prepend(" ").append(" ");
+  });
+  let text = normalizeWhitespace($("body").text());
+
+  // JS-rendered pages (e.g. talent.com) keep the description in a data blob
+  // instead of visible DOM text — scan those too, still zero extra fetches.
+  const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+  if (nextDataMatch) text += " " + nextDataMatch[1];
+  for (const m of html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)) {
+    text += " " + m[1];
+  }
+
+  const found = new Set();
+  for (const [key, label] of TECH_KEYWORDS) {
+    if (techBoundaryRegex(key).test(text)) found.add(label);
+  }
+  return found.size ? [...found].join(", ") : null;
+}
+
+// Ensure the column exists at most once per warm container (mirrors
+// _active_core.mjs's ensureActiveSchema for the `active` column).
+let _techSchemaReady = false;
+export async function ensureTechnologiesColumn(client) {
+  if (_techSchemaReady) return;
+  await client.query(`ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS technologies text`);
+  _techSchemaReady = true;
+}
+
+/* ======================
    Generic enrichment
 ====================== */
 /**
@@ -313,6 +414,8 @@ export async function enrichExperience({
   const client = await pool.connect();
 
   try {
+    await ensureTechnologiesColumn(client);
+
     const { rows } = await client.query(
       `SELECT id, url, title
          FROM job_posts
@@ -332,6 +435,7 @@ export async function enrichExperience({
       try {
         const html = await fetchText(row.url);
         let experience = extract(html);
+        const technologies = extractTechnologies(html);
 
         // Title always overrides (highest priority)
         if (
@@ -346,8 +450,8 @@ export async function enrichExperience({
         }
 
         await client.query(
-          `UPDATE job_posts SET experience = $1 WHERE id = $2`,
-          [experience || "-", row.id]
+          `UPDATE job_posts SET experience = $1, technologies = COALESCE($3, technologies) WHERE id = $2`,
+          [experience || "-", row.id, technologies]
         );
 
         success++;

@@ -11,7 +11,7 @@ import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -173,14 +173,15 @@ async function fetchSmartRecruiters(src) {
 
     const url = normalizeUrl(applyUrl);
 
+    const descHtml = extractSrDescription(detail);
     let experience = isInternshipTitle(title) ? "diakmunka" : null;
     if (!experience) {
-      const descHtml = extractSrDescription(detail);
       experience = (descHtml ? extractBodyExperience(descHtml) : null) || "-";
     }
+    const technologies = descHtml ? extractTechnologies(descHtml) : null;
 
     console.log(`[ats][${src.label}] ACCEPT: "${title}" exp=${experience} url=${url}`);
-    results.push({ source: src.key, title, url, experience });
+    results.push({ source: src.key, title, url, experience, technologies });
   }
 
   return { raw: all.length, mapped: results };
@@ -203,11 +204,11 @@ function dedupeBySourceUrl(items) {
 async function upsertJob(client, item) {
   const res = await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [item.source, item.title, item.url, item.experience ?? "-"]
+    [item.source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -223,6 +224,7 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
   let alreadyExisted = 0;
 
   try {
+    await ensureTechnologiesColumn(client);
     let anyFetchFailed = false;
     const foundBySource = new Map();
     const collected = [];

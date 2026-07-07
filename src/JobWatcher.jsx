@@ -1504,6 +1504,13 @@ const JobWatcher = () => {
                 {job.experience && (
                   <span className="job-experience">{job.experience}</span>
                 )}
+                {job.technologies && (
+                  <span className="job-tech-tags">
+                    {job.technologies.split(", ").map((tech) => (
+                      <span key={tech} className="job-tech-tag">{tech}</span>
+                    ))}
+                  </span>
+                )}
                 <span>
                   {job.firstSeen
                     ? new Date(job.firstSeen).toLocaleString("hu-HU")

@@ -3,44 +3,24 @@ export const config = {
 };
 
 
-import { Pool } from "pg";
 import { withTimeout } from "./_error-logger.mjs";
 import {
   enrichExperience,
   extractLinkedInExperience,
-  INTERN_SOURCES,
 } from "./_experience_core.mjs";
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-if (!connectionString) throw new Error("NETLIFY_DATABASE_URL missing");
-
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
 
 /* ======================
    MAIN
 ====================== */
 export default withTimeout("cron_experience-background", async () => {
   console.log("=== EXPERIENCE ENRICHMENT (LinkedIn) STARTED ===");
-  const client = await pool.connect();
 
-  try {
-    // Intern-centric sources: mark recent rows as diákmunka, no fetch
-    const internSourcePlaceholders = INTERN_SOURCES.map((_, i) => `$${i + 1}`).join(",");
-    const { rowCount: internMarked } = await client.query(
-      `UPDATE job_posts
-       SET experience = 'diákmunka'
-       WHERE (experience IS NULL OR experience = '-')
-         AND source IN (${internSourcePlaceholders})
-         AND first_seen >= NOW() - INTERVAL '20 minutes'`,
-      INTERN_SOURCES
-    );
-    console.log(`[intern-sources] ${internMarked} álláshirdetés megjelölve: diákmunka`);
-  } finally {
-    client.release();
-  }
+  // (2026-07-07) Az INTERN_SOURCES 'diákmunka' tömeg-címkézés TÖRÖLVE innen:
+  // minden diák-forrás scraper insertkor maga írja a címkét (DIAK_1/2/3,
+  // atlasz, melodiak, pannondiak…), ráadásul a 20 perces ablak a :23-as
+  // futásnál el sem érte a :55-ös dispatcher-futások sorait (28+ perc).
+  // Szabály (user, 2026-07-07): LinkedIn-en KÍVÜL experience-t CSAK a scraper
+  // írhat, a saját futása közben — backfill kizárólag LinkedInre létezik.
 
   // LinkedIn enrichment — re-run over recent LinkedIn rows whose experience is
   // not yet known. Rows already marked as "diákmunka" by the LinkedIn ingest

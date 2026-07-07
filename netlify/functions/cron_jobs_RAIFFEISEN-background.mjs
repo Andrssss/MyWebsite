@@ -20,7 +20,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -185,11 +185,11 @@ async function fetchPage(page) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -200,6 +200,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    await ensureTechnologiesColumn(client);
     let crawlError = false;
     const foundUrls = [];
     const allRows = [];
@@ -273,6 +274,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
 
         let source = "raiffeisen";
         let experience;
+        let technologies = null;
         if (levelLower.includes("gyakornok") || isInternshipTitle(title)) {
           experience = "diákmunka";
         } else {
@@ -280,6 +282,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
           try {
             const detailHtml = await fetchText(url);
             experience = extractBodyExperience(detailHtml) || "-";
+            technologies = extractTechnologies(detailHtml);
           } catch (err) {
             // The detail fetch only enriches experience; the job's existence is already
             // known from the list. Keep it (experience "-") and still push to foundUrls —
@@ -297,7 +300,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         const migrated = pattern
           ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
           : false;
-        const wasNew = await upsertJob(client, source, { title, url, experience });
+        const wasNew = await upsertJob(client, source, { title, url, experience, technologies });
         foundUrls.push(url);
         if (migrated) {
           migratedUrls++;

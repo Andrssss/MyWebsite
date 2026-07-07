@@ -29,7 +29,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl } from "./_active_core.mjs";
-import { extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -512,12 +512,12 @@ async function upsertJob(client, source, item) {
   // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO UPDATE SET company = EXCLUDED.company
         WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
-    [source, item.title, item.url, item.experience ?? "-", item.company || null]
+    [source, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -528,10 +528,13 @@ async function fetchDetailExperience(url) {
   try {
     const html = await fetchText(url);
     const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
-    return extractBodyExperience(normalizedHtml) || null;
+    return {
+      experience: extractBodyExperience(normalizedHtml) || null,
+      technologies: extractTechnologies(normalizedHtml),
+    };
   } catch (err) {
     await logFetchError("cron_jobs_DIAK_3", { url, message: `detail experience: ${err.message}` });
-    return null;
+    return { experience: null, technologies: null };
   }
 }
 
@@ -580,6 +583,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
 
   const client = write ? await pool.connect() : null;
+  if (client) await ensureTechnologiesColumn(client);
 
   const stats = {
     ok: true,
@@ -825,15 +829,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             } else if (isInternshipTitle(item.title)) {
               item.experience = "diákmunka";
             } else {
-              const exp = await fetchDetailExperience(item.url);
+              const { experience: exp, technologies } = await fetchDetailExperience(item.url);
               item.experience = exp || "-";
+              item.technologies = technologies;
               await sleep(400);
             }
           } else if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
           } else if (source === "wherewework" && !knownUrls.has(item.url)) {
-            const exp = await fetchDetailExperience(item.url);
+            const { experience: exp, technologies } = await fetchDetailExperience(item.url);
             if (exp) item.experience = exp;
+            item.technologies = technologies;
             await sleep(400);
           }
           console.log(`${tag}     upsert: [${item.experience ?? '-'}] "${item.title}"`);

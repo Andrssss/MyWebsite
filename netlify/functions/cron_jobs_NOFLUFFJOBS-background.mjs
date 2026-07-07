@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { extractBodyExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -282,10 +282,13 @@ async function fetchNofluffExperience(url) {
   try {
     const html = await fetchText(url);
     const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
-    return extractBodyExperience(normalizedHtml) || null;
+    return {
+      experience: extractBodyExperience(normalizedHtml) || null,
+      technologies: extractTechnologies(normalizedHtml),
+    };
   } catch (err) {
     await logFetchError("cron_jobs_NOFLUFFJOBS", { url, message: `nofluff experience: ${err.message}` });
-    return null;
+    return { experience: null, technologies: null };
   }
 }
 
@@ -303,13 +306,21 @@ function volatileUrlPattern(url) {
 }
 
 async function upsertJob(client, item) {
+  // Az experience és a technologies egymástól függetlenül healel: az experience
+  // csak a '-'/üres/NULL sorokat tölti ki egy most lefetchelt valós értékkel
+  // (pl. korábbi 429-es futás sora gyógyul a következő scrape-nél), a
+  // technologies pedig bármikor kitöltődik, ha korábban még NULL volt.
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
-     ON CONFLICT (source, url)
-        DO NOTHING;`,
-    ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null]
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+     ON CONFLICT (source, url) DO UPDATE SET
+        experience = CASE
+          WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
+           AND EXCLUDED.experience NOT IN ('-', '')
+          THEN EXCLUDED.experience ELSE job_posts.experience END,
+        technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies);`,
+    ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -378,10 +389,26 @@ async function scrapeNofluffjobs(client) {
   // Upsert AFTER all list pages are collected, so migrateVolatileUrl knows the
   // FULL current listing (a url still listed must never be renamed away).
   const currentUrls = allItems.map((c) => c.url);
+
+  // Experience-t CSAK ott fetchelünk, ahol a DB-ben még nincs valós érték (új
+  // url, vagy korábbi sikertelen fetch '-'-a) — nincs külön backfill, a scrape
+  // gyógyít. Mellékhatás: óránként csak pár detail-hívás megy ki, ami a
+  // nofluffjobs 429-es burst-limitje alatt marad.
+  const { rows: expRows } = await client.query(
+    `SELECT url, experience FROM job_posts
+      WHERE source = 'nofluffjobs' AND url = ANY($1::text[])`,
+    [currentUrls]
+  );
+  const storedExp = new Map(expRows.map((r) => [r.url, r.experience]));
+
   for (const item of allItems) {
-    const exp = await fetchNofluffExperience(item.url);
-    if (exp) item.experience = exp;
-    await sleep(400);
+    const known = storedExp.get(item.url);
+    if (known == null || known === "-" || known === "") {
+      const { experience: exp, technologies } = await fetchNofluffExperience(item.url);
+      if (exp) item.experience = exp;
+      item.technologies = technologies;
+      await sleep(400);
+    }
     const migrated = await migrateVolatileUrl(
       client, "nofluffjobs", item.url, volatileUrlPattern(item.url), currentUrls
     );
@@ -412,6 +439,7 @@ const _runJob = withTimeout("cron_jobs_NOFLUFFJOBS-background", async (request) 
   const client = await pool.connect();
 
   try {
+    await ensureTechnologiesColumn(client);
     const total = await scrapeNofluffjobs(client);
     console.log(`[nofluffjobs] done — ${total} jobs upserted`);
   } finally {

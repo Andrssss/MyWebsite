@@ -19,7 +19,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -129,11 +129,11 @@ function fetchText(url, redirectLeft = 5) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -144,6 +144,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    await ensureTechnologiesColumn(client);
     const foundUrls = [];
     let listHtml;
     try {
@@ -187,6 +188,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
 
         let source = "unicredit";
         let experience;
+        let technologies = null;
 
         if (isInternshipTitle(job.title)) {
           experience = "diákmunka";
@@ -197,6 +199,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
             // Body uses em-dash ("1–3 év") which extractBodyExperience may not match
             const normalizedHtml = detailHtml.replace(/–/g, "-");
             experience = extractBodyExperience(normalizedHtml) || "-";
+            technologies = extractTechnologies(normalizedHtml);
           } catch (err) {
             // The job's existence is already known from the LIST (title too) —
             // keep it (experience "-") and still upsert + push to foundUrls.
@@ -213,6 +216,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           title: job.title,
           url: job.url,
           experience,
+          technologies,
         });
         foundUrls.push(job.url);
         if (wasNew) {

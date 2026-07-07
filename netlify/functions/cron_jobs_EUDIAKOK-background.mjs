@@ -22,7 +22,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { extractBodyExperience, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -192,19 +192,20 @@ function parseDetailPage(html) {
   const experience = isInternshipTitle(title)
     ? "diákmunka"
     : extractBodyExperience(html);
+  const technologies = extractTechnologies(html);
 
-  return { title, experience };
+  return { title, experience, technologies };
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -214,6 +215,7 @@ async function upsertJob(client, source, item) {
 export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
+  await ensureTechnologiesColumn(client);
 
   let listHtml;
   try {
@@ -265,6 +267,7 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
           title: parsed.title,
           url: detailUrl,
           experience: parsed.experience,
+          technologies: parsed.technologies,
         });
         foundUrls.push(detailUrl);
 
