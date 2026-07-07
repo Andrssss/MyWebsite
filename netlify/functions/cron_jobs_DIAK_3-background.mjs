@@ -47,7 +47,10 @@ const pool = new Pool({
 
  
 async function runAllBatches() {
-  const size = 4;
+  // FIGYELEM: az azonos key-jű forrás-csoportnak (otp×5 = 2 bucket + 3 lista)
+  // EGY batchben kell maradnia — a foundBySource batch-lokális, két batchre
+  // esve a két reconcile egymás sorait deaktiválná/reaktiválná.
+  const size = 5;
   const totalBatches = Math.ceil(SOURCES.length / size);
 
   console.log(`[runAllBatches] START – ${SOURCES.length} forrás, ${totalBatches} batch (méret: ${size})`);
@@ -148,15 +151,43 @@ function dedupeByUrl(items) {
 // =====================
 const SOURCES = [
 
+  // OTP BUCKET-nézetek (bucketOnly): a TELJES élő listing megy a reconcile
+  // foundUrls-ébe, upsert NÉLKÜL — így a 3 kategória-listán kívüli, korábban
+  // ingestelt élő sorok nem deaktiválódnak, sőt a reconcile reaktivációja
+  // vissza is kapcsolja őket (RPA fejlesztő / Modell Validációs gyakornok
+  // osztályú téves lejáratások, 2026-07-07). Mérés: a Budapest-szűrős kereső
+  // 93, a szűretlen 113 állás, és EGYIK SEM superset — pl. Modell Validációs
+  // csak a Budapest-nézetben, LiveOps gyakornok / CBS Domain Architect csak a
+  // szűretlenben látszik → mindkét nézet kell. (A szűretlen nézet CSAK
+  // referencedate-rendezéssel lapozható stabilan; anélkül a sorok lapkérések
+  // között csúszkálnak és állások maradnak ki — kétszer futtatva igazolva.)
+  { key: "otp", label: "OTP bucket (Budapest)", bucketOnly: true, url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=&optionsFacetsDD_title=" },
+  { key: "otp", label: "OTP bucket (teljes)", bucketOnly: true, url: "https://karrier.otpbank.hu/search/?q=&sortColumn=referencedate&sortDirection=desc" },
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=di%C3%A1kmunka&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=&optionsFacetsDD_title=" },
     { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Üzletfejlesztés+és+innováció&optionsFacetsDD_title=&_gl=1*eqovvy*_up*MQ..*_ga*NDIyODM3NjU3LjE3ODAzMjUzMDY.*_ga_MS48V6C7P1*czE3ODAzMjUzMDYkbzEkZzEkdDE3ODAzMjU0MTgkajE0JGwwJGgw"},
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Informatika+és+digitalizáció&optionsFacetsDD_title=&_gl=1*1xvjrq1*_up*MQ..*_ga*MTA2NjU1MTQ3NS4xNzc5ODA3OTk5*_ga_MS48V6C7P1*czE3Nzk4MDc5OTkkbzEkZzAkdDE3Nzk4MDc5OTkkajYwJGwwJGgw" },
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
-  { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
+  // wherewework: a kategória-szegmenses path (…/budaors,budapest/bpo-services,…,itc,…)
+  // 2026-07-07-én bizonyítottan halott — BÁRMILYEN kategória-slug a path-ban
+  // "0 results"-ot ad (pedig a slugok léteznek a szűrő-formban), csak a
+  // city-only path működik. Ezért széles lista: minden kategória+szint,
+  // budaörs+budapest (~94 találat); a seniorFilter + experience-detektálás szűr.
+  { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
   { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
   { key: "miszisz", label: "MISZISZ", url: "https://miszisz.hu/?post_type%5B%5D=munkaink&s=&mmin=0&mmax=8000&mvaros%5B%5D=0&mvaros%5B%5D=2&mvaros%5B%5D=3&mvaros%5B%5D=4&mvaros%5B%5D=6&mvaros%5B%5D=7&mvaros%5B%5D=8&mvaros%5B%5D=9&mvaros%5B%5D=10&mvaros%5B%5D=11&mvaros%5B%5D=12&mvaros%5B%5D=15&mvaros%5B%5D=17&mvaros%5B%5D=21&mvaros%5B%5D=68&mvaros%5B%5D=69&mvaros%5B%5D=368&mkat%5B%5D=231&mkat%5B%5D=40&mkat%5B%5D=257&mkat%5B%5D=41" },
   // nofluffjobs → áttéve: cron_jobs_NOFLUFFJOBS-background.mjs
+];
+
+// A blacklistes url-t se az upsert, se a bucket ne lássa — különben a
+// reconcile reaktiválná a kézzel kigyomlált sorokat.
+const BLACKLIST_SOURCES = ["jobline", "otp", "muisz"];
+const BLACKLIST_URLS = [
+  "https://jobline.hu/allasok/25,200307,162",
+  "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
+  "https://muisz.hu/hu/regisztracio",
+  "https://muisz.hu/hu/diakmunkaink",
+  "https://karrier.otpbank.hu/otp/job/Budapest-Gyakornok-V%C3%A1llalati-Sz%C3%A1mlavezet%C3%A9si-K%C3%B6zpont-1051-Budapest-N%C3%A1dor-utca-6_-1051/1366316233/",
 ];
 
 // =====================
@@ -604,7 +635,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let merged = mergeCandidates(generic, ssr);
       console.log(`${tag}   merged (dedupe): ${merged.length}`);
 
-      // Paginate wherewework (follows [rel="next"] links until exhausted; 15-page cap against infinite loops)
+      // Paginate wherewework (follows [rel="next"] links until exhausted; page cap against infinite loops).
+      // A "We are sorry you didn't find the job..." szöveg NEM stop-jel: minden
+      // list-oldalon szerepel (találatokkal teli oldalon is — élőben igazolva
+      // 2026-07-07), template-zaj. A korábbi marker-check a 2. oldal fetch-e
+      // után azonnal megállt → csak az 1. oldal 10 állása került a foundUrls-be,
+      // és a reconcile a 2+. oldalra csúszott élő állásokat tévesen deaktiválta
+      // (pl. jarmuszimulacios-mernok-gyakornok/172590). Stop-jelek: nincs
+      // rel=next, vagy az oldal 0 új job-url-t ad.
       if (source === "wherewework") {
         let pageHtml = html;
         let pageUrl = p.url;
@@ -623,10 +661,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           } catch (err) {
             console.log(`${tag}   wherewework oldal ${pageNum} HIBA: ${err.message}`);
             await logFetchError("cron_jobs_DIAK_3", { url: nextUrl, message: err.message });
-            break;
-          }
-          if (pageHtml.includes("We are sorry you didn't find the job you were looking for!")) {
-            console.log(`${tag}   wherewework: "no jobs" oldal – megáll`);
+            // részleges lista → a reconcile nem deaktiválhat belőle
+            foundBySource.get(source).allSucceeded = false;
             break;
           }
           const pgGeneric = extractCandidates(pageHtml, nextUrl).filter((c) => looksLikeJobUrl(source, c.url));
@@ -634,6 +670,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           const prevCount = merged.length;
           merged = mergeCandidates(merged, pgGeneric, pgSsr);
           console.log(`${tag}   wherewework oldal ${pageNum}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
+          if (merged.length === prevCount) { console.log(`${tag}   wherewework: 0 új url az oldalon – megáll`); break; }
           pageUrl = nextUrl;
           await sleep(300);
         }
@@ -648,7 +685,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // reconcile ne deaktiváljon részleges lista alapján.
       if (source === "otp") {
         let startrow = 25;
-        let safetyPagesLeft = 8;
+        let safetyPagesLeft = 12;
+        let sawEnd = false;
         while (safetyPagesLeft-- > 0) {
           const pageUrl = `${p.url}${p.url.includes("?") ? "&" : "?"}startrow=${startrow}`;
           let pageHtml;
@@ -658,6 +696,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             console.log(`${tag}   otp lapozás HIBA (startrow=${startrow}): ${err.message}`);
             await logFetchError("cron_jobs_DIAK_3", { url: pageUrl, message: err.message });
             foundBySource.get(source).allSucceeded = false;
+            sawEnd = true; // a hibát már jelöltük, a cap-guard ne írja felül a logot
             break;
           }
           const pgGeneric = extractCandidates(pageHtml, pageUrl).filter((c) => looksLikeJobUrl(source, c.url));
@@ -665,10 +704,33 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           const prevCount = merged.length;
           merged = mergeCandidates(merged, pgGeneric, pgSsr);
           console.log(`${tag}   otp startrow=${startrow}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
-          if (merged.length === prevCount) break; // nincs új találat → utolsó oldal után járunk
+          if (merged.length === prevCount) { sawEnd = true; break; } // nincs új találat → utolsó oldal után járunk
           startrow += 25;
           await sleep(300);
         }
+        // Cap úgy merült ki, hogy az utolsó oldal még adott újat → a listing
+        // vége hiányozhat; részleges lista alapján a reconcile nem deaktiválhat.
+        if (!sawEnd) {
+          console.log(`${tag}   otp lapozás: oldal-cap kimerült, a listing csonka lehet → complete=false`);
+          foundBySource.get(source).allSucceeded = false;
+        }
+      }
+
+      // BUCKET-ONLY forrás (otp teljes-listing nézetek): minden itt látott url a
+      // reconcile foundUrls-ébe megy — nincs szűrés, nincs upsert. Rendeltetése,
+      // hogy a kategória-listákon KÍVÜL élő, korábban ingestelt sorok ne
+      // deaktiválódjanak, és a tévesen off sorokat a reconcile reaktiválja.
+      if (p.bucketOnly) {
+        const entry = foundBySource.get(source);
+        let bucketCount = 0;
+        for (const c of merged) {
+          if (BLACKLIST_URLS.includes(c.url)) continue;
+          entry.urls.push(c.url);
+          bucketCount++;
+        }
+        console.log(`${tag}   bucket-only: ${bucketCount} url a reconcile-bucketbe (upsert nélkül) – ${p.label}`);
+        stats.portals.push({ source, label: p.label, url: p.url, ok: true, matched: bucketCount });
+        continue;
       }
 
       if (source === "miszisz") {
@@ -704,18 +766,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       }
 
       // =========================
-      // BLACKLISTING
+      // BLACKLISTING (listák module-szinten — a bucket-ág is használja)
       // =========================
-      const BLACKLIST_SOURCES = [ "jobline", "otp","muisz"];
-      const BLACKLIST_URLS = [
-        "https://jobline.hu/allasok/25,200307,162",
-        "https://karrier.otpbank.hu/go/Minden-allasajanlat/1167001/?q=",
-        "https://muisz.hu/hu/regisztracio",
-        "https://muisz.hu/hu/diakmunkaink",
-        "https://karrier.otpbank.hu/otp/job/Budapest-Gyakornok-V%C3%A1llalati-Sz%C3%A1mlavezet%C3%A9si-K%C3%B6zpont-1051-Budapest-N%C3%A1dor-utca-6_-1051/1366316233/",
-
-      ];
-
       if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
         const _beforeBL = matchedList.length;
         matchedList = matchedList.filter(c => {
@@ -740,10 +792,19 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (write && client) {
         console.log(`${tag}   DB upsert: ${matchedList.length} állás mentése...`);
         const DIAKMUNKA_SOURCES = ["vizmuvek", "miszisz", "onejob"];
-        // Full current listing (pre-filter) of THIS list-url — a url in this set
-        // is live on the source, so migrateVolatileUrl must never rename its row away.
-        const currentUrls = merged.map((c) => c.url);
+        // Full current listing (pre-filter) of THIS list-url + minden eddig
+        // látott url a forrás korábbi entry-jeiből (az otp bucket-nézetek elöl
+        // állnak a SOURCES-ban, így a teljes élő listing védve van) — a url in
+        // this set is live on the source, so migrateVolatileUrl must never
+        // rename its row away.
+        const currentUrls = [...new Set([...merged.map((c) => c.url), ...foundBySource.get(source).urls])];
         const patternFor = VOLATILE_URL_PATTERNS[source];
+        // wherewework: a detail-fetch (elvárt évek kiolvasása) csak ÚJ url-nél fut.
+        // Meglévő sornál kidobott munka: az ON CONFLICT sosem írja felül az
+        // experience-t, a ~90 állásos lista újra-fetchelése percekig tartana.
+        const knownUrls = source === "wherewework"
+          ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
+          : null;
         for (const item of matchedList) {
           const pattern = patternFor ? patternFor(item.url) : null;
           if (pattern) {
@@ -770,7 +831,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             }
           } else if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
-          } else if (source === "wherewework") {
+          } else if (source === "wherewework" && !knownUrls.has(item.url)) {
             const exp = await fetchDetailExperience(item.url);
             if (exp) item.experience = exp;
             await sleep(400);
