@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(netlify env:get *)",
+      "Bash(npx netlify env:get *)",
+      "Bash(netlify env:list *)",
+      "Bash(npx netlify env:list *)",
+      "Bash(npx eslint *)"
     ]
   }
 }
