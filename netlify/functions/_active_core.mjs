@@ -205,6 +205,27 @@ export const BANNER_DEAD_SOURCES = {
     const m = body.slice(i, i + 3000).match(/system_status\\?"\s*:\s*(\d+)/);
     return !!m && m[1] === "2";
   },
+  // nofluffjobs: dead postings stay HTTP 200 forever (SEO), so only the body
+  // can tell. Two independent signals, either proves death (validated
+  // 2026-07-07 on 3 live PUBLISHED + 1 expired DISABLED page):
+  //   • Angular SSR renders <nfj-posting-expired-breadcrumbs> ONLY on dead
+  //     postings — live pages carry the expiry texts solely as i18n dict
+  //     entries ("EXPIRED_OFFER":{…}), never as an element, so the tag
+  //     boundary keeps it false-positive-free (talent's >…< trick);
+  //   • the transfer-state JSON keys the posting by its OWN slug
+  //     ("/posting/{slug}?…":{"status":"DISABLED"). On live pages the same
+  //     key opens the full job object whose own "status":"PUBLISHED" sits
+  //     hundreds of KB in, so a DISABLED right after the slug key can only be
+  //     this posting's verdict — never a related job's (those aren't keyed).
+  nofluffjobs: (row, body) => {
+    if (/<nfj-posting-expired/i.test(body)) return true;
+    const slug = (row.url.match(/\/hu\/job\/([^/?#]+)/) || [])[1];
+    if (!slug) return false;
+    const i = body.indexOf(`"/posting/${slug}?`);
+    if (i < 0) return false;
+    const m = body.slice(i, i + 400).match(/"status"\s*:\s*"([A-Z_]+)"/);
+    return !!m && m[1] === "DISABLED";
+  },
 };
 
 function _pathOf(u) {

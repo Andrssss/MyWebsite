@@ -315,53 +315,64 @@ async function upsertJob(client, item) {
 
 /* ── main scrape ─────────────────────────────────────────────── */
 
+// SSR renders at most ~20 list items per page; totalPages comes from the
+// embedded transfer state. Cap the walk so a parser glitch can't loop forever.
+const MAX_LIST_PAGES = 5;
+
 async function scrapeNofluffjobs(client) {
   const seen = new Set();
   let totalUpserted = 0;
   const foundUrls = [];
   const allItems = [];
-  let crawlError = false;
 
   for (const sourceUrl of NOFLUFF_SOURCES) {
-    console.log(`[nofluffjobs] Fetching: ${sourceUrl}`);
-    let html;
-    try {
-      html = await fetchText(sourceUrl);
-    } catch (err) {
-      await logFetchError("cron_jobs_NOFLUFFJOBS", { url: sourceUrl, message: err.message });
-      console.error(`[nofluffjobs] Fetch failed: ${err.message}`);
-      crawlError = true;
-      continue;
-    }
+    let totalPages = 1;
+    for (let page = 1; page <= Math.min(totalPages, MAX_LIST_PAGES); page++) {
+      const pageUrl = page === 1 ? sourceUrl : `${sourceUrl}&page=${page}`;
+      console.log(`[nofluffjobs] Fetching: ${pageUrl}`);
+      let html;
+      try {
+        html = await fetchText(pageUrl);
+      } catch (err) {
+        await logFetchError("cron_jobs_NOFLUFFJOBS", { url: pageUrl, message: err.message });
+        console.error(`[nofluffjobs] Fetch failed: ${err.message}`);
+        break;
+      }
 
-    const generic = extractCandidates(html, sourceUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
-    const ssr = extractSSR(html, sourceUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
-    let merged = mergeCandidates(generic, ssr);
-    console.log(`[nofluffjobs]   generic=${generic.length} ssr=${ssr.length} merged=${merged.length}`);
+      if (page === 1) {
+        const tp = html.match(/"totalPages"\s*:\s*(\d+)/);
+        if (tp) totalPages = parseInt(tp[1], 10) || 1;
+      }
 
-    // dedupe across source URLs
-    merged = merged.filter((c) => {
-      const u = normalizeUrl(c.url);
-      if (seen.has(u)) return false;
-      seen.add(u);
-      return true;
-    });
+      const generic = extractCandidates(html, pageUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
+      const ssr = extractSSR(html, pageUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
+      let merged = mergeCandidates(generic, ssr);
+      console.log(`[nofluffjobs]   page ${page}/${totalPages}: generic=${generic.length} ssr=${ssr.length} merged=${merged.length}`);
 
-    // clean & senior filter
-    merged = merged
-      .map((c) => ({ ...c, title: cleanJobTitle(c.title) ?? c.title }))
-      .filter((c) => {
-        if (isSeniorLike(c.title)) {
-          console.log(`[nofluffjobs]   [seniorFilter] KISZŰRVE: "${c.title}"`);
-          return false;
-        }
+      // dedupe across source URLs and pages
+      merged = merged.filter((c) => {
+        const u = normalizeUrl(c.url);
+        if (seen.has(u)) return false;
+        seen.add(u);
         return true;
       });
 
-    console.log(`[nofluffjobs]   after filters: ${merged.length}`);
-    allItems.push(...merged);
+      // clean & senior filter
+      merged = merged
+        .map((c) => ({ ...c, title: cleanJobTitle(c.title) ?? c.title }))
+        .filter((c) => {
+          if (isSeniorLike(c.title)) {
+            console.log(`[nofluffjobs]   [seniorFilter] KISZŰRVE: "${c.title}"`);
+            return false;
+          }
+          return true;
+        });
 
-    await sleep(1000);
+      console.log(`[nofluffjobs]   after filters: ${merged.length}`);
+      allItems.push(...merged);
+
+      await sleep(1000);
+    }
   }
 
   // Upsert AFTER all list pages are collected, so migrateVolatileUrl knows the
@@ -381,8 +392,15 @@ async function scrapeNofluffjobs(client) {
     totalUpserted++;
   }
 
-  const rc = await reconcileActive(client, "nofluffjobs", foundUrls, { complete: !crawlError });
-  console.log(`[nofluffjobs] active reconcile — complete=${!crawlError}, ${JSON.stringify(rc)}`);
+  // complete:false → reactivate-only. The list is criteria-filtered
+  // (trainee/junior) and mixes rotating "recommended" postings into the
+  // results, so absence from it can NOT mean the posting died: live ads get
+  // reclassified to mid/senior and drop off the filtered view (3 ilyen hibás
+  // deaktiválás user-jelzésre, 2026-07-07). Deactivation for this source is
+  // owned by the daily 404-sweep's BANNER_DEAD_SOURCES.nofluffjobs rule,
+  // which reads the posting's own detail-page status.
+  const rc = await reconcileActive(client, "nofluffjobs", foundUrls, { complete: false });
+  console.log(`[nofluffjobs] active reconcile (reactivate-only) — ${JSON.stringify(rc)}`);
 
   return totalUpserted;
 }

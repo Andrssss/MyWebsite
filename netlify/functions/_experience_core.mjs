@@ -220,6 +220,23 @@ export function extractBodyExperience(html) {
   return extractYearsFromText(pageText);
 }
 
+// bluebird.hu: Thrive builderes oldal — a hirdetés szövege a
+// section.tcb-post-content-ben van; a body-fallback azért biztonságos, mert a
+// céges boilerplate ("több mint 20 éves tapasztalattal") a 15 éves
+// plauzibilitási plafonon fennakad.
+export function extractBluebirdExperience(html) {
+  const $ = cheerioLoad(html);
+  $("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+    $(el).prepend(" ").append(" ");
+  });
+  const scoped = normalizeWhitespace($("section.tcb-post-content").text());
+  if (scoped) {
+    const fromScoped = extractYearsFromText(scoped);
+    if (fromScoped) return fromScoped;
+  }
+  return extractYearsFromText(normalizeWhitespace($("body").text()));
+}
+
 // talent.com: Next.js SSR — description is in __NEXT_DATA__ JSON, not in visible body text
 export function extractTalentExperience(html) {
   // 1. Try __NEXT_DATA__ (Next.js SSR blob)

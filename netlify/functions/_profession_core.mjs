@@ -274,6 +274,7 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
   const seenUrls = new Set();
   let pagesVisited = 0;
   let pagesWithJobs = 0;
+  let pageErrors = 0;
   const effectiveMaxPages = Math.min(
     Number.isFinite(maxPages) ? Math.max(1, Number(maxPages)) : 100,
     100
@@ -294,7 +295,11 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
         console.log(`[profession] HTTP 404 at page ${page}: ${pageUrl} — stopping pagination`);
         break;
       }
-      console.log(`[profession] fetch error at page ${page}: ${msg} — continuing to next page`);
+      // A kihagyott oldal állásai hiányoznak a listából — ezt jelezni KELL a
+      // reconcile felé (complete=false), különben egy átmeneti hiba egy teljes
+      // oldalnyi still-listed állást deaktiválna.
+      pageErrors++;
+      console.log(`[profession] fetch error at page ${page}: ${msg} — continuing to next page (marked incomplete)`);
       continue;
     }
     pagesVisited++;
@@ -335,6 +340,7 @@ async function extractProfessionCandidatesAllPages(source, baseUrl, startPage = 
     items: dedupeByUrl(all),
     pagesVisited,
     pagesWithJobs,
+    pageErrors,
   };
 }
 
@@ -403,7 +409,11 @@ export async function processProfessionSources(sources, jobName, request, pageOp
         const result = await processOneSource(client, p, jobName, pageOptions);
         const entry = foundBySource.get(result.source) || { urls: [], allSucceeded: true };
         if (result.ok) {
+          // A megtalált url-ek részleges crawlnál is mennek a reconcile-nak
+          // (jelenlét = életjel, reaktivációhoz kell), de kihagyott oldal
+          // esetén a deaktiválást tiltani kell.
           entry.urls.push(...result.foundUrls);
+          if (result.complete === false) entry.allSucceeded = false;
         } else {
           entry.allSucceeded = false;
         }
@@ -460,13 +470,16 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   const source = p.key;
 
   let merged = [];
+  let complete = true;
   try {
     if (source.startsWith("profession")) {
       const professionResult = await extractProfessionCandidatesAllPages(source, p.url, startPage, maxPages);
       merged = professionResult.items;
+      complete = (professionResult.pageErrors || 0) === 0;
       console.log(
         `[profession] crawled ${professionResult.pagesVisited} page(s), ` +
-          `${professionResult.pagesWithJobs} page(s) with jobs for source URL: ${p.url}`
+          `${professionResult.pagesWithJobs} page(s) with jobs, ` +
+          `${professionResult.pageErrors || 0} page error(s) for source URL: ${p.url}`
       );
     } else {
       const html = await fetchText(p.url);
@@ -526,5 +539,5 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
 
   const foundUrls = matchedList.map((c) => c.url);
   console.log(`[${jobName}] ${source}: ${matchedList.length} items processed for ${p.url}`);
-  return { source, label: p.label, url: p.url, ok: true, matched: matchedList.length, foundUrls };
+  return { source, label: p.label, url: p.url, ok: true, matched: matchedList.length, foundUrls, complete };
 }

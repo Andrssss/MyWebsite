@@ -14,7 +14,7 @@ import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, enrichExperience, extractBluebirdExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -281,6 +281,20 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
   } finally {
     client.release();
   }
+
+  // A feedben nincs szint-mező, a cím-kulcsszavak ritkán találnak → a friss
+  // sorokhoz a részletoldalról szedjük ki az évszám-követelményt.
+  try {
+    await enrichExperience({
+      sourceFilter: "source = 'bluebird'",
+      extract: extractBluebirdExperience,
+      label: "bluebird",
+      jobName: "cron_jobs_BLUE-background",
+    });
+  } catch (err) {
+    console.error("[cron_jobs_BLUE-background] experience enrichment failed:", err.message);
+  }
+
   return new Response("OK");
 });
 
