@@ -20,6 +20,17 @@ const getTodayLocalDateString = () => {
   return `${y}-${m}-${d}`;
 };
 
+// ISO időbélyeg -> helyi YYYY-MM-DD (a toISOString UTC-je éjfél körül egy
+// nappal elcsúszna, ezért helyi mezőkből építjük).
+const localDateStringFrom = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return getTodayLocalDateString();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 const readCookie = (name) => {
   const cookieName = `${name}=`;
   const parts = document.cookie.split(";");
@@ -478,6 +489,10 @@ const JobWatcher = () => {
   const [manualAppliedCompany, setManualAppliedCompany] = useState("");
   const [manualAppliedStatus, setManualAppliedStatus] = useState("");
   const [manualAddOpen, setManualAddOpen] = useState(false);
+  // A szerkesztés alatt álló (cache-ből élő) jelentkezés TÁROLT kulcsa;
+  // null = a kézi űrlap új felvitelt csinál.
+  const [editingAppliedKey, setEditingAppliedKey] = useState(null);
+  const manualCardRef = useRef(null);
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
   const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
 
@@ -562,9 +577,10 @@ const JobWatcher = () => {
   }, [isAdmin, myVisitorId]);
 
   // Persist an applied/interview change to the shared DB (admins only).
+  // Resolves to true when the DB write succeeded (non-admin: false, no write).
   const persistAdminApplied = (jobKey, applied, interview, job) => {
-    if (!isAdmin) return;
-    fetch(JOB_APPLIED_API, {
+    if (!isAdmin) return Promise.resolve(false);
+    return fetch(JOB_APPLIED_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -574,7 +590,9 @@ const JobWatcher = () => {
         interview,
         job: compactJob(job),
       }),
-    }).catch(() => {});
+    })
+      .then((res) => res.ok)
+      .catch(() => false);
   };
 
   const [bugOpen, setBugOpen] = useState(false);
@@ -670,26 +688,93 @@ const JobWatcher = () => {
     });
   };
 
-  const handleAddManualApplied = () => {
-    const title = manualAppliedTitle.trim();
-    const source = manualAppliedSource.trim() || "manual";
-    const url = manualAppliedUrl.trim();
-    if (!title) { setManualAppliedStatus("Adj meg legalább egy pozíció nevet"); return; }
-    const firstSeen = manualAppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(manualAppliedDate)
-      ? new Date(manualAppliedDate + "T00:00:00").toISOString()
-      : new Date().toISOString();
-    const manualJob = { source, title, url: url || undefined, firstSeen, company: manualAppliedCompany.trim() || undefined };
-    const key = jobKeyFor(manualJob);
-    setAppliedKeys((prev) => { const next = new Set(prev); next.add(key); saveAppliedKeys(next); return next; });
-    setAppliedCache((prev) => { const updated = { ...prev, [key]: manualJob }; saveAppliedCache(updated); return updated; });
-    persistAdminApplied(key, true, false, manualJob);
+  const resetManualAppliedForm = () => {
     setManualAppliedTitle("");
     setManualAppliedSource("");
     autoAppliedSourceRef.current = "";
     setManualAppliedUrl("");
     setManualAppliedDate(new Date().toISOString().slice(0, 10));
     setManualAppliedCompany("");
-    setManualAppliedStatus("Hozzáadva");
+    setEditingAppliedKey(null);
+  };
+
+  // Cache-ből élő (kézzel felvitt vagy lejárt) jelentkezés szerkesztése:
+  // a kézi felviteli űrlapot tölti fel az adataival, mentéskor a régi kulcs
+  // helyére kerül az új (adminnál a DB-ben is).
+  const startEditApplied = (key, job) => {
+    setEditingAppliedKey(key);
+    setManualAppliedTitle(job.title || "");
+    setManualAppliedSource(job.source || "");
+    autoAppliedSourceRef.current = "";
+    setManualAppliedUrl(job.url || "");
+    setManualAppliedCompany(job.company || "");
+    setManualAppliedDate(job.firstSeen ? localDateStringFrom(job.firstSeen) : getTodayLocalDateString());
+    setManualAppliedStatus("");
+    setManualAddOpen(true);
+    setTimeout(() => manualCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  };
+
+  const handleSaveManualApplied = () => {
+    const title = manualAppliedTitle.trim();
+    const source = manualAppliedSource.trim() || "manual";
+    const url = manualAppliedUrl.trim();
+    if (!title) { setManualAppliedStatus("Adj meg legalább egy pozíció nevet"); return; }
+    const editingKey = editingAppliedKey;
+    const prevJob = editingKey ? appliedCache[editingKey] : undefined;
+    // Változatlan dátumnál az eredeti időbélyeg marad (óra:perc nem vész el).
+    const firstSeen =
+      prevJob?.firstSeen && localDateStringFrom(prevJob.firstSeen) === manualAppliedDate
+        ? prevJob.firstSeen
+        : manualAppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(manualAppliedDate)
+        ? new Date(manualAppliedDate + "T00:00:00").toISOString()
+        : new Date().toISOString();
+    // A prevJob spread a nem szerkeszthető mezőket (description, experience)
+    // őrzi meg lejárt állásoknál; az űrlapmezők felülírják a többit.
+    const manualJob = {
+      ...(prevJob || {}),
+      source,
+      title,
+      url: url || undefined,
+      firstSeen,
+      company: manualAppliedCompany.trim() || undefined,
+    };
+    const key = jobKeyFor(manualJob);
+    const wasInterview = editingKey ? interviewKeys.has(editingKey) : false;
+
+    setAppliedKeys((prev) => {
+      const next = new Set(prev);
+      if (editingKey && editingKey !== key) next.delete(editingKey);
+      next.add(key);
+      saveAppliedKeys(next);
+      return next;
+    });
+    setInterviewKeys((prev) => {
+      if (!editingKey || editingKey === key) return prev;
+      const next = new Set(prev);
+      next.delete(editingKey);
+      if (wasInterview) next.add(key);
+      saveInterviewKeys(next);
+      return next;
+    });
+    setAppliedCache((prev) => {
+      const updated = { ...prev, [key]: manualJob };
+      if (editingKey && editingKey !== key) delete updated[editingKey];
+      saveAppliedCache(updated);
+      return updated;
+    });
+
+    if (editingKey && editingKey !== key) {
+      // Kulcs-csere a DB-ben: előbb az új sor, a régit csak sikeres beszúrás
+      // után töröljük — hiba esetén a régi sor marad, nincs adatvesztés.
+      persistAdminApplied(key, true, wasInterview, manualJob).then((ok) => {
+        if (ok) persistAdminApplied(editingKey, false, false);
+      });
+    } else {
+      persistAdminApplied(key, true, wasInterview, manualJob);
+    }
+
+    resetManualAppliedForm();
+    setManualAppliedStatus(editingKey ? "Mentve" : "Hozzáadva");
   };
 
   const longPressTimerRef = useRef(null);
@@ -1188,9 +1273,11 @@ const JobWatcher = () => {
       const apiKeys = new Set(list.map(jobKeyFor));
       // Applied jobs no longer in the API list (expired / manual adds) come
       // from the cache, matched by their STORED key so legacy entries render.
+      // cachedOnly + storedKey: ezekre jelenik meg a Szerkesztés gomb, és a
+      // mentés a tárolt kulcsot cseréli (compactJob mindkettőt kiszűri a DB-ből).
       const onlyCached = Object.entries(appliedCache)
         .filter(([key]) => appliedKeys.has(key) && !apiKeys.has(key))
-        .map(([, j]) => j);
+        .map(([key, j]) => ({ ...j, cachedOnly: true, storedKey: key }));
       list = [...list.filter((j) => appliedKeys.has(jobKeyFor(j))), ...onlyCached];
     }
 
@@ -1711,6 +1798,15 @@ const JobWatcher = () => {
                     {isInterview ? "✓ Interjú" : "Interjú"}
                   </label>
                 )}
+                {job.cachedOnly && (
+                  <button
+                    className="job-edit-btn"
+                    onClick={() => startEditApplied(job.storedKey || appliedKey, job)}
+                    title="Kézzel felvitt / lejárt jelentkezés adatainak szerkesztése"
+                  >
+                    ✎ Szerkesztés
+                  </button>
+                )}
               </div>
             </li>
           );
@@ -1722,6 +1818,7 @@ const JobWatcher = () => {
 
         {showAppliedOnly && (
           <li
+            ref={manualCardRef}
             className={`job-card job-card--manual-add${manualAddOpen ? " open" : ""}`}
             onClick={!manualAddOpen ? () => { setManualAddOpen(true); setManualAppliedStatus(""); } : undefined}
           >
@@ -1731,12 +1828,14 @@ const JobWatcher = () => {
               className="job-manual-toggle"
               onClick={(e) => {
                 e.stopPropagation();
-                setManualAddOpen((v) => !v);
+                // Bezárás szerkesztés közben = a szerkesztés megszakítása.
+                if (manualAddOpen && editingAppliedKey) resetManualAppliedForm();
+                setManualAddOpen(!manualAddOpen);
                 setManualAppliedStatus("");
               }}
             >
               <span className="job-manual-cta">
-                <strong>Kézileg hozzáadott jelentkezés</strong>
+                <strong>{editingAppliedKey ? "Jelentkezés szerkesztése" : "Kézileg hozzáadott jelentkezés"}</strong>
               </span>
               <span className="job-source">{manualAddOpen ? "Nyitva" : "Megnyitás"}</span>
             </button>
@@ -1797,8 +1896,18 @@ const JobWatcher = () => {
                   </label>
                 </div>
                 <div className="job-meta job-manual-submit-row">
-                  <span style={{ color: manualAppliedStatus === "Hozzáadva" ? "#4ade80" : "#ef4444" }}>{manualAppliedStatus}</span>
-                  <button className="job-btn job-btn--green" onClick={handleAddManualApplied}>Hozzáadás</button>
+                  <span style={{ color: manualAppliedStatus === "Hozzáadva" || manualAppliedStatus === "Mentve" ? "#4ade80" : "#ef4444" }}>{manualAppliedStatus}</span>
+                  {editingAppliedKey && (
+                    <button
+                      className="job-btn"
+                      onClick={() => { resetManualAppliedForm(); setManualAppliedStatus(""); }}
+                    >
+                      Mégse
+                    </button>
+                  )}
+                  <button className="job-btn job-btn--green" onClick={handleSaveManualApplied}>
+                    {editingAppliedKey ? "Mentés" : "Hozzáadás"}
+                  </button>
                 </div>
               </div>
             )}
