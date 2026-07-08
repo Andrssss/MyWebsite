@@ -384,6 +384,39 @@ export function extractTechnologies(html) {
   );
 
   if (!text) {
+    // zyntern (Vue SPA): the visible body is only navbar/footer — the posting
+    // lives in the <job-profile :data="..."> attribute as entity-escaped JSON
+    // whose description/requirements/offer fields hold the ad's HTML. Without
+    // this the whole source silently extracted nothing (12/12 aktív hirdetés
+    // '' markerrel, 2026-07-08).
+    const jobProfileData = $("job-profile").attr(":data");
+    if (jobProfileData) {
+      try {
+        const obj = JSON.parse(jobProfileData);
+        const parts = [];
+        for (const key of ["description", "requirements", "offer"]) {
+          if (typeof obj?.[key] === "string" && obj[key]) parts.push(obj[key]);
+        }
+        if (Array.isArray(obj?.skills)) {
+          for (const s of obj.skills) {
+            if (typeof s === "string") parts.push(s);
+            else if (typeof s?.name === "string") parts.push(s.name);
+          }
+        }
+        if (parts.length) {
+          const $desc = cheerioLoad(parts.join(" "));
+          $desc("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+            $desc(el).prepend(" ").append(" ");
+          });
+          text = normalizeWhitespace($desc.text());
+        }
+      } catch {
+        // ignore malformed :data JSON
+      }
+    }
+  }
+
+  if (!text) {
     // talent.com (Next.js): description lives in JSON-LD JobPosting.description,
     // not in the visible body — everything else on the page (related listings,
     // RSC data chunks) is noise for this posting.
@@ -563,76 +596,3 @@ export async function enrichExperience({
   }
 }
 
-/* ======================
-   Technologies backfill — cross-source
-   The per-scraper insert paths only fill `technologies` for rows that happen
-   to get a body fetch: title/level short-circuits ("gyakornok" level, junior/
-   medior title) skip the detail page, erste never fetches bodies at all, and
-   ON CONFLICT DO NOTHING means rows inserted before the column existed
-   (2026-07-07) are never revisited. This pass sweeps ALL displayed rows whose
-   `technologies IS NULL`, fetches their url once, and stores the result —
-   '' (empty string, falsy on the frontend) when no keyword matched, so a
-   checked row is never fetched again. Experience is deliberately NOT touched:
-   a login-wall/expired page would extract null and wipe a good value.
-====================== */
-export async function enrichTechnologies({
-  jobName = "technologies-backfill",
-  limit = 150,
-  sleepMs = 250,
-  displayDays = 30, // must match jobs.js's 30-day display window
-} = {}) {
-  const client = await pool.connect();
-  try {
-    await ensureTechnologiesColumn(client);
-
-    // Displayed set: LinkedIn is shown purely time-based (30d), everything
-    // else shows when active OR fresher than 30d (jobs.js). Newest first —
-    // those are at the top of the board.
-    const { rows } = await client.query(
-      `SELECT id, url, source
-         FROM job_posts
-        WHERE technologies IS NULL
-          AND (first_seen >= NOW() - make_interval(days => $1::int)
-               OR (source <> 'LinkedIn' AND active = true))
-        ORDER BY first_seen DESC
-        LIMIT $2`,
-      [displayDays, limit]
-    );
-    console.log(`[technologies] ${rows.length} rows to backfill`);
-
-    let filled = 0, none = 0, failed = 0;
-    for (const row of rows) {
-      try {
-        const html = await fetchText(row.url);
-        const technologies = extractTechnologies(html);
-        await client.query(
-          `UPDATE job_posts SET technologies = $1 WHERE id = $2 AND technologies IS NULL`,
-          [technologies ?? "", row.id]
-        );
-        technologies ? filled++ : none++;
-        await sleep(sleepMs);
-      } catch (err) {
-        failed++;
-        await logFetchError(jobName, {
-          url: row.url,
-          message: `technologies: ${err.message}`,
-          extra: { source: row.source, jobId: row.id },
-        });
-        // Permanently dead/blocked pages (4xx/999) would otherwise clog the
-        // newest-first queue forever — mark them checked. Transient failures
-        // (timeout, 5xx) stay NULL and get retried next run.
-        if (/HTTP (40\d|410|999)/.test(err.message)) {
-          await client.query(
-            `UPDATE job_posts SET technologies = '' WHERE id = $1 AND technologies IS NULL`,
-            [row.id]
-          );
-        }
-      }
-    }
-
-    console.log(`[technologies] done — filled: ${filled}, none: ${none}, failed: ${failed}`);
-    return { filled, none, failed, total: rows.length };
-  } finally {
-    client.release();
-  }
-}
