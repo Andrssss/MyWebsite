@@ -20,8 +20,17 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const YDIAK_URL =
-  "https://ydiak.hu/aktualis-diakmunkaink/it-munka#search-results";
+const YDIAK_SITEMAP_URL = "https://ydiak.hu/sitemap.xml";
+
+// ydiak detail-url a sitemapból: https://ydiak.hu/{kategória-slug}/{slug} — IT-re
+// szűrve, az /en/ oldalakat a horgony kizárja. A listaoldal HTML-jét Livewire
+// tölti (a találati card-komponensek a nyers HTML-ben ÜRES lazy placeholderek,
+// wire:key-vel), ezért a régi cheerio-parse 0 jobot adott. A sitemap viszont
+// app-generált, friss (élő lastmod-ok) és a teljes élő készletet listázza —
+// 2026-07-08-i élő ellenőrzés: 139 HU detail-url, a formátum kategória-oldalakon
+// igazolva; halott új-formátumú url tiszta HTTP 404 (a napi sweep sima szabálya
+// fogja; a RÉGI formátum 200-redirectjét a REDIRECT_DEAD_SOURCES fedi továbbra is).
+const YDIAK_IT_DETAIL_RE = /^https:\/\/ydiak\.hu\/it-munka\/[^/?#]+$/;
 
 const QDIAK_API_URL =
   "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
@@ -123,49 +132,35 @@ async function upsertJob(client, sourceKey, item) {
 
 /* ── Y Diák ─────────────────────────────────────────────────── */
 
-function extractYdiakJobs(html) {
-  const $ = cheerioLoad(html);
-  const jobs = [];
-  const seen = new Set();
-
-  $("#search-results article").each((_i, el) => {
-    const $art = $(el);
-
-    const title = normalizeWhitespace($art.find("h4").first().text());
-    if (!title) return;
-
-    const $link = $art.find('a[href*="/it-munka/"]').first();
-    let href = $link.attr("href");
-    if (!href) return;
-
-    const url = normalizeUrl(
-      href.startsWith("http") ? href : `https://ydiak.hu${href}`
-    );
-
-    if (seen.has(url)) return;
-    seen.add(url);
-
-    jobs.push({
-      title,
-      url,
-      experience: "diákmunka",
-    });
-  });
-
-  return jobs;
+async function fetchYdiakItUrls() {
+  try {
+    const xml = await fetchText(YDIAK_SITEMAP_URL);
+    const urls = [...new Set(
+      [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/g)]
+        .map((m) => normalizeUrl(m[1]))
+        .filter((u) => YDIAK_IT_DETAIL_RE.test(u))
+    )];
+    console.log(`ydiak: ${urls.length} IT detail urls in sitemap`);
+    return { urls, complete: true };
+  } catch (err) {
+    await logFetchError("cron_jobs_DIAK_2", { url: YDIAK_SITEMAP_URL, message: err.message, extra: { source: "ydiak" } });
+    console.log(`ydiak: sitemap fetch failed: ${err.message}`);
+    return { urls: [], complete: false };
+  }
 }
 
-async function fetchAllYdiakJobs() {
-  try {
-    const html = await fetchText(YDIAK_URL);
-    const jobs = extractYdiakJobs(html);
-    console.log(`ydiak: ${jobs.length} IT jobs found`);
-    return jobs;
-  } catch (err) {
-    await logFetchError("cron_jobs_DIAK_2", { url: YDIAK_URL, message: err.message, extra: { source: "ydiak" } });
-    console.log(`ydiak: failed: ${err.message}`);
-    return [];
-  }
+// Cím-fallback, ha a detail-oldal nem adna h1-et: slug → "Szoftverfejleszto gyakornok".
+function ydiakSlugTitle(url) {
+  const slug = url.split("/").filter(Boolean).pop() || "";
+  const words = slug.replace(/-+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Diákmunka";
+}
+
+async function fetchYdiakTitle(url) {
+  const html = await fetchText(url);
+  const $ = cheerioLoad(html);
+  const h1 = normalizeWhitespace($("h1").first().text());
+  return h1 || ydiakSlugTitle(url);
 }
 
 /* ── Q Diák ─────────────────────────────────────────────────── */
@@ -208,14 +203,30 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
   const client = await pool.connect();
 
   try {
-    /* Y Diák */
-    const ydiakJobs = await fetchAllYdiakJobs();
-    for (const job of ydiakJobs) {
-      await upsertJob(client, "ydiak", job);
+    /* Y Diák — sitemap-alapú ingest (2026-07-08). Detail-oldalt (cím: <h1>)
+       csak ÚJ url-nél fetchelünk — meglévő sort az upsert úgysem írna felül. */
+    const ydiak = await fetchYdiakItUrls();
+    if (ydiak.urls.length > 0) {
+      const { rows: knownRows } = await client.query(
+        `SELECT url FROM job_posts WHERE source = 'ydiak' AND url = ANY($1::text[])`,
+        [ydiak.urls]
+      );
+      const known = new Set(knownRows.map((r) => r.url));
+      for (const url of ydiak.urls) {
+        if (known.has(url)) continue;
+        try {
+          const title = await fetchYdiakTitle(url);
+          await upsertJob(client, "ydiak", { title, url, experience: "diákmunka" });
+          console.log(`ydiak: NEW "${title}" → ${url}`);
+        } catch (err) {
+          // Detail-hiba: az ingest kimarad (a következő óránkénti run újrapróbálja),
+          // de az url a foundUrls-ben marad — a sitemap-jelenlét a létezés bizonyítéka.
+          await logFetchError("cron_jobs_DIAK_2", { url, message: err.message, extra: { source: "ydiak" } });
+        }
+      }
     }
-    console.log(`ydiak: ${ydiakJobs.length} jobs processed`);
-    const rcY = await reconcileActive(client, "ydiak", ydiakJobs.map((j) => j.url), { complete: true });
-    console.log(`[ydiak] active reconcile — ${JSON.stringify(rcY)}`);
+    const rcY = await reconcileActive(client, "ydiak", ydiak.urls, { complete: ydiak.complete });
+    console.log(`[ydiak] active reconcile — complete=${ydiak.complete}, ${JSON.stringify(rcY)}`);
 
     /* Q Diák */
     const qdiakJobs = await fetchAllQdiakJobs();

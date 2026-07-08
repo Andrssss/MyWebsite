@@ -29,7 +29,12 @@ const TARGETS = [
   { name: "cron_jobs_ATLASZ-background" },
   { name: "cron_jobs_PANNONDIAK-background" },
   { name: "cron_jobs_TRENKWALDER-background" },
-  { name: "cron_jobs_WORKCENTER-background" },
+  // cron_jobs_WORKCENTER-background DROPPED 2026-07-08 (user decision): WAF has
+  // 403-blocked the Netlify IP since 05-07 (HTML and REST alike), so neither
+  // ingest nor reconcile could run and the sweep's 403s read as "alive" — the
+  // source was frozen at 9 forever-active rows. Rows deactivated manually the
+  // same day. Re-add here (and reactivate what's still live) if a proxy ever
+  // makes the source reachable again.
   // Cross-source safety net: deactivates any active non-LinkedIn job whose URL
   // now returns HTTP 404 (see _active_core.mjs sweepActive404). Once/day is
   // plenty — the per-source reconcile handles the common case hourly.
