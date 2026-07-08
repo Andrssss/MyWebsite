@@ -14,6 +14,7 @@ import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { reconcileActive } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, enrichExperience, extractBluebirdExperience } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -277,7 +278,14 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
       console.log(`${p.key}: ${items.length} items processed.`);
     }
 
-    // RSS feed only returns latest N items — can't deactivate reliably, skip reconcile.
+    // RSS feed only returns latest N items — absence proves nothing, so
+    // deactivation stays with the daily sweep's banner rule
+    // (BANNER_DEAD_SOURCES.bluebird). Presence DOES prove the posting is live,
+    // so run a reactivate-only reconcile (complete:false, nofluffjobs pattern):
+    // without it a false sweep verdict was permanent — nothing ever set
+    // active=true again on a re-seen row.
+    const rc = await reconcileActive(client, "bluebird", foundUrls, { complete: false });
+    console.log(`[bluebird] reactivate-only reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }
