@@ -6,6 +6,7 @@ export const config = {
 import { withTimeout } from "./_error-logger.mjs";
 import {
   enrichExperience,
+  enrichTechnologies,
   extractLinkedInExperience,
 } from "./_experience_core.mjs";
 
@@ -36,6 +37,18 @@ export default withTimeout("cron_experience-background", async () => {
     });
   } catch (err) {
     console.error("[cron_experience-background] LinkedIn enrichment failed:", err.message);
+  }
+
+  // Cross-source technologies backfill (2026-07-08): the per-scraper insert
+  // paths leave holes (title/level short-circuits skip the body fetch, erste
+  // never fetches, pre-07-07 rows predate the column) — this pass sweeps every
+  // displayed row with technologies IS NULL, 150/run, newest first. NOT the
+  // experience backfill (that stays LinkedIn-only per the user rule) — this
+  // only ever writes the technologies column.
+  try {
+    await enrichTechnologies({ jobName: "cron_experience-background", limit: 150 });
+  } catch (err) {
+    console.error("[cron_experience-background] technologies backfill failed:", err.message);
   }
 
   console.log("=== EXPERIENCE ENRICHMENT (LinkedIn) FINISHED ===");
