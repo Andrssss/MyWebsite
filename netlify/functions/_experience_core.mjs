@@ -313,33 +313,24 @@ export const TECH_KEYWORDS = [
   // data / databases
   ["postgresql", "PostgreSQL"], ["postgres", "PostgreSQL"], ["mysql", "MySQL"],
   ["mssql", "MSSQL"], ["sql server", "SQL Server"], ["oracle", "Oracle"], ["mongodb", "MongoDB"],
-  ["redis", "Redis"], ["elasticsearch", "Elasticsearch"], ["cassandra", "Cassandra"],
-  ["sqlite", "SQLite"], ["dynamodb", "DynamoDB"], ["snowflake", "Snowflake"],
-  ["power bi", "Power BI"], ["tableau", "Tableau"], ["spark", "Spark"], ["hadoop", "Hadoop"],
-  ["kafka", "Kafka"], ["rabbitmq", "RabbitMQ"], ["airflow", "Airflow"],
+  ["power bi", "Power BI"], 
 
   // cloud / devops
-  ["aws", "AWS"], ["azure", "Azure"], ["gcp", "GCP"], ["google cloud", "Google Cloud"],
-  ["docker", "Docker"], ["kubernetes", "Kubernetes"], ["terraform", "Terraform"],
-  ["ansible", "Ansible"], ["jenkins", "Jenkins"], ["gitlab ci", "GitLab CI"],
+  ["aws", "AWS"], ["azure", "Azure"], 
+  ["docker", "Docker"], ["kubernetes", "Kubernetes"],
   ["github actions", "GitHub Actions"], ["ci/cd", "CI/CD"], ["linux", "Linux"],
-  ["nginx", "Nginx"], ["microservices", "Microservices"],
 
   // tools / practices
-  ["git", "Git"], ["jira", "Jira"], ["confluence", "Confluence"], ["figma", "Figma"],
-  ["rest api", "REST API"], ["graphql", "GraphQL"], ["grpc", "gRPC"], ["soap", "SOAP"],
-  ["agile", "Agile"], ["scrum", "Scrum"], ["kanban", "Kanban"], ["tdd", "TDD"],
-  ["unit test", "Unit Test"], ["junit", "JUnit"], ["selenium", "Selenium"],
-  ["cypress", "Cypress"], ["jest", "Jest"],
+  ["git", "Git"],
+  ["rest api", "REST API"], 
+  ["selenium", "Selenium"],
 
   // data / AI
   ["machine learning", "Machine Learning"], ["deep learning", "Deep Learning"],
-  ["tensorflow", "TensorFlow"], ["pytorch", "PyTorch"], ["pandas", "Pandas"],
-  ["numpy", "NumPy"], ["scikit-learn", "scikit-learn"], ["nlp", "NLP"], ["llm", "LLM"],
-  ["opencv", "OpenCV"],
+  ["nlp", "NLP"], ["llm", "LLM"],
 
   // mobile
-  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"], ["xamarin", "Xamarin"],
+  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"], 
 ];
 
 function techBoundaryRegex(keyword) {

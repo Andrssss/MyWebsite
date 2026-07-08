@@ -899,6 +899,12 @@ html, body {
   max-height: 2000px;
 }
 
+/* 0 találatos (és állítatlan) tech chip: látszik, de nem kattintható */
+.job-tab--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 
 .job-experience {
   margin-left: 1rem;
