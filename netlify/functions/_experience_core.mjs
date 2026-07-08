@@ -50,19 +50,26 @@ export const MID_KEYWORDS = [
   "medior", "mid-level", "mid level",
 ];
 
+// Word-boundary match so e.g. "intern" doesn't fire on "internal"/"international"
+// and "mid" (from "mid-level") doesn't fire on "midtown" etc.
+function hasKeyword(text, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(text);
+}
+
 export function isInternshipTitle(title) {
   const t = normalizeText(title);
-  return INTERNSHIP_KEYWORDS.some(k => t.includes(k));
+  return INTERNSHIP_KEYWORDS.some(k => hasKeyword(t, k));
 }
 
 export function isJuniorTitle(title) {
   const t = normalizeText(title);
-  return JUNIOR_KEYWORDS.some(k => t.includes(k));
+  return JUNIOR_KEYWORDS.some(k => hasKeyword(t, k));
 }
 
 export function isMidLevelTitle(title) {
   const t = normalizeText(title);
-  return MID_KEYWORDS.some(k => t.includes(k));
+  return MID_KEYWORDS.some(k => hasKeyword(t, k));
 }
 
 // Sources that are inherently student/intern focused
@@ -237,9 +244,23 @@ export function extractBluebirdExperience(html) {
   return extractYearsFromText(normalizeWhitespace($("body").text()));
 }
 
-// talent.com: Next.js SSR — description is in __NEXT_DATA__ JSON, not in visible body text
+// talent.com: current markup renders the posting into a
+// [class*="jobDescriptionColumn"] container (CSS-modules hash suffix, hence
+// the substring match). Neither __NEXT_DATA__ nor JSON-LD are emitted anymore,
+// so without this the code fell through to a full-body scan — which also
+// picks up the "Hasonló munkák" (similar jobs) sidebar and its embedded JSON,
+// polluting results with unrelated postings' years/keywords.
 export function extractTalentExperience(html) {
-  // 1. Try __NEXT_DATA__ (Next.js SSR blob)
+  const $ = cheerioLoad(html);
+
+  // 0. Scoped job-description container (current talent.com markup)
+  const scoped = normalizeWhitespace($('[class*="jobDescriptionColumn"]').first().text());
+  if (scoped) {
+    const fromScoped = extractYearsFromText(scoped);
+    if (fromScoped) return fromScoped;
+  }
+
+  // 1. Try __NEXT_DATA__ (legacy Next.js SSR blob)
   const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
   if (nextDataMatch) {
     try {
@@ -253,7 +274,7 @@ export function extractTalentExperience(html) {
     }
   }
 
-  // 2. Try JSON-LD structured data
+  // 2. Try JSON-LD structured data (legacy)
   const jsonLdMatches = html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
   for (const m of jsonLdMatches) {
     try {
@@ -266,8 +287,7 @@ export function extractTalentExperience(html) {
     }
   }
 
-  // 3. Fallback: body text (for cases where SSR did render content)
-  const $ = cheerioLoad(html);
+  // 3. Last-resort fallback: full body text (may include unrelated sidebar content)
   return extractYearsFromText(normalizeWhitespace($("body").text()));
 }
 
@@ -356,8 +376,11 @@ export function extractTechnologies(html) {
   });
 
   // LinkedIn: same container used by extractLinkedInExperience.
+  // talent.com (current markup): [class*="jobDescriptionColumn"] (CSS-modules
+  // hash suffix, hence substring match) — neither JSON-LD nor __NEXT_DATA__
+  // below are emitted by the site anymore, they're kept as legacy fallbacks.
   let text = normalizeWhitespace(
-    $(".description, .job-description, #job-details, .show-more-less-html__markup").first().text()
+    $('.description, .job-description, #job-details, .show-more-less-html__markup, [class*="jobDescriptionColumn"]').first().text()
   );
 
   if (!text) {
@@ -398,12 +421,27 @@ export function extractTechnologies(html) {
     }
   }
 
-  if (!text) text = normalizeWhitespace($("body").text());
+  const matchKeywords = (t) => {
+    const found = new Set();
+    for (const [key, label] of TECH_KEYWORDS) {
+      if (techBoundaryRegex(key).test(t)) found.add(label);
+    }
+    return found;
+  };
 
-  const found = new Set();
-  for (const [key, label] of TECH_KEYWORDS) {
-    if (techBoundaryRegex(key).test(text)) found.add(label);
+  let found = text ? matchKeywords(text) : new Set();
+
+  // Scoped selectors are a substring/generic-id match (e.g. #job-details),
+  // so they can lock onto an unrelated element (profession.hu's hidden
+  // "Állás részletei" heading uses that exact id) and yield real-but-wrong
+  // text. Zero keyword hits on "found" text is the signal something other
+  // than the actual description got matched — fall back to the full body
+  // rather than reporting no technologies at all.
+  if (!found.size) {
+    const bodyText = normalizeWhitespace($("body").text());
+    if (bodyText !== text) found = matchKeywords(bodyText);
   }
+
   return found.size ? [...found].join(", ") : null;
 }
 
