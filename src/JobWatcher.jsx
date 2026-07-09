@@ -1949,7 +1949,7 @@ const JobWatcher = () => {
                     {isApplied ? "✓ Jelentkeztem" : "Jelentkeztem?"}
                   </button>
                 )}
-                {isApplied && isAdmin && (
+                {isApplied && (
                   <label
                     className={`job-interview-check${isInterview ? " checked" : ""}`}
                     title={isInterview ? "Interjú visszavonása" : "Megjelölés: Interjú"}
