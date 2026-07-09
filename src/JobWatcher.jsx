@@ -12,6 +12,65 @@ const VISITOR_COOKIE_NAME = "jobWatcherVisitorId";
 const DAILY_VISITOR_SENT_KEY = "jobWatcherVisitorSentDate";
 const ONE_MINUTE_MS = 60 * 1000;
 
+const CAREER_PAGES = [
+  { label: "Dolphio – gyakornok, szoftverfejlesztés", url: "https://www.dolphio.hu/dolphiokarrier/?search_keywords=&selected_category=gyakornok&selected_jobtype=szoftverfejlesztes&selected_location=budapest" },
+  { label: "Yettel / CEE Telecom Group", url: "https://jobs.ceetelcogroup.com/yettel/search/?createNewAlert=false&q=gyakornok&optionsFacetsDD_country=&optionsFacetsDD_lang=&optionsFacetsDD_department=" },
+  { label: "Accenture", url: "https://www.accenture.com/hu-en/careers/jobsearch?jk=Technology&sb=0&vw=1&is_rj=0&pg=1" },
+  { label: "AVL", url: "https://jobs.avl.com/search/?createNewAlert=false&q=&locationsearch=Budapest" },
+  { label: "DSS", url: "https://dss.hu/karrier/" },
+  { label: "Flexiton", url: "http://www.flexiton.hu/language/hu/karrier/" },
+  { label: "BKK", url: "https://bkk.karrierportal.hu/allasok" },
+  { label: "Prolan", url: "https://prolan.hrfelho.hu/allasajanlataink" },
+  { label: "DPD", url: "https://dpd.karrierportal.hu/allasok?_gl=1*l17chi*_ga*Njc0NjM3MDU4LjE3NDYxMDU5OTE.*_ga_Q3RB6RNZ25*MTc0NjEwNTk5MS4xLjAuMTc0NjEwNTk5MS42MC4wLjA." },
+  { label: "Cytocast", url: "https://www.cytocast.com/work-with-us/" },
+  { label: "IBS Budapest", url: "https://www.ibs-b.hu/hu/ibs/allasajanlatok-jobs/" },
+  { label: "Everengine", url: "https://everengine.com/allasajanlatok/" },
+  { label: "MAVIR", url: "https://karrier.mavir.hu/jobs?category=4893&jobworktype=0" },
+  { label: "OKFŐ", url: "https://okfo.gov.hu/Palyazatok_allashirdetesek/allashirdetesek/okfo-allashirdetesei" },
+  { label: "Telvice", url: "https://www.telvice.hu/karrier/" },
+  { label: "Enco Software", url: "https://www.karrier.encosoftware.hu/" },
+  { label: "Diagnosticum", url: "http://www.diagnosticum.hu/allas_con20211210" },
+  { label: "4Dsoft", url: "https://karrier.4dsoft.hu/jobs" },
+  { label: "Verizon (Indeed)", url: "https://hu.indeed.com/cmp/Verizon/jobs?q=intern&l=Budapest#cmp-skip-header-mobile" },
+  { label: "UiCentric", url: "https://rc.uicentric.com/careers/" },
+  { label: "Suit Solutions", url: "https://www.suitsolutions.eu/rolunk/karrier" },
+  { label: "OTP Bank", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=gyakornok&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=&optionsFacetsDD_title=" },
+  { label: "IdomSoft", url: "https://career.idomsoft.hu/jobs/budapest/" },
+  { label: "Adverticum", url: "https://adverticum.net/rolunk/allas/" },
+  { label: "aiMotive", url: "https://aimotive.com/career" },
+  { label: "BCA", url: "https://bca.hu/karrier" },
+  { label: "Cloudera", url: "https://cloudera.wd5.myworkdayjobs.com/External_Career?locationCountry=9db257f5937e4421b2fac64eec6832f8" },
+  { label: "Deutsche Telekom IT Solutions", url: "https://www.deutschetelekomitsolutions.hu/nyitott-poziciok/" },
+  { label: "Digital Thinkers", url: "https://digitalthinkers.com/career" },
+  { label: "Dolphio – összes", url: "https://www.dolphio.hu/dolphiokarrier/?search_keywords=&selected_category=-1&selected_jobtype=-1&selected_location=budapest" },
+  { label: "EDM Designer (blog)", url: "https://blog.edmdesigner.com/jobs/" },
+  { label: "Catworkx", url: "https://catworkx.one/hu/jobs/job-openings" },
+  { label: "ExxonMobil", url: "https://jobs.exxonmobil.com/search/?createNewAlert=false&q=&locationsearch=HU&optionsFacetsDD_department=&optionsFacetsDD_shifttype=&optionsFacetsDD_country=" },
+  { label: "Ericsson", url: "https://jobs.ericsson.com/careers?page=1&jobPipeline=careersite&query=intern&start=0&location=Hungary&pid=563121763871350&sort_by=solr&filter_include_remote=1" },
+  { label: "eGroup", url: "https://www.egroup.hu/hu/company-vallalat/career/" },
+  { label: "Femtonics", url: "https://femtonics.eu/careers/" },
+  { label: "MVM", url: "https://mvm.karrierportal.hu/allasok?q=d29ya3BsYWNlcy1jb3VudHklNUIlNUQlM0RCdWRhcGVzdCUyNnNwZWNpYWxpdGllcyU1QiU1RCUzRElUJTIwYml6dG9ucyVDMyVBMWd0ZWNobmlrYSUyNnNwZWNpYWxpdGllcyU1QiU1RCUzRElUJTIwcHJvZ3JhbW96JUMzJUExcyUyQyUyMEZlamxlc3p0JUMzJUE5cyUyNnNwZWNpYWxpdGllcyU1QiU1RCUzRElUJTIwJUMzJUJDemVtZWx0ZXQlQzMlQTlzJTJDJTIwVGVsZWtvbW11bmlrJUMzJUExY2klQzMlQjMlMjYuuzzuuzz#!" },
+  { label: "EPAM", url: "https://careers.epam.hu/careers/job-listings?country=Hungary" },
+  { label: "Gravity Research", url: "https://www.gravityresearch.com/careers/" },
+  { label: "GoTo", url: "https://goto.wd5.myworkdayjobs.com/GoToCareers?locationCountry=9db257f5937e4421b2fac64eec6832f8" },
+  { label: "Loxon", url: "https://www.loxon.eu/career/" },
+  { label: "Suzuki", url: "https://karrier.suzuki.hu/allasok?q=c3BlY2lhbGl0eSU1QiU1RCUzRElUJTI2#!" },
+  { label: "Mediso", url: "https://mediso.com/global/hu/career" },
+  { label: "Meltwater", url: "https://meltwatercareers.ttcportals.com/search/jobs/in/country/hungary" },
+  { label: "Gloster", url: "https://karrier.gloster.hu/DataCenter/Registration/JobAdvertisements/" },
+  { label: "Munch", url: "https://careers.munch.eco/#jobs" },
+  { label: "Oracle Cloud (software testing)", url: "https://fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs?keyword=software+testing&location=Hungary&locationId=300000000471730&locationLevel=country&mode=location" },
+  { label: "Novartis", url: "https://www.novartis.com/hu-hu/karrier/poziciok-keresese?country%5B0%5D=LOC_HU&field_alternative_country%5B0%5D=LOC_HU" },
+  { label: "Oncompass Medicine", url: "https://oncompassmedicine.com/career" },
+  { label: "QLM (Hrmaster)", url: "https://hrmaster.qlm.hu/DataCenter/Registration/JobAdvertisements/allasok" },
+  { label: "RR Software", url: "https://karrier.rrsoftware.hu/DataCenter/Registration/JobAdvertisements/allasok" },
+  { label: "SAP", url: "https://jobs.sap.com/go/SAP-Jobs-in-Budapest/912901/?q=&q2=&alertId=&locationsearch=&title=intern&location=" },
+  { label: "Sigma Technology", url: "https://sigmatechnology.com/open-positions/?country=Hungary" },
+  { label: "ThyssenKrupp", url: "https://jobs.thyssenkrupp.com/hu?filter=jobField%3AIT%2CjobField%3AM%C3%A9rn%C3%B6k+%C3%A9s+tudom%C3%A1ny&location=Budapest%2C+K%C3%B6z%C3%A9p-Magyarorsz%C3%A1g%2C+Magyarorsz%C3%A1g&lat=47.4978789&lng=19.0402383&placeId=51f08ba60e4d0a3340592a6fec7ebabf4740f00101f90164fb120000000000c00208" },
+  { label: "Post CH", url: "https://job.post.ch/" },
+  { label: "Trioda", url: "https://www.trioda.hu/karrier" },
+];
+
 const getTodayLocalDateString = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -810,6 +869,13 @@ const JobWatcher = () => {
   const [showEmail, setShowEmail] = useState(false);
   const [weeklyActiveUsers, setWeeklyActiveUsers] = useState(null);
   const [howToOpen, setHowToOpen] = useState(false);
+  const [careerPagesOpen, setCareerPagesOpen] = useState(false);
+
+  const openAllCareerPages = () => {
+    CAREER_PAGES.forEach(({ url }) => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+  };
 
   useEffect(() => {
     fetch(VISITOR_TRACK_API)
@@ -1331,13 +1397,22 @@ const JobWatcher = () => {
   return (
   <div className="job-watcher">
     <div className="job-watcher-header">
-      <button
-        className="job-howto-fab"
-        onClick={() => setHowToOpen((v) => !v)}
-        aria-label="How to megnyitása"
-      >
-        How to ❓
-      </button>
+      <div className="job-header-actions">
+        <button
+          className="job-fab-btn"
+          onClick={() => setCareerPagesOpen((v) => !v)}
+          aria-label="Karrier oldalak megnyitása"
+        >
+          Karrier oldalak 🔗
+        </button>
+        <button
+          className="job-fab-btn"
+          onClick={() => setHowToOpen((v) => !v)}
+          aria-label="How to megnyitása"
+        >
+          How to ❓
+        </button>
+      </div>
       <div>
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni. Sajnos az a feltételezés, hogy egyetem után rögtön találsz munkát az hibás. HA nem voltál gyakornok egyetem alatt, akkor nagy eséllyel munkanélküli leszel egyetem után !!!!</p>
@@ -2021,6 +2096,41 @@ const JobWatcher = () => {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
             />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {careerPagesOpen && (
+      <div
+        className="howto-modal-overlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setCareerPagesOpen(false);
+        }}
+      >
+        <div className="howto-modal career-modal" role="dialog" aria-modal="true" aria-label="Karrier oldalak">
+          <div className="howto-modal-header">
+            <span className="howto-modal-title">Karrier oldalak 🔗</span>
+            <button className="bug-modal-close" onClick={() => setCareerPagesOpen(false)} aria-label="Bezárás">✕</button>
+          </div>
+          <p className="howto-modal-info">
+            Cégek karrier oldalai, amiket (egyelőre) nem scrapelünk. {CAREER_PAGES.length} link.
+          </p>
+          <button className="career-open-all-btn" onClick={openAllCareerPages}>
+            Összes megnyitása ({CAREER_PAGES.length})
+          </button>
+          <div className="career-pages-grid">
+            {CAREER_PAGES.map(({ label, url }) => (
+              <a
+                key={url}
+                className="career-page-btn"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {label}
+              </a>
+            ))}
           </div>
         </div>
       </div>
