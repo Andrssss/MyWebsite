@@ -12,7 +12,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { enrichExperience, extractTalentExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -133,12 +133,12 @@ function fetchText(url, redirectLeft = 5) {
 async function upsertJob(client, sourceKey, item) {
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
        DO NOTHING
     `,
-    [sourceKey, item.title, item.url, item.experience, item.company || null]
+    [sourceKey, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
   );
 }
 
@@ -299,7 +299,30 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     const talentJobs = rawJobs.filter((job) => !isSeniorLike(job.title));
     console.log(`talent: ${talentJobs.length} unique jobs found (after senior filter), complete=${complete}`);
 
+    // Only a genuinely NEW posting needs its detail page — an already-known url's
+    // row is already complete and ON CONFLICT DO NOTHING would discard the fetch
+    // anyway. Title inference (inferTalentExperience) already resolved most jobs;
+    // only the "-" ones (title didn't reveal seniority) need the fetch. Either
+    // way the row is built COMPLETE before it's ever inserted — no separate pass
+    // comes back later to patch it in.
+    const { rows: knownRows } = await client.query(
+      `SELECT url FROM job_posts WHERE source = 'talent' AND url = ANY($1::text[])`,
+      [talentJobs.map((j) => j.url)]
+    );
+    const known = new Set(knownRows.map((r) => r.url));
+
     for (const job of talentJobs) {
+      if (!known.has(job.url) && job.experience === "-") {
+        try {
+          await sleep(400);
+          const html = await fetchText(job.url);
+          const normalizedHtml = html.replace(/–/g, "-").replace(/—/g, "-");
+          job.experience = extractTalentExperience(normalizedHtml) || "-";
+          job.technologies = extractTechnologies(normalizedHtml);
+        } catch (err) {
+          await logFetchError("cron_jobs_T", { url: job.url, message: err.message, extra: { source: "talent" } });
+        }
+      }
       await upsertJob(client, "talent", job);
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);
@@ -308,20 +331,6 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     console.log(`[talent] active reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
-  }
-
-  // Enrich experience for newly inserted talent rows,
-  // AND fix old rows incorrectly labelled 'senior' by the previous bug
-  try {
-    await enrichExperience({
-      sourceFilter: "source = 'talent'",
-      extract: extractTalentExperience,
-      label: "talent",
-      jobName: "cron_jobs_T-background",
-      experienceCondition: "(experience IS NULL OR experience = '-' OR experience = 'senior')",
-    });
-  } catch (err) {
-    console.error("[cron_jobs_T-background] experience enrichment failed:", err.message);
   }
 
   return new Response("OK");

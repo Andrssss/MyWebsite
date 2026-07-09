@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -368,11 +368,11 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
       DO NOTHING    `,
-    [source, item.title, canonicalUrl, item.experience || null, item.company || null]
+    [source, item.title, canonicalUrl, item.experience || null, item.company || null, item.technologies || null]
   );
 }
 
@@ -405,8 +405,19 @@ export async function processProfessionSources(sources, jobName, request, pageOp
     const client = await pool.connect();
     const foundBySource = new Map(); // source -> { urls: string[], allSucceeded: boolean }
     try {
+      // Only a genuinely NEW url needs its own detail-page fetch for
+      // experience/technologies — an already-known row is already complete
+      // and ON CONFLICT DO NOTHING would discard the fetch anyway.
+      const sourceKeys = [...new Set(sources.map((s) => s.key))];
+      const { rows: knownRows } = await client.query(
+        `SELECT source, url FROM job_posts WHERE source = ANY($1::text[])`,
+        [sourceKeys]
+      );
+      const knownBySource = new Map(sourceKeys.map((k) => [k, new Set()]));
+      for (const r of knownRows) knownBySource.get(r.source)?.add(r.url);
+
       for (const p of sources) {
-        const result = await processOneSource(client, p, jobName, pageOptions);
+        const result = await processOneSource(client, p, jobName, pageOptions, knownBySource);
         const entry = foundBySource.get(result.source) || { urls: [], allSucceeded: true };
         if (result.ok) {
           // A megtalált url-ek részleges crawlnál is mennek a reconcile-nak
@@ -466,7 +477,7 @@ export async function processProfessionSources(sources, jobName, request, pageOp
   });
 }
 
-async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}) {
+async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}, knownBySource = null) {
   const source = p.key;
 
   let merged = [];
@@ -501,6 +512,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
     // Full current listing (pre-filter) — a url in this set is live on the
     // source, so migrateVolatileUrl must never rename its row away.
     const currentUrls = merged.map((c) => c.url);
+    const known = knownBySource?.get(source);
     for (const item of matchedList) {
       if (isInternshipTitle(item.title)) item.experience = "diákmunka";
       else if (isJuniorTitle(item.title)) item.experience = "junior";
@@ -524,6 +536,21 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         if (rowCount > 0) {
           console.log(`[dedupe] skipped "${item.title}" — duplicate of intern source`);
           continue;
+        }
+      }
+
+      // Title alone didn't reveal seniority — fetch the detail page ONCE, only
+      // for a genuinely new posting (that survived the dedupe check above), and
+      // fully populate the row before it's ever inserted. No separate pass
+      // comes back later to patch it in.
+      if (!item.experience && known && !known.has(item.url)) {
+        try {
+          await sleep(300);
+          const detailHtml = await fetchText(item.url);
+          item.experience = extractProfessionExperience(detailHtml) || "-";
+          item.technologies = extractTechnologies(detailHtml);
+        } catch (err) {
+          await logFetchError(jobName, { url: item.url, message: err.message });
         }
       }
 

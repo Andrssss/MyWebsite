@@ -14,9 +14,9 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import {
-  enrichExperience,
   extractBodyExperience,
   extractKukaExperience,
+  extractTechnologies,
   INTERNSHIP_KEYWORDS,
 } from "./_experience_core.mjs";
 
@@ -148,12 +148,28 @@ function htmlToText(html) {
 async function upsertJob(client, sourceKey, item) {
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;`,
-    [sourceKey, item.title, item.url, item.experience ?? "-", item.company || null]
+    [sourceKey, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
+}
+
+// Only a genuinely NEW url needs its own detail-page fetch for experience —
+// an already-known row is already complete and ON CONFLICT DO NOTHING would
+// discard the fetch anyway. Builds the row COMPLETE before it's ever
+// inserted; no separate pass comes back later to patch it in.
+async function enrichIfNew(job, known, extract, jobName) {
+  if (known.has(job.url) || (job.experience && job.experience !== "-")) return;
+  try {
+    await sleep(400);
+    const html = await fetchText(job.url);
+    job.experience = extract(html) || "-";
+    job.technologies = extractTechnologies(html);
+  } catch (err) {
+    await logFetchError(jobName, { url: job.url, message: err.message });
+  }
 }
 
 /* ── DreamJobs ──────────────────────────────────────────────── */
@@ -337,8 +353,11 @@ function inferKukaExperience(title) {
   if (_filters.some((kw) => normalized.includes(normalizeText(kw))))
     return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
+  // kuka "junior" hirdetései gyakornoki-egyenértékűek (üzleti szabály, korábban
+  // egy külön futás utáni SQL-lel javítottuk "junior" → "diákmunka"-ra; most
+  // rögtön insert előtt a helyes érték kerül be, nincs utólagos patch).
   if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b|\btrainee\b|\bintern\b|\bgyakornok\b/.test(normalized))
-    return "junior";
+    return "diákmunka";
   return null;
 }
 
@@ -404,6 +423,12 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
   const client = await pool.connect();
 
   try {
+    const { rows: knownRows } = await client.query(
+      `SELECT source, url FROM job_posts WHERE source IN ('dreamjobs','melonjobs','kuka')`
+    );
+    const known = new Map([["dreamjobs", new Set()], ["melonjobs", new Set()], ["kuka", new Set()]]);
+    for (const r of knownRows) known.get(r.source)?.add(r.url);
+
     /* DreamJobs */
     try {
       const allDreamJobs = await fetchAllDreamJobs();
@@ -424,6 +449,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
           const migrated = await migrateVolatileUrl(client, "dreamjobs", job.url, pattern, currentUrls);
           if (migrated) console.log(`[dreamjobs] MIGRATED url → ${job.url}`);
         }
+        await enrichIfNew(job, known.get("dreamjobs"), extractBodyExperience, "cron_jobs_MIX");
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
@@ -440,6 +466,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       console.log(`melonjobs: ${melonJobs.length} jobs found`);
 
       for (const job of melonJobs) {
+        await enrichIfNew(job, known.get("melonjobs"), extractBodyExperience, "cron_jobs_MIX");
         await upsertJob(client, "melonjobs", job);
       }
       console.log(`melonjobs: ${melonJobs.length} jobs processed`);
@@ -459,6 +486,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       console.log(`kuka: ${kukaJobs.length} jobs found (of ${allKukaJobs.length} listed)`);
 
       for (const job of kukaJobs) {
+        await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX");
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);
@@ -472,49 +500,6 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
     }
   } finally {
     client.release();
-  }
-
-  // Kuka: "junior" experience → diákmunka (recent rows only)
-  try {
-    const kukaClient = await pool.connect();
-    try {
-      const { rowCount: kukaMarked } = await kukaClient.query(
-        `UPDATE job_posts
-            SET experience = 'diákmunka'
-          WHERE source = 'kuka'
-            AND LOWER(experience) = 'junior'
-            AND first_seen >= NOW() - INTERVAL '30 minutes'`
-      );
-      console.log(`[kuka-junior] ${kukaMarked} álláshirdetés átírva: junior → diákmunka`);
-    } finally {
-      kukaClient.release();
-    }
-  } catch (err) {
-    console.error("[cron_jobs_MIX-background] kuka-junior update failed:", err.message);
-  }
-
-  // Enrich experience for newly inserted dreamjobs / melonjobs / kuka rows
-  for (const pipe of [
-    {
-      sourceFilter: "source IN ('dreamjobs','melonjobs')",
-      extract: extractBodyExperience,
-      label: "dreamjobs / melonjobs",
-    },
-    {
-      sourceFilter: "source = 'kuka'",
-      extract: extractKukaExperience,
-      label: "kuka",
-      extraInternKeywords: ["junior"],
-    },
-  ]) {
-    try {
-      await enrichExperience({
-        ...pipe,
-        jobName: "cron_jobs_MIX-background",
-      });
-    } catch (err) {
-      console.error(`[cron_jobs_MIX-background] experience enrichment (${pipe.label}) failed:`, err.message);
-    }
   }
 
   return new Response("OK");

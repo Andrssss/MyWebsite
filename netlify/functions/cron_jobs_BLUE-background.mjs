@@ -15,7 +15,11 @@ import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, enrichExperience, extractBluebirdExperience } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractBluebirdExperience, extractTechnologies } from "./_experience_core.mjs";
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 let _filters = [];
 
@@ -159,22 +163,17 @@ function getDedupeKey(rawUrl) {
    DB upsert
 --------------------- */
 async function upsertJob(client, source, item) {
-  const experience = isInternshipTitle(item.title) ? "diákmunka"
-    : isJuniorTitle(item.title) ? "junior"
-    : isMidLevelTitle(item.title) ? "medior"
-    : "-";
-
   // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
   // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO UPDATE SET company = EXCLUDED.company
         WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;
         `,
-    [source, item.title, item.url, experience, item.company || null]
+    [source, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
   );
 }
 
@@ -231,6 +230,14 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
   ];
   const client = await pool.connect();
   try {
+    // Only a genuinely NEW url needs its own detail-page fetch for experience —
+    // an already-known row is already complete and ON CONFLICT DO UPDATE only
+    // ever touches `company`, so the fetch would otherwise be wasted.
+    const { rows: knownRows } = await client.query(
+      `SELECT url FROM job_posts WHERE source = 'bluebird'`
+    );
+    const known = new Set(knownRows.map((r) => r.url));
+
     const foundUrls = [];
     let crawlError = false;
     for (const p of SOURCES) {
@@ -268,6 +275,24 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
         }
       }
       for (const it of items) {
+        // Build the row COMPLETE before it's ever inserted — no separate pass
+        // comes back later to patch experience/technologies in. A feltehetőleg
+        // évszám-alapú szint (a feedben nincs szint-mező) csak új állásnál kell
+        // a detail-oldalról.
+        it.experience = isInternshipTitle(it.title) ? "diákmunka"
+          : isJuniorTitle(it.title) ? "junior"
+          : isMidLevelTitle(it.title) ? "medior"
+          : "-";
+        if (!known.has(it.url) && it.experience === "-") {
+          try {
+            await sleep(500);
+            const detailHtml = await fetchText(it.url);
+            it.experience = extractBluebirdExperience(detailHtml) || "-";
+            it.technologies = extractTechnologies(detailHtml);
+          } catch (err) {
+            await logFetchError("cron_jobs_BLUE", { url: it.url, message: err.message });
+          }
+        }
         try {
           await upsertJob(client, p.key, it);
         } catch (err) {
@@ -288,19 +313,6 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
     console.log(`[bluebird] reactivate-only reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
-  }
-
-  // A feedben nincs szint-mező, a cím-kulcsszavak ritkán találnak → a friss
-  // sorokhoz a részletoldalról szedjük ki az évszám-követelményt.
-  try {
-    await enrichExperience({
-      sourceFilter: "source = 'bluebird'",
-      extract: extractBluebirdExperience,
-      label: "bluebird",
-      jobName: "cron_jobs_BLUE-background",
-    });
-  } catch (err) {
-    console.error("[cron_jobs_BLUE-background] experience enrichment failed:", err.message);
   }
 
   return new Response("OK");

@@ -12,7 +12,11 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { enrichExperience, extractBodyExperience, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 let _filters = [];
 
@@ -186,16 +190,14 @@ function getDedupeKey(rawUrl) {
    DB upsert
 --------------------- */
 async function upsertJob(client, source, item) {
-  const experience = isInternshipTitle(item.title) ? "diákmunka" : "-";
-
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, experience, item.company ?? null]
+    [source, item.title, item.url, item.experience, item.company ?? null, item.technologies ?? null]
   );
 }
 
@@ -238,6 +240,14 @@ const SOURCES = [
   let crawlError = false;
 
   try {
+    // Only a genuinely NEW url needs its own detail-page fetch for experience —
+    // an already-known row is already complete and ON CONFLICT DO NOTHING would
+    // discard the fetch anyway.
+    const { rows: knownRows } = await client.query(
+      `SELECT url FROM job_posts WHERE source = 'karrierhungaria'`
+    );
+    const known = new Set(knownRows.map((r) => r.url));
+
     /* --- Karrierhungaria (Inertia API) --- */
     for (const url of SOURCES) {
       let jobs;
@@ -260,6 +270,19 @@ const SOURCES = [
       });
 
       for (const it of items) {
+        // Build the row COMPLETE before it's ever inserted — no separate pass
+        // comes back later to patch experience/technologies in.
+        it.experience = isInternshipTitle(it.title) ? "diákmunka" : "-";
+        if (!known.has(it.url) && it.experience === "-") {
+          try {
+            await sleep(500);
+            const detailHtml = await fetchText(it.url);
+            it.experience = extractBodyExperience(detailHtml) || "-";
+            it.technologies = extractTechnologies(detailHtml);
+          } catch (err) {
+            await logFetchError("cron_jobs_A_K", { url: it.url, message: err.message });
+          }
+        }
         try {
           await upsertJob(client, "karrierhungaria", it);
         } catch (err) {
@@ -276,18 +299,6 @@ const SOURCES = [
   } finally {
     console.log(`Script finished at ${new Date().toISOString()}`);
     client.release();
-  }
-
-  // Enrich experience for newly inserted karrierhungaria rows
-  try {
-    await enrichExperience({
-      sourceFilter: "source = 'karrierhungaria'",
-      extract: extractBodyExperience,
-      label: "karrierhungaria",
-      jobName: "cron_jobs_A_K-background",
-    });
-  } catch (err) {
-    console.error("[cron_jobs_A_K-background] experience enrichment failed:", err.message);
   }
 
   return new Response("OK");
