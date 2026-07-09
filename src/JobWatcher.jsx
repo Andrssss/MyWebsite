@@ -1341,6 +1341,14 @@ const JobWatcher = () => {
       <div>
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni. Sajnos az a feltételezés, hogy egyetem után rögtön találsz munkát az hibás. HA nem voltál gyakornok egyetem alatt, akkor nagy eséllyel munkanélküli leszel egyetem után !!!!</p>
+          <div className="job-linkedin-notice">
+            <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
+            <p>
+              A LinkedIn-t nem tudjuk teljesen scrapelni, mert a publikus API-k
+              erősen korlátozottak. Jelenleg nagyjából az itt látható állások{" "}
+              <strong>~50%-át</strong> tudjuk csak megjeleníteni.
+            </p>
+          </div>
           <div className="job-last-commit">
             <span>Elmúlt 1 hét git commitok:</span>
             {lastUpdates.length > 0 ? (

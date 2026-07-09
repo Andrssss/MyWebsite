@@ -53,6 +53,35 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 
+.job-linkedin-notice {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-left: 4px solid #f0a020;
+  background: rgba(240, 160, 32, 0.1);
+  border-radius: 0 8px 8px 0;
+  color: #ffe3ad;
+}
+
+.job-linkedin-notice__title {
+  display: block;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f0a020;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.job-linkedin-notice p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.job-linkedin-notice strong {
+  color: #ffb84d;
+  font-weight: 800;
+}
+
 .job-last-commit {
   display: inline-block;
   font-size: 0.85rem;
