@@ -1303,6 +1303,12 @@ const JobWatcher = () => {
      jelöl — pontosan úgy, mintha egyenként rákattintottál volna (trackClick). */
   const openAllFiltered = () => {
     if (openableJobs.length === 0) return;
+    if (openableJobs.length > 100) {
+      window.alert(
+        `Egyszerre legfeljebb 100 állást lehet megnyitni, most ${openableJobs.length} lenne. Szűkíts a szűrőkkel, mielőtt megnyitod őket.`
+      );
+      return;
+    }
     if (
       openableJobs.length > 12 &&
       !window.confirm(
