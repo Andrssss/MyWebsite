@@ -101,6 +101,7 @@ const FIXED = [
   { key: "bluebird", label: "bluebird" },
   { key: "ydiak", label: "Y Diák" },
   { key: "qdiak", label: "Q Diák" },
+  { key: "alllocaljobs", label: "AllLocalJobs" },
 
   { key: "mbh", label: "MBH Bank" },
   { key: "kh", label: "K&H Bank" },

@@ -41,6 +41,16 @@ const BODY_CAP_BYTES = 1_500_000;
 // Accept-Encoding: identity) so BANNER_DEAD_SOURCES rules can match on it.
 // Exported so ad-hoc maintenance scripts can drive sweepActive404 with the
 // exact same checker the scheduled run uses.
+// A Location fejléc a Node http-ben latin1-ként dekódolódik; ha a szerver nyers
+// UTF-8 bájtokat küld benne (alllocaljobs: /állás → "Ã¡llÃ¡s"), a naiv new URL()
+// dupla-encode-ol és VALÓDI 404-re visz → a sweep élő sorokat ölne (2026-07-10:
+// 13 alllocaljobs sort ölt így, óránkénti reactivate flip-flopot okozva). A
+// latin1→utf8 roundtrip helyreállítja; ASCII/percent-encoded Location-re no-op.
+function fixLocationEncoding(loc) {
+  const decoded = Buffer.from(loc, "latin1").toString("utf8");
+  return decoded.includes("�") ? loc : decoded;
+}
+
 export function fetchFinal(url, opts = {}, redirectLeft = 5) {
   const wantBody = opts.wantBody === true;
   return new Promise((resolve) => {
@@ -67,7 +77,7 @@ export function fetchFinal(url, opts = {}, redirectLeft = 5) {
         res.resume();
         const loc = res.headers.location;
         if (!loc || redirectLeft <= 0) return resolve({ status: code, finalUrl: url });
-        try { return resolve(fetchFinal(new URL(loc, url).toString(), opts, redirectLeft - 1)); }
+        try { return resolve(fetchFinal(new URL(fixLocationEncoding(loc), url).toString(), opts, redirectLeft - 1)); }
         catch { return resolve({ status: code, finalUrl: url }); }
       }
       if (!wantBody) {

@@ -13,7 +13,7 @@ import { withTimeout } from "./_error-logger.mjs";
  *
  * Hourly targets (≥10 active, or mixed scrapers):
  *   BLUE, DIAK_1, DIAK_2, DIAK_3, F_3, MIX, T, VALOREBASIS, NOFLUFFJOBS,
- *   ERSTE, KH, RAIFFEISEN
+ *   ERSTE, KH, RAIFFEISEN, ALLLOCALJOBS
  *
  * Elsewhere: MBH (cron_dispatcher_test); low-volume <10 single-source scrapers
  * (A_K, CG, ATS, MFB, UNICREDIT, EUDIAKOK, MELODIAK, ATLASZ, PANNONDIAK,
@@ -43,6 +43,8 @@ const TARGETS = [
   { name: "cron_jobs_ERSTE-background" },
   { name: "cron_jobs_KH-background" },
   { name: "cron_jobs_RAIFFEISEN-background" },
+  // Added 2026-07-09: alllocaljobs aggregátor, it-budapest slice (~93 posting).
+  { name: "cron_jobs_ALLLOCALJOBS-background" },
 ];
 
 export default withTimeout("cron_dispatcher", async () => {

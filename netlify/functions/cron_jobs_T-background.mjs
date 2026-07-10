@@ -24,10 +24,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// NO &date=1 filter: the active-model reconcile needs the FULL current listing
-// per source (see _active_core.mjs). With date=1 we'd only see the last-24h
-// window, so every still-open job older than the grace window would be wrongly
-// deactivated. We fetch the whole list and let ON CONFLICT DO NOTHING dedupe.
+// NO &date=1 filter: we want the widest listing per keyword — for ingest
+// breadth and so the reactivate-only reconcile can heal live rows that rotate
+// back into the search. (&date=1 also returns near-empty results nowadays.)
+// We fetch the whole list and let ON CONFLICT DO NOTHING dedupe.
 const TALENT_SEARCH_URLS = [
   "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU",
   "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU",
@@ -228,8 +228,9 @@ function extractTalentJobs(html) {
 async function fetchAllTalentJobs() {
   const allJobs = [];
   const seen = new Set();
-  // If any keyword crawl hits a fetch error we can't trust the URL set to be
-  // complete, so we tell reconcileActive to skip deactivation this run.
+  // If any keyword crawl hits a fetch error the URL set is incomplete. Since
+  // the reconcile is reactivate-only nowadays this flag is log-only, but it
+  // still tells a flaky run apart from a clean one.
   let complete = true;
 
   for (const searchUrl of TALENT_SEARCH_URLS) {
@@ -327,8 +328,18 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);
 
-    const rc = await reconcileActive(client, "talent", talentJobs.map((j) => j.url), { complete });
-    console.log(`[talent] active reconcile — ${JSON.stringify(rc)}`);
+    // complete:false → reactivate-only, NEVER listing-diff deactivation.
+    // talent's search results are a rotating nondeterministic SUBSET of the
+    // source (2026-07-10 probe: 61 aged live rows absent from a clean full
+    // crawl, 5/5 spot-checks live) AND the listing keeps showing closed jobs —
+    // so absence proves nothing and presence proves nothing. The listing-diff
+    // deactivate/reactivate churn (~30 flips/day) was pure rotation noise.
+    // Deactivation is owned entirely by the daily 404-sweep (HTTP 404 +
+    // id-anchored system_status=2, _active_core.mjs BANNER_DEAD_SOURCES), and
+    // its kills are sticky (sweep_dead + STICKY_SWEEP_DEAD_SOURCES) so this
+    // reactivation can't resurrect a closed-but-still-listed job either.
+    const rc = await reconcileActive(client, "talent", talentJobs.map((j) => j.url), { complete: false });
+    console.log(`[talent] active reconcile (reactivate-only) — ${JSON.stringify(rc)}`);
   } finally {
     client.release();
   }

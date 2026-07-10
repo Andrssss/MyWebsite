@@ -16,6 +16,9 @@
 //     ACTIVE_GRACE_DAYS, so a flaky scrape can't immediately hide a new posting.
 //   • Deactivation is skipped when the crawl looks incomplete (empty result set,
 //     or caller passes complete=false) so a broken scrape can't wipe a source.
+//   • Sweep kills are sticky where they must be: for STICKY_SWEEP_DEAD_SOURCES
+//     (listing shows closed jobs too) a row the 404-sweep proved dead at its own
+//     URL (sweep_dead=true) is never reactivated from mere listing presence.
 //
 // LinkedIn never calls this (it only sees a recent window); it stays time-based
 // on the frontend instead.
@@ -33,6 +36,12 @@ export async function ensureActiveSchema(client) {
   if (_schemaReady) return;
   await client.query(
     `ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true`
+  );
+  // Set by sweepActive404 when a row's OWN detail page proved it dead (404 /
+  // closed-banner). For STICKY_SWEEP_DEAD_SOURCES it blocks reactivation from
+  // listing presence; cleared only by migrateVolatileUrl (rename = fresh URL).
+  await client.query(
+    `ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS sweep_dead boolean NOT NULL DEFAULT false`
   );
   await client.query(
     `CREATE INDEX IF NOT EXISTS idx_job_posts_source_active ON job_posts (source, active)`
@@ -68,11 +77,16 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
   // Reactivate rows that re-appeared on the source. Being in foundUrls proves the
   // posting is live, so this is safe even on a partial (complete=false) crawl.
   // Steady state (everything already active) touches zero rows.
+  // STICKY_SWEEP_DEAD_SOURCES exception: their listing shows closed jobs too, so
+  // presence proves nothing — a sweep-proven death (sweep_dead) stays dead, else
+  // the hourly crawl resurrects every kill the morning after (daily flip-flop).
+  const noResurrect = STICKY_SWEEP_DEAD_SOURCES.has(source);
   const reactivated = await client.query(
     `UPDATE job_posts
         SET active = true
       WHERE source = $1
         AND active = false
+        ${noResurrect ? "AND NOT sweep_dead" : ""}
         AND url = ANY($2::text[])
       RETURNING url`,
     [source, urls]
@@ -146,7 +160,7 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
          ORDER BY active DESC, first_seen DESC
          LIMIT 1)
      UPDATE job_posts
-        SET url = $2, active = true
+        SET url = $2, active = true, sweep_dead = false
        FROM victim
       WHERE job_posts.id = victim.id
       RETURNING victim.url AS old_url`,
@@ -170,7 +184,27 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 // DIFFERENT path" counts as dead. Kept per-source: many healthy sites redirect
 // http→https or add a trailing slash, which keeps the path and stays alive
 // under this rule.
+//
+// ⚠️ alllocaljobs must NEVER be added here (nor to BANNER_DEAD_SOURCES): its
+// detail urls are session-gated, so a cookieless fetch of a LIVE job also
+// 200-redirects to a different path (/állások?requested_vacancy_not_found=1)
+// — the redirect rule would kill live rows. Its deactivation is owned entirely
+// by its own scraper's reconcileActive (full slice walk).
 export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok"]);
+
+// Sources whose LISTING keeps showing already-closed jobs, so being in
+// foundUrls does not prove a posting is live. For these, reconcileActive's
+// reactivation skips rows the 404-sweep proved dead at their own detail page
+// (sweep_dead=true) — without this the hourly crawl would resurrect every
+// sweep kill and the pair would flip-flop daily. One-way by design: a
+// sweep_dead row only returns via migrateVolatileUrl (new URL), which is fine —
+// talent ids are single-use (reposts get a fresh id) and purged ids stay 404.
+//
+// talent (2026-07-10): its search results are ALSO a rotating nondeterministic
+// subset of the source (live jobs drop in/out run-to-run), so its scraper
+// reconciles reactivate-only (complete:false) — absence proves nothing either.
+// The daily sweep (404 / id-anchored system_status=2) is its sole deactivator.
+export const STICKY_SWEEP_DEAD_SOURCES = new Set(["talent"]);
 
 // Sources whose sites answer a DEAD job url with a plain 200 page — no 404,
 // no redirect — so neither sweep rule above can see it. For these the sweep
@@ -324,9 +358,12 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
 
   let deactivated = 0;
   if (confirmed.length) {
+    // sweep_dead records that the row died at its OWN URL (double-checked) —
+    // for STICKY_SWEEP_DEAD_SOURCES this keeps reconcileActive from
+    // resurrecting it off a listing that still shows closed jobs.
     const res = await client.query(
       `UPDATE job_posts
-          SET active = false
+          SET active = false, sweep_dead = true
         WHERE active = true
           AND source <> 'LinkedIn'
           AND url = ANY($1::text[])`,
