@@ -255,6 +255,35 @@ const sourceFromUrl = (raw) => {
   }
 };
 
+// Kézzel beillesztett link megtisztítása, hogy a jobKey rövid és stabil
+// maradjon (a szerver 512 karakternél elvágja). LinkedIn kereső-linkből
+// (?currentJobId=... + eBP/refId/trackingId zaj) a kanonikus
+// /jobs/view/<id>/ lesz; más linkről csak az ismert tracking paraméterek
+// esnek le. Séma nélküli linket https://-szel egészít ki, hogy kattintható
+// abszolút URL legyen.
+const normalizeJobUrl = (raw) => {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "";
+  try {
+    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const u = new URL(withScheme);
+    const host = u.hostname.toLowerCase();
+    if (host === "linkedin.com" || host.endsWith(".linkedin.com")) {
+      const id =
+        u.searchParams.get("currentJobId") ||
+        (u.pathname.match(/\/jobs\/view\/(\d+)/) || [])[1];
+      if (id) return `https://www.linkedin.com/jobs/view/${id}/`;
+    }
+    const trackingParams = new Set(["gclid", "fbclid", "refid", "trackingid", "ebp", "referralsearchid"]);
+    for (const p of [...u.searchParams.keys()]) {
+      if (/^utm_/i.test(p) || trackingParams.has(p.toLowerCase())) u.searchParams.delete(p);
+    }
+    return u.toString();
+  } catch {
+    return trimmed;
+  }
+};
+
 // One-time upgrade of legacy title-keyed marks ("job:src:title") to the
 // url-keyed format, using the cached job objects to learn each mark's url.
 // Entries without a cached url keep their legacy key. Returns null when
@@ -851,7 +880,7 @@ const JobWatcher = () => {
   const handleSaveManualApplied = () => {
     const title = manualAppliedTitle.trim();
     const source = manualAppliedSource.trim() || "manual";
-    const url = manualAppliedUrl.trim();
+    const url = normalizeJobUrl(manualAppliedUrl);
     if (!title) { setManualAppliedStatus("Adj meg legalább egy pozíció nevet"); return; }
     const editingKey = editingAppliedKey;
     const prevJob = editingKey ? appliedCache[editingKey] : undefined;
@@ -873,6 +902,12 @@ const JobWatcher = () => {
       company: manualAppliedCompany.trim() || undefined,
     };
     const key = jobKeyFor(manualJob);
+    // A szerver 512 karakteres kulcsnál 400-zal elutasít — ilyenkor lokálisan
+    // se mentsünk, különben a helyi lista és a DB szétcsúszik.
+    if (key.length > 512) {
+      setManualAppliedStatus("A link túl hosszú a mentéshez — rövidítsd le");
+      return;
+    }
     const wasInterview = editingKey ? interviewKeys.has(editingKey) : false;
 
     setAppliedKeys((prev) => {
@@ -2022,6 +2057,7 @@ const JobWatcher = () => {
                   <input
                     className="job-search"
                     value={manualAppliedUrl}
+                    onBlur={() => setManualAppliedUrl((v) => normalizeJobUrl(v) || v)}
                     onChange={(e) => {
                       const v = e.target.value;
                       setManualAppliedUrl(v);

@@ -167,12 +167,17 @@ const SOURCES = [
     { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Üzletfejlesztés+és+innováció&optionsFacetsDD_title=&_gl=1*eqovvy*_up*MQ..*_ga*NDIyODM3NjU3LjE3ODAzMjUzMDY.*_ga_MS48V6C7P1*czE3ODAzMjUzMDYkbzEkZzEkdDE3ODAzMjU0MTgkajE0JGwwJGgw"},
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=Budapest&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Informatika+és+digitalizáció&optionsFacetsDD_title=&_gl=1*1xvjrq1*_up*MQ..*_ga*MTA2NjU1MTQ3NS4xNzc5ODA3OTk5*_ga_MS48V6C7P1*czE3Nzk4MDc5OTkkbzEkZzAkdDE3Nzk4MDc5OTkkajYwJGwwJGgw" },
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
-  // wherewework: a kategória-szegmenses path (…/budaors,budapest/bpo-services,…,itc,…)
-  // 2026-07-07-én bizonyítottan halott — BÁRMILYEN kategória-slug a path-ban
-  // "0 results"-ot ad (pedig a slugok léteznek a szűrő-formban), csak a
-  // city-only path működik. Ezért széles lista: minden kategória+szint,
-  // budaörs+budapest (~94 találat); a seniorFilter + experience-detektálás szűr.
-  { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest" },
+  // wherewework (2026-07-11): a city-only path (…/budaors,budapest) a site újabb
+  // router-változása után már NEM szűkít városra — 748 találat / 75 oldal
+  // (07-07-én még ~94 volt). Ingest-forrásnak használhatatlan: a job_filters
+  // 324 címet átengedne, ebből 303 új, zömmel nem-IT (credit controller,
+  // invoicing specialist stb.). Ezért BUCKET-ONLY (otp-minta): minden url a
+  // reconcile foundUrls-ébe megy — életben tartja / reaktiválja a korábban
+  // ingestelt sorokat —, de nem ingestel. Ingest csak az intern/entry-level
+  // listából. (A kategória-path — pl. /itc — újra él, de a Bosch a mérnök-IT
+  // posztjait "Industrial Production" alá sorolja, így az itc-lista a meglévő
+  // sorainkat NEM fedné — élőben ellenőrizve: 0/21 találat.)
+  { key: "wherewework", label: "wherewework bucket (széles)", bucketOnly: true, url: "https://www.wherewework.hu/en/jobs/budaors,budapest" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
   { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
   { key: "miszisz", label: "MISZISZ", url: "https://miszisz.hu/?post_type%5B%5D=munkaink&s=&mmin=0&mmax=8000&mvaros%5B%5D=0&mvaros%5B%5D=2&mvaros%5B%5D=3&mvaros%5B%5D=4&mvaros%5B%5D=6&mvaros%5B%5D=7&mvaros%5B%5D=8&mvaros%5B%5D=9&mvaros%5B%5D=10&mvaros%5B%5D=11&mvaros%5B%5D=12&mvaros%5B%5D=15&mvaros%5B%5D=17&mvaros%5B%5D=21&mvaros%5B%5D=68&mvaros%5B%5D=69&mvaros%5B%5D=368&mkat%5B%5D=231&mkat%5B%5D=40&mkat%5B%5D=257&mkat%5B%5D=41" },
@@ -650,14 +655,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (source === "wherewework") {
         let pageHtml = html;
         let pageUrl = p.url;
-        let safetyPagesLeft = 25;
+        // 90 oldal ≈ 900 állás — a széles bucket-lista ma 75 oldal (748 állás).
+        let safetyPagesLeft = 90;
         let pageNum = 1;
+        let sawEnd = false;
         while (safetyPagesLeft-- > 0) {
           const $pg = cheerioLoad(pageHtml);
           const nextHref = $pg('[rel="next"]').attr("href");
-          if (!nextHref) { console.log(`${tag}   wherewework: nincs több oldal (${pageNum} oldal után)`); break; }
+          if (!nextHref) { console.log(`${tag}   wherewework: nincs több oldal (${pageNum} oldal után)`); sawEnd = true; break; }
           const nextUrl = absolutize(nextHref, pageUrl);
-          if (!nextUrl) break;
+          if (!nextUrl) break; // értelmezhetetlen next-href → a lista vége hiányozhat, a cap-guard jelzi
           pageNum++;
           console.log(`${tag}   wherewework: oldal ${pageNum} → ${nextUrl}`);
           try {
@@ -667,6 +674,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             await logFetchError("cron_jobs_DIAK_3", { url: nextUrl, message: err.message });
             // részleges lista → a reconcile nem deaktiválhat belőle
             foundBySource.get(source).allSucceeded = false;
+            sawEnd = true; // a hibát már jelöltük, a cap-guard ne írja felül a logot
             break;
           }
           const pgGeneric = extractCandidates(pageHtml, nextUrl).filter((c) => looksLikeJobUrl(source, c.url));
@@ -674,9 +682,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           const prevCount = merged.length;
           merged = mergeCandidates(merged, pgGeneric, pgSsr);
           console.log(`${tag}   wherewework oldal ${pageNum}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
-          if (merged.length === prevCount) { console.log(`${tag}   wherewework: 0 új url az oldalon – megáll`); break; }
+          if (merged.length === prevCount) { console.log(`${tag}   wherewework: 0 új url az oldalon – megáll`); sawEnd = true; break; }
           pageUrl = nextUrl;
           await sleep(300);
+        }
+        // Cap úgy merült ki, hogy volt még rel=next → a listing csonka lehet;
+        // részleges lista alapján a reconcile nem deaktiválhat. (2026-07-10 körül
+        // a 25-ös cap + hiányzó guard pont így deaktivált tévesen 15 élő sort,
+        // miután a lista 75 oldalasra hízott.)
+        if (!sawEnd) {
+          console.log(`${tag}   wherewework lapozás: oldal-cap kimerült, a listing csonka lehet → complete=false`);
+          foundBySource.get(source).allSucceeded = false;
         }
       }
 
