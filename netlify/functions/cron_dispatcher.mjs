@@ -45,6 +45,9 @@ const TARGETS = [
   { name: "cron_jobs_RAIFFEISEN-background" },
   // Added 2026-07-09: alllocaljobs aggregátor, it-budapest slice (~93 posting).
   { name: "cron_jobs_ALLLOCALJOBS-background" },
+  // Added 2026-07-11: allasportal (HR Portal/CVOnline aggregátor),
+  // v-budapest/k-informatika szelet (~180 posting).
+  { name: "cron_jobs_ALLASPORTAL-background" },
 ];
 
 export default withTimeout("cron_dispatcher", async () => {

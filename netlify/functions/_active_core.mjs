@@ -204,7 +204,14 @@ export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok"]);
 // subset of the source (live jobs drop in/out run-to-run), so its scraper
 // reconciles reactivate-only (complete:false) — absence proves nothing either.
 // The daily sweep (404 / id-anchored system_status=2) is its sole deactivator.
-export const STICKY_SWEEP_DEAD_SOURCES = new Set(["talent"]);
+//
+// allasportal (2026-07-11): aggregator — its "redirect" rows' URLs
+// (/munka/redirect/<id>) 302 to the real posting (cvonline). A dead id turns
+// plain HTTP 404, so the sweep catches deaths the moment cvonline pulls the
+// posting; the allasportal LISTING lags behind and would resurrect the row
+// next hour (sweep↔reconcile flip-flop) without stickiness. Unlike talent, its
+// scraper's reconcile stays a full deactivator (complete category walk).
+export const STICKY_SWEEP_DEAD_SOURCES = new Set(["talent", "allasportal"]);
 
 // Sources whose sites answer a DEAD job url with a plain 200 page — no 404,
 // no redirect — so neither sweep rule above can see it. For these the sweep

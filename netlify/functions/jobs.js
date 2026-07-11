@@ -102,6 +102,7 @@ const FIXED = [
   { key: "ydiak", label: "Y Diák" },
   { key: "qdiak", label: "Q Diák" },
   { key: "alllocaljobs", label: "AllLocalJobs" },
+  { key: "allasportal", label: "Állásportál" },
 
   { key: "mbh", label: "MBH Bank" },
   { key: "kh", label: "K&H Bank" },

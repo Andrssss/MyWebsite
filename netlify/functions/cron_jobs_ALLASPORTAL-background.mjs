@@ -75,7 +75,7 @@ function normalizeWhitespace(s) {
 function normalizeText(s) {
   return String(s ?? "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -115,7 +115,7 @@ function fixLocationEncoding(loc) {
 
 // Kézi redirect-követés (cookie nem kell ehhez a site-hoz): a /munka/redirect/<id>
 // külső célra (cvonline) 302-zik, a body onnan jön.
-async function fetchFinal(url) {
+export async function fetchFinal(url) {
   let current = url;
   for (let hop = 0; hop < 6; hop++) {
     const res = await fetch(current, {
@@ -147,7 +147,8 @@ async function fetchFinal(url) {
 // div.card → a.pos[data-job] a hirdetés linkje (jobshow: /munka-<slug>/,
 // redirect: /munka/redirect/<id>); cég a .comp-logo h2-ben. Ami nem passzol a
 // két URL-mintára (pl. promó-kártya külső linkkel), kiesik.
-function parseCards(html) {
+// (parseCards/parseLastPage/fetchFinal exportálva a DB nélküli dry-run teszthez.)
+export function parseCards(html) {
   const $ = cheerioLoad(html);
   const items = [];
   $("div.card").each((_, el) => {
@@ -176,7 +177,7 @@ function parseCards(html) {
 
 // A pager `a.last` linkjéből az utolsó oldalszám; ha nincs pager (≤15 találat),
 // 1 oldal a szelet.
-function parseLastPage(html) {
+export function parseLastPage(html) {
   const $ = cheerioLoad(html);
   const href = $("a.last").first().attr("href") || "";
   const m = href.match(/[?&](?:amp;)?page=(\d+)/);

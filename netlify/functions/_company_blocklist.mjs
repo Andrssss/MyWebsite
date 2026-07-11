@@ -12,7 +12,7 @@
   kényszerülne.
 */
 
-// talent + alllocaljobs — a cégnév display-formában tárolódik.
+// talent + alllocaljobs + allasportal — a cégnév display-formában tárolódik.
 // A "…IT Solutions" és az "…IT Solutions HU" két külön cégnév, ezért
 // mindkettő listaelem.
 export const COMPANY_BLOCKLIST = [
@@ -35,6 +35,7 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
 const LISTS_BY_SOURCE = {
   talent: COMPANY_BLOCKLIST,
   alllocaljobs: COMPANY_BLOCKLIST,
+  allasportal: COMPANY_BLOCKLIST,
   LinkedIn: LINKEDIN_COMPANY_BLOCKLIST,
 };
 
