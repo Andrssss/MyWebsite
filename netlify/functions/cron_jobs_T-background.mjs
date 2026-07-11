@@ -12,6 +12,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -295,10 +296,16 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
   const client = await pool.connect();
 
   try {
+    await purgeBlockedCompanies(client, "talent");
+
     /* talent.com */
     const { jobs: rawJobs, complete } = await fetchAllTalentJobs();
-    const talentJobs = rawJobs.filter((job) => !isSeniorLike(job.title));
-    console.log(`talent: ${talentJobs.length} unique jobs found (after senior filter), complete=${complete}`);
+    const afterSenior = rawJobs.filter((job) => !isSeniorLike(job.title));
+    const talentJobs = afterSenior.filter((job) => !isBlockedCompany(job.company, "talent"));
+    console.log(
+      `talent: ${talentJobs.length} unique jobs found (after senior+company filter, ` +
+      `blocked_company=${afterSenior.length - talentJobs.length}), complete=${complete}`
+    );
 
     // Only a genuinely NEW posting needs its detail page — an already-known url's
     // row is already complete and ON CONFLICT DO NOTHING would discard the fetch

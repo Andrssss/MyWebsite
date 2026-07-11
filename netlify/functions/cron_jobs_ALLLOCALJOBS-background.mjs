@@ -31,6 +31,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
@@ -113,25 +114,6 @@ function isSeniorLike(title) {
   const n = normalizeText(title);
   return _filters.some((k) => _blacklistRegex(k).test(n));
 }
-
-// Cég-blocklist (user-döntés 2026-07-10): ezeknek a cégeknek a hirdetéseit nem
-// mentjük, a korábban bekerült soraikat a run eleji purge törli. Normalizált
-// (ékezet-/kisbetű-független) PONTOS egyezés — a "…IT Solutions" és az
-// "…IT Solutions HU" a forráson két külön cégnév, ezért mindkettő listaelem.
-const COMPANY_BLOCKLIST = [
-  "Deutsche Telekom IT Solutions HU",
-  "Deutsche Telekom IT Solutions",
-  "Magyar Telekom Nyrt.",
-  "Bosch Group",
-  "Siemens Energy",
-  "MOL Magyarország",
-];
-const _blockedCompanies = new Set(COMPANY_BLOCKLIST.map(normalizeText));
-
-function isBlockedCompany(company) {
-  return company != null && _blockedCompanies.has(normalizeText(company));
-}
-
 /* ── session-aware fetch ─────────────────────────────────────── */
 
 // Minimál cookie jar: egy hoszt, path/expiry nem érdekes — a PHP session
@@ -285,20 +267,6 @@ async function upsertJob(client, item) {
   );
 }
 
-// Blocklistás cégek sorainak kitakarítása — idempotens; az egyszeri kézi
-// törlés (2026-07-10) után azt fedi le, ha a blocklist előtti kód még
-// visszainsertelt párat, vagy ha a lista később bővül.
-async function purgeBlockedCompanies(client) {
-  const { rowCount } = await client.query(
-    `DELETE FROM job_posts
-      WHERE source = 'alllocaljobs' AND lower(company) = ANY($1::text[])`,
-    [COMPANY_BLOCKLIST.map((c) => c.toLowerCase())]
-  );
-  if (rowCount > 0) {
-    console.log(`[alllocaljobs] company-blocklist purge: ${rowCount} sor törölve`);
-  }
-}
-
 /* ── main scrape ─────────────────────────────────────────────── */
 
 // Egy slice teljes bejárása. complete csak akkor, ha a lapozás természetesen ért
@@ -361,7 +329,7 @@ async function walkSlice(slug, jar) {
 }
 
 async function scrapeAlllocaljobs(client) {
-  await purgeBlockedCompanies(client);
+  await purgeBlockedCompanies(client, "alllocaljobs");
 
   const jar = makeJar();
   const seen = new Set();
@@ -413,7 +381,7 @@ async function scrapeAlllocaljobs(client) {
       continue;
     }
 
-    if (isBlockedCompany(item.company)) {
+    if (isBlockedCompany(item.company, "alllocaljobs")) {
       skippedCompany++;
       continue;
     }
