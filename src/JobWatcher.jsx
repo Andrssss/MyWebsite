@@ -292,12 +292,19 @@ const migrateAppliedKeys = (applied, interview, cache) => {
   const moves = [];
   for (const [key, job] of Object.entries(cache || {})) {
     if (!job || !job.url || !job.source) continue;
-    const newKey = jobKeyFor(job);
+    // A normalizeJobUrl előtti kézi felvitelek nyers linket cache-elhettek
+    // (LinkedIn kereső-URL eBP/trackingId zajjal) — tisztítás nélkül a
+    // migrált kulcs átlépheti a szerver 512-es limitjét, és a POST minden
+    // betöltéskor 400-zal elhasal.
+    const url = normalizeJobUrl(job.url);
+    const migratedJob = url === job.url ? job : { ...job, url };
+    const newKey = jobKeyFor(migratedJob);
     if (newKey === key) continue;
+    if (newKey.length > 512) continue; // így is túl hosszú: marad a legacy kulcs
     moves.push({
       oldKey: key,
       newKey,
-      job,
+      job: migratedJob,
       applied: applied.has(key),
       interview: interview.has(key),
     });
