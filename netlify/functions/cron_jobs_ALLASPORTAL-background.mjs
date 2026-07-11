@@ -3,8 +3,19 @@
 
   Kutatási jegyzet: scripts/ALLASPORTAL_SCRAPE_RESEARCH.md (2026-07-11 élő próbák)
 
+  🚫 ELENGEDVE (user-döntés 2026-07-11, workcenter-minta) — PROD-BLOKK miatt:
+  a site CLOUDFLARE mögött van (`Server: cloudflare`), és a Netlify (AWS Lambda)
+  datacenter IP-jét 403-mal tiltja MÁR AZ ELSŐ oldalon. Lakossági IP-ről (dry-run)
+  MINDEN 200 — akár default curl-UA-val, cache-buszterrel is —, tehát IP/ASN-szintű
+  blokk, header/UA-tuning BIZTOSAN nem segít (a kliens már böngésző-UA-t küld).
+  Ugyanaz az osztály, mint a workcenternél. A parse/lapozás/extrakció maga KÉSZ és
+  lokálisan igazolt (lásd a kutatási jegyzet dry-run szakaszát) — csak a prod-fetch
+  bukik a Cloudflare-IP-blokkon. A fájl megmarad; ha egyszer lesz proxy /
+  nem-datacenter host, a `cron_dispatcher.mjs`-ben 1 sor visszavétele elég.
+  (Amíg nem fut: reconcile üres foundUrls → skip, meglévő sort nem deaktivál.)
+
   Forrás: a HR Portal / CVOnline hálózat aggregátora. Klasszikus szerver-renderelt
-  PHP, bot-védelem nélkül. Szelet (user-döntés 2026-07-11): KÖTELEZŐEN Budapest+IT,
+  PHP; alkalmazás-szintű bot-védelem nincs, de a Cloudflare-réteg IP-alapon blokkol. Szelet (user-döntés 2026-07-11): KÖTELEZŐEN Budapest+IT,
   azaz /v-budapest/k-informatika/ — ez a site saját teljes kategória-listázása
   (nem kereső-nézet), így a szelet bejárása a forrás teljes listájának számít és
   a reconcile teljes jogú deaktivátor lehet.

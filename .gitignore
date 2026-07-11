@@ -30,6 +30,9 @@ backfill_daily_stats.mjs
 *.md
 # Local Netlify folder
 .netlify
+# EPAM Learn scraper (böngészőprofil session-cookie-kkal + dump)
+.pw-epam-profile/
+epam_dump/
 scripts/check_workcenter.mjs
 scripts/test_years.mjs
 /scripts

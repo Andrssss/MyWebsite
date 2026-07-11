@@ -846,9 +846,8 @@ html, body {
 }
 
 .job-interview-check input {
-  margin: 0;
-  cursor: pointer;
-  accent-color: #a855f7;
+  /* a pipát a felirat adja ("✓ Interjú"), a natív checkbox duplázná */
+  display: none;
 }
 
 .job-interview-check.checked {
