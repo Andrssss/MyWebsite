@@ -190,7 +190,17 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 // 200-redirects to a different path (/állások?requested_vacancy_not_found=1)
 // — the redirect rule would kill live rows. Its deactivation is owned entirely
 // by its own scraper's reconcileActive (full slice walk).
-export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok"]);
+//
+// profession-intern (2026-07-12): a posting drops off ALL 6 scraped category
+// listings well before it actually closes — profession.hu's search demotes
+// aged ads out of the paginated results while the ad itself stays fully live
+// and reachable (validated: NIX Tech "Angular Developer" -2943319, "KI-Engineer"
+// -2938506, Cushman & Wakefield "BI Analyst" -2935497 — all plain 200, no
+// closed banner, exhaustively absent from every category/page we crawl). A
+// job that's ACTUALLY closed 301-redirects to an unrelated /allasok/ category
+// listing (different path) — confirmed on 8/8 aged-out rows. So listing
+// absence proves nothing for this source; only the redirect does.
+export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok", "profession-intern"]);
 
 // Sources whose LISTING keeps showing already-closed jobs, so being in
 // foundUrls does not prove a posting is live. For these, reconcileActive's
@@ -212,6 +222,19 @@ export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok"]);
 // next hour (sweep↔reconcile flip-flop) without stickiness. Unlike talent, its
 // scraper's reconcile stays a full deactivator (complete category walk).
 export const STICKY_SWEEP_DEAD_SOURCES = new Set(["talent", "allasportal"]);
+
+// Sources fully excluded from the 404 sweep: their own detail-page URL can't be
+// trusted with a plain GET, so the sweep would only ever produce false-positive
+// kills — reconcileActive's full-listing walk already owns their active flag.
+//   • LinkedIn: bot-blocked (no clean 404s), also shown time-based on the
+//     frontend, so its `active` flag is irrelevant anyway.
+//   • tudasdiak (2026-07-12): app.tudatosdiak.hu is an Inertia SPA whose detail
+//     route 404s on a bare GET even for a LIVE posting (confirmed live on the
+//     "Security Support Engineering Intern (IAM)" job — sweep killed it, the
+//     hourly cron_jobs_DIAK_1 listing scrape resurrected it the same day, on
+//     loop once per day right after the 14:00 UTC sweep). tudasdiak's listing
+//     has <10 postings and its own reconcileActive already tracks it fully.
+export const SWEEP_EXCLUDED_SOURCES = new Set(["LinkedIn", "tudasdiak"]);
 
 // Sources whose sites answer a DEAD job url with a plain 200 page — no 404,
 // no redirect — so neither sweep rule above can see it. For these the sweep
@@ -324,8 +347,8 @@ function _isDeadResult(row, res) {
  * alive". Each dead verdict is re-checked once to drop transients before it
  * deactivates.
  *
- * LinkedIn is excluded: bot-blocked (no clean 404s) and shown time-based on the
- * frontend, so its `active` flag is irrelevant.
+ * SWEEP_EXCLUDED_SOURCES are skipped entirely — sources whose own detail-page
+ * URL can't be trusted with a plain GET (see the constant's doc comment).
  *
  * @param {import("pg").PoolClient} client
  * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
@@ -339,7 +362,8 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
   await ensureActiveSchema(client);
 
   const { rows } = await client.query(
-    `SELECT url, source FROM job_posts WHERE active = true AND source <> 'LinkedIn'`
+    `SELECT url, source FROM job_posts WHERE active = true AND NOT (source = ANY($1::text[]))`,
+    [[...SWEEP_EXCLUDED_SOURCES]]
   );
   if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0 };
 
@@ -372,14 +396,95 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
       `UPDATE job_posts
           SET active = false, sweep_dead = true
         WHERE active = true
-          AND source <> 'LinkedIn'
+          AND NOT (source = ANY($2::text[]))
           AND url = ANY($1::text[])`,
-      [confirmed]
+      [confirmed, [...SWEEP_EXCLUDED_SOURCES]]
     );
     deactivated = res.rowCount ?? 0;
   }
 
   return { checked: rows.length, suspects: suspects.length, deactivated };
+}
+
+/**
+ * Revives sweep kills that no longer hold up.
+ *
+ * A STICKY_SWEEP_DEAD_SOURCES row's `sweep_dead` flag is otherwise one-way —
+ * cleared only by migrateVolatileUrl (URL rename) — because listing presence
+ * alone can't be trusted to resurrect it (see STICKY_SWEEP_DEAD_SOURCES doc
+ * comment). But talent can flip the SAME url's own status back to alive
+ * (system_status 2→1, a same-day expire → re-list cycle) with no URL change
+ * at all, which left it stuck inactive forever even though the exact signal
+ * that killed it now says it's alive (2026-07-12: confirmed on 2 user-reported
+ * urls, one with a real `system_date_expired`→`system_date_re_found` cycle,
+ * one that per talent's own data never expired at all). Re-runs the same
+ * per-URL check used to kill the row and un-sticks (sweep_dead=false,
+ * active=true) any row that now comes back clean, double-checked to avoid
+ * reviving off a transient blip (mirrors sweepActive404's own re-check).
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
+ * @param {object} [opts]
+ * @param {number} [opts.concurrency=12]
+ * @returns {Promise<{checked:number, revived:number}>}
+ */
+export async function reviveSweepDead(client, checkFinal, opts = {}) {
+  const concurrency = Math.max(1, opts.concurrency ?? 12);
+
+  await ensureActiveSchema(client);
+
+  const { rows } = await client.query(
+    `SELECT url, source FROM job_posts WHERE sweep_dead = true AND source = ANY($1::text[])`,
+    [[...STICKY_SWEEP_DEAD_SOURCES]]
+  );
+  if (rows.length === 0) return { checked: 0, revived: 0 };
+
+  const wantBody = (row) => ({ wantBody: BANNER_DEAD_SOURCES[row.source] !== undefined });
+  const results = new Map();
+  const lanes = Array.from({ length: concurrency }, (_, i) =>
+    rows.filter((_, idx) => idx % concurrency === i)
+  );
+  await Promise.all(
+    lanes.map(async (list) => {
+      for (const row of list) results.set(row.url, await checkFinal(row.url, wantBody(row)));
+    })
+  );
+
+  // Negative statuses (local failure) never count as "alive" — only a real
+  // response that fails every dead-rule is a revival candidate.
+  const candidates = rows.filter((r) => {
+    const res = results.get(r.url);
+    return !!res && res.status >= 0 && !_isDeadResult(r, res);
+  });
+
+  const confirmed = [];
+  for (const row of candidates) {
+    const res = await checkFinal(row.url, wantBody(row));
+    if (res && res.status >= 0 && !_isDeadResult(row, res)) confirmed.push(row);
+  }
+
+  let revived = 0;
+  if (confirmed.length) {
+    const urls = confirmed.map((r) => r.url);
+    const res = await client.query(
+      `UPDATE job_posts
+          SET active = true, sweep_dead = false
+        WHERE sweep_dead = true
+          AND source = ANY($2::text[])
+          AND url = ANY($1::text[])`,
+      [urls, [...STICKY_SWEEP_DEAD_SOURCES]]
+    );
+    revived = res.rowCount ?? 0;
+    for (const source of new Set(confirmed.map((r) => r.source))) {
+      logRecovery({
+        type: "sweep-revived",
+        source,
+        urls: confirmed.filter((r) => r.source === source).map((r) => r.url),
+      });
+    }
+  }
+
+  return { checked: rows.length, revived };
 }
 
 /**

@@ -16,7 +16,7 @@ import { Pool } from "pg";
 import http from "http";
 import https from "https";
 import { withTimeout } from "./_error-logger.mjs";
-import { sweepActive404, expireAgedPushSource } from "./_active_core.mjs";
+import { sweepActive404, reviveSweepDead, expireAgedPushSource } from "./_active_core.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -110,6 +110,9 @@ const _runJob = withTimeout("cron_404sweep-background", async () => {
 
     const rc = await sweepActive404(client, fetchFinal);
     console.log(`[404sweep] ${JSON.stringify(rc)}`);
+
+    const revived = await reviveSweepDead(client, fetchFinal);
+    console.log(`[404sweep] revive sticky kills: ${JSON.stringify(revived)}`);
   } finally {
     client.release();
   }

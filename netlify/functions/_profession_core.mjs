@@ -403,7 +403,7 @@ export async function processProfessionSources(sources, jobName, request, pageOp
     // source key (e.g. all P_* tasks using "profession-intern") don't overwrite
     // each other's reconcile results.
     const client = await pool.connect();
-    const foundBySource = new Map(); // source -> { urls: string[], allSucceeded: boolean }
+    const foundBySource = new Map(); // source -> urls: string[]
     try {
       // Only a genuinely NEW url needs its own detail-page fetch for
       // experience/technologies — an already-known row is already complete
@@ -418,22 +418,23 @@ export async function processProfessionSources(sources, jobName, request, pageOp
 
       for (const p of sources) {
         const result = await processOneSource(client, p, jobName, pageOptions, knownBySource);
-        const entry = foundBySource.get(result.source) || { urls: [], allSucceeded: true };
-        if (result.ok) {
-          // A megtalált url-ek részleges crawlnál is mennek a reconcile-nak
-          // (jelenlét = életjel, reaktivációhoz kell), de kihagyott oldal
-          // esetén a deaktiválást tiltani kell.
-          entry.urls.push(...result.foundUrls);
-          if (result.complete === false) entry.allSucceeded = false;
-        } else {
-          entry.allSucceeded = false;
-        }
-        foundBySource.set(result.source, entry);
+        const urls = foundBySource.get(result.source) || [];
+        // Found urls still feed reconcile as reactivation signal (presence =
+        // alive) even on a partial crawl — see the reactivate-only note below.
+        if (result.ok) urls.push(...result.foundUrls);
+        foundBySource.set(result.source, urls);
         await sleep(50);
       }
-      for (const [source, { urls, allSucceeded }] of foundBySource) {
-        const rc = await reconcileActive(client, source, urls, { complete: allSucceeded });
-        console.log(`[${jobName}] ${source}: active reconcile complete=${allSucceeded} ${JSON.stringify(rc)}`);
+      for (const [source, urls] of foundBySource) {
+        // complete:false → reactivate-only, NEVER listing-diff deactivation.
+        // Profession's search demotes aged ads out of the paginated category
+        // listings well before the ad actually closes (2026-07-12: live rows
+        // absent from every page of every category we crawl), so absence here
+        // proves nothing. Deactivation is owned by cron_404sweep-background's
+        // REDIRECT_DEAD_SOURCES rule (_active_core.mjs) instead, which reads
+        // each row's OWN url.
+        const rc = await reconcileActive(client, source, urls, { complete: false });
+        console.log(`[${jobName}] ${source}: active reconcile (reactivate-only) ${JSON.stringify(rc)}`);
       }
     } finally {
       client.release();
