@@ -1075,12 +1075,16 @@ const VOLATILE_URL_PATTERNS = {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
+  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
+  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
+  // (csak a zyntern ad company-t; a többi forrás itemjein a guard no-op)
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, first_seen)
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;`,
+        DO UPDATE SET company = EXCLUDED.company
+        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
     [source, item.title, item.url, item.experience ?? "-", item.company || null]
   );
 }

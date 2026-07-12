@@ -310,6 +310,8 @@ async function upsertJob(client, item) {
   // csak a '-'/üres/NULL sorokat tölti ki egy most lefetchelt valós értékkel
   // (pl. korábbi 429-es futás sora gyógyul a következő scrape-nél), a
   // technologies pedig bármikor kitöltődik, ha korábban még NULL volt.
+  // A company ugyanígy backfillel: régi (company nélküli) sor kap cégnevet,
+  // meglévő értéket sosem írunk felül.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
@@ -319,7 +321,8 @@ async function upsertJob(client, item) {
           WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
            AND EXCLUDED.experience NOT IN ('-', '')
           THEN EXCLUDED.experience ELSE job_posts.experience END,
-        technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies);`,
+        technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
+        company = COALESCE(job_posts.company, EXCLUDED.company);`,
     ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }

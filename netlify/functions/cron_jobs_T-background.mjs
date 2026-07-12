@@ -132,13 +132,15 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 async function upsertJob(client, sourceKey, item) {
+  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
+  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
-       DO NOTHING
-    `,
+        DO UPDATE SET company = EXCLUDED.company
+        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
     [sourceKey, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
   );
 }
@@ -308,8 +310,8 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     );
 
     // Only a genuinely NEW posting needs its detail page — an already-known url's
-    // row is already complete and ON CONFLICT DO NOTHING would discard the fetch
-    // anyway. Title inference (inferTalentExperience) already resolved most jobs;
+    // row is already complete, the upsert at most backfills its company (never
+    // experience/technologies). Title inference (inferTalentExperience) already resolved most jobs;
     // only the "-" ones (title didn't reveal seniority) need the fetch. Either
     // way the row is built COMPLETE before it's ever inserted — no separate pass
     // comes back later to patch it in.

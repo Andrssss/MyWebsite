@@ -146,20 +146,25 @@ function htmlToText(html) {
 }
 
 async function upsertJob(client, sourceKey, item) {
+  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
+  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
+  // (kuka itemeknek nincs company-ja → ott a guard miatt no-op)
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;`,
+        DO UPDATE SET company = EXCLUDED.company
+        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
     [sourceKey, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
 // Only a genuinely NEW url needs its own detail-page fetch for experience —
-// an already-known row is already complete and ON CONFLICT DO NOTHING would
-// discard the fetch anyway. Builds the row COMPLETE before it's ever
-// inserted; no separate pass comes back later to patch it in.
+// an already-known row is already complete, so the upsert would at most
+// backfill its company (never experience/technologies). Builds the row
+// COMPLETE before it's ever inserted; no separate pass comes back later to
+// patch it in.
 async function enrichIfNew(job, known, extract, jobName) {
   if (known.has(job.url) || (job.experience && job.experience !== "-")) return;
   try {
