@@ -62,11 +62,13 @@ const _runJob = withTimeout("oneoff_company_backfill", async () => {
 
     let updated = 0, noSignal = 0, failed = 0;
     for (const r of work) {
-      await sleep(600);
+      await sleep(1500);
       let company = null;
-      // az nfj SSR nem determinisztikus (néha ld+json nélküli shell jön) → 1 retry
-      for (let attempt = 0; attempt < 2 && !company; attempt++) {
-        if (attempt) await sleep(2000);
+      // az nfj SSR nem determinisztikus, a talentnél meg gyanítható egy
+      // Netlify-egress rate-limit (helyi fetch mindig sikerült ugyanarra az
+      // url-re) → hosszabb, növekvő backoff, több próba
+      for (let attempt = 0; attempt < 4 && !company; attempt++) {
+        if (attempt) await sleep(3000 * attempt);
         try {
           const resp = await fetch(r.url, { headers: UA, redirect: "follow" });
           if (!resp.ok) { console.log(`  -- ${resp.status} ${r.url}`); break; }
