@@ -122,6 +122,58 @@ function isSeniorLike(title = "", desc = "") {
   return _filters.some(k => _blacklistRegex(k).test(n));
 }
 
+// =====================
+// HELYSZÍN — csak Budapest
+// =====================
+// A /budapest/ kereső NEM szűr helyszínre: Szeged, Debrecen, Győr (sőt német városok)
+// hirdetései is bejönnek a találati listába.
+//
+// KÉT CSAPDA a helyszín kiolvasásában:
+//  1. A URL városnév-slugja HASZNÁLHATATLAN: bármilyen slug 200-at ad ugyanarra az
+//     id-ra (a "…-kft-budapest-2947222" is a szegedi hirdetést adja vissza), és van
+//     szegedi hirdetés "-debrecen-" sluggal is.
+//  2. A lista-kártya helyszín-mezője CSAK AZ ELSŐDLEGES várost mutatja. Egy
+//     "7027 Paks, Budapest, Szeged" hirdetés a kártyán simán "Paks" — ha csak a
+//     kártyára hagyatkoznánk, valódi budapesti állásokat dobnánk el.
+// Ezért: ha a kártya nem budapesti, a detail-oldal TELJES helyszín-listája dönt
+// (.address-data + itemprop=addressLocality) — lásd extractDetailLocation() + a szűrést
+// a processOneSource-ban.
+//
+// FAIL-OPEN: csak akkor dobunk el egy hirdetést, ha a helyszín KIFEJEZETTEN megnevez
+// egy nem-budapesti települést ÉS Budapest sehol nem szerepel. Üres, ismeretlen,
+// "Távmunka / Remote" helyszín vagy sikertelen detail-fetch → MARAD.
+const WORK_MODE_WORDS = [
+  "hibrid", "hybrid", "tavmunka", "remote", "home office", "homeoffice",
+  "orszagos", "orszagosan", "magyarorszag", "hungary",
+];
+
+function isBudapestLocation(location) {
+  const n = normalizeText(location);
+  if (!n) return true;
+  if (n.includes("budapest") || /\bbuda\b/.test(n)) return true;
+
+  let rest = n;
+  for (const w of WORK_MODE_WORDS) rest = rest.split(w).join(" ");
+  rest = rest.replace(/[•\/,;()\-–—.]/g, " ").replace(/\s+/g, " ").trim();
+  if (!rest) return true; // pl. "Távmunka / Remote", "Hibrid •"
+
+  // Csak kerület-jelölés maradt (pl. "Hibrid • XIII") → budapesti kerület.
+  const districtish = (t) => /^[ivxlc]+$/.test(t) || t === "kerulet" || t === "ker";
+  if (rest.split(" ").every(districtish)) return true;
+
+  return false; // valódi, nem budapesti település
+}
+
+// A detail-oldal TELJES helyszín-listája (a kártyával ellentétben itt minden város
+// szerepel): a "Munkavégzés helye" blokk + a schema.org microdata együtt.
+function extractDetailLocation(html) {
+  const $ = cheerioLoad(html);
+  const parts = [];
+  $(".address-data").each((_, el) => parts.push(normalizeWhitespace($(el).text())));
+  $('[itemprop="addressLocality"]').each((_, el) => parts.push(normalizeWhitespace($(el).text())));
+  return parts.filter(Boolean).join(", ");
+}
+
 function looksLikeJobUrl(sourceKey, url) {
   if (!url) return false;
   const u = new URL(url);
@@ -258,11 +310,17 @@ function extractCandidates(html, baseUrl) {
       }
     }
 
+    // A kártyán belüli helyszín-mező (id="detailed-job-card-{id}-details-location"),
+    // pl. "Budapest", "Hibrid • Budapest XI.kerület", "Szeged", "Távmunka / Remote".
+    const location =
+      normalizeWhitespace(card.find('[id$="-details-location"]').first().text()) || null;
+
     items.push({
       title: title.slice(0, 300),
       url,
       description: desc ? desc.slice(0, 800) : null,
       company: company ? company.slice(0, 200) : null,
+      location,
     });
   });
 
@@ -505,6 +563,37 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
 
   let matchedList = merged.filter((c) => !isSeniorLike(c.title, c.description));
 
+  // Csak budapesti állások kellenek. A kiszűrt sorok a foundUrls-ból is kimaradnak,
+  // így a reconcile sem élesztheti újra egy korábban bekerült vidéki hirdetés sorát.
+  // (currentUrls SZÁNDÉKOSAN a szűretlen listából jön — a vidéki url-ek is élnek a
+  // forráson, a migrateVolatileUrl still-listed guardjának látnia kell őket.)
+  if (source.startsWith("profession")) {
+    const kept = [];
+    let dropped = 0;
+    for (const c of matchedList) {
+      if (isBudapestLocation(c.location)) {
+        kept.push(c);
+        continue;
+      }
+      // A kártya csak az elsődleges várost mutatja — mielőtt eldobjuk, a detail-oldal
+      // teljes helyszín-listája dönt (pl. kártyán "Paks", valójában "Paks, Budapest,
+      // Szeged"). A letöltött HTML-t eltesszük: lejjebb az experience/technologies
+      // kinyerésének már nem kell újra lekérnie.
+      try {
+        await sleep(300);
+        c.detailHtml = await fetchText(c.url);
+      } catch (err) {
+        await logFetchError(jobName, { url: c.url, message: err.message });
+        kept.push(c); // fail-open: ha nem tudjuk ellenőrizni, marad
+        continue;
+      }
+      if (isBudapestLocation(extractDetailLocation(c.detailHtml))) kept.push(c);
+      else dropped++;
+    }
+    matchedList = kept;
+    if (dropped) console.log(`[${source}] ${dropped} nem-budapesti hirdetés kiszűrve`);
+  }
+
   if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
     matchedList = matchedList.filter(c => !BLACKLIST_URLS.includes(c.url));
   }
@@ -546,14 +635,18 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
       // comes back later to patch it in.
       if (!item.experience && known && !known.has(item.url)) {
         try {
-          await sleep(300);
-          const detailHtml = await fetchText(item.url);
+          let detailHtml = item.detailHtml; // a helyszín-ellenőrzés már letölthette
+          if (!detailHtml) {
+            await sleep(300);
+            detailHtml = await fetchText(item.url);
+          }
           item.experience = extractProfessionExperience(detailHtml) || "-";
           item.technologies = extractTechnologies(detailHtml);
         } catch (err) {
           await logFetchError(jobName, { url: item.url, message: err.message });
         }
       }
+      delete item.detailHtml;
 
       const pattern = volatileUrlPattern(item.url);
       if (pattern) {

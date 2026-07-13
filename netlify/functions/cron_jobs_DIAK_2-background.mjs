@@ -125,7 +125,8 @@ async function upsertJob(client, sourceKey, item) {
       (source, title, url, experience, first_seen)
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url)
-        DO NOTHING;`,
+        DO UPDATE SET title = EXCLUDED.title
+        WHERE job_posts.title IS DISTINCT FROM EXCLUDED.title;`,
     [sourceKey, item.title, item.url, item.experience ?? "-"]
   );
 }
