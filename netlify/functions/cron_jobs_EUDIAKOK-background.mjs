@@ -302,7 +302,13 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
     // List fetch succeeded (we returned early otherwise), so the crawl is
     // complete: detail failures no longer threaten any listed job's row.
     const complete = true;
-    const rc = await reconcileActive(client, "eudiakok", foundUrls, { complete });
+    // eudiakok regularly has ZERO open IT/Budapest student jobs — a legitimate
+    // state, not a blocked crawl (the list fetch above provably succeeded). Without
+    // emptyIsValid the empty-set guard makes its rows IMMORTAL: reconcile can never
+    // deactivate them, and the sweep's redirect rule doesn't fire either because a
+    // closed posting still answers 200 on its own path (2 rows were stuck active on
+    // 2026-07-14). See ACTIVATION_AUDIT.md.
+    const rc = await reconcileActive(client, "eudiakok", foundUrls, { complete, emptyIsValid: true });
     console.log(`[eudiakok] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();

@@ -543,6 +543,18 @@ async function fetchDetailExperience(url) {
   }
 }
 
+// A wherewework kártyán a cím VÉGÉN ott a feladás dátuma ("Backend Engineer
+// (Node.js) 2026. 07. 09."), és eddig így is mentettük. Emiatt egy dátum-alakú
+// blacklist-szó (a job_filters-ben tényleg volt "2026. 07. 09." és "2026. 07. 10.")
+// EGY EGÉSZ NAP termését kiszűrte, pozíciótól függetlenül — 2026-07-14-én 597
+// hirdetés, köztük 205 valódi fejlesztői állás (lásd BLACKLIST_AUDIT.md).
+// A dátumot a cím ELEJÉN levágjuk, még a blacklist-ellenőrzés előtt, hogy ez
+// szerkezetileg se fordulhasson elő újra.
+function cleanWhereweworkTitle(rawTitle) {
+  if (!rawTitle) return null;
+  return normalizeWhitespace(rawTitle).replace(/\s*\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*$/, "").trim();
+}
+
 function cleanMisziszListTitle(rawTitle) {
   if (!rawTitle) return null;
 
@@ -770,6 +782,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       let matchedList = merged
         .map((c) => {
           if (source === "miszisz") c.title = cleanMisziszListTitle(c.title);
+          if (source === "wherewework") c.title = cleanWhereweworkTitle(c.title);
           return c;
         })
         .filter((c) => {

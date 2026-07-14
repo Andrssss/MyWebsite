@@ -187,6 +187,11 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
     let skippedSenior = 0;
     let skippedNoTitle = 0;
     let notBudapest = 0;
+    // A row whose parse throws never reaches foundUrls, but the reconcile below
+    // used to run with complete:true anyway — so a still-LIVE posting we merely
+    // failed to parse would be deactivated. Any parse failure now marks the
+    // listing incomplete, which makes reconcileActive skip deactivation.
+    let rowParseFailed = false;
 
     for (const el of rows) {
       try {
@@ -255,6 +260,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           console.log(`[mfb] EXISTS [${source}] "${title}" → ${url}`);
         }
       } catch (err) {
+        rowParseFailed = true;
         console.error(`[mfb] row parse failed: ${err.message}`);
       }
     }
@@ -264,8 +270,10 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}`
     );
 
-    // Single API response = full current listing, so the crawl is complete.
-    const rc = await reconcileActive(client, "mfb", foundUrls, { complete: true });
+    // Single API response = full current listing, so the crawl is complete —
+    // UNLESS a row failed to parse, in which case foundUrls is missing a live
+    // posting and deactivation must be skipped.
+    const rc = await reconcileActive(client, "mfb", foundUrls, { complete: !rowParseFailed });
     console.log(`[mfb] active reconcile — ${JSON.stringify(rc)}`);
   } finally {
     client.release();

@@ -58,11 +58,17 @@ export async function ensureActiveSchema(client) {
  *                                    match the `url` column values exactly)
  * @param {object} [opts]
  * @param {boolean} [opts.complete=true]  false → skip deactivation (partial/failed crawl)
+ * @param {boolean} [opts.emptyIsValid=false]  true → an EMPTY foundUrls set is a
+ *   legitimate "this source has no open jobs right now" answer, not a failed crawl,
+ *   so deactivation still runs. Only pass this when the caller has PROVEN the fetch
+ *   succeeded (i.e. it also passes complete:true on the same run) — otherwise a
+ *   blocked crawl would wipe the whole source.
  * @param {number}  [opts.graceDays=ACTIVE_GRACE_DAYS]
  * @returns {Promise<{deactivated:number, reactivated:number, skipped:boolean}>}
  */
 export async function reconcileActive(client, source, foundUrls, opts = {}) {
   const complete = opts.complete !== false;
+  const emptyIsValid = opts.emptyIsValid === true;
   const graceDays = opts.graceDays ?? ACTIVE_GRACE_DAYS;
 
   await ensureActiveSchema(client);
@@ -70,8 +76,26 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
   const urls = [...new Set((foundUrls || []).filter(Boolean))];
 
   // Empty set ⇒ almost certainly a failed/blocked crawl. Never deactivate then.
+  //
+  // EXCEPTION (emptyIsValid): for a source that legitimately empties out, this
+  // guard makes its rows IMMORTAL — reconcile can never deactivate them, and if
+  // the sweep's rules don't fire either they stay active forever (observed on
+  // eudiakok 2026-07-14: listing = 0 jobs, 2 rows stuck active). A caller that
+  // has proven the fetch succeeded may opt in, and only the deactivation half
+  // runs (there is nothing to reactivate against an empty set).
   if (urls.length === 0) {
-    return { deactivated: 0, reactivated: 0, skipped: true };
+    if (!(emptyIsValid && complete)) {
+      return { deactivated: 0, reactivated: 0, skipped: true };
+    }
+    const gone = await client.query(
+      `UPDATE job_posts
+          SET active = false
+        WHERE source = $1
+          AND active = true
+          AND first_seen < NOW() - make_interval(days => $2::int)`,
+      [source, graceDays]
+    );
+    return { deactivated: gone.rowCount ?? 0, reactivated: 0, skipped: false };
   }
 
   // Reactivate rows that re-appeared on the source. Being in foundUrls proves the

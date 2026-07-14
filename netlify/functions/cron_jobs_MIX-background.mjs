@@ -41,8 +41,12 @@ const DREAMJOBS_API_URLS = [
   "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=22381&tags%5Boffice-location%5D%5B%5D=2925&tags%5Boffice-location%5D%5B%5D=15990&scope%5B%5D=isNotBlue&per_page=50",
 ];
 
+// job-categories: 62=Rendszergazda, 110=Tesztelő, 112=IT tanácsadó.
+// A korábbi `63` ÜRES kategória volt (élőben ellenőrizve 2026-07-14: 0 találat),
+// a 62 és a 112 viszont valódi IT-állásokat tartalmaz, amiket sosem kértünk le
+// (Gazdasági informatikus, ERP System Analyst) — lásd SCRAPER_BUG_INVESTIGATION.md.
 const MELONJOBS_API_URL =
-  "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63,110&per_page=100&page=1";
+  "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=62,110,112&per_page=100&page=1";
 
 const KUKA_API_URL =
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU";
@@ -201,7 +205,12 @@ function resolveDreamSlug(raw, lang) {
 }
 
 function buildDreamJobsUrl(job) {
-  const lang = /^[a-z]{2}$/i.test(String(job?.primary_lang || "")) ? String(job.primary_lang).toLowerCase() : "hu";
+  // MINDIG a magyar locale-t tároljuk. Korábban a `job.primary_lang` döntött, így egy
+  // angol nyelvű hirdetés /en/-re és az ANGOL slugra került (…/en/…/devops-engineer-58),
+  // miközben a lista /hu/-t ad (…/hu/…/devops-engineer-56) → ugyanaz az állás két külön
+  // sorként is bekerülhetett (DB: 2 db /en/, 6 db /hu/). A site minden hirdetést kiszolgál
+  // /hu/-n. Lásd SCRAPER_BUG_INVESTIGATION.md.
+  const lang = "hu";
   const companySlug = resolveDreamSlug(job?.company?.slug, lang);
   const localizedSlug =
     resolveDreamSlug(job?.slugs?.[`slug_${lang}`], lang) ||
@@ -220,9 +229,16 @@ function buildDreamJobsUrl(job) {
 // company reposts the ad (DB evidence: artofinfo m365-engineer-1 → -2), so the
 // url alone can't be the row identity. Company is part of the prefix, so only
 // the same company's same slug matches.
+//
+// The LOCALE segment is deliberately left open (`[a-z]{2}`) instead of being
+// escaped into the prefix: buildDreamJobsUrl now always emits /hu/, so the rows
+// still stored under /en/ (2 at the time of the fix) have to be able to migrate
+// onto their /hu/ url rather than being inserted a second time.
 function dreamjobsVolatileUrlPattern(url) {
-  const m = url.match(/^(https:\/\/dreamjobs\.hu\/[a-z]{2}\/job\/[^/]+\/.+)-\d+$/);
-  return m ? `^${escapeRegex(m[1])}-\\d+$` : null;
+  const m = url.match(/^https:\/\/dreamjobs\.hu\/[a-z]{2}\/job\/([^/]+)\/(.+)-\d+$/);
+  if (!m) return null;
+  const [, company, slugBase] = m;
+  return `^https://dreamjobs\\.hu/[a-z]{2}/job/${escapeRegex(company)}/${escapeRegex(slugBase)}-\\d+$`;
 }
 
 function pickJobTitle(job) {
@@ -243,20 +259,27 @@ function extractDreamJobs(payload) {
     .filter((item) => item.title && item.url);
 }
 
+// Returns { jobs, complete }. `complete` is false when a paging loop ran all the
+// way to MAX_PAGES without a natural end — the listing is then TRUNCATED, and
+// reconcileActive must not deactivate the rows that fell off the tail. (Same bug
+// class that killed 15 live wherewework rows on 2026-07-11: an exhausted page cap
+// with no guard reads as "these jobs are gone".)
 async function fetchAllDreamJobs() {
   const jobs = [];
   const seen = new Set();
+  let complete = true;
 
   for (const apiUrl of DREAMJOBS_API_URLS) {
     const baseUrl = new URL(apiUrl);
     const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "50", 10) || 50;
+    let naturalEnd = false;
 
     for (let page = 1; page <= MAX_PAGES; page += 1) {
       baseUrl.searchParams.set("page", String(page));
       const payload = await fetchJson(baseUrl.toString());
       const pageJobs = extractDreamJobs(payload);
 
-      if (pageJobs.length === 0) break;
+      if (pageJobs.length === 0) { naturalEnd = true; break; }
 
       for (const job of pageJobs) {
         const key = normalizeUrl(job.url);
@@ -266,11 +289,16 @@ async function fetchAllDreamJobs() {
         }
       }
 
-      if (pageJobs.length < perPage) break;
+      if (pageJobs.length < perPage) { naturalEnd = true; break; }
+    }
+
+    if (!naturalEnd) {
+      complete = false;
+      console.warn(`[dreamjobs] page cap (${MAX_PAGES}) exhausted for ${apiUrl} — listing truncated, skipping deactivation`);
     }
   }
 
-  return jobs;
+  return { jobs, complete };
 }
 
 /* ── MelonJobs ──────────────────────────────────────────────── */
@@ -335,20 +363,22 @@ async function fetchAllMelonJobs() {
   const jobs = [];
   const baseUrl = new URL(MELONJOBS_API_URL);
   const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "100", 10) || 100;
+  let naturalEnd = false;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     baseUrl.searchParams.set("page", String(page));
     const payload = await fetchJson(baseUrl.toString());
     const pageJobs = extractMelonJobs(payload);
 
-    if (pageJobs.length === 0 && (!Array.isArray(payload) || payload.length === 0)) break;
+    if (pageJobs.length === 0 && (!Array.isArray(payload) || payload.length === 0)) { naturalEnd = true; break; }
 
     jobs.push(...pageJobs);
 
-    if (!Array.isArray(payload) || payload.length < perPage) break;
+    if (!Array.isArray(payload) || payload.length < perPage) { naturalEnd = true; break; }
   }
 
-  return jobs;
+  if (!naturalEnd) console.warn(`[melonjobs] page cap (${MAX_PAGES}) exhausted — listing truncated, skipping deactivation`);
+  return { jobs, complete: naturalEnd };
 }
 
 /* ── KUKA ───────────────────────────────────────────────────── */
@@ -406,6 +436,7 @@ const KUKA_MAX_PAGES = 20;
 async function fetchAllKukaJobs() {
   const jobs = [];
   const seen = new Set();
+  let naturalEnd = false;
   for (let page = 0; page < KUKA_MAX_PAGES; page += 1) {
     const startrow = page * KUKA_PAGE_SIZE;
     const url = startrow === 0 ? KUKA_API_URL : `${KUKA_API_URL}&startrow=${startrow}`;
@@ -417,9 +448,10 @@ async function fetchAllKukaJobs() {
       jobs.push(job);
       added += 1;
     }
-    if (pageJobs.length < KUKA_PAGE_SIZE || added === 0) break;
+    if (pageJobs.length < KUKA_PAGE_SIZE || added === 0) { naturalEnd = true; break; }
   }
-  return jobs;
+  if (!naturalEnd) console.warn(`[kuka] page cap (${KUKA_MAX_PAGES}) exhausted — listing truncated, skipping deactivation`);
+  return { jobs, complete: naturalEnd };
 }
 /* ── handler ────────────────────────────────────────────────── */
 
@@ -436,7 +468,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
     /* DreamJobs */
     try {
-      const allDreamJobs = await fetchAllDreamJobs();
+      const { jobs: allDreamJobs, complete: dreamComplete } = await fetchAllDreamJobs();
       // Full current listing (pre-filter) — a url in this set is live on the
       // source, so migrateVolatileUrl must never rename its row away.
       const currentUrls = allDreamJobs.map((j) => j.url);
@@ -458,7 +490,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
-      const rc = await reconcileActive(client, "dreamjobs", dreamJobs.map((j) => j.url), { complete: true });
+      const rc = await reconcileActive(client, "dreamjobs", dreamJobs.map((j) => j.url), { complete: dreamComplete });
       console.log(`[dreamjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "dreamjobs", message: err.message });
@@ -467,7 +499,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
     /* MelonJobs */
     try {
-      const melonJobs = await fetchAllMelonJobs();
+      const { jobs: melonJobs, complete: melonComplete } = await fetchAllMelonJobs();
       console.log(`melonjobs: ${melonJobs.length} jobs found`);
 
       for (const job of melonJobs) {
@@ -475,7 +507,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "melonjobs", job);
       }
       console.log(`melonjobs: ${melonJobs.length} jobs processed`);
-      const rc = await reconcileActive(client, "melonjobs", melonJobs.map((j) => j.url), { complete: true });
+      const rc = await reconcileActive(client, "melonjobs", melonJobs.map((j) => j.url), { complete: melonComplete });
       console.log(`[melonjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "melonjobs", message: err.message });
@@ -486,7 +518,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
     try {
       // Full paginated listing — the bucket for reconcile. Any fetch error throws
       // out to the catch below, so a partial crawl never reaches reconcileActive.
-      const allKukaJobs = await fetchAllKukaJobs();
+      const { jobs: allKukaJobs, complete: kukaComplete } = await fetchAllKukaJobs();
       const kukaJobs = allKukaJobs.filter((job) => !isSeniorLike(job.title, ""));
       console.log(`kuka: ${kukaJobs.length} jobs found (of ${allKukaJobs.length} listed)`);
 
@@ -497,7 +529,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       console.log(`kuka: ${kukaJobs.length} jobs processed`);
       // Reconcile against the FULL listing (incl. senior) so a still-listed job is
       // never wrongly deactivated just because it now matches the senior filter.
-      const rc = await reconcileActive(client, "kuka", allKukaJobs.map((j) => j.url), { complete: true });
+      const rc = await reconcileActive(client, "kuka", allKukaJobs.map((j) => j.url), { complete: kukaComplete });
       console.log(`[kuka] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
