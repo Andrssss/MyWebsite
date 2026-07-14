@@ -75,8 +75,33 @@ const VideoGroup = ({ name, items }) => {
 const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
   const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const iframeRef = React.useRef(null);
+  const closingRef = React.useRef(false);
   const driveUrl = `https://drive.google.com/file/d/${file.id}/preview`;
   const openUrl = `https://drive.google.com/file/d/${file.id}/view`;
+
+  // Egy MÉG TÖLTŐ cross-origin iframe kiszedése a DOM-ból szinkron frame-detachot vált ki:
+  // a böngésző megvárja, amíg a Drive renderer-folyamata válaszol -> a teljes PDF betöltéséig
+  // befagy az egész oldal. Ezért előbb about:blank-re navigáljuk (ez megszakítja a betöltést),
+  // az overlayt azonnal elrejtjük, és csak utána unmountolunk.
+  const requestClose = React.useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    const iframe = iframeRef.current;
+    if (!iframe) { onClose(); return; }
+    setClosing(true);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      onClose();
+    };
+    const timer = setTimeout(finish, 400);
+    iframe.addEventListener('load', finish, { once: true });
+    iframe.src = 'about:blank';
+  }, [onClose]);
 
   React.useEffect(() => {
     setLoaded(false);
@@ -95,16 +120,17 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
 
   React.useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (closingRef.current) return;
+      if (e.key === 'Escape') requestClose();
       if (e.key === 'ArrowLeft' && hasPrev) onPrev();
       if (e.key === 'ArrowRight' && hasNext) onNext();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, onPrev, onNext, hasPrev, hasNext]);
+  }, [requestClose, onPrev, onNext, hasPrev, hasNext]);
 
   return createPortal(
-    <div className="preview-overlay" onClick={onClose}>
+    <div className="preview-overlay" style={closing ? { display: 'none' } : undefined} onClick={requestClose}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-modal-header">
           <span className="preview-modal-title">{file.name}</span>
@@ -113,7 +139,7 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
               target="_blank" rel="noopener noreferrer" className="preview-modal-download">
               ⬇ Letöltés
             </a>
-            <button className="preview-modal-close" onClick={onClose}>✕</button>
+            <button className="preview-modal-close" onClick={requestClose}>✕</button>
           </div>
         </div>
         <div className="preview-iframe-wrap">
@@ -129,7 +155,7 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
               )}
             </div>
           )}
-          <iframe src={driveUrl}
+          <iframe ref={iframeRef} src={driveUrl}
             className="preview-iframe" title={file.name} allow="autoplay"
             onLoad={() => setLoaded(true)} />
           {hasPrev && (
