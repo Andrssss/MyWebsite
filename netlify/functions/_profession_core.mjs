@@ -142,9 +142,17 @@ function isSeniorLike(title = "", desc = "") {
 // FAIL-OPEN: csak akkor dobunk el egy hirdetést, ha a helyszín KIFEJEZETTEN megnevez
 // egy nem-budapesti települést ÉS Budapest sehol nem szerepel. Üres, ismeretlen,
 // "Távmunka / Remote" helyszín vagy sikertelen detail-fetch → MARAD.
+// Ezek NEM települések, csak munkavégzés-módok — a helyszín-vizsgálat előtt kivonjuk őket,
+// és ha nem marad valódi városnév, a hirdetés MARAD (lásd a FAIL-OPEN elvet fentebb).
+// Az "iroda"/"opcionalis" 2026-07-14-én került be: a "Távmunka / Remote • Opcionális iroda"
+// helyszínű (tehát TÁVMUNKA) hirdetéseket a szűrő vidékinek hitte — a work-mode szavak
+// kivonása után az "opcionalis iroda" maradt, amit városnévnek vett → 6 élő RemRed-hirdetést
+// dobott ki tévesen. Városos formát ez nem enged át: a "Debrecen iroda"-ból az "iroda" kivonása
+// után is marad a "debrecen".
 const WORK_MODE_WORDS = [
   "hibrid", "hybrid", "tavmunka", "remote", "home office", "homeoffice",
   "orszagos", "orszagosan", "magyarorszag", "hungary",
+  "opcionalis iroda", "opcionalis", "iroda",
 ];
 
 function isBudapestLocation(location) {
@@ -444,21 +452,70 @@ const BLACKLIST_URLS = [
   "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
 ];
 
-// Nem-budapesti sorok, amik már KIESTEK a listából: a detail-alapú purge (lásd lentebb)
-// sosem látja őket, mert az csak a listán MÉG szereplő jelöltekre fut. Ezek viszont ÉLNEK
-// a saját url-jükön, így a napi sweep revive-köre (SWEEP_SOLE_DEACTIVATOR_SOURCES) minden
-// nap vissza akarná kapcsolni őket — ezért törölni kell, nem csak kikapcsolva hagyni.
-// Helyszín MINDEGYIKNÉL a detail-oldal teljes város-listájából ellenőrizve 2026-07-14-én
-// (4× Debrecen + 1× Hagen, DE). ⚠️ A URL városnév-slugja KOZMETIKAI: a "-szeged-2944697"
-// valójában debreceni hirdetés — sosem slug alapján törlünk, csak pontos url-egyezésre.
-// Idempotens: ha már nincsenek meg, a DELETE 0 sort érint. Nyugodtan törölhető a lista,
-// ha egyszer lefutott (a jövőbeli vidéki sorokat már a detail-purge takarítja).
+// EGYSZERI TAKARÍTÁS (2026-07-14) — 42 nem-budapesti sor, ami a Budapest-szűrő (fdfa2a0)
+// bevezetése ELŐTT került be, és azóta bent ragadt: 37 közülük AKTÍV volt, tehát vidéki/külföldi
+// állás látszott az oldalon (36× Debrecen + 1× Dortmund), 5 pedig inaktív-de-élő.
+//
+// Miért kell EZ IS a lentebbi detail-alapú purge mellé? Mert az csak a listán MÉG szereplő
+// jelöltekre fut. A profession reconcile-ja reactivate-only, tehát az "aktív" NEM bizonyítja,
+// hogy a hirdetés még a listán van — a listáról lekerült sorokat a scraper soha többé nem
+// látja, így magától sosem takarítaná el őket. Az inaktívakat ráadásul a napi sweep
+// revive-köre (SWEEP_SOLE_DEACTIVATOR_SOURCES) minden nap vissza akarná kapcsolni, hiszen a
+// hirdetés a saját url-jén ÉL — ezért TÖRÖLNI kell őket, nem kikapcsolva hagyni.
+//
+// Helyszín MINDEGYIKNÉL a detail-oldal TELJES város-listájából ellenőrizve (nem a kártyáról,
+// és főleg nem a URL-ből: a "…-szeged-2944697" valójában DEBRECEN — a slug kozmetikai).
+// ⚠️ A 6 RemRed-hirdetés SZÁNDÉKOSAN nincs a listán: azok "Távmunka / Remote • Opcionális
+// iroda" helyszínűek, tehát TÁVMUNKÁK — a régi WORK_MODE_WORDS hitte őket vidékinek.
+//
+// A PURGE_CUTOFF teszi egyszerivé: csak a cutoff ELŐTT beszúrt sorokat törli. Ha egy url
+// valaha mégis visszakerülne (mert a hirdető átírta budapestire), az új sor first_seen-je a
+// cutoff UTÁN lesz → a purge nem nyúl hozzá, tehát nincs örökös törlés-újraszúrás körhinta.
+// Idempotens: ha már nincsenek meg, a DELETE 0 sort érint, és a lista utána nyugodtan törölhető.
+const PURGE_CUTOFF = "2026-07-15T00:00:00Z";
 const NON_BUDAPEST_PURGE_URLS = [
+  "https://www.profession.hu/allas/ai-swe-agentic-handover-engineer-t-cloud-public-ref-m-deutsche-telekom-tsi-hungary-kft-2947033",
+  "https://www.profession.hu/allas/ai-swe-agentic-handover-engineer-t-cloud-public-ref-m-deutsche-telekom-tsi-hungary-kft-szeged-2947033",
+  "https://www.profession.hu/allas/ai-swe-agentic-handover-engineer-t-cloud-public-ref-y-deutsche-telekom-tsi-hungary-kft-2946955",
+  "https://www.profession.hu/allas/ai-swe-agentic-handover-engineer-t-cloud-public-ref-y-deutsche-telekom-tsi-hungary-kft-szeged-2946955",
+  "https://www.profession.hu/allas/business-analyst-data-analytics-ref-w-deutsche-telekom-tsi-hungary-kft-szeged-2943045",
+  "https://www.profession.hu/allas/cloud-architect-for-t-cloud-public-ref-n-deutsche-telekom-tsi-hungary-kft-2947127",
+  "https://www.profession.hu/allas/cloud-architect-for-t-cloud-public-ref-n-deutsche-telekom-tsi-hungary-kft-szeged-2947127",
+  "https://www.profession.hu/allas/cloud-architect-t-cloud-public-ref-b-deutsche-telekom-tsi-hungary-kft-2947147",
+  "https://www.profession.hu/allas/cloud-architect-t-cloud-public-ref-b-deutsche-telekom-tsi-hungary-kft-szeged-2947147",
   "https://www.profession.hu/allas/cloud-devops-engineer-ref-b-deutsche-telekom-tsi-hungary-kft-szeged-2944697",
-  "https://www.profession.hu/allas/quality-engineer-functional-test-and-migration-test-german-speaking-ref-p-deutsche-telekom-tsi-hungary-kft-debrecen-2943063",
+  "https://www.profession.hu/allas/cloud-engineer-adesso-business-consulting-kft-2947113",
   "https://www.profession.hu/allas/cloud-engineer-t-cloud-public-deutsche-telekom-tsi-hungary-kft-debrecen-2943258",
-  "https://www.profession.hu/allas/software-architect-tas-ref-x-deutsche-telekom-tsi-hungary-kft-debrecen-2943279",
+  "https://www.profession.hu/allas/cloud-engineer-t-cloud-public-deutsche-telekom-tsi-hungary-kft-szeged-2943258",
+  "https://www.profession.hu/allas/cloud-engineer-t-cloud-public-ref-e-deutsche-telekom-tsi-hungary-kft-2946800",
+  "https://www.profession.hu/allas/cloud-engineer-t-cloud-public-ref-e-deutsche-telekom-tsi-hungary-kft-szeged-2946800",
+  "https://www.profession.hu/allas/data-engineer-ref-y-deutsche-telekom-tsi-hungary-kft-szeged-2944621",
+  "https://www.profession.hu/allas/devops-engineer-ref-x-deutsche-telekom-tsi-hungary-kft-2947160",
+  "https://www.profession.hu/allas/german-speaking-devops-engineer-ref-q-deutsche-telekom-tsi-hungary-kft-szeged-2944536",
+  "https://www.profession.hu/allas/integrated-intelligence-analyst-deutsche-telekom-tsi-hungary-kft-2947050",
+  "https://www.profession.hu/allas/integrated-intelligence-analyst-deutsche-telekom-tsi-hungary-kft-szeged-2947050",
   "https://www.profession.hu/allas/ki-engineer-ki-anwendungsbetreuer-in-w-m-d-budapesti-nemetnyelvu-tavtanulasi-kozpont-alapitvany-2938506",
+  "https://www.profession.hu/allas/kubernetes-security-governance-deutsche-telekom-tsi-hungary-kft-2947222",
+  "https://www.profession.hu/allas/kubernetes-security-governance-deutsche-telekom-tsi-hungary-kft-szeged-2947222",
+  "https://www.profession.hu/allas/linux-devops-engineer-deutsche-telekom-tsi-hungary-kft-2947145",
+  "https://www.profession.hu/allas/linux-devops-engineer-deutsche-telekom-tsi-hungary-kft-szeged-2947145",
+  "https://www.profession.hu/allas/microsoft-architect-with-german-language-ref-s-deutsche-telekom-tsi-hungary-kft-2946872",
+  "https://www.profession.hu/allas/mobile-network-security-governance-deutsche-telekom-tsi-hungary-kft-2947203",
+  "https://www.profession.hu/allas/mobile-network-security-governance-deutsche-telekom-tsi-hungary-kft-szeged-2947203",
+  "https://www.profession.hu/allas/quality-engineer-functional-test-and-migration-test-german-speaking-ref-p-deutsche-telekom-tsi-hungary-kft-debrecen-2943063",
+  "https://www.profession.hu/allas/quality-engineer-functional-test-and-migration-test-german-speaking-ref-p-deutsche-telekom-tsi-hungary-kft-szeged-2943063",
+  "https://www.profession.hu/allas/software-architect-tas-ref-x-deutsche-telekom-tsi-hungary-kft-debrecen-2943279",
+  "https://www.profession.hu/allas/software-architect-tas-ref-x-deutsche-telekom-tsi-hungary-kft-szeged-2943279",
+  "https://www.profession.hu/allas/solution-engineer-ref-a-deutsche-telekom-tsi-hungary-kft-szeged-2943318",
+  "https://www.profession.hu/allas/sovereign-ai-platform-engineer-t-cloud-public-ref-y-deutsche-telekom-tsi-hungary-kft-2946952",
+  "https://www.profession.hu/allas/sovereign-ai-platform-engineer-t-cloud-public-ref-y-deutsche-telekom-tsi-hungary-kft-szeged-2946952",
+  "https://www.profession.hu/allas/specialist-devops-engineer-t-cloud-public-ref-x-deutsche-telekom-tsi-hungary-kft-szeged-2944626",
+  "https://www.profession.hu/allas/technical-business-analyst-with-english-and-german-ref-v-deutsche-telekom-tsi-hungary-kft-2946781",
+  "https://www.profession.hu/allas/technical-business-analyst-with-english-and-german-ref-v-deutsche-telekom-tsi-hungary-kft-szeged-2946781",
+  "https://www.profession.hu/allas/technology-engineer-ref-k-deutsche-telekom-tsi-hungary-kft-szeged-2944644",
+  "https://www.profession.hu/allas/test-automation-engineer-playwright-selenium-cypress-german-speaking-ref-u-deutsche-telekom-tsi-hungary-kft-szeged-2943249",
+  "https://www.profession.hu/allas/test-automation-engineer-ref-i-deutsche-telekom-tsi-hungary-kft-szeged-2944589",
+  "https://www.profession.hu/allas/ux-ui-designer-ref-u-deutsche-telekom-tsi-hungary-kft-szeged-2944501",
 ];
 
 // =====================
@@ -480,14 +537,18 @@ export async function processProfessionSources(sources, jobName, request, pageOp
     const client = await pool.connect();
     const foundBySource = new Map(); // source -> urls: string[]
     try {
-      // Run-eleji takarítás (cég-blocklist mintája): a listából már kiesett, ezért a
-      // detail-purge számára láthatatlan nem-budapesti sorok törlése. Idempotens.
+      // Run-eleji takarítás (cég-blocklist mintája): a Budapest-szűrő bevezetése előtt
+      // bent ragadt nem-budapesti sorok egyszeri törlése. A first_seen < PURGE_CUTOFF
+      // teszi egyszerivé — egy később újra beszúrt sorhoz már nem nyúl (nincs körhinta).
       if (NON_BUDAPEST_PURGE_URLS.length > 0) {
         const { rowCount } = await client.query(
-          `DELETE FROM job_posts WHERE source LIKE 'profession%' AND url = ANY($1::text[])`,
-          [NON_BUDAPEST_PURGE_URLS]
+          `DELETE FROM job_posts
+            WHERE source LIKE 'profession%'
+              AND url = ANY($1::text[])
+              AND first_seen < $2::timestamptz`,
+          [NON_BUDAPEST_PURGE_URLS, PURGE_CUTOFF]
         );
-        if (rowCount > 0) console.log(`[${jobName}] purge: ${rowCount} listából kiesett nem-budapesti sor törölve`);
+        if (rowCount > 0) console.log(`[${jobName}] purge: ${rowCount} nem-budapesti sor törölve (egyszeri takarítás)`);
       }
 
       // Only a genuinely NEW url needs its own detail-page fetch for
