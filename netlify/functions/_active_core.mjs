@@ -104,10 +104,16 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
   // STICKY_SWEEP_DEAD_SOURCES exception: their listing shows closed jobs too, so
   // presence proves nothing — a sweep-proven death (sweep_dead) stays dead, else
   // the hourly crawl resurrects every kill the morning after (daily flip-flop).
+  // sweep_dead is cleared on the way back in: the flag means "the sweep proved this
+  // row dead at its own url", and listing presence has just disproved it. Keeping the
+  // invariant (sweep_dead ⇒ active = false) is what lets reviveSweepDead below scan
+  // `sweep_dead AND NOT active` without picking up stale flags on live rows.
+  // No-op for STICKY_SWEEP_DEAD_SOURCES — there the guard below never lets a
+  // sweep_dead row reach this UPDATE in the first place.
   const noResurrect = STICKY_SWEEP_DEAD_SOURCES.has(source);
   const reactivated = await client.query(
     `UPDATE job_posts
-        SET active = true
+        SET active = true, sweep_dead = false
       WHERE source = $1
         AND active = false
         ${noResurrect ? "AND NOT sweep_dead" : ""}
@@ -430,36 +436,82 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
   return { checked: rows.length, suspects: suspects.length, deactivated };
 }
 
+// How far back reviveSweepDead looks (by first_seen). Without a bound it would
+// re-fetch EVERY row the sweep ever killed, every day, forever — a cost that only
+// grows. A posting that first appeared over a month ago and is dead is not coming
+// back; the false-kill window we actually care about is days, not months.
+export const REVIVE_MAX_AGE_DAYS = 45;
+
+// Sources whose reconcileActive is hardcoded reactivate-only (`complete:false`),
+// i.e. their LISTING can never deactivate anything — the 404-sweep is their SOLE
+// deactivator. For these, an inactive row means "the sweep killed it" no matter what
+// `sweep_dead` says, so reviveSweepDead re-checks ALL their inactive rows, not just
+// the flagged ones. That is what heals rows killed by an OLDER, since-fixed reconcile:
+// they carry sweep_dead=false and are otherwise unreachable forever, because the ad has
+// long since aged out of the listing that would have reactivated it (2026-07-14: 7 live
+// profession-intern rows sat off exactly like this, invisible to every automatic path).
+//
+// Safe only because each of these four has an authoritative per-url death rule
+// (profession-intern → REDIRECT_DEAD_SOURCES; talent/nofluffjobs/bluebird →
+// BANNER_DEAD_SOURCES), so "no death signal on its own page" really does mean alive,
+// and because their reconcile cannot re-deactivate what this revives (no flip-flop).
+//
+// ⚠️ Do NOT add a source here whose rows can be deactivated on PURPOSE (policy), e.g.
+// out-of-scope-location rows: they are ALIVE at their url, so this would resurrect them
+// every day. Such rows must be DELETED instead (profession's non-Budapest purge does).
+export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
+  "profession-intern",
+  "talent",
+  "nofluffjobs",
+  "bluebird",
+]);
+
 /**
- * Revives sweep kills that no longer hold up.
+ * Revives sweep kills that no longer hold up — the "and what if I was wrong?"
+ * counterpart of sweepActive404.
  *
- * A STICKY_SWEEP_DEAD_SOURCES row's `sweep_dead` flag is otherwise one-way —
- * cleared only by migrateVolatileUrl (URL rename) — because listing presence
- * alone can't be trusted to resurrect it (see STICKY_SWEEP_DEAD_SOURCES doc
- * comment). But talent can flip the SAME url's own status back to alive
- * (system_status 2→1, a same-day expire → re-list cycle) with no URL change
- * at all, which left it stuck inactive forever even though the exact signal
- * that killed it now says it's alive (2026-07-12: confirmed on 2 user-reported
- * urls, one with a real `system_date_expired`→`system_date_re_found` cycle,
- * one that per talent's own data never expired at all). Re-runs the same
- * per-URL check used to kill the row and un-sticks (sweep_dead=false,
- * active=true) any row that now comes back clean, double-checked to avoid
- * reviving off a transient blip (mirrors sweepActive404's own re-check).
+ * Runs for EVERY sweep-eligible source, not just the sticky ones. It keys strictly
+ * on `sweep_dead`, i.e. rows the sweep itself killed at their OWN url (double-checked
+ * at the time), so it re-asks exactly the question it once answered wrong. Rows that
+ * reconcileActive deactivated (listing absence) or that were switched off by hand /
+ * by policy carry sweep_dead=false and are never touched — that separation is what
+ * makes running this across all sources safe.
+ *
+ * Why it can't stay sticky-only (measured 2026-07-14): 10 talent and 7 profession-intern
+ * rows were equally alive by their own url's rules; the 14:00 sweep revived all 10 talent
+ * rows and left all 7 profession-intern rows dead, purely because talent is in
+ * STICKY_SWEEP_DEAD_SOURCES. Every non-sticky source's false kills were permanent —
+ * as when the latin1 Location bug killed 13 live alllocaljobs rows (2026-07-10) and
+ * nothing brought them back. See FALSE_DEACTIVATION_CHECK_2026-07-14.md.
+ *
+ * The original sticky motivation still holds and is subsumed: talent can flip the SAME
+ * url's status back to alive (system_status 2→1, expire → re-list with no URL change),
+ * which used to leave it stuck inactive forever even though the exact signal that killed
+ * it now says alive (2026-07-12, confirmed on 2 user-reported urls).
+ *
+ * Revivals are double-checked (mirrors sweepActive404's own re-check) so a transient
+ * blip can't resurrect a genuinely dead row.
  *
  * @param {import("pg").PoolClient} client
  * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
  * @param {object} [opts]
  * @param {number} [opts.concurrency=12]
+ * @param {number} [opts.maxAgeDays=REVIVE_MAX_AGE_DAYS]
  * @returns {Promise<{checked:number, revived:number}>}
  */
 export async function reviveSweepDead(client, checkFinal, opts = {}) {
   const concurrency = Math.max(1, opts.concurrency ?? 12);
+  const maxAgeDays = opts.maxAgeDays ?? REVIVE_MAX_AGE_DAYS;
 
   await ensureActiveSchema(client);
 
   const { rows } = await client.query(
-    `SELECT url, source FROM job_posts WHERE sweep_dead = true AND source = ANY($1::text[])`,
-    [[...STICKY_SWEEP_DEAD_SOURCES]]
+    `SELECT url, source FROM job_posts
+      WHERE active = false
+        AND (sweep_dead = true OR source = ANY($3::text[]))
+        AND NOT (source = ANY($1::text[]))
+        AND first_seen >= NOW() - make_interval(days => $2::int)`,
+    [[...SWEEP_EXCLUDED_SOURCES], maxAgeDays, [...SWEEP_SOLE_DEACTIVATOR_SOURCES]]
   );
   if (rows.length === 0) return { checked: 0, revived: 0 };
 
@@ -493,10 +545,11 @@ export async function reviveSweepDead(client, checkFinal, opts = {}) {
     const res = await client.query(
       `UPDATE job_posts
           SET active = true, sweep_dead = false
-        WHERE sweep_dead = true
-          AND source = ANY($2::text[])
+        WHERE active = false
+          AND (sweep_dead = true OR source = ANY($3::text[]))
+          AND NOT (source = ANY($2::text[]))
           AND url = ANY($1::text[])`,
-      [urls, [...STICKY_SWEEP_DEAD_SOURCES]]
+      [urls, [...SWEEP_EXCLUDED_SOURCES], [...SWEEP_SOLE_DEACTIVATOR_SOURCES]]
     );
     revived = res.rowCount ?? 0;
     for (const source of new Set(confirmed.map((r) => r.source))) {

@@ -444,6 +444,23 @@ const BLACKLIST_URLS = [
   "https://www.profession.hu/allasok/it-tanacsado-elemzo-auditor/budapest/1,10,23,0,201",
 ];
 
+// Nem-budapesti sorok, amik már KIESTEK a listából: a detail-alapú purge (lásd lentebb)
+// sosem látja őket, mert az csak a listán MÉG szereplő jelöltekre fut. Ezek viszont ÉLNEK
+// a saját url-jükön, így a napi sweep revive-köre (SWEEP_SOLE_DEACTIVATOR_SOURCES) minden
+// nap vissza akarná kapcsolni őket — ezért törölni kell, nem csak kikapcsolva hagyni.
+// Helyszín MINDEGYIKNÉL a detail-oldal teljes város-listájából ellenőrizve 2026-07-14-én
+// (4× Debrecen + 1× Hagen, DE). ⚠️ A URL városnév-slugja KOZMETIKAI: a "-szeged-2944697"
+// valójában debreceni hirdetés — sosem slug alapján törlünk, csak pontos url-egyezésre.
+// Idempotens: ha már nincsenek meg, a DELETE 0 sort érint. Nyugodtan törölhető a lista,
+// ha egyszer lefutott (a jövőbeli vidéki sorokat már a detail-purge takarítja).
+const NON_BUDAPEST_PURGE_URLS = [
+  "https://www.profession.hu/allas/cloud-devops-engineer-ref-b-deutsche-telekom-tsi-hungary-kft-szeged-2944697",
+  "https://www.profession.hu/allas/quality-engineer-functional-test-and-migration-test-german-speaking-ref-p-deutsche-telekom-tsi-hungary-kft-debrecen-2943063",
+  "https://www.profession.hu/allas/cloud-engineer-t-cloud-public-deutsche-telekom-tsi-hungary-kft-debrecen-2943258",
+  "https://www.profession.hu/allas/software-architect-tas-ref-x-deutsche-telekom-tsi-hungary-kft-debrecen-2943279",
+  "https://www.profession.hu/allas/ki-engineer-ki-anwendungsbetreuer-in-w-m-d-budapesti-nemetnyelvu-tavtanulasi-kozpont-alapitvany-2938506",
+];
+
 // =====================
 // Main processing function
 // =====================
@@ -463,6 +480,16 @@ export async function processProfessionSources(sources, jobName, request, pageOp
     const client = await pool.connect();
     const foundBySource = new Map(); // source -> urls: string[]
     try {
+      // Run-eleji takarítás (cég-blocklist mintája): a listából már kiesett, ezért a
+      // detail-purge számára láthatatlan nem-budapesti sorok törlése. Idempotens.
+      if (NON_BUDAPEST_PURGE_URLS.length > 0) {
+        const { rowCount } = await client.query(
+          `DELETE FROM job_posts WHERE source LIKE 'profession%' AND url = ANY($1::text[])`,
+          [NON_BUDAPEST_PURGE_URLS]
+        );
+        if (rowCount > 0) console.log(`[${jobName}] purge: ${rowCount} listából kiesett nem-budapesti sor törölve`);
+      }
+
       // Only a genuinely NEW url needs its own detail-page fetch for
       // experience/technologies — an already-known row is already complete
       // and ON CONFLICT DO NOTHING would discard the fetch anyway.
@@ -570,6 +597,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   if (source.startsWith("profession")) {
     const kept = [];
     let dropped = 0;
+    let purged = 0;
     for (const c of matchedList) {
       if (isBudapestLocation(c.location)) {
         kept.push(c);
@@ -587,11 +615,28 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         kept.push(c); // fail-open: ha nem tudjuk ellenőrizni, marad
         continue;
       }
-      if (isBudapestLocation(extractDetailLocation(c.detailHtml))) kept.push(c);
-      else dropped++;
+      if (isBudapestLocation(extractDetailLocation(c.detailHtml))) {
+        kept.push(c);
+        continue;
+      }
+      dropped++;
+      // A szűrő eddig CSAK az insertet gátolta — egy már bent lévő vidéki sort sosem
+      // takarított el, így egyetlen fail-open (detail-fetch hiba a fenti catch-ben, vagy
+      // üres kártya-helyszín) ÖRÖKRE bent hagyta a sort. Így gyűlt össze 2026-07-14-ig
+      // 46 aktív nem-budapesti sor. Itt viszont a detail-oldal TELJES város-listája épp
+      // most bizonyította, hogy nem budapesti → a sora törölhető, és a DB minden futáson
+      // magától tisztul (nem kell újabb kézi DELETE-kör).
+      if (client) {
+        const { rowCount } = await client.query(
+          `DELETE FROM job_posts WHERE source = $1 AND url = $2`,
+          [source, c.url]
+        );
+        if (rowCount > 0) purged += rowCount;
+      }
     }
     matchedList = kept;
     if (dropped) console.log(`[${source}] ${dropped} nem-budapesti hirdetés kiszűrve`);
+    if (purged) console.log(`[${source}] ${purged} nem-budapesti SOR TÖRÖLVE a db-ből`);
   }
 
   if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {

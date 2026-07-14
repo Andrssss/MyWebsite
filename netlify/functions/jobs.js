@@ -290,6 +290,18 @@ exports.handler = async (event) => {
              WHERE first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
+          : timeRange === "30d"
+          ? // Every timeRange branch must take exactly ONE parameter: the call below
+            // passes [limit] alone whenever timeRange is set. Without this branch "30d"
+            // fell through to the two-parameter default and the request 500'd — which
+            // is what the UI sends with the 24h+7d filters both on (JobWatcher.jsx).
+            `SELECT source, title, url, company,
+                    first_seen AS "firstSeen",
+                    experience, technologies, active
+             FROM job_posts
+             WHERE first_seen >= NOW() - INTERVAL '30 days'
+             ORDER BY first_seen DESC, id DESC
+             LIMIT $1`
           : `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
                     experience, technologies, active
