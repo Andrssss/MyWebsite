@@ -11,6 +11,7 @@
     "server:dev": "node server/server.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@neondatabase/serverless": "^1.1.0",
     "@netlify/blobs": "^10.4.4",
     "@sendgrid/mail": "^8.1.6",

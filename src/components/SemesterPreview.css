@@ -499,6 +499,13 @@
 .file-btn-download:hover { background: #3a9e5a; }
 
 /* === PREVIEW MODAL === */
+/* Nyitott előnézetnél a háttéroldal nem görög, csak a PDF (iframe) belseje. */
+html.preview-scroll-lock,
+body.preview-scroll-lock {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .preview-overlay {
   position: fixed;
   inset: 0;
@@ -508,6 +515,7 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
+  overscroll-behavior: contain;
 }
 
 .preview-modal {

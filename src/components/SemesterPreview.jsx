@@ -110,6 +110,17 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
     return () => clearTimeout(t);
   }, [file.id]);
 
+  // Amíg az előnézet nyitva van, a háttéroldal görgetését zároljuk, hogy csak a
+  // PDF (az iframe belseje) görögjön, ne az egész ablak — PC-n és mobilon egyaránt.
+  React.useEffect(() => {
+    document.documentElement.classList.add('preview-scroll-lock');
+    document.body.classList.add('preview-scroll-lock');
+    return () => {
+      document.documentElement.classList.remove('preview-scroll-lock');
+      document.body.classList.remove('preview-scroll-lock');
+    };
+  }, []);
+
   // Ha az iframe magához veszi a fókuszt (pl. görgetés után), azonnal visszaszerezzük,
   // hogy a billentyűzetes navigáció mindig működjön.
   React.useEffect(() => {

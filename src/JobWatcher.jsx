@@ -522,6 +522,25 @@ function kwRegex(kw) {
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
 }
 
+// Kategória-prioritás (erős → gyenge) — CSAK VÉGSŐ TIE-BREAK: a fenti egyedi
+// szabályok után, ha még mindig több kategória maradt, ez választ közülük egyet.
+// A szabályokat NEM írja felül, csak a maradék többértelműséget oldja fel, hogy
+// egy állás pontosan egy kategóriába kerüljön. Új kategóriát ide is érdemes
+// felvenni; a listán kívüli a leggyengébb prioritást kapja.
+const CATEGORY_PRIORITY = [
+  "C++", "DevOps", "Security", "Data / AI", "Elemző / Analyst",
+  "QA / Tesztelő", "Mobil", "Menedzser / PM", "Webfejlesztés",
+  "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
+];
+const categoryRank = (c) => {
+  const i = CATEGORY_PRIORITY.indexOf(c);
+  return i === -1 ? CATEGORY_PRIORITY.length : i;
+};
+const collapseByPriority = (cats) => {
+  if (cats.length <= 1) return cats;
+  return [[...cats].sort((a, b) => categoryRank(a) - categoryRank(b))[0]];
+};
+
 const getCategoriesForJob = (job, jobCategories) => {
   if (!job.title || !jobCategories.length) return [];
   const title = job.title.toLowerCase();
@@ -552,16 +571,17 @@ const getCategoriesForJob = (job, jobCategories) => {
   const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
   const effective = withoutFallback.length > 0 ? withoutFallback : matches;
   // Hálózat / Infra alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
+  let result;
   if (effective.length > 1 && effective.includes("Hálózat / Infra")) {
-    const others = effective.filter((c) => c !== "Hálózat / Infra");
-    return others;
+    result = effective.filter((c) => c !== "Hálózat / Infra");
+  } else if (effective.length > 1 && effective.includes("Mérnöki / Gyártás")) {
+    // Mérnöki / Gyártás alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
+    result = effective.filter((c) => c !== "Mérnöki / Gyártás");
+  } else {
+    result = effective;
   }
-  // Mérnöki / Gyártás alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
-  if (effective.length > 1 && effective.includes("Mérnöki / Gyártás")) {
-    const others = effective.filter((c) => c !== "Mérnöki / Gyártás");
-    return others;
-  }
-  return effective;
+  // VÉGSŐ tie-break: ha a fenti szabályok után IS több kategória maradt, a prioritás dönt → egy kategória.
+  return collapseByPriority(result);
 };
 
 const JobWatcher = () => {

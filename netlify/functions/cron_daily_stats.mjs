@@ -29,6 +29,19 @@ function kwRegex(kw) {
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
 }
 
+// Kategória-prioritás (erős → gyenge) — CSAK VÉGSŐ TIE-BREAK a fenti egyedi
+// szabályok után, ha még mindig több kategória maradt. A frontend
+// getCategoriesForJob-bal SZINKRONBAN tartandó (src/JobWatcher.jsx).
+const CATEGORY_PRIORITY = [
+  "C++", "DevOps", "Security", "Data / AI", "Elemző / Analyst",
+  "QA / Tesztelő", "Mobil", "Menedzser / PM", "Webfejlesztés",
+  "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
+];
+const categoryRank = (c) => {
+  const i = CATEGORY_PRIORITY.indexOf(c);
+  return i === -1 ? CATEGORY_PRIORITY.length : i;
+};
+
 function categorizeJobs(rows, JOB_CATEGORIES) {
   const counts = {};
   for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
@@ -77,6 +90,10 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
       cats = effective;
     }
 
+    // VÉGSŐ tie-break: ha a fenti szabályok után IS több kategória maradt, a prioritás dönt → egy kategória.
+    if (cats.length > 1) {
+      cats = [[...cats].sort((a, b) => categoryRank(a) - categoryRank(b))[0]];
+    }
     if (cats.length > 0) {
       for (const cat of cats) counts[cat]++;
     } else {

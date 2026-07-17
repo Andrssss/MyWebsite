@@ -29,6 +29,10 @@ const TARGETS = [
   { name: "cron_jobs_ATLASZ-background" },
   { name: "cron_jobs_PANNONDIAK-background" },
   { name: "cron_jobs_TRENKWALDER-background" },
+  // AI-scraped worker (cron_jobs_AI-background) is intentionally NOT triggered
+  // yet — Phase 1 is in-session/manual extraction via ai-ingest.mjs (no
+  // Anthropic API). When we automate it (intended cadence: every 5 hours), add
+  // it to a 5-hourly trigger, not this daily one. See AI_SCRAPER_PLAN.md.
   // cron_jobs_WORKCENTER-background DROPPED 2026-07-08 (user decision): WAF has
   // 403-blocked the Netlify IP since 05-07 (HTML and REST alike), so neither
   // ingest nor reconcile could run and the sweep's 403s read as "alive" — the
