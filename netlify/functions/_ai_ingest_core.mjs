@@ -2,7 +2,7 @@
 //
 // Shared ingest tail for the `ai-scraped` pipeline: given already-extracted job
 // rows for one site, apply the same filtering + url-keyed upsert + reconcile that
-// every hand scraper uses, and write them to source `ai:<site>`.
+// every hand scraper uses, and write them to source `AI - <site>`.
 //
 // One code path, three callers:
 //   • ai-ingest.js         — jobs I (or a local script) extracted in-session NOW
@@ -148,7 +148,7 @@ async function upsertJob(client, source, job, resolvedExperience) {
  *
  * @param {import("pg").PoolClient} client
  * @param {object} args
- * @param {string} args.source        DB source value, e.g. "ai:example"
+ * @param {string} args.source        DB source value, e.g. "AI - example"
  * @param {Array}  args.jobs          [{ title, url, company?, location?, experience?, technologies? }]
  *                                    — already validated/normalized. `experience`/`technologies` are
  *                                    OPTIONAL body-derived values (read the detail page, same as every

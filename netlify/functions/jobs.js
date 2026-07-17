@@ -79,10 +79,10 @@ const CACHE_HEADERS = {
 
 // FIXED lista (key/label)
 // `prefix` entries aggregate every db source starting with that prefix under one
-// UI bucket (see AI_SCRAPER_PLAN.md): all `ai:<site>` sources → one "AI-scraped"
+// UI bucket (see AI_SCRAPER_PLAN.md): all `AI - <site>` sources → one "AI-scraped"
 // bucket, so adding an AI-scraped site needs zero edits here.
 const FIXED = [
-  { key: "ai-scraped", label: "AI-scraped", prefix: "ai:" },
+  { key: "ai-scraped", label: "AI-scraped", prefix: "AI - " },
 
   { key: "karrierhungaria", label: "Karrier Hungaria" },
 
@@ -239,7 +239,7 @@ exports.handler = async (event) => {
       if (source) {
         const fixedEntry = FIXED.find((s) => s.key === source);
 
-        // Prefix bucket (e.g. ai-scraped → every `ai:%` source). Not time-based.
+        // Prefix bucket (e.g. ai-scraped → every `AI - %` source). Not time-based.
         if (fixedEntry?.prefix) {
           const like = fixedEntry.prefix + "%";
           const timeClause =

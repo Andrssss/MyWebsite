@@ -13,7 +13,7 @@
   shared _ai_ingest_core.mjs tail, identical to the in-session path.
 
   Sites are data-driven from `ai_extractors` (managed via ai-extractors.js); each
-  writes to source `ai:<site>`. INVARIANT (§5): only NEW sites, never ones we
+  writes to source `AI - <site>`. INVARIANT (§5): only NEW sites, never ones we
   already scrape. Requires Authorization: Bearer $CRON_SECRET.
 */
 
@@ -98,7 +98,7 @@ async function extractForSite(site, html) {
     const jobs = runRecipe(html, site.recipe, { baseUrl });
     if (jobs.length > 0) return { jobs, usage, recipe: null };
     // Recipe produced nothing — markup likely changed. Regenerate + llm-read fallback THIS run.
-    console.warn(`[ai:${site.site}] recipe yielded 0 rows — regenerating + llm-read fallback`);
+    console.warn(`[AI - ${site.site}] recipe yielded 0 rows — regenerating + llm-read fallback`);
     const authored = await authorRecipe(html, { baseUrl });
     add(authored.usage);
     const read = await extractJobsLLM(html, { baseUrl });
@@ -154,7 +154,7 @@ async function runSite(client, site) {
   await recordResult(client, site, { ok: stats.ok, recipe });
 
   console.log(
-    `[ai:${site.site}] mode=${site.mode} rows=${stats.rows} upserted=${stats.inserted} ` +
+    `[AI - ${site.site}] mode=${site.mode} rows=${stats.rows} upserted=${stats.inserted} ` +
     `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ok=${stats.ok} ` +
     `full_listing=${site.full_listing} complete=${stats.complete} ` +
     `cost=$${cost.toFixed(4)} reconcile=${JSON.stringify(stats.reconcile)}`
@@ -202,7 +202,7 @@ async function scrapeAll(client) {
     } catch (err) {
       // One site's failure must never abort the batch.
       await logFetchError("cron_jobs_AI-background", { url: site.list_url, message: `site: ${err.message}` });
-      console.error(`[ai:${site.site}] failed: ${err.message}`);
+      console.error(`[AI - ${site.site}] failed: ${err.message}`);
     }
   }
 }

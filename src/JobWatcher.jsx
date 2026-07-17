@@ -1005,7 +1005,6 @@ const JobWatcher = () => {
   const [commitsOpen, setCommitsOpen] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [weeklyActiveUsers, setWeeklyActiveUsers] = useState(null);
-  const [howToOpen, setHowToOpen] = useState(false);
   const [careerPagesOpen, setCareerPagesOpen] = useState(false);
 
   const openAllCareerPages = (pages) => {
@@ -1541,13 +1540,6 @@ const JobWatcher = () => {
           aria-label="Karrier oldalak megnyitása"
         >
           Karrier oldalak 🔗
-        </button>
-        <button
-          className="job-fab-btn"
-          onClick={() => setHowToOpen((v) => !v)}
-          aria-label="How to megnyitása"
-        >
-          How to ❓
         </button>
       </div>
       <div>
@@ -2206,34 +2198,6 @@ const JobWatcher = () => {
             >
               {bugSending ? "Küldés…" : "Küldés"}
             </button>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {howToOpen && (
-      <div
-        className="howto-modal-overlay"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setHowToOpen(false);
-        }}
-      >
-        <div className="howto-modal" role="dialog" aria-modal="true" aria-label="How to videó">
-          <div className="howto-modal-header">
-            <span className="howto-modal-title">How to ❓</span>
-            <button className="bug-modal-close" onClick={() => setHowToOpen(false)} aria-label="Bezárás">✕</button>
-          </div>
-          <p className="howto-modal-info">
-            Rövid útmutató a használathoz. A videó itt, ezen az oldalon marad.
-          </p>
-          <div className="howto-modal-video">
-            <iframe
-              src="https://www.youtube.com/embed/lAZc1KR_8WE"
-              title="JobWatcher how to"
-              loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
           </div>
         </div>
       </div>

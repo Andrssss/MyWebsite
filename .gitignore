@@ -28,6 +28,7 @@ backfill_daily_stats.mjs
 *.sw?
 *.vs
 *.md
+*.sql
 # Local Netlify folder
 .netlify
 # EPAM Learn scraper (böngészőprofil session-cookie-kkal + dump)

@@ -3,7 +3,7 @@
 // Authenticated write path for the `ai-scraped` pipeline. Accepts a batch of
 // already-extracted job rows for one site and runs them through the SAME
 // filter + url-keyed upsert + reconcile as the automated worker
-// (_ai_ingest_core.mjs), writing to source `ai:<site>`.
+// (_ai_ingest_core.mjs), writing to source `AI - <site>`.
 //
 // Phase 1 use (see AI_SCRAPER_PLAN.md): jobs extracted in-session / by hand are
 // POSTed here — no Anthropic API involved. Same endpoint later serves a local
@@ -96,7 +96,7 @@ export default async (request) => {
   if (!Array.isArray(payload.jobs)) return json(400, { error: "jobs tömb kötelező." });
 
   const jobs = sanitize(payload.jobs);
-  const source = `ai:${slug}`;
+  const source = `AI - ${slug}`;
 
   const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
   const client = await pool.connect();

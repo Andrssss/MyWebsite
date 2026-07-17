@@ -3,7 +3,7 @@
 // Admin CRUD for the AI-scraped site registry (`ai_extractors`), so new sites
 // can be added without DB creds — same pattern as categories.js / filters.js.
 // See AI_SCRAPER_PLAN.md. Adding a site here is all it takes for
-// cron_jobs_AI-background.mjs to start ingesting it into source `ai:<site>`.
+// cron_jobs_AI-background.mjs to start ingesting it into source `AI - <site>`.
 //
 // INVARIANT: only add sites we do NOT already have a hand scraper for.
 
@@ -29,7 +29,7 @@ function json(statusCode, body) {
   };
 }
 
-// slug: lowercase, alnum + dash only — becomes source `ai:<slug>`.
+// slug: lowercase, alnum + dash only — becomes source `AI - <slug>`.
 function toSlug(s) {
   return String(s || "")
     .trim()
@@ -101,7 +101,7 @@ exports.handler = async (event) => {
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (site) DO NOTHING
          RETURNING site, source_value, list_url, mode, full_listing`,
-        [slug, `ai:${slug}`, list_url, m, full_listing === true]
+        [slug, `AI - ${slug}`, list_url, m, full_listing === true]
       );
       if (rows.length === 0) return json(409, { error: "Ez a site már létezik." });
       return json(201, rows[0]);
