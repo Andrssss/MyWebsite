@@ -229,6 +229,20 @@ async function fetchWithSession(url, jar, extraHeaders = {}) {
 
 /* ── extraction ─────────────────────────────────────────────── */
 
+// A detail-oldal alján egy "Hasonló munkák, amelyeket még nem látott:" szekció ül,
+// tele MÁS állások teljes szövegével (a valós oldal ~2/3-a!). Ha a nyers body-t adnánk
+// az experience/technologies kinyerőknek, azok a szomszéd hirdetések kulcsszavait és
+// év-számait is beszednék (megfigyelt szennyezés: egy Laravel/React + "3 év" hirdetés
+// "Python, AWS, Azure, LLM" + "10 év" címkéket kapott a hasonló-jobs blokkból).
+// A hasonló-kártyák data-href-es elemek (a lista is így hivatkozik rájuk) — a törlésük
+// eltünteti a más-állás-szöveget, a valódi leírást viszont érintetlenül hagyja (az nem
+// data-href-es). A megmaradó puszta "Hasonló munkák…" fejléc-szöveg kulcsszó-mentes.
+function stripSimilarJobs(html) {
+  const $ = cheerioLoad(html);
+  $("[data-href]").remove();
+  return $.html();
+}
+
 function parseCards(html) {
   const $ = cheerioLoad(html);
   const items = [];
@@ -479,8 +493,9 @@ async function scrapeAlllocaljobs(client) {
         if (finalUrl.includes("requested_vacancy_not_found")) {
           throw new Error("detail redirected to requested_vacancy_not_found");
         }
-        item.experience = extractBodyExperience(body) || "-";
-        item.technologies = extractTechnologies(body);
+        const detailBody = stripSimilarJobs(body); // a "Hasonló munkák" blokk nélkül
+        item.experience = extractBodyExperience(detailBody) || "-";
+        item.technologies = extractTechnologies(detailBody);
       } catch (err) {
         await logFetchError("cron_jobs_ALLLOCALJOBS-background", { url: item.url, message: `detail: ${err.message}` });
       }
