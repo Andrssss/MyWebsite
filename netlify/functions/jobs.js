@@ -127,6 +127,7 @@ const FIXED = [
   { key: "workcenter", label: "WorkCenter" },
   { key: "workly", label: "Workly" },
   { key: "random_email", label: "Random Email" },
+  { key: "Hays", label: "Hays" },
 ];
 
 // Sources still shown by time window (NOT governed by the active flag). For now
