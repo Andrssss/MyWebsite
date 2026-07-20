@@ -10,13 +10,15 @@ import { withTimeout } from "./_error-logger.mjs";
  * These scrapers each feed a single source (or only sub-sources) that stays
  * under ~10 open jobs, so hourly crawling is wasteful. They run once per day at
  * 14:00 UTC instead. Every listed function scrapes ONLY sources that are all
- * under 10 — mixed scrapers (DIAK_1/2/3, MIX, …) stay on the hourly dispatcher
- * because they also feed larger sources.
+ * under 10 — mixed scrapers that ALSO feed a source ≥10 (DIAK_1, DIAK_3, MIX, …)
+ * stay on the hourly dispatcher.
  *
  * Sources (approx. counts at time of split, 2026-07-01):
  *   A_K=karrierhungaria(3), CG=cg-jobstream(7), ATS=wise(7)+roland(1),
  *   MFB(5), UNICREDIT(1), EUDIAKOK(3), MELODIAK(2), ATLASZ(1),
  *   PANNONDIAK(1), TRENKWALDER(5), WORKCENTER(9)
+ * Added 2026-07-20: DIAK_2=ydiak(0)+qdiak(7) — a mixed scraper, but BOTH its
+ *   sources are under 10 now (unlike DIAK_1/DIAK_3), so it fits the <10 rule.
  */
 const TARGETS = [
   { name: "cron_jobs_A_K-background" },
@@ -29,6 +31,10 @@ const TARGETS = [
   { name: "cron_jobs_ATLASZ-background" },
   { name: "cron_jobs_PANNONDIAK-background" },
   { name: "cron_jobs_TRENKWALDER-background" },
+  // Moved from the hourly dispatcher 2026-07-20 (user decision): ydiak finds
+  // nothing (IT/Budapest listing empty) and qdiak sits at 7 rows, none new in
+  // a week. Scrapes sources "ydiak" + "qdiak"; both reconcile daily now.
+  { name: "cron_jobs_DIAK_2-background" },
   // AI-scraped worker (cron_jobs_AI-background) is intentionally NOT triggered
   // yet — Phase 1 is in-session/manual extraction via ai-ingest.mjs (no
   // Anthropic API). When we automate it (intended cadence: every 5 hours), add

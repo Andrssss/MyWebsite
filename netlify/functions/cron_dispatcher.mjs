@@ -25,7 +25,11 @@ import { withTimeout } from "./_error-logger.mjs";
 const TARGETS = [
   { name: "cron_jobs_BLUE-background" },
   { name: "cron_jobs_DIAK_1-background" },
-  { name: "cron_jobs_DIAK_2-background" },
+  // cron_jobs_DIAK_2-background MOVED to cron_dispatcher_daily 2026-07-20
+  // (user decision): both its sources are now under 10 — ydiak(0, finds nothing:
+  // the IT/Budapest listing shows "Nem találtunk álláshirdetést") and qdiak(7,
+  // none new in 7 days) — so hourly crawling is wasteful. DIAK_3 stays hourly
+  // below: it also feeds otp(17) and wherewework(23), both ≥10 and active.
   { name: "cron_jobs_DIAK_3-background" },
   { name: "cron_jobs_F_3-background", body: { startPage: 1 } },
   { name: "cron_jobs_MIX-background" },
