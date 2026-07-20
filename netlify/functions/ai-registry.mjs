@@ -115,12 +115,21 @@ function authDiagnostic(request) {
 
 async function handleGet() {
   const reg = await readRegistry();
+  // Hand the caller its remaining upload budget so it can stop hunting for more
+  // postings once it has enough to fill it — verifying finds it can't upload
+  // this hour is wasted effort (they'd throttle and get re-found next run).
+  const budget = await checkBudget();
   return json(200, {
     sites: reg.sites,
     permanentlyRejected: reg.permanentlyRejected,
     // urls only — the routine needs these to skip already-found postings, and
     // sending full finding objects would grow this response without bound.
     knownUrls: reg.findings.map((f) => f.url).filter(Boolean),
+    uploadBudget: {
+      remaining: budget.remaining,
+      limit: budget.limit,
+      resetInSeconds: budget.resetInSeconds,
+    },
     counts: {
       sites: Object.keys(reg.sites).length,
       permanentlyRejected: reg.permanentlyRejected.length,
