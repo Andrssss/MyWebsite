@@ -8,6 +8,30 @@
   it-budapest full-text "It" keresés NEM matchel rá — a slice-ok kereső-nézetek,
   egyik sem superset, ezért unió kell, DIAK_3/otp-minta). SSR lista + AJAX lapozás
   slice-onként:
+
+  ⚠️ 2026-07-20: a slice-slug NEM kategória, hanem CÍM-RE menő full-text keresés
+  (élőben igazolva: az it-budapest 87 találatának mindegyike szó szerint "IT"-t
+  visel a címében; a breadcrumb "It"-et keresési kifejezésként mutatja). Ezért egy
+  állás csak akkor látszik, ha a címe tartalmazza a kitalált kulcsszót — a
+  "Fullstack Vezető Fejlesztő - Logisztikai Platform"-ot MIND A 10 slice elvéti.
+  Emiatt jött be a `budapest` BÖNGÉSZŐ-lista (nem keresés!) teljes bejárása: az a
+  város minden állását adja, cím-szóhasználattól függetlenül → ez az egyetlen
+  igazi superset ezen a site-on.
+
+  ⚠️ A böngésző-lista MINDEN iparágat hoz (3 294 vs a slice-unió ~540), ezért az
+  onnan JÖVŐ sorokra kötelező az `isItJob` IT-allowlist kapu — a `job_filters`
+  (isSeniorLike) csak denylist, nem szűrne ki egy "Customer Service Agent"-et.
+  A slice-ból jövő sorok kapu NÉLKÜL mennek tovább, mint eddig (a slice maga a
+  kapu) — így a meglévő ingest-viselkedés bitre változatlan.
+
+  ⚠️ Város: KIZÁRÓLAG a `/állások/budapest` böngésző-lista használható, a csupasz
+  `/állások` SOHA — az országos (5 954, vidéki állásokkal). Ebben a scraperben
+  NINCS helyszín-szűrés kódban: a Budapest-scope-ot végig az URL adja.
+
+  ⚠️ `?interval=1` (mai állások) NEM használható itt: dátum-ablakos lista a
+  reconcile-nak azt üzenné, hogy minden tegnapi állás eltűnt → tömeges téves
+  deaktiválás. Ez a talent `&date=1` / minddiak `date: today` hibaosztály
+  (CRON_JOBS_AUDIT.md), kétszer megégetett minta.
     1. GET /állások/<slice> → 20 kártya + searchHash (yii.search.register)
        + következő oldal env/page (yii.search.next) + session cookie
     2. GET /vacancy-search/next?hash=&e=&page=N
@@ -29,8 +53,10 @@
 import { Pool } from "pg";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
+import { loadCategories } from "./load_categories.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { isItJob } from "./_ai_ingest_core.mjs";
 import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
@@ -38,6 +64,7 @@ import {
 } from "./_experience_core.mjs";
 
 let _filters = [];
+let _categories = [];
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -67,10 +94,28 @@ const SLICE_SLUGS = [
 ];
 const sliceUrl = (slug) => `${BASE}/%C3%A1ll%C3%A1sok/${slug}`;
 
+// Város-BÖNGÉSZŐ lista (nem keresés) — a site egyetlen igazi superset-nézete.
+// Slug KÖTÖTT: "budapest". Ide SOHA nem jöhet a csupasz "/állások" (országos).
+const BROWSE_SLUG = "budapest";
+const browseUrl = () => `${BASE}/%C3%A1ll%C3%A1sok/${BROWSE_SLUG}`;
+
 // 20 kártya/oldal; a legnagyobb slice (developer, ~142) ≈ 8 oldal. A cap
 // parser-hiba elleni védelem — ha elérjük, a walk NEM teljes (complete=false),
 // hogy ne deaktiváljon tévesen.
 const MAX_LIST_PAGES = 15;
+
+// A böngésző-lista 2026-07-20-án 3 294 állás ≈ 165 oldal — külön, bőven fölé
+// méretezett cap. Kimerülés = NEM természetes vég → complete=false (wherewework
+// 07-11 tanulság: a cap-kimerülés guard nélkül ölt 15 élő sort).
+const BROWSE_MAX_PAGES = 250;
+
+// A detail-fetch (szint + technológiák) opcionális és ÖNGYÓGYÍTÓ: ami most
+// kimarad, az '-'-szal megy be és a következő futás needsDetail-je pótolja
+// (nofluffjobs-minta). Ezért időkeret-túllépéskor a detail-fetch-et elhagyjuk,
+// NEM a futást szakítjuk meg — a completeness (és így a reconcile) érintetlen.
+// A withTimeout kerete háttérfüggvényre 14 perc; 10 percnél elzárjuk a csapot,
+// hogy az upsertek + reconcile biztosan beférjenek.
+const DETAIL_DEADLINE_MS = 10 * 60 * 1000;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -273,8 +318,7 @@ async function upsertJob(client, item) {
 // véget, hiba nélkül, ÉS a begyűjtött darabszám nagyjából kiadja a slice saját
 // "Talált állások" összesítőjét — így egy csendben eltörő selector/lapozó nem
 // tud mass-deactivate-et okozni (F1).
-async function walkSlice(slug, jar) {
-  const listUrl = sliceUrl(slug);
+async function walkSlice(slug, jar, { listUrl = sliceUrl(slug), maxPages = MAX_LIST_PAGES } = {}) {
   const items = [];
   let naturalEnd = false;
   let totalCount = null;
@@ -298,7 +342,7 @@ async function walkSlice(slug, jar) {
   }
 
   // további oldalak: AJAX fragmentek
-  for (let guard = 2; guard <= MAX_LIST_PAGES && next && searchHash; guard++) {
+  for (let guard = 2; guard <= maxPages && next && searchHash; guard++) {
     await sleep(500);
     const pageUrl =
       `${BASE}/vacancy-search/next?hash=${encodeURIComponent(searchHash)}` +
@@ -329,6 +373,10 @@ async function walkSlice(slug, jar) {
 }
 
 async function scrapeAlllocaljobs(client) {
+  // A detail-időkeret a FUTÁS elejéhez kötött, nem a bejárás végéhez: a böngésző-
+  // lista ~165 oldala önmagában percek, utána indítva a számlálót a kettő összege
+  // átlépné a withTimeout 14 percét.
+  const runStart = Date.now();
   await purgeBlockedCompanies(client, "alllocaljobs");
 
   const jar = makeJar();
@@ -346,8 +394,24 @@ async function scrapeAlllocaljobs(client) {
     await sleep(500);
   }
 
+  // Böngésző-lista a slice-ok UTÁN: a `seen` dedupe így a slice-változatot tartja
+  // meg, vagyis a slice-ból is látszó állások pontosan úgy mennek be, mint eddig
+  // (nem esnek az isItJob kapu alá) — a bővítés tisztán additív.
+  //
+  // Hibája ugyanúgy complete=false, mint bármelyik slice-é: ha a 165 oldalas
+  // bejárás félbeszakad, a nem látott urljei hiányoznának a foundUrls-ből és
+  // tévesen deaktiválódnának. Konzervatív irány — inkább ne deaktiváljunk.
+  const browse = await walkSlice(BROWSE_SLUG, jar, {
+    listUrl: browseUrl(),
+    maxPages: BROWSE_MAX_PAGES,
+  });
+  const browseItems = browse.items.map((i) => ({ ...i, fromBrowse: true }));
+  allItems.push(...browseItems);
+  if (!browse.complete) allComplete = false;
+  console.log(`[alllocaljobs] browse ${BROWSE_SLUG}: ${browseItems.length} cards (complete=${browse.complete})`);
+
   if (allItems.length === 0) {
-    console.error("[alllocaljobs] no cards from ANY slice — skipping upsert+reconcile");
+    console.error("[alllocaljobs] no cards from ANY slice OR the browse list — skipping upsert+reconcile");
     return;
   }
 
@@ -357,6 +421,9 @@ async function scrapeAlllocaljobs(client) {
   let alreadyExisted = 0;
   let skippedSenior = 0;
   let skippedCompany = 0;
+  let skippedNonIt = 0;
+  let skippedDetailBudget = 0;
+  const detailDeadline = runStart + DETAIL_DEADLINE_MS;
 
   // url → tárolt experience; detail-fetch csak oda megy, ahol a DB-ben még
   // nincs valós érték (új url, vagy korábbi sikertelen fetch '-'-a) — nincs
@@ -381,6 +448,14 @@ async function scrapeAlllocaljobs(client) {
       continue;
     }
 
+    // IT-allowlist KIZÁRÓLAG a böngésző-listából jövő sorokra (lásd fejléc): az
+    // minden iparágat hoz, a slice-ok viszont maguk IT-keresések. Ugyanaz a kapu,
+    // amit az AI-pipeline használ (_ai_ingest_core.isItJob, job_categories).
+    if (item.fromBrowse && !isItJob(item.title, _categories)) {
+      skippedNonIt++;
+      continue;
+    }
+
     if (isBlockedCompany(item.company, "alllocaljobs")) {
       skippedCompany++;
       continue;
@@ -393,7 +468,11 @@ async function scrapeAlllocaljobs(client) {
       : isMidLevelTitle(item.title) ? "medior"
       : "-";
 
-    if (needsDetail(item.url) && item.experience === "-") {
+    if (needsDetail(item.url) && item.experience === "-" && Date.now() >= detailDeadline) {
+      // Időkeret elfogyott — '-'-szal megy be, a következő futás needsDetail-je
+      // pótolja. A completeness szándékosan NEM romlik ettől (lásd DETAIL_DEADLINE_MS).
+      skippedDetailBudget++;
+    } else if (needsDetail(item.url) && item.experience === "-") {
       try {
         await sleep(500);
         const { body, finalUrl } = await fetchWithSession(item.url, jar);
@@ -418,8 +497,9 @@ async function scrapeAlllocaljobs(client) {
 
   console.log(
     `[alllocaljobs] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-    `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, unique=${foundUrls.length} ` +
-    `(raw=${allItems.length}, slices_complete=${allComplete})`
+    `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
+    `skipped_nonit=${skippedNonIt}, skipped_detail_budget=${skippedDetailBudget}, ` +
+    `unique=${foundUrls.length} (raw=${allItems.length}, complete=${allComplete})`
   );
 
   const rc = await reconcileActive(client, "alllocaljobs", foundUrls, { complete: allComplete });
@@ -429,7 +509,7 @@ async function scrapeAlllocaljobs(client) {
 /* ── handler ─────────────────────────────────────────────────── */
 
 const _runJob = withTimeout("cron_jobs_ALLLOCALJOBS-background", async () => {
-  _filters = await loadFilters();
+  [_filters, _categories] = await Promise.all([loadFilters(), loadCategories()]);
   const client = await pool.connect();
   try {
     await ensureTechnologiesColumn(client);
