@@ -22,6 +22,7 @@ import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { ingestJobs, sanitizeJobs, toSlug } from "./_ai_ingest_core.mjs";
+import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -56,7 +57,18 @@ export default async (request) => {
   if (!slug) return json(400, { error: "site (slug) kötelező." });
   if (!Array.isArray(payload.jobs)) return json(400, { error: "jobs tömb kötelező." });
 
-  const jobs = sanitizeJobs(payload.jobs);
+  if (payload.jobs.length > MAX_ROWS_PER_REQUEST) {
+    return json(413, { error: "Too many jobs in one request", max: MAX_ROWS_PER_REQUEST, received: payload.jobs.length });
+  }
+
+  // Same hourly budget as ai-registry.mjs — shared on purpose, since both
+  // endpoints accept the same token and a per-endpoint limit would just move
+  // the abuse to whichever one wasn't capped.
+  const budget = await checkBudget();
+  if (payload.jobs.length > 0 && budget.remaining === 0) return tooManyRequests(budget);
+
+  const throttled = Math.max(0, payload.jobs.length - budget.remaining);
+  const jobs = sanitizeJobs(payload.jobs).slice(0, budget.remaining);
   const source = `AI - ${slug}`;
 
   const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
@@ -65,12 +77,20 @@ export default async (request) => {
     const stats = await ingestJobs(client, {
       source,
       jobs,
-      fullListing: payload.full_listing === true,
+      // A truncated batch is no longer the site's complete listing, so it must
+      // not be allowed to deactivate rows that simply fell past the cap.
+      fullListing: payload.full_listing === true && throttled === 0,
       filters,
       categories,
     });
-    console.log(`[ai-ingest ${source}] received=${payload.jobs.length} clean=${jobs.length} ${JSON.stringify(stats)}`);
-    return json(200, { source, received: payload.jobs.length, ...stats });
+    await consume(stats.insertedUrls.length);
+    console.log(`[ai-ingest ${source}] received=${payload.jobs.length} clean=${jobs.length} throttled=${throttled} ${JSON.stringify(stats)}`);
+    return json(200, {
+      source,
+      received: payload.jobs.length,
+      ...stats,
+      rateLimit: { limit: budget.limit, throttled, resetInSeconds: budget.resetInSeconds },
+    });
   } catch (err) {
     console.error(`[ai-ingest ${source}] error: ${err.message}`);
     return json(500, { error: "Szerver hiba", details: err.message });

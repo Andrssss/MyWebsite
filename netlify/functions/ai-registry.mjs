@@ -44,6 +44,7 @@ import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { ingestJobs, sanitizeJobs, toSlug } from "./_ai_ingest_core.mjs";
+import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -151,12 +152,36 @@ async function handlePost(request) {
     return json(400, { error: "Invalid JSON body" });
   }
 
+  const submitted = Array.isArray(payload.findings) ? payload.findings : [];
+
+  // Oversized payload: reject before any DB work rather than filtering 10k rows.
+  if (submitted.length > MAX_ROWS_PER_REQUEST) {
+    return json(413, {
+      error: "Too many findings in one request",
+      max: MAX_ROWS_PER_REQUEST,
+      received: submitted.length,
+    });
+  }
+
+  // Hourly write budget — caps what a leaked token can inject. The content
+  // filters stop accidental bad rows but can be gamed by crafted titles; this
+  // bounds the damage regardless of what the titles say.
+  const budget = await checkBudget();
+  if (submitted.length > 0 && budget.remaining === 0) return tooManyRequests(budget);
+
+  // Truncate to the remaining budget so this request can't exceed it. Dropped
+  // rows are NOT recorded as findings, so the routine re-finds them next run
+  // rather than losing them silently.
+  const throttled = Math.max(0, submitted.length - budget.remaining);
+  const accepted = submitted.slice(0, budget.remaining);
+
   const reg = await readRegistry();
   const now = new Date().toISOString();
   const results = {};
+  let totalWritten = 0;
 
   // 1. Findings → the real DB, through the shared deterministic gates.
-  const groups = groupBySlug(payload.findings);
+  const groups = groupBySlug(accepted);
   if (groups.size > 0) {
     const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
     const client = await pool.connect();
@@ -170,6 +195,7 @@ async function handlePost(request) {
         // AI-scraped write path).
         const stats = await ingestJobs(client, { source, jobs, fullListing: false, filters, categories });
         results[source] = stats;
+        totalWritten += stats.insertedUrls.length;
         console.log(
           `[ai-registry] ${source}: rows=${stats.rows} inserted=${stats.inserted} ` +
           `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
@@ -210,9 +236,21 @@ async function handlePost(request) {
 
   await writeRegistry(reg);
 
+  // Charge only rows that actually reached the DB — rows the content filters
+  // dropped never got written, so billing them would let a legitimate run with
+  // a few rejects starve its own budget.
+  await consume(totalWritten);
+
   return json(200, {
     ok: true,
     ingested: results,
+    rateLimit: {
+      limit: budget.limit,
+      writtenThisRequest: totalWritten,
+      remainingBefore: budget.remaining,
+      throttled, // submitted but not processed — re-submit next run
+      resetInSeconds: budget.resetInSeconds,
+    },
     counts: {
       sites: Object.keys(reg.sites).length,
       permanentlyRejected: reg.permanentlyRejected.length,
