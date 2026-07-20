@@ -1,0 +1,215 @@
+// netlify/functions/ai-registry.mjs
+//
+// The single API the AI-scraped discovery ROUTINE talks to. Replaces the old
+// "routine writes ai_scraped_registry.json and git-pushes it" design, which
+// never actually worked — the push silently failed on every run since
+// 2026-07-17, so not one finding ever reached the DB (see AI_SCRAPER_PLAN.md §0).
+//
+// Two halves, because the routine needs BOTH:
+//
+//   GET  → the routine's MEMORY. Routines start cold every run
+//          (persist_session:false), so without this it would re-research the
+//          same ~120 already-rejected companies forever. Returns the sites it
+//          has checked (with lastChecked, for the 7-day re-check rule), the
+//          permanently-rejected list, and the urls it has already found.
+//
+//   POST → the routine's WRITE. Findings go through the exact same
+//          filter/upsert/reconcile tail every other AI-scraped write path uses
+//          (_ai_ingest_core.mjs ingestJobs) — so the routine's own LLM judgment
+//          is never the only gate; isItJob/isSeniorLike/isSeniorByYears and the
+//          company blocklist all re-apply here, deterministically, in code.
+//
+// The POST is INCREMENTAL, not a whole-state replace: the routine reports only
+// what it did this run ({findings, sitesChecked, rejected}) and the server
+// merges into stored state. That keeps payloads small no matter how big the
+// registry grows, and means a run that dies halfway can't truncate the state it
+// never got around to echoing back.
+//
+// State lives in Netlify Blobs (same store pattern as fetch-error-logs /
+// weekly-backups) rather than Postgres — it's one small JSON doc of bookkeeping,
+// not relational data, and this avoids a schema migration for it.
+//
+//   curl https://bakan7.netlify.app/.netlify/functions/ai-registry \
+//     -H "Authorization: Bearer $AI_INGEST_TOKEN"
+//
+//   curl -X POST https://bakan7.netlify.app/.netlify/functions/ai-registry \
+//     -H "Authorization: Bearer $AI_INGEST_TOKEN" -H "Content-Type: application/json" \
+//     -d '{"findings":[{"slug":"example","title":"Junior Dev","url":"https://example.hu/allas/1",
+//          "company":"ACME","experience":"junior","technologies":"Java"}],
+//          "sitesChecked":{"example":{"url":"https://example.hu/karrier","status":"has_junior_opening"}},
+//          "rejected":["SomeCorp"]}'
+
+import { Pool } from "pg";
+import { getStore } from "@netlify/blobs";
+import { loadFilters } from "./load_filters.mjs";
+import { loadCategories } from "./load_categories.mjs";
+import { ingestJobs, sanitizeJobs, toSlug } from "./_ai_ingest_core.mjs";
+
+const connectionString = process.env.NETLIFY_DATABASE_URL;
+if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
+
+const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
+
+const STORE_NAME = "ai-scraped-registry";
+const KEY = "registry.json";
+
+const EMPTY = { sites: {}, permanentlyRejected: [], findings: [], updatedAt: null };
+
+// Strong consistency: this is a read-modify-write of a single doc, and the
+// routine's next run must see what this run just committed.
+function store() {
+  return getStore({ name: STORE_NAME, consistency: "strong" });
+}
+
+async function readRegistry() {
+  const raw = await store().get(KEY, { type: "json" });
+  if (!raw || typeof raw !== "object") return { ...EMPTY };
+  return {
+    sites: raw.sites && typeof raw.sites === "object" ? raw.sites : {},
+    permanentlyRejected: Array.isArray(raw.permanentlyRejected) ? raw.permanentlyRejected : [],
+    findings: Array.isArray(raw.findings) ? raw.findings : [],
+    updatedAt: raw.updatedAt || null,
+  };
+}
+
+async function writeRegistry(reg) {
+  await store().setJSON(KEY, { ...reg, updatedAt: new Date().toISOString() });
+}
+
+function json(status, body) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+  });
+}
+
+// Accepts a token dedicated to this endpoint, falling back to CRON_SECRET so
+// the function still works before AI_INGEST_TOKEN is set. AI_INGEST_TOKEN is
+// the one to actually use: it has to live in the routine's stored prompt text
+// (routines have no env-var injection), and a token that can only reach this
+// one filtered endpoint is a far smaller blast radius than CRON_SECRET, which
+// authorizes every background worker in the cron fleet.
+function authorized(request) {
+  const expected = process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET;
+  if (!expected) return false;
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  return token === expected;
+}
+
+/* ── GET: hand the routine its memory ───────────────────────────────── */
+
+async function handleGet() {
+  const reg = await readRegistry();
+  return json(200, {
+    sites: reg.sites,
+    permanentlyRejected: reg.permanentlyRejected,
+    // urls only — the routine needs these to skip already-found postings, and
+    // sending full finding objects would grow this response without bound.
+    knownUrls: reg.findings.map((f) => f.url).filter(Boolean),
+    counts: {
+      sites: Object.keys(reg.sites).length,
+      permanentlyRejected: reg.permanentlyRejected.length,
+      findings: reg.findings.length,
+    },
+    updatedAt: reg.updatedAt,
+  });
+}
+
+/* ── POST: ingest findings + merge this run's bookkeeping ───────────── */
+
+function groupBySlug(findings) {
+  const groups = new Map();
+  for (const f of findings || []) {
+    if (!f || !f.title || !f.url) continue;
+    const slug = toSlug(f.slug);
+    if (!slug) continue;
+    if (!groups.has(slug)) groups.set(slug, []);
+    groups.get(slug).push(f);
+  }
+  return groups;
+}
+
+async function handlePost(request) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json(400, { error: "Invalid JSON body" });
+  }
+
+  const reg = await readRegistry();
+  const now = new Date().toISOString();
+  const results = {};
+
+  // 1. Findings → the real DB, through the shared deterministic gates.
+  const groups = groupBySlug(payload.findings);
+  if (groups.size > 0) {
+    const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
+    const client = await pool.connect();
+    try {
+      for (const [slug, rawJobs] of groups) {
+        const source = `AI - ${slug}`;
+        const jobs = sanitizeJobs(rawJobs);
+        // fullListing:false — the routine reports individual postings it found,
+        // never a site's complete current listing, so reconcile stays
+        // reactivate-only and the 404 sweep owns deaths (same as every other
+        // AI-scraped write path).
+        const stats = await ingestJobs(client, { source, jobs, fullListing: false, filters, categories });
+        results[source] = stats;
+        console.log(
+          `[ai-registry] ${source}: rows=${stats.rows} inserted=${stats.inserted} ` +
+          `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
+          `skip_non_it=${stats.skippedNonIt}`
+        );
+
+        // Record only what actually survived the gates, so the routine's
+        // knownUrls reflects the DB rather than what it hoped to write.
+        const accepted = new Set(stats.insertedUrls);
+        const known = new Set(reg.findings.map((f) => f.url));
+        for (const j of jobs) {
+          if (!accepted.has(j.url) || known.has(j.url)) continue;
+          reg.findings.push({ slug, ...j, foundDate: now });
+        }
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  // 2. Merge this run's bookkeeping.
+  for (const [rawSlug, info] of Object.entries(payload.sitesChecked || {})) {
+    const slug = toSlug(rawSlug);
+    if (!slug) continue;
+    reg.sites[slug] = {
+      ...(reg.sites[slug] || {}),
+      ...(info && typeof info === "object" ? info : {}),
+      lastChecked: now,
+    };
+  }
+
+  const rejectedSet = new Set(reg.permanentlyRejected);
+  for (const name of payload.rejected || []) {
+    const n = String(name || "").trim();
+    if (n) rejectedSet.add(n);
+  }
+  reg.permanentlyRejected = [...rejectedSet];
+
+  await writeRegistry(reg);
+
+  return json(200, {
+    ok: true,
+    ingested: results,
+    counts: {
+      sites: Object.keys(reg.sites).length,
+      permanentlyRejected: reg.permanentlyRejected.length,
+      findings: reg.findings.length,
+    },
+  });
+}
+
+export default async (request) => {
+  if (!authorized(request)) return json(401, { error: "Unauthorized" });
+  if (request.method === "GET") return handleGet();
+  if (request.method === "POST") return handlePost(request);
+  return json(405, { error: "GET or POST only" });
+};

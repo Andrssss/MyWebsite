@@ -18,6 +18,59 @@ import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
 } from "./_experience_core.mjs";
 
+/* ── url/row normalization (shared by every caller-supplied write path) ──
+   Lives here so ai-ingest.mjs and ai-registry.mjs can't drift apart on what
+   counts as the same url — `url` IS the row identity for the ON CONFLICT
+   upsert below, so two endpoints normalizing differently would silently
+   create duplicate rows for one posting. */
+
+const TRACKING = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
+
+export function toSlug(s) {
+  return String(s || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+export function normalizeUrl(raw) {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    u.hash = "";
+    TRACKING.forEach((p) => u.searchParams.delete(p));
+    return u.toString().replace(/\?$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function trimField(v, max) {
+  if (!v) return null;
+  return String(v).replace(/\s+/g, " ").trim().slice(0, max) || null;
+}
+
+// Normalize + dedupe caller-supplied rows. No HTML hallucination guard here —
+// these callers are trusted via bearer token; that guard lives in
+// _ai_extract_core.mjs, which is the one path handling raw LLM output.
+export function sanitizeJobs(rawJobs) {
+  const seen = new Set();
+  const out = [];
+  for (const j of rawJobs || []) {
+    if (!j || typeof j.title !== "string" || typeof j.url !== "string") continue;
+    const title = j.title.replace(/\s+/g, " ").trim();
+    const url = normalizeUrl(j.url.trim());
+    if (title.length < 3 || !url || seen.has(url)) continue;
+    seen.add(url);
+    out.push({
+      title: title.slice(0, 300),
+      url,
+      company: trimField(j.company, 200),
+      location: trimField(j.location, 200),
+      experience: trimField(j.experience, 100),
+      technologies: trimField(j.technologies, 500),
+    });
+  }
+  return out;
+}
+
 /* ── IT-only gate (user rule 2026-07-16: ai-scraped accepts ONLY IT jobs) ──
    Reuses the SAME job_categories keyword lists the rest of the app uses for
    classification (loadCategories(), see cron_daily_stats.mjs / JobWatcher.jsx)
@@ -169,7 +222,8 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
   const complete = ok && !!fullListing;
 
   const foundUrls = []; // FULL pre-filter set → a filter change can't deactivate a live job (F3).
-  let inserted = 0;
+  const insertedUrls = []; // Only rows that passed every gate — callers use this to record what
+                           // actually reached the DB, rather than what they hoped to write.
   let skippedSenior = 0;
   let skippedCompany = 0;
   let skippedNonIt = 0;
@@ -183,7 +237,7 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
     if (isSeniorByYears(resolvedExperience)) { skippedSenior++; continue; }
     if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
     await upsertJob(client, source, job, resolvedExperience);
-    inserted++;
+    insertedUrls.push(job.url);
   }
 
   let reconcile = { skipped: true };
@@ -191,5 +245,8 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
     reconcile = await reconcileActive(client, source, foundUrls, { complete });
   }
 
-  return { rows: jobs.length, inserted, skippedSenior, skippedCompany, skippedNonIt, ok, complete, reconcile };
+  return {
+    rows: jobs.length, inserted: insertedUrls.length, insertedUrls,
+    skippedSenior, skippedCompany, skippedNonIt, ok, complete, reconcile,
+  };
 }

@@ -21,53 +21,12 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobs, toSlug } from "./_ai_ingest_core.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
-
-const TRACKING = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
-
-function toSlug(s) {
-  return String(s || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function normalizeUrl(raw) {
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    u.hash = "";
-    TRACKING.forEach((p) => u.searchParams.delete(p));
-    return u.toString().replace(/\?$/, "");
-  } catch {
-    return null;
-  }
-}
-
-// Normalize + dedupe caller-supplied rows (no HTML hallucination guard here —
-// the caller is trusted via CRON_SECRET; the guard lives in _ai_extract_core for LLM output).
-function sanitize(rawJobs) {
-  const seen = new Set();
-  const out = [];
-  for (const j of rawJobs || []) {
-    if (!j || typeof j.title !== "string" || typeof j.url !== "string") continue;
-    const title = j.title.replace(/\s+/g, " ").trim();
-    const url = normalizeUrl(j.url.trim());
-    if (title.length < 3 || !url || seen.has(url)) continue;
-    seen.add(url);
-    out.push({
-      title: title.slice(0, 300),
-      url,
-      company: j.company ? String(j.company).replace(/\s+/g, " ").trim().slice(0, 200) || null : null,
-      location: j.location ? String(j.location).replace(/\s+/g, " ").trim().slice(0, 200) || null : null,
-      experience: j.experience ? String(j.experience).replace(/\s+/g, " ").trim().slice(0, 100) || null : null,
-      technologies: j.technologies ? String(j.technologies).replace(/\s+/g, " ").trim().slice(0, 500) || null : null,
-    });
-  }
-  return out;
-}
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -77,9 +36,11 @@ function json(status, body) {
 }
 
 export default async (request) => {
-  // Auth (writes to prod DB).
+  // Auth (writes to prod DB). Same token pair as ai-registry.mjs — the scoped
+  // AI_INGEST_TOKEN when set, else CRON_SECRET.
+  const expected = process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET;
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  if (!process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+  if (!expected || token !== expected) {
     return json(401, { error: "Unauthorized" });
   }
   if (request.method !== "POST") return json(405, { error: "POST only" });
@@ -95,7 +56,7 @@ export default async (request) => {
   if (!slug) return json(400, { error: "site (slug) kötelező." });
   if (!Array.isArray(payload.jobs)) return json(400, { error: "jobs tömb kötelező." });
 
-  const jobs = sanitize(payload.jobs);
+  const jobs = sanitizeJobs(payload.jobs);
   const source = `AI - ${slug}`;
 
   const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
