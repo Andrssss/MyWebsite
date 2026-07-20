@@ -130,50 +130,11 @@ function resolveExperience(job) {
   return job.experience && job.experience !== "-" ? job.experience : "-";
 }
 
-// AI-scraped-ONLY guard (2026-07-16): a generic title ("Java szoftverfejlesztő")
-// can hide a body that demands 5-8+ years — the title-keyword blacklist above
-// can never catch this since the title itself says nothing senior. None of the
-// other ~30 hand scrapers reject on body-stated years (they just record it
-// honestly for stats); this pipeline is stricter on purpose, since every OTHER
-// site we scrape was individually vetted as student/entry-level-focused, while
-// an AI-discovered career page has no such guarantee. Only fires on a raw
-// years-phrase (resolveExperience's body-derived fallback) — a title-matched
-// "medior" is a legitimate category elsewhere and is NOT rejected here.
-const SENIOR_YEARS_THRESHOLD = 3;
-const CANONICAL_EXPERIENCE_LABELS = new Set(["diákmunka", "junior", "medior", "-"]);
-
-// Returns the effective "required years" number to compare against the
-// threshold. A RANGE ("1-3 év") signals the poster accepts the LOWER bound —
-// treating it like a flat "3 év" floor (i.e. taking the max) would wrongly
-// reject a genuinely junior-friendly "1-3 év" the same way bap.hu's unambiguous
-// "legalább 8 év" / "legalább 5 éves" floors were correctly rejected (real
-// case: WM Rendszerház "Back End Fejlesztő" stated "1-3 év szakmai
-// tapasztalat" — the 1-year floor is the real signal, not the 3-year ceiling).
-// A plain floor ("legalább N év", "N+ years") has no lower bound to prefer, so
-// that case still takes the max across all such mentions (handles an ad
-// stating multiple requirements).
-function parseMaxYears(text) {
-  if (!text) return null;
-  const s = String(text);
-
-  const rangeMatches = [...s.matchAll(/(\d+)\s*[-–]\s*(\d+)\s*\+?\s*(?:év|éves|ev|eves|years?|yrs?)/gi)];
-  if (rangeMatches.length) {
-    return Math.min(...rangeMatches.map((m) => parseInt(m[1], 10)));
-  }
-
-  let max = null;
-  for (const m of s.matchAll(/(\d+)\s*\+?\s*(?:év|éves|ev|eves|years?|yrs?)/gi)) {
-    const n = parseInt(m[1], 10);
-    if (!Number.isNaN(n) && (max === null || n > max)) max = n;
-  }
-  return max;
-}
-
-export function isSeniorByYears(resolvedExperience) {
-  if (CANONICAL_EXPERIENCE_LABELS.has(resolvedExperience)) return false;
-  const years = parseMaxYears(resolvedExperience);
-  return years !== null && years >= SENIOR_YEARS_THRESHOLD;
-}
+// NB: az AI-pipeline korábban a body-ból BECSÜLT évszám alapján is dobott
+// (isSeniorByYears, küszöb 3 év) — ezt 2026-07-20-án kivettük (user-döntés):
+// a magas évszámos találatot is elmentjük, a frontend csak megjelöli (senior
+// badge). A cím-denylist (isSeniorLike) maradt az egyetlen senior-kapu itt is,
+// mint minden más scrapernél.
 
 /* ── upsert (row fully built BEFORE insert — experience-write-policy) ── */
 
@@ -233,8 +194,10 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
     foundUrls.push(job.url);
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
     if (isSeniorLike(job.title, filters)) { skippedSenior++; continue; }
+    // Évszám-alapú senior NEM dob többé (user-döntés 2026-07-20): a magas
+    // évszámos AI-találatot is elmentjük, a frontend csak megjelöli (senior
+    // badge). A cím-denylist (isSeniorLike) marad, mint minden scrapernél.
     const resolvedExperience = resolveExperience(job);
-    if (isSeniorByYears(resolvedExperience)) { skippedSenior++; continue; }
     if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
     await upsertJob(client, source, job, resolvedExperience);
     insertedUrls.push(job.url);

@@ -519,16 +519,19 @@ const isMediorExperience = (experience) => {
   return !hasJuniorYearToken(experience);
 };
 
-// Senior az évszám alapján (a backend _experience_core.isSeniorExperience
-// tükre): a leírásból kinyert experience-mezőben ott az évszám ("5-10 years",
-// "7+ years", "10 év"). A LEGKISEBB évszámot vesszük — csak akkor rejtünk, ha a
-// legenyhébb olvasat is legalább SENIOR_MIN_YEARS év. Szint-tokenben
-// (junior/medior/diákmunka/-) nincs szám → nem senior.
+// Senior JELÖLÉS (nem szűrünk, csak badge-elünk). Két jel:
+//   1) explicit senior/lead szint-címke (pl. NIX taxonómia "senior", MFB/
+//      Raiffeisen "Szenior" szint) — egyértelmű, nem évszám;
+//   2) évszám: a leírásból kinyert "5-10 years"/"7+ years"/"10 év" — a LEGKISEBB
+//      évszámot vesszük, csak ha az is >= SENIOR_MIN_YEARS ("3-5 év" min 3 → NEM).
+// Junior/medior/diákmunka/- szint-tokenben nincs se szám, se senior-szó → nem az.
 const SENIOR_MIN_YEARS = 5;
 const isSeniorExperience = (experience) => {
-  const nums = normalizeExperience(experience).match(/\d+/g);
+  const n = normalizeExperience(experience);
+  if (/\b(senior|szenior|lead)\b/.test(n)) return true;
+  const nums = n.match(/\d+/g);
   if (!nums) return false;
-  return Math.min(...nums.map((n) => parseInt(n, 10))) >= SENIOR_MIN_YEARS;
+  return Math.min(...nums.map((x) => parseInt(x, 10))) >= SENIOR_MIN_YEARS;
 };
 
 const getKeywordNotesForJob = (job) => {
@@ -1285,15 +1288,6 @@ const JobWatcher = () => {
   const preTechJobs = useMemo(() => {
     let list = jobs;
 
-    // Senior hirdetések (min. tapasztalat >= SENIOR_MIN_YEARS év) sehol nem
-    // kellenek egy belépő/junior boardra. A cím-alapú denylist nem fogja meg a
-    // semleges című seniorokat ("AI Security Architect", "IT Retail Project
-    // Specialist"), az experience-mezőben viszont ott az évszám. Minden mód
-    // (default/gyakornok/junior/medior) ELŐTT szűrünk, a tech-chip számok is
-    // ebből jönnek. Az "Applied" nézet a cache-fallbackből hozza vissza a
-    // bejelölt seniorokat, tehát az nem sérül.
-    list = list.filter((j) => !isSeniorExperience(j.experience));
-
     const isJuniorTrackCandidate = (job) => {
       const t = (job.title || "").toLowerCase();
       const title = (job.title || "").toLowerCase();
@@ -2013,8 +2007,23 @@ const JobWatcher = () => {
 
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
+                {isSeniorExperience(job.experience) && (
+                  <span
+                    className="job-senior-badge"
+                    title="Minimum tapasztalat ≥ 5 év — valószínűleg nem belépő/junior szint"
+                  >
+                    ⚠ Senior
+                  </span>
+                )}
                 {job.experience && (
-                  <span className="job-experience">{job.experience}</span>
+                  <span
+                    className={
+                      "job-experience" +
+                      (isSeniorExperience(job.experience) ? " job-experience--senior" : "")
+                    }
+                  >
+                    {job.experience}
+                  </span>
                 )}
                 {job.technologies && (
                   <span className="job-tech-tags">

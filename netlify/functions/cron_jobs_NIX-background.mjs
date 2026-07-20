@@ -19,16 +19,14 @@
   Flow (mirrors cron_jobs_MFB — single company, one API call = full listing):
     1. GET the levels taxonomy → id→slug map (fallback: LEVEL_SLUG_FALLBACK).
     2. GET all vacancies (one request).
-    3. Decide seniority from the title (job_filters denylist + title helpers) and
-       the levels taxonomy, and DROP seniors at scrape time:
-         • title on the job_filters denylist → skip
-         • neutral title AND taxonomy says senior/lead-only → skip
-         • neutral title, no level tag, description years read senior → skip
-       The frontend only hides NUMERIC ≥5yr experience (isSeniorExperience), so a
-       bare "senior" label would slip through — seniors must be dropped here.
+    3. Drop a vacancy ONLY on the job_filters title denylist (isSeniorLike) — the
+       same single, uniform senior gate every scraper uses (user decision
+       2026-07-20). A senior/lead levels-taxonomy tag or a high description
+       year-range is NOT dropped: the row is SAVED and merely flagged in the UI.
     4. experience label: title override wins (codebase convention), then the level
-       band (trainee→diákmunka, junior/strong-junior→junior, medior→medior), then
-       the description year-range as a last resort.
+       band (trainee→diákmunka, junior/strong-junior→junior, medior→medior,
+       senior/lead→"senior" so the UI badge catches it), then the description
+       year-range as a last resort (kept even when high).
     5. Extract technologies from content.rendered (no extra fetch).
     6. Upsert on (source, url); reconcileActive with the complete listing.
 
@@ -50,7 +48,6 @@ import {
   isMidLevelTitle,
   extractBodyExperience,
   extractTechnologies,
-  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -289,18 +286,24 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
         const lRank = effectiveLevelRank(v?.levels, slugMap);
         const contentYears = extractBodyExperience(contentHtml);
 
-        // Senior filter — dropped at scrape time (see header comment).
-        const taxonomySenior = tRank == null && lRank === SENIOR_RANK;
-        const yearsSenior = tRank == null && lRank == null && isSeniorExperience(contentYears);
-        if (isSeniorLike(title) || taxonomySenior || yearsSenior) {
+        // Csak a cím-denylist dob (isSeniorLike) — uniform, mint MINDEN scrapernél
+        // (user-döntés 2026-07-20). Sem a taxonómia-senior, sem a leírásból becsült
+        // magas évszám NEM dob többé: elmentjük, a frontend csak megjelöli (senior
+        // badge). A cím marad az egyetlen megbízható, egységes senior-kapu.
+        if (isSeniorLike(title)) {
           skippedSenior++;
-          console.log(`[nix] SKIP senior "${title}" (titleRank=${tRank}, levelRank=${lRank}) → ${url}`);
+          console.log(`[nix] SKIP title-denylist "${title}" → ${url}`);
           continue;
         }
 
-        // experience label: title override wins, then the level band, then years.
+        // experience label: title override wins, then the level band; a senior/lead
+        // szint (rank 3) "senior"-t kap (a frontend badge a "senior" szót is jelöli),
+        // rank nélkül a leírás évszáma marad (magas is bekerül, jelölve).
         const rank = tRank != null ? tRank : lRank;
-        const experience = rank != null ? RANK_EXPERIENCE[rank] : (contentYears || "-");
+        const experience =
+          rank === SENIOR_RANK ? "senior"
+          : rank != null ? RANK_EXPERIENCE[rank]
+          : (contentYears || "-");
         const technologies = extractTechnologies(contentHtml);
 
         const wasNew = await upsertJob(client, "nix", { title, url, experience, technologies });

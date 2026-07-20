@@ -16,8 +16,9 @@
 //   POST → the routine's WRITE. Findings go through the exact same
 //          filter/upsert/reconcile tail every other AI-scraped write path uses
 //          (_ai_ingest_core.mjs ingestJobs) — so the routine's own LLM judgment
-//          is never the only gate; isItJob/isSeniorLike/isSeniorByYears and the
-//          company blocklist all re-apply here, deterministically, in code.
+//          is never the only gate; isItJob / isSeniorLike (title denylist) and
+//          the company blocklist all re-apply here, deterministically, in code.
+//          (Body-year senior dropping was removed 2026-07-20 — see ingestJobs.)
 //
 // The POST is INCREMENTAL, not a whole-state replace: the routine reports only
 // what it did this run ({findings, sitesChecked, rejected}) and the server

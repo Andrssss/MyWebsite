@@ -188,38 +188,21 @@ export function extractYearsFromText(text) {
 }
 
 /* ======================
-   Seniority-by-years (shared)
-   A student/entry board nem akar senior hirdetést. A cím-alapú denylist
-   (job_filters) NEM fogja meg a semleges című seniorokat ("AI Security
-   Architect"), a leírásból kinyert experience viszont ott az évszám
-   ("5-10 years", "7+ years", "10 év"). Erre szűrünk.
-====================== */
-export const SENIOR_MIN_YEARS = 5;
-
-// A legkisebb évszám az experience-stringben. Az experience mező vagy egy
-// szint-token (junior/medior/diákmunka/-), vagy az extractYearsFromText
-// év-tokenjei — utóbbiban minden szám évszám, szint-tokenben nincs szám.
-// A MINIMUMOT vesszük (nem a maxot): így egy máshol említett kisebb szám
-// ("… legalább 2 hónap …") fail-open módon látni hagyja a határeseteket,
-// csak akkor rejtünk, ha a legenyhébb olvasat is senior.
-export function minYearsFromExperience(experience) {
-  const nums = String(experience ?? "").match(/\d+/g);
-  if (!nums) return null;
-  return Math.min(...nums.map((n) => parseInt(n, 10)));
-}
-
-export function isSeniorExperience(experience, threshold = SENIOR_MIN_YEARS) {
-  const min = minYearsFromExperience(experience);
-  return min != null && min >= threshold;
-}
-
-/* ======================
    Source-specific extractors
 ====================== */
 
 // LinkedIn: .description / .show-more-less-html__markup
 export function extractLinkedInExperience(html) {
   const $ = cheerioLoad(html);
+  // Block elemek közé szóközt szúrunk, különben a szomszédos <li>-k szövege
+  // összeragad: a LinkedIn a követelményeket sibling <li>-kben adja
+  // ("…végzettség</li><li>3-5 év…"), és padding nélkül a cheerio .text()
+  // "végzettség3-5 év"-et csinál — így a "3" elé nincs \b, a tartomány-regex
+  // csak a "5 év"-et fogja meg, és egy 3–5 éves junior/medior hirdetés
+  // senior-ként olvasódik. Ugyanaz a fix, amit az extractBodyExperience használ.
+  $("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+    $(el).prepend(" ").append(" ");
+  });
   const description = normalizeWhitespace(
     $(".description, .job-description, #job-details, .show-more-less-html__markup")
       .first()

@@ -265,10 +265,14 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
           continue;
         }
 
+        // Csak a cím-denylist dob (isSeniorLike) — uniform, mint MINDEN scrapernél
+        // (user-döntés 2026-07-20). A "Szenior" szint NEM dob többé: elmentjük, a
+        // szint lentebb az experience fallbackja (a frontend badge a "szenior"
+        // szó / évszám alapján jelöli).
         const levelLower = level.toLowerCase();
-        if (levelLower.includes("szenior") || isSeniorLike(title)) {
+        if (isSeniorLike(title)) {
           skippedSenior++;
-          console.log(`[raiffeisen] SKIP senior "${title}" level="${level}" → ${url}`);
+          console.log(`[raiffeisen] SKIP senior "${title}" → ${url}`);
           continue;
         }
 
@@ -281,7 +285,9 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
           await sleep(800);
           try {
             const detailHtml = await fetchText(url);
-            experience = extractBodyExperience(detailHtml) || "-";
+            // A leírás évszáma az elsődleges; ha nincs, az explicit szint-címke
+            // (level, pl. "Szenior") a fallback — így a senior sor is jelölhető.
+            experience = extractBodyExperience(detailHtml) || level || "-";
             technologies = extractTechnologies(detailHtml);
           } catch (err) {
             // The detail fetch only enriches experience; the job's existence is already
@@ -292,7 +298,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
             detailFetchFailed++;
             await logFetchError("cron_jobs_RAIFFEISEN-background", { url, message: err.message });
             console.error(`[raiffeisen] detail fetch failed ${url}: ${err.message}`);
-            experience = "-";
+            experience = level || "-";
           }
         }
 

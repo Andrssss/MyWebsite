@@ -218,18 +218,14 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           continue;
         }
 
-        // The site renders multi-selected career levels concatenated with no
-        // separator (e.g. "Medior (2-5 év)Szenior (5-10 év)" for a posting open
-        // to both bands) — a bare "szenior" substring check wrongly treated
-        // those as senior-only and excluded them. Only skip when szenior is the
-        // SOLE level (live evidence: id 341 "IT Rendszerszervező" was mislabeled
-        // senior-only and false-deactivated, but is open to medior too).
+        // Csak a cím-denylist dob (isSeniorLike) — uniform, mint MINDEN scrapernél
+        // (user-döntés 2026-07-20). A "Szenior" career-level NEM dob többé:
+        // elmentjük, a career-level lentebb az experience-be kerül (a frontend
+        // badge a "szenior"/évszám alapján jelöli).
         const levelLower = careerLevel.toLowerCase();
-        const seniorOnly =
-          levelLower.includes("szenior") && !/gyakornok|junior|medior/.test(levelLower);
-        if (seniorOnly || isSeniorLike(title)) {
+        if (isSeniorLike(title)) {
           skippedSenior++;
-          console.log(`[mfb] SKIP senior "${title}" level="${careerLevel}" → ${url}`);
+          console.log(`[mfb] SKIP senior "${title}" → ${url}`);
           continue;
         }
 

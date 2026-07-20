@@ -965,6 +965,26 @@ html, body {
   color: #ffcc66;
 }
 
+/* Senior flag — a hirdetést nem szűrjük ki, csak jelöljük: min. tapasztalat
+   >= 5 év (isSeniorExperience). Amber "figyelem" pill, elkülönül a zöld "Új"
+   és a szürke "Lejárt" badge-től. */
+.job-senior-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #3a1d00;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+/* Ha senior, az évszám-pill is figyelmeztető színt kap, hogy kiugorjon. */
+.job-experience--senior {
+  color: #f97316;
+}
+
 .job-tech-tags {
   display: inline-flex;
   flex-wrap: wrap;

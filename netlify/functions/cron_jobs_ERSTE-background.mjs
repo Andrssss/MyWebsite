@@ -215,18 +215,13 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
           continue;
         }
 
-        const expLower = expCombined.toLowerCase();
-        const hasSeniorMarker = expLower.includes("5 év fölött") || expLower.includes("vezető");
-        const hasJuniorMarker =
-          expLower.includes("1-3 év") ||
-          expLower.includes("3-5 év") ||
-          expLower.includes("0-2 év") ||
-          expLower.includes("2-5 év");
-        const seniorOnly = hasSeniorMarker && !hasJuniorMarker;
-
-        if (seniorOnly || isSeniorLike(title)) {
+        // Csak a cím-denylist dob (isSeniorLike) — uniform, mint MINDEN scrapernél
+        // (user-döntés 2026-07-20). Az explicit tapasztalat-sáv ("5 év fölött")
+        // NEM dob többé: elmentjük, az experience az expCombined marad (pl.
+        // "5 év fölött" → a frontend badge évszám alapján jelöli).
+        if (isSeniorLike(title)) {
           skippedSenior++;
-          console.log(`[erste] SKIP senior "${title}" exp="${expCombined}" → ${url}`);
+          console.log(`[erste] SKIP senior "${title}" → ${url}`);
           continue;
         }
 

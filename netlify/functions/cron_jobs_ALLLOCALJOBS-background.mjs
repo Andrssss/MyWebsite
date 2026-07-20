@@ -61,7 +61,6 @@ import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mj
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
-  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -435,7 +434,6 @@ async function scrapeAlllocaljobs(client) {
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
-  let skippedSeniorYears = 0;
   let skippedCompany = 0;
   let skippedNonIt = 0;
   let skippedDetailBudget = 0;
@@ -503,20 +501,6 @@ async function scrapeAlllocaljobs(client) {
       }
     }
 
-    // Senior kiszűrése az évszám alapján: a cím-denylist (isSeniorLike) nem
-    // fogja meg a semleges című seniorokat, a most kinyert experience viszont
-    // megmutatja a "10 years"/"5-10 years"/"7+ years"-t. A foundUrls már
-    // tartalmazza az url-t (F3-safe). ÚJ sort NEM hozunk létre. Ha viszont a sor
-    // MÁR a DB-ben van (pl. egy korábbi futás detail-budgetje '-'-szal tette be,
-    // és csak most derült ki a senior évszám), upsert-eljük, hogy a valós
-    // experience bekerüljön és a frontend elrejtse — különben '-'-on ragadna és
-    // láthatóan maradna.
-    if (isSeniorExperience(item.experience)) {
-      skippedSeniorYears++;
-      if (known.has(item.url)) await upsertJob(client, item);
-      continue;
-    }
-
     if (known.has(item.url)) {
       alreadyExisted++;
     } else {
@@ -528,8 +512,7 @@ async function scrapeAlllocaljobs(client) {
 
   console.log(
     `[alllocaljobs] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-    `skipped_senior=${skippedSenior}, skipped_senior_years=${skippedSeniorYears}, ` +
-    `skipped_company=${skippedCompany}, ` +
+    `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
     `skipped_nonit=${skippedNonIt}, skipped_detail_budget=${skippedDetailBudget}, ` +
     `unique=${foundUrls.length} (raw=${allItems.length}, complete=${allComplete})`
   );
