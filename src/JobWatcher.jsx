@@ -417,6 +417,19 @@ const hoursSince = (iso) => {
 const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka", "talent"];
 const JUNIOR_KEYWORD = "junior";
 
+// Some source-filter buttons are PREFIX buckets, not real db sources: the
+// "ai-scraped" button aggregates every `AI - <slug>` row under one label
+// (mirrors the `prefix` entry in jobs.js FIXED — keep the prefix in sync there).
+// Client-side source filtering loads all rows and matches by source, so a prefix
+// bucket must match by startsWith, not exact equality, or selecting it shows nothing.
+const SOURCE_PREFIX_BUCKETS = { "ai-scraped": "AI - " };
+
+function jobMatchesSourceKey(jobSource, key) {
+  const prefix = SOURCE_PREFIX_BUCKETS[key];
+  if (prefix) return (jobSource || "").startsWith(prefix);
+  return jobSource === key;
+}
+
 const JUNIOR_EXCLUDED_SOURCES = [
   "minddiak",
   "muisz",
@@ -1351,9 +1364,9 @@ const JobWatcher = () => {
     );
 
     if (selected.length) {
-      list = list.filter((j) => selected.includes(j.source));
+      list = list.filter((j) => selected.some((k) => jobMatchesSourceKey(j.source, k)));
     } else if (excluded.length) {
-      list = list.filter((j) => !excluded.includes(j.source));
+      list = list.filter((j) => !excluded.some((k) => jobMatchesSourceKey(j.source, k)));
     }
 
     const selectedCats = Object.keys(categoryStates).filter((k) => categoryStates[k] === "selected");
