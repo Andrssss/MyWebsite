@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -753,6 +753,16 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         }
       }
       delete item.detailHtml;
+
+      // Senior kiszűrése az évszám alapján (a semleges című seniorokat az
+      // isSeniorLike cím-denylist nem fogja meg): a most kinyert experience-ben
+      // ott a "5-10 years"/"7+ years"/"10 év". A foundUrls a matchedList-ből
+      // számol a hívó oldalon, így az url benne marad (reconcile-safe) — csak az
+      // insertet hagyjuk ki. Meglévő senior sorokat a frontend rejt el.
+      if (isSeniorExperience(item.experience)) {
+        console.log(`[${source}] skip senior "${item.title}" (${item.experience})`);
+        continue;
+      }
 
       const pattern = volatileUrlPattern(item.url);
       if (pattern) {

@@ -519,6 +519,18 @@ const isMediorExperience = (experience) => {
   return !hasJuniorYearToken(experience);
 };
 
+// Senior az évszám alapján (a backend _experience_core.isSeniorExperience
+// tükre): a leírásból kinyert experience-mezőben ott az évszám ("5-10 years",
+// "7+ years", "10 év"). A LEGKISEBB évszámot vesszük — csak akkor rejtünk, ha a
+// legenyhébb olvasat is legalább SENIOR_MIN_YEARS év. Szint-tokenben
+// (junior/medior/diákmunka/-) nincs szám → nem senior.
+const SENIOR_MIN_YEARS = 5;
+const isSeniorExperience = (experience) => {
+  const nums = normalizeExperience(experience).match(/\d+/g);
+  if (!nums) return false;
+  return Math.min(...nums.map((n) => parseInt(n, 10))) >= SENIOR_MIN_YEARS;
+};
+
 const getKeywordNotesForJob = (job) => {
   if (!job.title) return [];
   const title = job.title.toLowerCase();
@@ -1272,6 +1284,15 @@ const JobWatcher = () => {
   // sem tartalmazza.
   const preTechJobs = useMemo(() => {
     let list = jobs;
+
+    // Senior hirdetések (min. tapasztalat >= SENIOR_MIN_YEARS év) sehol nem
+    // kellenek egy belépő/junior boardra. A cím-alapú denylist nem fogja meg a
+    // semleges című seniorokat ("AI Security Architect", "IT Retail Project
+    // Specialist"), az experience-mezőben viszont ott az évszám. Minden mód
+    // (default/gyakornok/junior/medior) ELŐTT szűrünk, a tech-chip számok is
+    // ebből jönnek. Az "Applied" nézet a cache-fallbackből hozza vissza a
+    // bejelölt seniorokat, tehát az nem sérül.
+    list = list.filter((j) => !isSeniorExperience(j.experience));
 
     const isJuniorTrackCandidate = (job) => {
       const t = (job.title || "").toLowerCase();

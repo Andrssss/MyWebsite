@@ -35,6 +35,10 @@ const TARGETS = [
   // nothing (IT/Budapest listing empty) and qdiak sits at 7 rows, none new in
   // a week. Scrapes sources "ydiak" + "qdiak"; both reconcile daily now.
   { name: "cron_jobs_DIAK_2-background" },
+  // Single-company WordPress source (nixstech.com REST API). ~16 total openings,
+  // Budapest, most junior/medior after the senior-skip — well under the <10-per-
+  // source daily-tier rule. Added 2026-07-20.
+  { name: "cron_jobs_NIX-background" },
   // AI-scraped worker (cron_jobs_AI-background) is intentionally NOT triggered
   // yet — Phase 1 is in-session/manual extraction via ai-ingest.mjs (no
   // Anthropic API). When we automate it (intended cadence: every 5 hours), add
