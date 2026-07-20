@@ -96,6 +96,20 @@ function authorized(request) {
   return token === expected;
 }
 
+// Deploy-time diagnostic for the 401 body. Reports only WHICH env var the
+// function is comparing against and whether a token was sent at all — never any
+// part of either secret. Without this, "var not set", "var has a typo", and
+// "var set but Netlify hasn't redeployed yet" are indistinguishable from
+// outside, since all three return an identical 401.
+function authDiagnostic(request) {
+  return {
+    comparingAgainst: process.env.AI_INGEST_TOKEN ? "AI_INGEST_TOKEN"
+      : process.env.CRON_SECRET ? "CRON_SECRET (fallback — AI_INGEST_TOKEN is NOT set)"
+      : "nothing (neither AI_INGEST_TOKEN nor CRON_SECRET is set)",
+    bearerReceived: /^Bearer\s+\S/i.test(request.headers.get("authorization") || ""),
+  };
+}
+
 /* ── GET: hand the routine its memory ───────────────────────────────── */
 
 async function handleGet() {
@@ -208,7 +222,7 @@ async function handlePost(request) {
 }
 
 export default async (request) => {
-  if (!authorized(request)) return json(401, { error: "Unauthorized" });
+  if (!authorized(request)) return json(401, { error: "Unauthorized", ...authDiagnostic(request) });
   if (request.method === "GET") return handleGet();
   if (request.method === "POST") return handlePost(request);
   return json(405, { error: "GET or POST only" });
