@@ -156,18 +156,40 @@ function groupBySlug(findings) {
 
 // One-time collapse of legacy per-company `AI - <slug>` sources into the flat
 // AI_SOURCE (user decision 2026-07-21). Idempotent — matches 0 rows once done,
-// so it's safe to run on every POST (self-healing, no manual SQL / DB creds
-// needed). Skips any row whose url already exists under AI_SOURCE so the
-// (source, url) unique constraint can't be violated; such duplicates (same
-// posting submitted under two slugs) stay legacy but still show in the bucket.
+// so it's safe to run on every POST (self-healing, no manual SQL / DB creds).
+//
+// Collision-safe: `url` is the row identity, so several legacy rows sharing a
+// url (the SAME posting found under different slugs, e.g. `AI - gravity` and
+// `AI - gravity-taboola`) must collapse to ONE row, or the flat rename would
+// violate the (source, url) unique constraint. Runs in a transaction; on ANY
+// error it rolls back and logs rather than failing the POST (retries next run).
 async function migrateLegacyAiSources(client) {
-  const res = await client.query(
-    `UPDATE job_posts j SET source = $1
-     WHERE j.source LIKE 'AI - %'
-       AND NOT EXISTS (SELECT 1 FROM job_posts k WHERE k.url = j.url AND k.source = $1)`,
-    [AI_SOURCE]
-  );
-  if (res.rowCount) console.log(`[ai-registry] migrated ${res.rowCount} legacy 'AI - *' rows → '${AI_SOURCE}'`);
+  try {
+    await client.query("BEGIN");
+    // 1. de-dupe among legacy rows: keep the oldest (lowest id) per url.
+    await client.query(
+      `DELETE FROM job_posts a USING job_posts b
+       WHERE a.source LIKE 'AI - %' AND b.source LIKE 'AI - %'
+         AND a.url = b.url AND a.id > b.id`
+    );
+    // 2. drop any legacy row whose url already exists under AI_SOURCE.
+    await client.query(
+      `DELETE FROM job_posts j
+       WHERE j.source LIKE 'AI - %'
+         AND EXISTS (SELECT 1 FROM job_posts k WHERE k.url = j.url AND k.source = $1)`,
+      [AI_SOURCE]
+    );
+    // 3. rename the survivors — now guaranteed no (source, url) collision.
+    const res = await client.query(
+      `UPDATE job_posts SET source = $1 WHERE source LIKE 'AI - %'`,
+      [AI_SOURCE]
+    );
+    await client.query("COMMIT");
+    if (res.rowCount) console.log(`[ai-registry] migrated ${res.rowCount} legacy 'AI - *' rows → '${AI_SOURCE}'`);
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(`[ai-registry] legacy source migration failed (retries next POST): ${err.message}`);
+  }
 }
 
 async function handlePost(request) {
