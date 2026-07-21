@@ -11,7 +11,7 @@
   Ugyanaz az osztály, mint a workcenternél. A parse/lapozás/extrakció maga KÉSZ és
   lokálisan igazolt (lásd a kutatási jegyzet dry-run szakaszát) — csak a prod-fetch
   bukik a Cloudflare-IP-blokkon. A fájl megmarad; ha egyszer lesz proxy /
-  nem-datacenter host, a `cron_dispatcher.mjs`-ben 1 sor visszavétele elég.
+  nem-datacenter host, a `cron_scheduler.mjs` GRID-jébe 1 sor felvétele elég.
   (Amíg nem fut: reconcile üres foundUrls → skip, meglévő sort nem deaktivál.)
 
   Forrás: a HR Portal / CVOnline hálózat aggregátora. Klasszikus szerver-renderelt
