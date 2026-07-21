@@ -148,6 +148,13 @@ export function fetchText(url, redirectLeft = 5) {
 export function extractYearsFromText(text) {
   if (!text) return null;
 
+  // Betű→szám határra szóközt szúrunk. A hirdetés-leírásokban a felsorolás-pontok
+  // gyakran elválasztó nélkül összeérnek ("…végzettség1-5 év", "…field2–3 years"):
+  // a betűhöz tapadt szám elé nincs \b, így a tartomány-regex az ALSÓ határt
+  // elvesztette és csak a felső számot fogta ("5 év" a "1-5 év" helyett). A block-
+  // padding ezt nem oldja meg, ha a pontok közt nincs block-elem (csak szövegcsomó).
+  text = String(text).replace(/(\p{L})(\d)/gu, "$1 $2");
+
   const patterns = [
     // "N év" / "N-M év" / "N–M+ years" / "N+ years" — az opcionális [-–]tartomány
     // UTÁN álló '+' is a matchbe kerül. Külön "\d+\+ years" pattern nélkül,

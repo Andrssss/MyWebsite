@@ -47,7 +47,11 @@
 
   ⚠️ A 404-sweep szabályai közé NEM kerülhet be (se REDIRECT_DEAD, se banner):
   ÉLŐ állás is más path-ra redirectel cookie nélkül, tehát a redirect-szabály
-  élő sorokat ölne. Deaktiválást kizárólag a reconcileActive végzi.
+  élő sorokat ölne. Deaktiválást kizárólag a reconcileActive végzi — DE nem
+  puszta listából-hiányzásra: egy grace-en túli, listából kiesett sort a
+  reconcile confirmDead-kapuja előbb SESSION-nel lekéri, és csak akkor deaktivál,
+  ha az a saját urljén requested_vacancy_not_found-ra redirectel. Így a lapozó-
+  unió tűréséből (90%) kicsúszó, de ÉLŐ sorok nem esnek ki tévesen.
 */
 
 import { Pool } from "pg";
@@ -116,6 +120,12 @@ const BROWSE_MAX_PAGES = 250;
 // A withTimeout kerete háttérfüggvényre 14 perc; 10 percnél elzárjuk a csapot,
 // hogy az upsertek + reconcile biztosan beférjenek.
 const DETAIL_DEADLINE_MS = 10 * 60 * 1000;
+
+// A reconcile confirmDead-kapuja a scrape UTÁN fut, soronként egy session-
+// fetch-csel (+500ms). 12,5 percnél elzárjuk, hogy a végső UPDATE + release
+// beférjen a 14 percbe; a határon túli jelöltek megerősítetlenül AKTÍVAK
+// maradnak (fail-safe), a következő futás úgyis újra megnézi őket.
+const CONFIRM_DEADLINE_MS = 12.5 * 60 * 1000;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -517,7 +527,27 @@ async function scrapeAlllocaljobs(client) {
     `unique=${foundUrls.length} (raw=${allItems.length}, complete=${allComplete})`
   );
 
-  const rc = await reconcileActive(client, "alllocaljobs", foundUrls, { complete: allComplete });
+  // confirmDead: a listából kiesett, grace-en túli sorokat a reconcile csak
+  // akkor deaktiválja, ha a saját urljük SESSION-nel lekérve
+  // requested_vacancy_not_found-ra redirectel (ugyanaz a halál-jel, amit a
+  // detail-enrich is használ, lásd fentebb). Élő sor 200-zal betölt → false →
+  // marad aktív. Hiba/keret-túllépés → false → marad aktív (fail-safe).
+  const confirmDeadline = runStart + CONFIRM_DEADLINE_MS;
+  const confirmDead = async (url) => {
+    if (Date.now() >= confirmDeadline) return false;
+    await sleep(500);
+    try {
+      const { finalUrl } = await fetchWithSession(url, jar);
+      return finalUrl.includes("requested_vacancy_not_found");
+    } catch {
+      return false;
+    }
+  };
+
+  const rc = await reconcileActive(client, "alllocaljobs", foundUrls, {
+    complete: allComplete,
+    confirmDead,
+  });
   console.log(`[alllocaljobs] active reconcile — complete=${allComplete}, ${JSON.stringify(rc)}`);
 }
 

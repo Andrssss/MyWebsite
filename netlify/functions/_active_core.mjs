@@ -64,7 +64,17 @@ export async function ensureActiveSchema(client) {
  *   succeeded (i.e. it also passes complete:true on the same run) — otherwise a
  *   blocked crawl would wipe the whole source.
  * @param {number}  [opts.graceDays=ACTIVE_GRACE_DAYS]
- * @returns {Promise<{deactivated:number, reactivated:number, skipped:boolean}>}
+ * @param {(url: string) => Promise<boolean>} [opts.confirmDead]  optional per-row
+ *   death gate. When given, a row that is aged AND absent from foundUrls is NOT
+ *   deactivated on absence alone — it is only switched off if confirmDead(url)
+ *   resolves true (the caller proved it dead at the row's OWN url). Anything
+ *   unconfirmed — still live, a network error, a thrown fetch, or the caller
+ *   running out of time and returning false — stays active. Fail-safe by design:
+ *   for sources whose listing can transiently drop a LIVE posting (alllocaljobs:
+ *   a job slips out of the paginated slice/browse union), absence is not proof of
+ *   death, so we make the site say so before hiding the row. Errors thrown by
+ *   confirmDead are swallowed as "not dead" (keep active).
+ * @returns {Promise<{deactivated:number, reactivated:number, skipped:boolean, confirmChecked?:number}>}
  */
 export async function reconcileActive(client, source, foundUrls, opts = {}) {
   const complete = opts.complete !== false;
@@ -132,6 +142,49 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
 
   if (!complete) {
     return { deactivated: 0, reactivated: reactivated.rowCount ?? 0, skipped: true };
+  }
+
+  // Aged jobs that vanished from the source are the deactivation candidates.
+  // With a confirmDead gate we prove each dead at its OWN url before hiding it
+  // (listing-absence alone is unreliable for the source); without it, absence is
+  // the verdict as before.
+  if (typeof opts.confirmDead === "function") {
+    const { rows: candidates } = await client.query(
+      `SELECT url FROM job_posts
+        WHERE source = $1
+          AND active = true
+          AND first_seen < NOW() - make_interval(days => $3::int)
+          AND url <> ALL($2::text[])`,
+      [source, urls, graceDays]
+    );
+    const dead = [];
+    for (const { url } of candidates) {
+      let isDead = false;
+      try {
+        isDead = (await opts.confirmDead(url)) === true;
+      } catch {
+        isDead = false; // fail-safe: unconfirmed stays active
+      }
+      if (isDead) dead.push(url);
+    }
+    let confirmedOff = 0;
+    if (dead.length) {
+      const res = await client.query(
+        `UPDATE job_posts
+            SET active = false
+          WHERE source = $1
+            AND active = true
+            AND url = ANY($2::text[])`,
+        [source, dead]
+      );
+      confirmedOff = res.rowCount ?? 0;
+    }
+    return {
+      deactivated: confirmedOff,
+      reactivated: reactivated.rowCount ?? 0,
+      skipped: false,
+      confirmChecked: candidates.length,
+    };
   }
 
   // Deactivate aged jobs that vanished from the source.
@@ -219,7 +272,12 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 // detail urls are session-gated, so a cookieless fetch of a LIVE job also
 // 200-redirects to a different path (/állások?requested_vacancy_not_found=1)
 // — the redirect rule would kill live rows. Its deactivation is owned entirely
-// by its own scraper's reconcileActive (full slice walk).
+// by its own scraper's reconcileActive (full slice walk), which now passes a
+// confirmDead gate: an aged, listing-absent row is only switched off once a
+// SESSION-cookie'd fetch of its own url redirects to requested_vacancy_not_found
+// (the only trustworthy death signal here — with a valid session a live job
+// loads 200, so this can't false-kill the ~10% that slip out of the paginated
+// union).
 //
 // profession-intern (2026-07-12): a posting drops off ALL 6 scraped category
 // listings well before it actually closes — profession.hu's search demotes
