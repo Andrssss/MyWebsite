@@ -1482,6 +1482,67 @@ const JobWatcher = () => {
     });
   };
 
+  /* Összes szűrő visszaállítása alaphelyzetbe — az "Nincs találat." nézet
+     "Szűrők törlése" gombja hívja, hogy a szűrők kombinációja miatt beragadt
+     (0 találatos) állapotból egy kattintással ki lehessen jönni. */
+  const resetAllFilters = () => {
+    setQ("");
+    setActiveSavedSearches(new Set());
+    localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([]));
+    setInternMode(false);
+    localStorage.setItem("jobWatcherInternMode", "false");
+    setJuniorMode(false);
+    localStorage.setItem("jobWatcherJuniorMode", "false");
+    setMediorMode(false);
+    localStorage.setItem("jobWatcherMediorMode", "false");
+    setTime24h(true);
+    localStorage.setItem("jobWatcherTime24h", "true");
+    setTime7d(false);
+    localStorage.setItem("jobWatcherTime7d", "false");
+    setAllSources("neutral");
+    setAllCategories("neutral");
+    setAllTechs("neutral");
+  };
+
+  /* Emberi olvasható lista arról, mely szűrők vannak épp aktívan bekapcsolva
+     — a "Nincs találat." üzenet ebből magyarázza meg, mi okozhatja a 0
+     találatot (csak azok a tech-state-ek számítanak, amik ténylegesen
+     szűrnek is, ld. visibleJobs fenti globalTechCounts > 0 feltétele). */
+  const activeFilterReasons = useMemo(() => {
+    const reasons = [];
+    const nq = q.trim();
+    if (nq) {
+      reasons.push(`keresés: "${nq}"`);
+    } else {
+      const activeSearchTerms = [...activeSavedSearches].filter((s) => savedSearches.includes(s));
+      if (activeSearchTerms.length) reasons.push(`mentett keresés: ${activeSearchTerms.join(", ")}`);
+    }
+
+    if (time7d) reasons.push("időszűrő: 1 hét");
+    else if (time24h) reasons.push("időszűrő: 24 óra");
+
+    if (internMode) reasons.push("Gyakornok mód");
+    if (juniorMode) reasons.push("Junior mód");
+    if (mediorMode) reasons.push("Medior mód");
+
+    const selectedSources = Object.keys(sourceStates).filter((k) => sourceStates[k] === "selected");
+    const excludedSources = Object.keys(sourceStates).filter((k) => sourceStates[k] === "excluded");
+    if (selectedSources.length) reasons.push(`${selectedSources.length} kiválasztott forrás`);
+    else if (excludedSources.length) reasons.push(`${excludedSources.length} kizárt forrás`);
+
+    const selectedCats = Object.keys(categoryStates).filter((k) => categoryStates[k] === "selected");
+    const excludedCats = Object.keys(categoryStates).filter((k) => categoryStates[k] === "excluded");
+    if (selectedCats.length) reasons.push(`${selectedCats.length} kiválasztott kategória`);
+    else if (excludedCats.length) reasons.push(`${excludedCats.length} kizárt kategória`);
+
+    const selectedTechs = Object.keys(techStates).filter((k) => techStates[k] === "selected" && globalTechCounts[k] > 0);
+    const excludedTechs = Object.keys(techStates).filter((k) => techStates[k] === "excluded" && globalTechCounts[k] > 0);
+    if (selectedTechs.length) reasons.push(`${selectedTechs.length} kiválasztott technológia`);
+    else if (excludedTechs.length) reasons.push(`${excludedTechs.length} kizárt technológia`);
+
+    return reasons;
+  }, [q, activeSavedSearches, savedSearches, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, techStates, globalTechCounts]);
+
   const visibleJobs = useMemo(() => {
     let list = preTechJobs;
 
@@ -1940,7 +2001,17 @@ const JobWatcher = () => {
     {loading ? (
       <div className="job-status">Betöltés…</div>
     ) : visibleJobs.length === 0 && !showAppliedOnly ? (
-      <div className="job-status">Nincs találat.</div>
+      <div className="job-status job-status--empty">
+        <p>Nincs találat.</p>
+        {activeFilterReasons.length > 0 && (
+          <p className="job-empty-reason">
+            Ezt az aktív szűrőid okozhatják: {activeFilterReasons.join(", ")}.
+          </p>
+        )}
+        <button className="job-btn" onClick={resetAllFilters}>
+          Szűrők törlése
+        </button>
+      </div>
     ) : (
       <ul className="job-list">
         {visibleJobs.map((job) => {

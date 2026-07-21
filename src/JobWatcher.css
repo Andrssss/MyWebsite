@@ -459,6 +459,22 @@
   font-size: 15px;
 }
 
+.job-status--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.job-status--empty p {
+  margin: 0;
+}
+
+.job-empty-reason {
+  font-size: 13px;
+  color: #888;
+}
+
 /* ====== LIST ====== */
 .job-list {
   list-style: none;
