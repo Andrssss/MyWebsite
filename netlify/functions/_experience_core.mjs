@@ -72,6 +72,18 @@ export function isMidLevelTitle(title) {
   return MID_KEYWORDS.some(k => hasKeyword(t, k));
 }
 
+// Senior detection — kept in sync with isSeniorExperience in src/JobWatcher.jsx
+// (frontend hides/filters on this same rule; used here so cron_daily_stats.mjs
+// excludes senior postings from the statistics the same way).
+export const SENIOR_MIN_YEARS = 5;
+export function isSeniorExperience(experience) {
+  const n = normalizeText(experience);
+  if (/\b(senior|szenior|lead)\b/.test(n)) return true;
+  const nums = n.match(/\d+/g);
+  if (!nums) return false;
+  return Math.min(...nums.map(x => parseInt(x, 10))) >= SENIOR_MIN_YEARS;
+}
+
 // Sources that are inherently student/intern focused
 export const INTERN_SOURCES = [
   "minddiak", "muisz", "zyntern", "schonherz",

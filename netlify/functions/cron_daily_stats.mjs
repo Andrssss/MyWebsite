@@ -9,7 +9,7 @@ export const config = {
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadCategories } from "./load_categories.mjs";
-import { INTERNSHIP_KEYWORDS, INTERN_SOURCES } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isSeniorExperience } from "./_experience_core.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -117,36 +117,31 @@ export default async function handler() {
     statsDate.setUTCDate(statsDate.getUTCDate() );
     const today = statsDate.toISOString().slice(0, 10);
 
-    // Mai összes új munka
-    const { rows: totalRows } = await client.query(
-      `SELECT COUNT(*)::int AS cnt
+    // Mai összes új munka (experience is szükséges a senior kizáráshoz)
+    const { rows: todayRows } = await client.query(
+      `SELECT title, source, experience
        FROM job_posts
        WHERE (first_seen AT TIME ZONE 'UTC')::date = $1`,
       [today]
     );
-    const totalJobs = totalRows[0]?.cnt ?? 0;
 
-    // Mai diák/intern munkák: forrás alapján VAGY cím kulcsszó alapján
-    const sourcePlaceholders = INTERN_SOURCES.map((_, i) => `$${i + 2}`).join(",");
-    const titleKeywordConditions = INTERN_TITLE_KEYWORDS.map(
-      (_, i) => `LOWER(title) LIKE $${INTERN_SOURCES.length + i + 2}`
-    ).join(" OR ");
-    const experienceKeywordConditions = INTERN_TITLE_KEYWORDS.map(
-      (_, i) => `LOWER(COALESCE(experience, '')) LIKE $${INTERN_SOURCES.length + i + 2}`
-    ).join(" OR ");
+    // Senior hirdetéseket kizárjuk a statisztikából — frontend logikával
+    // szinkronban (ld. isSeniorExperience a JobWatcher.jsx-ben és _experience_core.mjs-ben).
+    const todayJobs = todayRows.filter((row) => !isSeniorExperience(row.experience));
+    const totalJobs = todayJobs.length;
 
-    const params = [
-      today,
-      ...INTERN_SOURCES,
-      ...INTERN_TITLE_KEYWORDS.map((kw) => `%${kw}%`),
-    ];
-
-    const { rows: internJobRows } = await client.query(
-      `SELECT title FROM job_posts
-       WHERE (first_seen AT TIME ZONE 'UTC')::date = $1
-         AND (source IN (${sourcePlaceholders}) OR ${titleKeywordConditions} OR ${experienceKeywordConditions} OR COALESCE(experience, '') ~* '${ZERO_RANGE_EXPERIENCE_REGEX}')`,
-      params
-    );
+    // Mai diák/intern munkák: forrás alapján VAGY cím/experience kulcsszó alapján
+    const zeroRangeRegex = new RegExp(ZERO_RANGE_EXPERIENCE_REGEX, "i");
+    const internJobRows = todayJobs.filter((row) => {
+      const title = (row.title || "").toLowerCase();
+      const experience = (row.experience || "").toLowerCase();
+      return (
+        INTERN_SOURCES.includes(row.source) ||
+        INTERN_TITLE_KEYWORDS.some((kw) => title.includes(kw)) ||
+        INTERN_TITLE_KEYWORDS.some((kw) => experience.includes(kw)) ||
+        zeroRangeRegex.test(experience)
+      );
+    });
     const internJobs = internJobRows.length;
 
     // Upsert a napi statisztikába
@@ -158,11 +153,7 @@ export default async function handler() {
       [today, totalJobs, internJobs]
     );
 
-    // Kategória bontás mentése (összes)
-    const { rows: todayJobs } = await client.query(
-      `SELECT title FROM job_posts WHERE (first_seen AT TIME ZONE 'UTC')::date = $1`,
-      [today]
-    );
+    // Kategória bontás mentése (összes, senior nélkül)
     const categories = categorizeJobs(todayJobs, JOB_CATEGORIES);
 
     for (const { category, count } of categories) {
