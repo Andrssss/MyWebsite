@@ -525,7 +525,8 @@ const isMediorExperience = (experience) => {
   return !hasJuniorYearToken(experience);
 };
 
-// Senior JELÖLÉS (nem szűrünk, csak badge-elünk). Két jel:
+// Senior JELÖLÉS + szűrés: alapból elrejtjük, "Csak senior" módban KIZÁRÓLAG
+// ezeket mutatjuk (ld. preTechJobs). Badge-elés is ebből. Két jel:
 //   1) explicit senior/lead szint-címke (pl. NIX taxonómia "senior", MFB/
 //      Raiffeisen "Szenior" szint) — egyértelmű, nem évszám;
 //   2) évszám: a leírásból kinyert "5-10 years"/"7+ years"/"10 év" — a LEGKISEBB
@@ -658,6 +659,10 @@ const JobWatcher = () => {
 
   const [mediorMode, setMediorMode] = useState(
     () => localStorage.getItem("jobWatcherMediorMode") === "true"
+  );
+
+  const [seniorMode, setSeniorMode] = useState(
+    () => localStorage.getItem("jobWatcherSeniorMode") === "true"
   );
 
   const [time24h, setTime24h] = useState(() => {
@@ -1263,6 +1268,8 @@ const JobWatcher = () => {
       localStorage.setItem("jobWatcherJuniorMode", false);
       setMediorMode(false);
       localStorage.setItem("jobWatcherMediorMode", false);
+      setSeniorMode(false);
+      localStorage.setItem("jobWatcherSeniorMode", false);
     }
   };
 
@@ -1272,6 +1279,8 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
+      setSeniorMode(false);
+      localStorage.setItem("jobWatcherSeniorMode", false);
     }
   };
 
@@ -1281,6 +1290,21 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
+      setSeniorMode(false);
+      localStorage.setItem("jobWatcherSeniorMode", false);
+    }
+  };
+
+  const handleSeniorToggle = (checked) => {
+    setSeniorMode(checked);
+    localStorage.setItem("jobWatcherSeniorMode", checked);
+    if (checked) {
+      setInternMode(false);
+      localStorage.setItem("jobWatcherInternMode", false);
+      setJuniorMode(false);
+      localStorage.setItem("jobWatcherJuniorMode", false);
+      setMediorMode(false);
+      localStorage.setItem("jobWatcherMediorMode", false);
     }
   };
 
@@ -1377,6 +1401,10 @@ const JobWatcher = () => {
       });
     }
 
+    // Alapból a senior-jelölésű állásokat elrejtjük; a "Csak senior" mód
+    // megfordítja ezt, és KIZÁRÓLAG a senior-jelölésűeket mutatja.
+    list = list.filter((j) => isSeniorExperience(j.experience) === seniorMode);
+
     const selected = Object.keys(sourceStates).filter(
       (k) => sourceStates[k] === "selected"
     );
@@ -1408,7 +1436,7 @@ const JobWatcher = () => {
     }
 
     return list;
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, jobCategories, savedSearches, activeSavedSearches]);
+  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, seniorMode, sourceStates, categoryStates, jobCategories, savedSearches, activeSavedSearches]);
 
   /* =======================
      TECHNOLÓGIA SZŰRŐ
@@ -1495,6 +1523,8 @@ const JobWatcher = () => {
     localStorage.setItem("jobWatcherJuniorMode", "false");
     setMediorMode(false);
     localStorage.setItem("jobWatcherMediorMode", "false");
+    setSeniorMode(false);
+    localStorage.setItem("jobWatcherSeniorMode", "false");
     setTime24h(true);
     localStorage.setItem("jobWatcherTime24h", "true");
     setTime7d(false);
@@ -1524,6 +1554,7 @@ const JobWatcher = () => {
     if (internMode) reasons.push("Gyakornok mód");
     if (juniorMode) reasons.push("Junior mód");
     if (mediorMode) reasons.push("Medior mód");
+    if (seniorMode) reasons.push("Csak senior mód");
 
     const selectedSources = Object.keys(sourceStates).filter((k) => sourceStates[k] === "selected");
     const excludedSources = Object.keys(sourceStates).filter((k) => sourceStates[k] === "excluded");
@@ -1541,7 +1572,7 @@ const JobWatcher = () => {
     else if (excludedTechs.length) reasons.push(`${excludedTechs.length} kizárt technológia`);
 
     return reasons;
-  }, [q, activeSavedSearches, savedSearches, time24h, time7d, internMode, juniorMode, mediorMode, sourceStates, categoryStates, techStates, globalTechCounts]);
+  }, [q, activeSavedSearches, savedSearches, time24h, time7d, internMode, juniorMode, mediorMode, seniorMode, sourceStates, categoryStates, techStates, globalTechCounts]);
 
   const visibleJobs = useMemo(() => {
     let list = preTechJobs;
@@ -1816,6 +1847,15 @@ const JobWatcher = () => {
               onChange={(e) => handleMediorToggle(e.target.checked)}
             />
             Csak medior
+          </label>
+
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={seniorMode}
+              onChange={(e) => handleSeniorToggle(e.target.checked)}
+            />
+            Csak senior
           </label>
 
           <label className="job-checkbox">

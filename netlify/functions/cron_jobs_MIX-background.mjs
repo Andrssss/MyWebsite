@@ -36,9 +36,16 @@ const MAX_PAGES = 20;
 // the live endpoint is `/api/v1/{locale}/jobs`. Same query filters still work.
 // (The job shape also renamed `slugs` → `slug` as a {en,hu,ro} map, but
 // buildDreamJobsUrl already falls back to `job.slug`, so no change needed there.)
+//
+// 2026-07-21: dropped the `tags[office-location]` filter (was 2925=Budapest,
+// 15990=Távmunka only). A full unfiltered live scan showed 2/20 correctly-categorized
+// IT postings sitting outside those two tags (Pécs, Veszprém) — invisible to the
+// scraper purely because of the location tag, not a category problem. Also merged the
+// two category-URLs into one covering the union of both (57,44,49,55,58,22381); they
+// overlapped and `fetchAllDreamJobs`'s `seen` dedupe made the split pointless once
+// location stopped being the differentiator. See CRON_JOBS_AUDIT.md #2 for the numbers.
 const DREAMJOBS_API_URLS = [
-  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
-  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=22381&tags%5Boffice-location%5D%5B%5D=2925&tags%5Boffice-location%5D%5B%5D=15990&scope%5B%5D=isNotBlue&per_page=50",
+  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Bjob-category%5D%5B%5D=22381&scope%5B%5D=isNotBlue&per_page=50",
 ];
 
 // job-categories: 62=Rendszergazda, 110=Tesztelő, 112=IT tanácsadó.

@@ -128,13 +128,23 @@ export function isSeniorLike(title, filters) {
 // caller-supplied body-derived value (job.experience, e.g. a "8 év" years
 // phrase from extractBodyExperience) get used. Row must be fully built
 // BEFORE insert — no separate fetch-then-UPDATE (experience-write-policy).
+//
+// A level WORD (junior/medior/senior/...) in job.experience is only trusted
+// when the title itself says so (handled above) — a caller self-judging
+// "this reads like medior" from body years and writing that word directly
+// is exactly the 2026-07-21 bug report (flexinform "Automata szoftvertesztelő",
+// body said "Legalább 2 év", title said nothing, row got stamped "medior").
+// Strip a bare level word back to "-" rather than trusting it here.
+const LEVEL_WORD_RE = /(^|[^a-z0-9])(junior|medior|mid-level|mid level|szenior|senior|lead)([^a-z0-9]|$)/i;
 function resolveExperience(job) {
   const fromTitle = isInternshipTitle(job.title) ? "diákmunka"
     : isJuniorTitle(job.title) ? "junior"
     : isMidLevelTitle(job.title) ? "medior"
     : "-";
   if (fromTitle !== "-") return fromTitle;
-  return job.experience && job.experience !== "-" ? job.experience : "-";
+  const bodyExp = job.experience && job.experience !== "-" ? job.experience : "-";
+  if (bodyExp !== "-" && LEVEL_WORD_RE.test(bodyExp)) return "-";
+  return bodyExp;
 }
 
 // NB: az AI-pipeline korábban a body-ból BECSÜLT évszám alapján is dobott
