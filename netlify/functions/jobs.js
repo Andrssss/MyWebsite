@@ -78,11 +78,12 @@ const CACHE_HEADERS = {
 };
 
 // FIXED lista (key/label)
-// `prefix` entries aggregate every db source starting with that prefix under one
-// UI bucket (see AI_SCRAPER_PLAN.md): all `AI - <site>` sources → one "AI-scraped"
-// bucket, so adding an AI-scraped site needs zero edits here.
+// The `AI-scraped` bucket now uses ONE flat db source ("AI-scraped"); `prefix`
+// stays only to also catch any legacy `AI - <slug>` rows still around during the
+// migration (see ai-registry.mjs migrateLegacyAiSources). Matches source = key
+// OR source LIKE 'AI - %'.
 const FIXED = [
-  { key: "ai-scraped", label: "AI-scraped", prefix: "AI - " },
+  { key: "AI-scraped", label: "AI-scraped", prefix: "AI - " },
 
   { key: "karrierhungaria", label: "Karrier Hungaria" },
 
@@ -128,6 +129,7 @@ const FIXED = [
   { key: "workly", label: "Workly" },
   { key: "random_email", label: "Random Email" },
   { key: "Hays", label: "Hays" },
+  { key: "nix", label: "NIX" },
 ];
 
 // Sources still shown by time window (NOT governed by the active flag). For now
@@ -209,7 +211,7 @@ exports.handler = async (event) => {
         const out = FIXED.map((s) => {
           let count;
           if (s.prefix) {
-            count = rows.reduce((sum, r) => (r.source.startsWith(s.prefix) ? sum + r.count : sum), 0);
+            count = rows.reduce((sum, r) => (r.source === s.key || r.source.startsWith(s.prefix) ? sum + r.count : sum), 0);
           } else {
             const dbKeys = s.keys || [s.key];
             count = dbKeys.reduce((sum, k) => sum + (map.get(k)?.count ?? 0), 0);
@@ -253,10 +255,10 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience, technologies, active
              FROM job_posts
-             WHERE source LIKE $1 ${timeClause}
+             WHERE (source = $1 OR source LIKE $2) ${timeClause}
              ORDER BY first_seen DESC, id DESC
-             LIMIT $2`,
-            [like, limit]
+             LIMIT $3`,
+            [fixedEntry.key, like, limit]
           );
           cacheSet(cacheKey, rows);
           return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });

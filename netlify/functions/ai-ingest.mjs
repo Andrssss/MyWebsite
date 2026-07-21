@@ -21,7 +21,7 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobs, toSlug } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -69,7 +69,8 @@ export default async (request) => {
 
   const throttled = Math.max(0, payload.jobs.length - budget.remaining);
   const jobs = sanitizeJobs(payload.jobs).slice(0, budget.remaining);
-  const source = `AI - ${slug}`;
+  // Flat single source for all ai-scraped rows (slug kept only for logging).
+  const source = AI_SOURCE;
 
   const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
   const client = await pool.connect();

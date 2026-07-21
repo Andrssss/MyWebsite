@@ -26,6 +26,13 @@ import {
 
 const TRACKING = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
 
+// Single flat DB source for EVERY ai-scraped find (user decision 2026-07-21):
+// one "AI-scraped" bucket instead of per-company `AI - <slug>` sources. The
+// routine still tracks companies by slug in its registry memory, but the
+// `job_posts.source` value is always this. Legacy `AI - <slug>` rows are
+// collapsed into it by the migration in ai-registry.mjs.
+export const AI_SOURCE = "AI-scraped";
+
 export function toSlug(s) {
   return String(s || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }

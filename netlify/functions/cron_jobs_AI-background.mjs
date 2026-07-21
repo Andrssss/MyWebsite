@@ -21,7 +21,7 @@ import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { ingestJobs } from "./_ai_ingest_core.mjs";
+import { ingestJobs, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import {
   extractJobsLLM,
   authorRecipe,
@@ -122,7 +122,8 @@ async function extractForSite(site, html) {
 }
 
 async function runSite(client, site) {
-  const source = site.source_value;
+  // Flat single source for all ai-scraped rows (was site.source_value per-site).
+  const source = AI_SOURCE;
 
   let html;
   try {

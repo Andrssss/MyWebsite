@@ -44,7 +44,7 @@ import { Pool } from "pg";
 import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobs, toSlug } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -154,6 +154,22 @@ function groupBySlug(findings) {
   return groups;
 }
 
+// One-time collapse of legacy per-company `AI - <slug>` sources into the flat
+// AI_SOURCE (user decision 2026-07-21). Idempotent — matches 0 rows once done,
+// so it's safe to run on every POST (self-healing, no manual SQL / DB creds
+// needed). Skips any row whose url already exists under AI_SOURCE so the
+// (source, url) unique constraint can't be violated; such duplicates (same
+// posting submitted under two slugs) stay legacy but still show in the bucket.
+async function migrateLegacyAiSources(client) {
+  const res = await client.query(
+    `UPDATE job_posts j SET source = $1
+     WHERE j.source LIKE 'AI - %'
+       AND NOT EXISTS (SELECT 1 FROM job_posts k WHERE k.url = j.url AND k.source = $1)`,
+    [AI_SOURCE]
+  );
+  if (res.rowCount) console.log(`[ai-registry] migrated ${res.rowCount} legacy 'AI - *' rows → '${AI_SOURCE}'`);
+}
+
 async function handlePost(request) {
   let payload;
   try {
@@ -190,40 +206,50 @@ async function handlePost(request) {
   const results = {};
   let totalWritten = 0;
 
-  // 1. Findings → the real DB, through the shared deterministic gates.
-  const groups = groupBySlug(accepted);
-  if (groups.size > 0) {
-    const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
-    const client = await pool.connect();
-    try {
-      for (const [slug, rawJobs] of groups) {
-        const source = `AI - ${slug}`;
-        const jobs = sanitizeJobs(rawJobs);
-        // fullListing:false — the routine reports individual postings it found,
-        // never a site's complete current listing, so reconcile stays
-        // reactivate-only and the 404 sweep owns deaths (same as every other
-        // AI-scraped write path).
-        const stats = await ingestJobs(client, { source, jobs, fullListing: false, filters, categories });
-        results[source] = stats;
-        totalWritten += stats.insertedUrls.length;
-        console.log(
-          `[ai-registry] ${source}: rows=${stats.rows} inserted=${stats.inserted} ` +
-          `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
-          `skip_non_it=${stats.skippedNonIt}`
-        );
-
-        // Record only what actually survived the gates, so the routine's
-        // knownUrls reflects the DB rather than what it hoped to write.
-        const accepted = new Set(stats.insertedUrls);
-        const known = new Set(reg.findings.map((f) => f.url));
-        for (const j of jobs) {
-          if (!accepted.has(j.url) || known.has(j.url)) continue;
-          reg.findings.push({ slug, ...j, foundDate: now });
-        }
-      }
-    } finally {
-      client.release();
+  // Flatten every finding to ONE source (AI_SOURCE), keeping each job's slug only
+  // for the registry bookkeeping below. Dedupe across slugs by url (url is the
+  // row identity), so the same posting reported under two slugs writes once.
+  const slugByUrl = new Map();
+  const allJobs = [];
+  for (const [slug, rawJobs] of groupBySlug(accepted)) {
+    for (const j of sanitizeJobs(rawJobs)) {
+      if (slugByUrl.has(j.url)) continue;
+      slugByUrl.set(j.url, slug);
+      allJobs.push(j);
     }
+  }
+
+  // Always open a client: even a findings-less POST runs the legacy migration.
+  const client = await pool.connect();
+  try {
+    await migrateLegacyAiSources(client);
+
+    if (allJobs.length > 0) {
+      const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
+      // fullListing:false — the routine reports individual postings it found,
+      // never a site's complete current listing, so reconcile stays
+      // reactivate-only and the 404 sweep owns deaths.
+      const stats = await ingestJobs(client, { source: AI_SOURCE, jobs: allJobs, fullListing: false, filters, categories });
+      results[AI_SOURCE] = stats;
+      totalWritten = stats.insertedUrls.length;
+      console.log(
+        `[ai-registry] ${AI_SOURCE}: rows=${stats.rows} inserted=${stats.inserted} ` +
+        `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
+        `skip_non_it=${stats.skippedNonIt}`
+      );
+
+      // Record only what actually survived the gates, so the routine's knownUrls
+      // reflects the DB rather than what it hoped to write. Keep the slug so the
+      // registry still tracks which company each finding came from.
+      const insertedSet = new Set(stats.insertedUrls);
+      const known = new Set(reg.findings.map((f) => f.url));
+      for (const j of allJobs) {
+        if (!insertedSet.has(j.url) || known.has(j.url)) continue;
+        reg.findings.push({ slug: slugByUrl.get(j.url), ...j, foundDate: now });
+      }
+    }
+  } finally {
+    client.release();
   }
 
   // 2. Merge this run's bookkeeping.

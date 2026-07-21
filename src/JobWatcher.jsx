@@ -417,17 +417,23 @@ const hoursSince = (iso) => {
 const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka", "talent"];
 const JUNIOR_KEYWORD = "junior";
 
-// Some source-filter buttons are PREFIX buckets, not real db sources: the
-// "ai-scraped" button aggregates every `AI - <slug>` row under one label
-// (mirrors the `prefix` entry in jobs.js FIXED — keep the prefix in sync there).
-// Client-side source filtering loads all rows and matches by source, so a prefix
-// bucket must match by startsWith, not exact equality, or selecting it shows nothing.
-const SOURCE_PREFIX_BUCKETS = { "ai-scraped": "AI - " };
+// The "AI-scraped" button is a bucket, not a plain source: rows use the flat
+// source "AI-scraped", but any legacy `AI - <slug>` rows still around during the
+// migration belong to it too (mirrors jobs.js FIXED — keep the prefix in sync).
+// Client-side source filtering loads all rows and matches by source, so the
+// bucket must match the flat key OR the legacy prefix, not just exact equality.
+const SOURCE_PREFIX_BUCKETS = { "AI-scraped": "AI - " };
 
 function jobMatchesSourceKey(jobSource, key) {
   const prefix = SOURCE_PREFIX_BUCKETS[key];
-  if (prefix) return (jobSource || "").startsWith(prefix);
+  if (prefix) return jobSource === key || (jobSource || "").startsWith(prefix);
   return jobSource === key;
+}
+
+// Legacy `AI - <slug>` rows display as the flat "AI-scraped" label until the DB
+// migration collapses them (so the badge never shows a stale per-company name).
+function displaySource(jobSource) {
+  return (jobSource || "").startsWith("AI - ") ? "AI-scraped" : jobSource;
 }
 
 const JUNIOR_EXCLUDED_SOURCES = [
@@ -1987,7 +1993,7 @@ const JobWatcher = () => {
                     </span>
                   )}
                 </div>
-                <span className="job-source">{job.source}</span>
+                <span className="job-source">{displaySource(job.source)}</span>
               </div>
 
               {job.description && (
