@@ -71,6 +71,21 @@ function volatileUrlPattern(url) {
   return m ? `^${escapeRegex(m[1])}-\\d+$` : null;
 }
 
+// The OPPOSITE churn also happens: the id stays put but the slug text changes
+// (a title edit re-slugs the posting) — live evidence 2026-07-22: "frontend-
+// fejleszto-8899" got re-slugged to "frontend-fejleszto-rendszeres-
+// megtakaritasok-es-biztositasok-squad-8899" (same trailing id, longer title).
+// volatileUrlPattern's fixed-prefix match can't catch this (the prefix changed
+// too), so it silently orphaned the old row instead of migrating it — the old
+// url stayed reachable (HTTP 200) but fell out of the listing and aged off as
+// "Lejárt" while a separate new row got created for what a user sees as the
+// same job. Fallback: match ANY erste url ending in the same numeric id,
+// regardless of prefix.
+function idOnlyPattern(url) {
+  const m = url.match(/-(\d+)$/);
+  return m ? `-${m[1]}$` : null;
+}
+
 function _blacklistRegex(k) {
   const escaped = normalizeText(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
@@ -225,6 +240,11 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
           continue;
         }
 
+        // 2026-07-20-i refaktor törölte ezt a sort (a vele együtt eltávolított
+        // seniorOnly logika tartotta fenn), de az isIntern lentebb továbbra is
+        // rá hivatkozott → ReferenceError MINDEN nem-senior sornál, azóta a
+        // teljes forrás új sort nem tudott felvenni (2026-07-22 user-jelzés).
+        const expLower = expCombined.toLowerCase();
         const isIntern =
           expLower.includes("gyakornok") ||
           expLower.includes("pályakezdő") ||
@@ -235,9 +255,13 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
         let experience = isIntern ? "diákmunka" : expCombined || "-";
 
         const pattern = volatileUrlPattern(url);
-        const migrated = pattern
+        let migrated = pattern
           ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
           : false;
+        if (!migrated) {
+          const idPattern = idOnlyPattern(url);
+          if (idPattern) migrated = await migrateVolatileUrl(client, source, url, idPattern, currentUrls);
+        }
         const wasNew = await upsertJob(client, source, { title, url, experience });
         foundUrls.push(url);
         if (migrated) {
