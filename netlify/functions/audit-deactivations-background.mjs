@@ -36,7 +36,48 @@ function pathOf(u) {
   }
 }
 
-// Mirrors _active_core.mjs's private _isDeadResult — same rules, same sources.
+// Round 1 (status-only) showed most sites keep a "closed" job's page at plain
+// HTTP 200 with an in-page banner instead of a real 404/redirect — exactly the
+// pattern _active_core.mjs's BANNER_DEAD_SOURCES already exists for, just not
+// registered for these sources yet. This generic, source-agnostic phrase list
+// (validated 2026-07-22 by manually reading schonherz/otp/minddiak/kuka/qdiak/
+// miszisz/raiffeisen/workly/melodiak/mbh/cg-jobstream/wise/dreamjobs — all
+// confirmed genuinely closed, false positives in round 1) catches the same
+// signal across every source without duplicating any scraper's own extraction
+// logic — it only asks "does this page say the posting is closed", nothing else.
+const GENERIC_DEAD_PHRASES = [
+  "már nem aktuális",
+  "már nem érhető el",
+  "már betöltötték",
+  "lejárt a jelentkezési",
+  "jelentkezési időszak lejárt",
+  "érvényességi ideje lejárt",
+  "lezárt hirdetés",
+  "állás nem található",
+  "álláshirdetés nem található",
+  "a keresett álláshirdetés nem található",
+  "sajnos a keresett állás már lejárt",
+  "position has been filled",
+  "this job has expired",
+  "job has expired",
+  "expired job",
+  "no longer accepting applications",
+  "job posting has expired",
+  "vacancy has expired",
+  "this position is no longer available",
+];
+
+// Sources whose own detail-page status is documented as unreliable via a plain
+// cookieless GET in EITHER direction (not just "needs a banner rule"):
+//   • alllocaljobs — session-gated; a cookieless fetch of a LIVE job can also
+//     redirect/404 (see _active_core.mjs REDIRECT_DEAD_SOURCES comment).
+//   • random_email — deactivated on a 10-day TTL by policy (expireAgedPushSource),
+//     not because the source proved it dead; the page being alive is expected
+//     and not a mistake.
+const UNVERIFIABLE_BY_PLAIN_GET = new Set(["alllocaljobs", "random_email"]);
+
+// Mirrors _active_core.mjs's private _isDeadResult, extended with the generic
+// phrase pass above.
 function verdict(row, res) {
   if (!res || res.status < 0) return { dead: false, reason: `inconclusive:${res ? res.status : "no-response"}` };
   if (res.status === 404) return { dead: true, reason: "404" };
@@ -51,6 +92,12 @@ function verdict(row, res) {
   if (rule && res.status === 200 && typeof res.body === "string") {
     const hit = typeof rule === "function" ? rule(row, res.body) : res.body.toLowerCase().includes(rule);
     if (hit) return { dead: true, reason: "banner-match" };
+  }
+
+  if (res.status === 200 && typeof res.body === "string") {
+    const lower = res.body.toLowerCase();
+    const phrase = GENERIC_DEAD_PHRASES.find((p) => lower.includes(p));
+    if (phrase) return { dead: true, reason: `generic-banner:${phrase}` };
   }
 
   if (res.status >= 400 && res.status !== 404) return { dead: false, reason: `inconclusive:${res.status}` };
@@ -80,7 +127,8 @@ const _runJob = withTimeout("audit-deactivations-background", async () => {
     client.release();
   }
 
-  const wantBody = (row) => ({ wantBody: BANNER_DEAD_SOURCES[row.source] !== undefined });
+  // Always fetch body now — the generic phrase pass needs it for every source,
+  // not just the ones with a registered BANNER_DEAD_SOURCES rule.
   const flagged = [];
   const perSource = new Map();
   const bump = (source, key) => {
@@ -88,8 +136,9 @@ const _runJob = withTimeout("audit-deactivations-background", async () => {
     perSource.get(source)[key]++;
   };
 
-  const excluded = rows.filter((r) => SWEEP_EXCLUDED_SOURCES.has(r.source));
-  const toCheck = rows.filter((r) => !SWEEP_EXCLUDED_SOURCES.has(r.source));
+  const skipLive = (s) => SWEEP_EXCLUDED_SOURCES.has(s) || UNVERIFIABLE_BY_PLAIN_GET.has(s);
+  const excluded = rows.filter((r) => skipLive(r.source));
+  const toCheck = rows.filter((r) => !skipLive(r.source));
   for (const r of excluded) {
     bump(r.source, "total");
     bump(r.source, "excluded");
@@ -102,7 +151,7 @@ const _runJob = withTimeout("audit-deactivations-background", async () => {
         bump(row.source, "total");
         let res;
         try {
-          res = await fetchFinal(row.url, wantBody(row));
+          res = await fetchFinal(row.url, { wantBody: true });
         } catch {
           res = { status: -3, finalUrl: null };
         }
@@ -139,7 +188,11 @@ const _runJob = withTimeout("audit-deactivations-background", async () => {
       firstSeen: r.first_seen,
       status: null,
       finalUrl: null,
-      reason: "excluded-source-needs-manual-check",
+      reason: r.source === "random_email"
+        ? "ttl-policy-not-a-bug"
+        : SWEEP_EXCLUDED_SOURCES.has(r.source)
+        ? "excluded-source-needs-manual-check"
+        : "session-gated-needs-cookie-check",
     });
   }
 
