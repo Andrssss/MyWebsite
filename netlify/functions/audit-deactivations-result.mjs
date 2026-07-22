@@ -1,23 +1,25 @@
 // ONE-OFF temporary reader for the audit-deactivations-background blob — delete
 // together with that file after use.
-const { getStore } = require("@netlify/blobs");
+import { getStore } from "@netlify/blobs";
 
-exports.handler = async (event) => {
-  const auth = (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
+export default async (request) => {
+  const auth = (request.headers.get("authorization") || "").trim();
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   const expected = process.env.CRON_SECRET;
   if (!expected || token !== expected) {
-    return { statusCode: 401, body: "Unauthorized" };
+    return new Response("Unauthorized", { status: 401 });
   }
 
   const store = getStore("job-audit");
   const data = await store.get("latest", { type: "json" }).catch(() => null);
   if (!data) {
-    return { statusCode: 404, body: JSON.stringify({ status: "not_found" }) };
+    return new Response(JSON.stringify({ status: "not_found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  return {
-    statusCode: 200,
+  return new Response(JSON.stringify(data), {
+    status: 200,
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify(data),
-  };
+  });
 };
