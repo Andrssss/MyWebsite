@@ -382,6 +382,51 @@ export const BANNER_DEAD_SOURCES = {
     const m = body.slice(i, i + 400).match(/"status"\s*:\s*"([A-Z_]+)"/);
     return !!m && (m[1] === "DISABLED" || m[1] === "EXPIRED");
   },
+
+  // Added 2026-07-22, each validated by fetching a currently-active listed job
+  // for that exact source and confirming the phrase is ABSENT (the project's
+  // repeated "SPA template noise" trap — see the doc comment above and
+  // qdiak's entry below for why that check matters).
+  schonherz: "sajnos ez a hirdetés már nem aktuális",
+  minddiak: "ez az álláshirdetés már nem érhető el",
+  miszisz: "lejárt a jelentkezési",
+  mbh: "a keresett álláshirdetés nem található",
+  "cg-jobstream": "position has been filled",
+  wise: "job has expired",
+  // dreamjobs shows the full posting (title/description/apply button) even
+  // when expired — SEO pattern, same idea as nofluffjobs — but adds an
+  // explicit expiry line the live-page check confirmed is absent otherwise.
+  dreamjobs: "már lejárt",
+  // kuka/cg-jobstream/wise's ATS renders in the visitor's locale, so both an
+  // English and a German "closed" string were seen live; checking either
+  // covers kuka specifically (cg-jobstream/wise only showed the English one).
+  kuka: (row, body) => {
+    const lower = body.toLowerCase();
+    return lower.includes("position has been filled") || lower.includes("job has expired") || lower.includes("bereits besetzt");
+  },
+  // qdiak's own phrase ("Ez az állás már nem elérhető") is NOT safe as a plain
+  // substring — confirmed live 2026-07-22 that it's baked into every page as
+  // the disabled-apply-button's i18n dict entry
+  // (`"application":{"button":{"inactive":"Ez az állás már nem elérhető",...`),
+  // present whether the job is open or closed. The reliable signal instead is
+  // the job's OWN campaign status, anchored by its id (same pattern as
+  // talent's system_status): `"id":"{uuid}","kampany":{...,"statusz":"aktiv"}`
+  // on a live job vs `"statusz":"szunetel"` (or any other non-"aktiv" value)
+  // on a dead one — validated against one confirmed-live and one
+  // confirmed-dead posting.
+  qdiak: (row, body) => {
+    const id = (row.url.match(/\/munkak\/([0-9a-f-]{36})/i) || [])[1];
+    if (!id) return false;
+    // Next.js flight payload ships this as backslash-escaped JSON; fall back
+    // to the plain form too (mirrors talent's rule, same underlying reason).
+    // Verified 2026-07-22 against one confirmed-live page (statusz:"aktiv")
+    // and one confirmed-dead page (statusz:"szunetel").
+    let i = body.indexOf(`\\"id\\":\\"${id}\\",\\"kampany\\"`);
+    if (i < 0) i = body.indexOf(`"id":"${id}","kampany"`);
+    if (i < 0) return false;
+    const m = body.slice(i, i + 400).match(/statusz\\?"\s*:\s*\\?"([^"\\]*)/);
+    return !!m && m[1] !== "aktiv";
+  },
 };
 
 function _pathOf(u) {
