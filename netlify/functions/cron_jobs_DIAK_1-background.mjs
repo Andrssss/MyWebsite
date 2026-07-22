@@ -1261,7 +1261,7 @@ async function fetchAllTudasdiakJobs(html, listUrl, { maxPages = 20 } = {}) {
         const title = j.language_content?.title ? String(j.language_content.title).trim().slice(0, 300) : null;
         const permalink = j.language_content?.permalink || "-";
         const puuid = j.puuid;
-        const url = puuid ? `https://app.tudatosdiak.hu/hu/jobs/${permalink}/${puuid}` : null;
+        const url = puuid ? `https://app.tudatosdiak.hu/hu/jobs/${permalink}/pj${puuid}` : null;
         return { title, url, description: null };
       })
       .filter((x) => x.title && x.url);
