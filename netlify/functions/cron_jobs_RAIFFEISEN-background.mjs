@@ -19,7 +19,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex, pruneStaleIdDuplicates } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -76,6 +76,17 @@ function sleep(ms) {
 function volatileUrlPattern(url) {
   const m = url.match(/^(.*)-\d+$/);
   return m ? `^${escapeRegex(m[1])}-\\d+$` : null;
+}
+
+// The OPPOSITE churn also happens: the id stays put but the slug text changes
+// (a title/content edit re-slugs the posting) — same jsbq-platform issue fixed
+// for erste/kh 2026-07-22 (see cron_jobs_ERSTE-background.mjs's idOnlyPattern
+// doc comment). volatileUrlPattern's fixed-prefix match can't catch this, so
+// this fallback matches ANY raiffeisen url ending in the same numeric id,
+// regardless of prefix.
+function idOnlyPattern(url) {
+  const m = url.match(/-(\d+)$/);
+  return m ? `-${m[1]}$` : null;
 }
 
 function fetchText(url, redirectLeft = 5) {
@@ -303,9 +314,13 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         }
 
         const pattern = volatileUrlPattern(url);
-        const migrated = pattern
+        let migrated = pattern
           ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
           : false;
+        if (!migrated) {
+          const idPattern = idOnlyPattern(url);
+          if (idPattern) migrated = await migrateVolatileUrl(client, source, url, idPattern, currentUrls);
+        }
         const wasNew = await upsertJob(client, source, { title, url, experience, technologies });
         foundUrls.push(url);
         if (migrated) {
@@ -334,6 +349,12 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
     const complete = !crawlError;
     const rc = await reconcileActive(client, "raiffeisen", foundUrls, { complete });
     console.log(`[raiffeisen] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
+
+    // Same jsbq-platform id-stable-slug-rename gap as erste/kh — a second
+    // re-slug before the first migration runs orphans the oldest row. See
+    // pruneStaleIdDuplicates' doc comment in _active_core.mjs.
+    const pruned = await pruneStaleIdDuplicates(client, "raiffeisen", (url) => (url.match(/-(\d+)$/) || [])[1] ?? null);
+    if (pruned.deleted > 0) console.log(`[raiffeisen] pruned ${pruned.deleted} stale duplicate row(s)`);
   } finally {
     client.release();
   }

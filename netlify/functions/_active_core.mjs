@@ -288,7 +288,10 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 // job that's ACTUALLY closed 301-redirects to an unrelated /allasok/ category
 // listing (different path) — confirmed on 8/8 aged-out rows. So listing
 // absence proves nothing for this source; only the redirect does.
-export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok", "profession-intern"]);
+// wherewework (2026-07-22): a dead job 302-redirects to the generic /en/jobs
+// board root (a different path) instead of banner-ing or 404-ing; a live job
+// stays a plain 200 at its own path. Confirmed 6/6 dead + 3/3 live samples.
+export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok", "profession-intern", "wherewework"]);
 
 // Sources whose LISTING keeps showing already-closed jobs, so being in
 // foundUrls does not prove a posting is live. For these, reconcileActive's
@@ -390,6 +393,14 @@ export const BANNER_DEAD_SOURCES = {
   schonherz: "sajnos ez a hirdetés már nem aktuális",
   minddiak: "ez az álláshirdetés már nem érhető el",
   miszisz: "lejárt a jelentkezési",
+  // melodiak's plain phrase ("Lezárt hirdetés") is ALSO baked into every page
+  // as i18n props JSON (`"section3":{"text1":"Lezárt hirdetés",...}`, present
+  // whether the job is open or closed) — same trap as qdiak. The reliable
+  // signal is the actual server-rendered banner element, confirmed present
+  // only on a dead page and absent on a live one (2026-07-22, live sample
+  // fetched fresh from web-api.melodiak.hu's own listing since no active row
+  // existed in job_posts to test against at the time).
+  melodiak: "<h3>lezárt hirdetés</h3>",
   mbh: "a keresett álláshirdetés nem található",
   "cg-jobstream": "position has been filled",
   wise: "job has expired",
