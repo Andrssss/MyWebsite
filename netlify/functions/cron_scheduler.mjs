@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–22 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "3,8,11,12,13,14,22,27,33,38,43,45,52 4-22 * * *",
+  schedule: "3,8,11,12,13,14,22,27,33,34,38,43,45,52 4-22 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -41,6 +41,7 @@ const GRID = {
   22: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
   27: [{ name: "cron_jobs_MIX-background" }],          // kuka/zyntern/dreamjobs (~35)
   33: [{ name: "cron_jobs_MBH-background" }],          // mbh (~29)
+  34: [{ name: "cron_jobs_PRODIAK-background" }],      // prodiak (~13, IT+Budapest) — added 2026-07-22, previously an orphan source with no scraper at all
   38: [{ name: "cron_jobs_BLUE-background" }],         // bluebird (~19)
   43: [{ name: "cron_jobs_DIAK_1-background" }],       // schonherz/minddiak/muisz (~20)
   45: [{ name: "cron_jobs_ALLLOCALJOBS-background" }], // alllocaljobs (~221) — 5 min clear after
