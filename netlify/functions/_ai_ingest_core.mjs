@@ -16,6 +16,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
+  extractYearsFromText,
 } from "./_experience_core.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
@@ -136,15 +137,30 @@ export function isSeniorLike(title, filters) {
 // body said "Legalább 2 év", title said nothing, row got stamped "medior").
 // Strip a bare level word back to "-" rather than trusting it here.
 const LEVEL_WORD_RE = /(^|[^a-z0-9])(junior|medior|mid-level|mid level|szenior|senior|lead)([^a-z0-9]|$)/i;
+
+// The other 30 scrapers only ever put ONE of two shapes in this column: a
+// title-matched canonical label, or a years-phrase produced by
+// extractYearsFromText ("8 év", "3-5 év" — see _experience_core.mjs). The AI
+// pipeline's job.experience is caller-supplied free text (the routine's own
+// body judgment), so it can be neither — e.g. a literal quote from the
+// posting ("kezdő programozók jelentkezését is várjuk", 2026-07-22 bug
+// report) sailed straight into the DB untouched because it contained no bare
+// level word for the check above to catch. Re-run it through the same years
+// extractor every other source uses instead of trusting arbitrary prose.
+const CANONICAL_LEVELS = { diakmunka: "diákmunka", junior: "junior", medior: "medior" };
 function resolveExperience(job) {
   const fromTitle = isInternshipTitle(job.title) ? "diákmunka"
     : isJuniorTitle(job.title) ? "junior"
     : isMidLevelTitle(job.title) ? "medior"
     : "-";
   if (fromTitle !== "-") return fromTitle;
-  const bodyExp = job.experience && job.experience !== "-" ? job.experience : "-";
-  if (bodyExp !== "-" && LEVEL_WORD_RE.test(bodyExp)) return "-";
-  return bodyExp;
+
+  const raw = job.experience && job.experience !== "-" ? job.experience.trim() : "-";
+  if (raw === "-") return "-";
+  const canonical = CANONICAL_LEVELS[normalizeText(raw)];
+  if (canonical) return canonical;
+  if (LEVEL_WORD_RE.test(raw)) return "-";
+  return extractYearsFromText(raw) || "-";
 }
 
 // NB: az AI-pipeline korábban a body-ból BECSÜLT évszám alapján is dobott
