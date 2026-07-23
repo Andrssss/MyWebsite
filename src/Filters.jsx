@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { adminFetch } from "./adminAuth";
 import "./Filters.css";
 
 const API = "/.netlify/functions/filters";
@@ -35,7 +36,7 @@ const Filters = () => {
     if (!word) return;
     setError(null);
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ word }),
@@ -59,7 +60,7 @@ const Filters = () => {
     const removed = filters.find(f => f.id === id);
     setError(null);
     try {
-      await fetch(API, {
+      await adminFetch(API, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -80,7 +81,7 @@ const Filters = () => {
     setPurging(prev => ({ ...prev, [item.uid]: "counting" }));
     setError(null);
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ word: item.word, action: "count" }),
@@ -99,11 +100,10 @@ const Filters = () => {
     setPurging(p => ({ ...p, [item.uid]: "deleting" }));
     setError(null);
     try {
-      const adminId = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("jobWatcherVisitorId="))?.split("=")[1] || "";
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word: item.word, action: "delete", adminId }),
+        body: JSON.stringify({ word: item.word, action: "delete" }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); setPurging(p => ({ ...p, [item.uid]: prev })); return; }
@@ -132,7 +132,7 @@ const Filters = () => {
     setUndoStack(prev => prev.filter(u => u.uid !== item.uid));
     setError(null);
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ word: item.word }),

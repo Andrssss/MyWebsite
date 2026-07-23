@@ -11,6 +11,17 @@ const pool = new Pool({
 const ALLOWED_ORIGIN =
   process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
+// Admin auth: a real server-side secret (never committed to source). Falls back
+// to CRON_SECRET so this keeps working until ADMIN_SECRET is set in Netlify.
+function authorized(event) {
+  const expected = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+  if (!expected) return false;
+  const hdr =
+    (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
+  const token = hdr.replace(/^Bearer\s+/i, "").trim();
+  return token.length > 0 && token === expected;
+}
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -35,6 +46,11 @@ exports.handler = async (event) => {
       },
       body: "",
     };
+  }
+
+  // All mutations require the admin secret; only the read-only list is public.
+  if (method !== "GET" && !authorized(event)) {
+    return json(401, { error: "Unauthorized" });
   }
 
   let client;

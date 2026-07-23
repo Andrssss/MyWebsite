@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { adminFetch } from "./adminAuth";
 import "./Filters.css";
 
 const API = "/.netlify/functions/categories";
@@ -52,7 +53,7 @@ const Categories = () => {
       .map((k) => k.trim())
       .filter(Boolean);
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, keywords }),
@@ -72,7 +73,7 @@ const Categories = () => {
     const removed = categories.find((c) => c.id === id);
     setError(null);
     try {
-      await fetch(API, {
+      await adminFetch(API, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -97,7 +98,7 @@ const Categories = () => {
     setUndoStack((prev) => prev.filter((u) => u.uid !== item.uid));
     setError(null);
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: item.name, keywords: item.keywords }),
@@ -115,7 +116,7 @@ const Categories = () => {
     setError(null);
     const updated = cat.keywords.filter((k) => k !== keyword);
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: cat.id, keywords: updated }),
@@ -145,7 +146,7 @@ const Categories = () => {
     if (!cat) return;
     const merged = [...cat.keywords, item.keyword];
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.catId, keywords: merged }),
@@ -166,7 +167,7 @@ const Categories = () => {
     const newKws = input.split(",").map((k) => k.trim()).filter(Boolean);
     const merged = [...cat.keywords, ...newKws.filter((k) => !cat.keywords.some((ex) => ex.toLowerCase() === k.toLowerCase()))];
     try {
-      const res = await fetch(API, {
+      const res = await adminFetch(API, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: cat.id, keywords: merged }),

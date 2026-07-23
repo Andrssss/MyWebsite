@@ -11,12 +11,18 @@ const pool = new Pool({
 const ALLOWED_ORIGIN =
   process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
-const ADMIN_VISITOR_IDS = new Set([
-  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
-  "69872482-1311-4702-a5e5-a782ca9f2669",
-  "82906f93-dfbb-4684-b2b1-a948b99553e0",
-  "b878ceed-55b7-47db-87ec-c4e2825246f8",
-]);
+// Admin auth: a real server-side secret, never committed to source. The old
+// model (a hardcoded visitor UUID checked against a source-committed allowlist)
+// was public in the repo, so anyone could purge the DB. Falls back to
+// CRON_SECRET so this keeps working until ADMIN_SECRET is set in Netlify.
+function authorized(event) {
+  const expected = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+  if (!expected) return false;
+  const hdr =
+    (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
+  const token = hdr.replace(/^Bearer\s+/i, "").trim();
+  return token.length > 0 && token === expected;
+}
 
 function json(statusCode, body) {
   return {
@@ -42,6 +48,12 @@ exports.handler = async (event) => {
       },
       body: "",
     };
+  }
+
+  // Every mutating / data-reading-beyond-the-word-list action requires the
+  // admin secret. Only the plain filter-word list (GET) stays public.
+  if (method !== "GET" && !authorized(event)) {
+    return json(401, { error: "Unauthorized" });
   }
 
   let client;
@@ -93,9 +105,9 @@ exports.handler = async (event) => {
       return json(200, { ok: true });
     }
 
-    // PATCH – count or purge jobs matching a filter word (last 1 day only)
+    // PATCH – count or purge jobs matching a filter word
     if (method === "PATCH") {
-      const { word, action, adminId } = JSON.parse(event.body || "{}");
+      const { word, action } = JSON.parse(event.body || "{}");
       if (!word || typeof word !== "string") {
         return json(400, { error: "word kötelező." });
       }
@@ -118,9 +130,10 @@ exports.handler = async (event) => {
         return json(200, { count: countRes.rows[0].count, titles: titlesRes.rows.map(r => r.title) });
       }
 
-      // default: delete
-      if (!ADMIN_VISITOR_IDS.has(String(adminId || ""))) {
-        return json(403, { error: "Forbidden" });
+      // default: delete. Guard against a too-broad substring wiping the whole
+      // table — a 1–2 char word (e.g. "a") matches almost every title.
+      if (trimmed.length < 3) {
+        return json(400, { error: "Legalább 3 karakteres szó kell a törléshez." });
       }
       const result = await client.query(
         `DELETE FROM job_posts ${whereClause}`,
