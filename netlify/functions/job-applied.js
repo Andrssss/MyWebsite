@@ -1,21 +1,32 @@
 // netlify/functions/job-applied.js
-// Shared "applied jobs" list for the admins, stored in the DB.
-// All admin visitor IDs read/write the SAME shared list (admin_applied_jobs table),
-// so whatever one admin marks as "jelentkeztem" / "interjú" is visible to the others.
+// "Applied jobs" list, partitioned per owner in the SAME table/DB.
+//
+// `applied_by` is the partition key, resolved SERVER-SIDE from the visitor
+// cookie (never trusted from the client): the four real admins all resolve to
+// the literal 'admin' bucket (shared — that's the point, any of the 4 sees
+// what the others marked), while each little-admin gets `little:<their UUID>`,
+// their OWN bucket, so they can't collide with or see the real admins' list.
 //
 // A row exists while a job has any status. Two flags per job:
 //   applied   → "Jelentkeztem"
 //   interview → "Interjú" (a sub-state; only meaningful while applied)
 //
-// Every request needs `Authorization: Bearer $ADMIN_SECRET`.
+// Every request needs `Authorization: Bearer $ADMIN_SECRET` AND a visitor
+// cookie recognized by _admin_identity_core (either tier) — knowing the
+// password alone is no longer enough, closing a gap the old UUID-only auth
+// didn't have either (anyone with a leaked/guessed secret could hit this
+// regardless of who they were).
 //
 // GET
 //   → { applied: ['job:src:url', ...], interview: [...], appliedCache: { 'job:src:url': {job}, ... } }
 //   (Key = jobKeyFor() in JobWatcher.jsx: url-keyed; title-keyed only when the
 //   entry has no url. Legacy 'job:src:title' rows are migrated by the frontend.)
-// POST { adminId, jobKey, applied: bool, interview: bool, job? }
+// POST { jobKey, applied: bool, interview: bool, job? }
 //   Sends the FULL desired state. If both flags are false → row is deleted.
+//   `applied_by` is NOT client-supplied — it's always the caller's resolved
+//   ownerKey, so nobody can write into someone else's bucket by lying about it.
 const { Pool } = require("pg");
+const { resolveOwnerKey, hasAdminSecret } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -29,33 +40,64 @@ const pool = new Pool({
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
-// Auth is the ADMIN_SECRET bearer token, NOT a visitor-id allowlist.
-//
-// This used to gate on four hardcoded UUIDs — which were committed to a public
-// repo, so anyone could read them and both dump the shared applied list (GET)
-// and flip job_posts.hidden (the mirror below). `adminId` is still accepted, but
-// only as an attribution label for `applied_by`; it authorizes nothing.
 function authorized(event) {
-  const expected = (process.env.ADMIN_SECRET || process.env.CRON_SECRET || "").trim();
-  if (!expected) return false;
-  const hdr =
-    (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
-  const token = hdr.replace(/^Bearer\s+/i, "").trim();
-  return token.length > 0 && token === expected;
+  return hasAdminSecret(event) && resolveOwnerKey(event) !== null;
 }
 
 const ensureTable =
   globalThis.__ensureAdminAppliedTable ||
-  pool.query(
-    `CREATE TABLE IF NOT EXISTS admin_applied_jobs (
-       job_key text PRIMARY KEY,
-       job_data jsonb NOT NULL DEFAULT '{}'::jsonb,
-       applied boolean NOT NULL DEFAULT false,
-       interview boolean NOT NULL DEFAULT false,
-       applied_by text,
-       applied_at timestamptz NOT NULL DEFAULT now()
-     )`
-  );
+  (async () => {
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS admin_applied_jobs (
+         job_key text NOT NULL,
+         job_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+         applied boolean NOT NULL DEFAULT false,
+         interview boolean NOT NULL DEFAULT false,
+         applied_by text,
+         applied_at timestamptz NOT NULL DEFAULT now(),
+         PRIMARY KEY (job_key)
+       )`
+    );
+
+    // One-time migration: is the PK still job_key alone? If so, every existing
+    // row predates per-owner buckets (little-admin never had access to this
+    // endpoint before 2026-07-24), so it's all real-admin data — collapse
+    // applied_by into 'admin' before widening the key, so the four admins
+    // don't lose their existing list once rows are partitioned by applied_by.
+    const { rows } = await pool.query(
+      `SELECT array_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS cols
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.key_column_usage kcu
+           ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        WHERE tc.table_schema = 'public'
+          AND tc.table_name = 'admin_applied_jobs'
+          AND tc.constraint_type = 'PRIMARY KEY'
+        GROUP BY tc.constraint_name`
+    );
+    const cols = rows[0]?.cols || [];
+    const alreadyPartitioned = cols.length === 2 && cols.includes("job_key") && cols.includes("applied_by");
+
+    if (!alreadyPartitioned) {
+      // Unconditional, not just NULL/empty: pre-migration rows hold whichever
+      // raw admin UUID last touched them (the pre-2026-07-24 behavior), not
+      // 'admin' — every one of those needs collapsing, or most existing
+      // "Jelentkeztem" marks would silently vanish from the admins' shared view.
+      await pool.query(`UPDATE admin_applied_jobs SET applied_by = 'admin'`);
+      try {
+        await pool.query(`ALTER TABLE admin_applied_jobs DROP CONSTRAINT admin_applied_jobs_pkey`);
+      } catch (err) {
+        if (err.code !== "42704") throw err; // 42704 undefined_object: already dropped (concurrent cold start)
+      }
+      try {
+        await pool.query(
+          `ALTER TABLE admin_applied_jobs ADD CONSTRAINT admin_applied_jobs_pkey PRIMARY KEY (job_key, applied_by)`
+        );
+      } catch (err) {
+        if (err.code !== "42710" && err.code !== "42P16") throw err; // already exists / already a pk
+      }
+    }
+  })();
 globalThis.__ensureAdminAppliedTable = ensureTable;
 
 function corsHeaders(extra = {}) {
@@ -81,16 +123,19 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
 
-  // GET → shared applied/interview lists + cache
+  // GET → this caller's applied/interview list + cache (own bucket only)
   if (event.httpMethod === "GET") {
     if (!authorized(event)) return jsonResponse(401, { error: "Unauthorized" });
+    const ownerKey = resolveOwnerKey(event);
 
     try {
       await ensureTable;
       const { rows } = await pool.query(
         `SELECT job_key, job_data, applied, interview
            FROM admin_applied_jobs
-          ORDER BY applied_at DESC`
+          WHERE applied_by = $1
+          ORDER BY applied_at DESC`,
+        [ownerKey]
       );
       const applied = [];
       const interview = [];
@@ -110,6 +155,7 @@ exports.handler = async (event) => {
   // POST { adminId, jobKey, applied, interview, job? }
   if (event.httpMethod === "POST") {
     if (!authorized(event)) return jsonResponse(401, { error: "Unauthorized" });
+    const ownerKey = resolveOwnerKey(event);
 
     const MAX_BODY_BYTES = 8192;
     const rawBody = event.body || "";
@@ -130,7 +176,6 @@ exports.handler = async (event) => {
       return jsonResponse(400, { error: "Invalid JSON body" });
     }
 
-    const adminId = String(payload.adminId || "").trim();
     const jobKey = String(payload.jobKey || "").trim();
     const applied = Boolean(payload.applied);
     const interview = Boolean(payload.interview);
@@ -145,28 +190,33 @@ exports.handler = async (event) => {
     try {
       await ensureTable;
       if (!applied && !interview) {
-        await pool.query(`DELETE FROM admin_applied_jobs WHERE job_key = $1`, [jobKey]);
+        await pool.query(`DELETE FROM admin_applied_jobs WHERE job_key = $1 AND applied_by = $2`, [
+          jobKey,
+          ownerKey,
+        ]);
       } else {
         await pool.query(
           `INSERT INTO admin_applied_jobs (job_key, job_data, applied, interview, applied_by, applied_at)
            VALUES ($1, $2::jsonb, $3, $4, $5, now())
-           ON CONFLICT (job_key) DO UPDATE
+           ON CONFLICT (job_key, applied_by) DO UPDATE
              SET applied = EXCLUDED.applied,
                  interview = EXCLUDED.interview,
                  job_data = CASE
                    WHEN EXCLUDED.job_data = '{}'::jsonb THEN admin_applied_jobs.job_data
                    ELSE EXCLUDED.job_data
                  END,
-                 applied_by = EXCLUDED.applied_by,
                  applied_at = now()`,
-          [jobKey, JSON.stringify(job), applied, interview, adminId]
+          [jobKey, JSON.stringify(job), applied, interview, ownerKey]
         );
       }
-      // Mirror "applied" onto job_posts.hidden: marking a job applied removes it
-      // from the public board, unapplying brings it back. Only possible when we
-      // know the row's identity (url) — url-less manual entries have no job_posts row.
+      // Mirror "applied" onto job_posts.hidden — but ONLY for the real admins'
+      // shared bucket. This flag is PUBLIC (every visitor's board), so a
+      // little-admin's own personal applied-tracking must never touch it: their
+      // bucket is supposed to be private bookkeeping, not something that hides
+      // a job for everyone else. Only possible when we know the row's identity
+      // (url) — url-less manual entries have no job_posts row.
       const jobUrl = typeof job.url === "string" ? job.url.trim() : "";
-      if (jobUrl) {
+      if (jobUrl && ownerKey === "admin") {
         await pool.query(`UPDATE job_posts SET hidden = $1 WHERE url = $2`, [applied, jobUrl]);
       }
       return jsonResponse(200, { ok: true });

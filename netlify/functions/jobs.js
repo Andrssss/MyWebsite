@@ -1,6 +1,5 @@
 // netlify/functions/jobs.js
 const { neon } = require("@neondatabase/serverless");
-const crypto = require("crypto");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -92,73 +91,24 @@ const PRIVATE_HEADERS = {
 // credential from ADMIN_SECRET (which authorizes destructive actions) — if this
 // one leaks, the blast radius is "someone sees hidden ads", not data loss.
 //
-// The credential is the device's existing visitor UUID, matched against the
-// LITTLE_ADMIN* env vars. Same shape as the old ADMIN_VISITOR_IDS allowlist but
-// the values live ONLY in the Netlify env — never in source. That distinction is
-// the whole point: the four UUIDs committed to the public repo are burned and
-// must not be reused here (anyone can read them and set the cookie).
-const LITTLE_ADMIN_COOKIE = "jobWatcherVisitorId";
+// Identity resolution (which env vars count, cookie matching, timing-safe
+// compare) lives in _admin_identity_core.js, shared with job-applied.js — a
+// duplicated copy here is exactly what caused the 2026-07-23 LITTLE_ADMIN_4..7
+// → ADMIN_1..4 rename to silently break this file while job-applied.js's
+// separate check kept working.
+const { isRecognizedAdmin } = require("./_admin_identity_core");
 
-function readCookie(event, name) {
-  const raw =
-    (event.headers && (event.headers.cookie || event.headers.Cookie)) || "";
-  for (const part of raw.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    if (part.slice(0, idx).trim() !== name) continue;
-    try {
-      return decodeURIComponent(part.slice(idx + 1).trim());
-    } catch {
-      return part.slice(idx + 1).trim();
-    }
-  }
-  return "";
-}
+// One-line boot log so "is any key even configured?" is answerable from the
+// function log without exposing values. isRecognizedAdmin re-reads process.env
+// per call (cheap: a handful of string comparisons), so this is diagnostic
+// only, not a cached gate.
+console.log(
+  `[jobs] admin/little-admin env keys present: ${
+    Object.keys(process.env).filter((k) => /^(LITTLE_ADMIN(_\d+)?|ADMIN_\d+)$/.test(k)).length
+  }`
+);
 
-function safeEqual(a, b) {
-  const ba = Buffer.from(String(a));
-  const bb = Buffer.from(String(b));
-  if (ba.length !== bb.length || ba.length === 0) return false;
-  return crypto.timingSafeEqual(ba, bb);
-}
-
-// Multiple keys so separate devices/people can be revoked independently: drop
-// one env var and only that holder loses access, the others keep working.
-// Any `LITTLE_ADMIN`, `LITTLE_ADMIN_2`… (read-only tier) OR `ADMIN_1`, `ADMIN_2`…
-// (the real admins — same UUIDs as JobWatcher.jsx's hardcoded ADMIN_VISITOR_IDS,
-// renamed here 2026-07-23 so the env names distinguish the two tiers) is picked
-// up automatically — adding a device is an env change only, no code edit. Both
-// tiers see hidden rows here; the split only matters elsewhere (visitor-click.js
-// / daily-visitor.js exclude ADMIN_* clicks from analytics, not LITTLE_ADMIN*).
-// The digit suffix is required in both prefixes, so a typo'd name (or matching
-// `ADMIN_SECRET`, which has no trailing digits) silently grants nobody access
-// rather than being treated as a key.
-// Computed once per container: Netlify restarts containers when env changes.
-// `.trim()` is load-bearing: pasting a secret into the Netlify env UI very
-// easily carries a trailing space or newline, and safeEqual compares length
-// first — so an untrimmed key fails to match with NO error anywhere, which is
-// almost impossible to diagnose from the outside.
-const LITTLE_ADMIN_KEYS = Object.keys(process.env)
-  .filter((k) => /^(LITTLE_ADMIN(_\d+)?|ADMIN_\d+)$/.test(k))
-  .sort()
-  .map((k) => (typeof process.env[k] === "string" ? process.env[k].trim() : ""))
-  .filter((v) => v.length > 0);
-
-// One-line boot log so "is the key even configured?" is answerable from the
-// function log without exposing any value.
-console.log(`[jobs] little-admin/admin keys configured: ${LITTLE_ADMIN_KEYS.length}`);
-
-function isLittleAdmin(event) {
-  const cookie = readCookie(event, LITTLE_ADMIN_COOKIE);
-  if (!cookie) return false;
-  // No early exit: every configured key is compared, so which key matched
-  // (or that a second key exists at all) isn't observable from response timing.
-  let ok = false;
-  for (const expected of LITTLE_ADMIN_KEYS) {
-    if (safeEqual(cookie, expected)) ok = true;
-  }
-  return ok;
-}
+const isLittleAdmin = isRecognizedAdmin;
 
 // FIXED lista (key/label)
 // The `AI-scraped` bucket now uses ONE flat db source ("AI-scraped"); `prefix`
