@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLinkedin } from "react-icons/fa";
-import { adminFetch, purgeJobListCache } from "./adminAuth";
+import { adminFetch, purgeJobListCache, ensureAdminSecret } from "./adminAuth";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
@@ -750,11 +750,15 @@ const JobWatcher = () => {
   // Admins share a single applied/interview list stored in the DB.
   // Load it on mount and make the DB the source of truth for them.
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isLittleAdmin) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${JOB_APPLIED_API}?adminId=${encodeURIComponent(myVisitorId)}`);
+        // Ask for the password up front and verify it server-side, so admin
+        // status is settled before anything unlocks — not discovered later.
+        if (!(await ensureAdminSecret())) return;
+        if (cancelled) return;
+        const res = await adminFetch(JOB_APPLIED_API);
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled || !data) return;
@@ -777,7 +781,7 @@ const JobWatcher = () => {
           // failure just leaves the old row for the next load to retry.
           for (const m of migrated.moves) {
             try {
-              const resNew = await fetch(JOB_APPLIED_API, {
+              const resNew = await adminFetch(JOB_APPLIED_API, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -789,7 +793,7 @@ const JobWatcher = () => {
                 }),
               });
               if (resNew.ok) {
-                await fetch(JOB_APPLIED_API, {
+                await adminFetch(JOB_APPLIED_API, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -812,13 +816,13 @@ const JobWatcher = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, myVisitorId]);
+  }, [isAdmin, isLittleAdmin, myVisitorId]);
 
   // Persist an applied/interview change to the shared DB (admins only).
   // Resolves to true when the DB write succeeded (non-admin: false, no write).
   const persistAdminApplied = (jobKey, applied, interview, job) => {
-    if (!isAdmin) return Promise.resolve(false);
-    return fetch(JOB_APPLIED_API, {
+    if (!isAdmin && !isLittleAdmin) return Promise.resolve(false);
+    return adminFetch(JOB_APPLIED_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

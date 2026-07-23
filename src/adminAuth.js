@@ -20,6 +20,52 @@ export function getAdminSecret({ prompt = true } = {}) {
 
 export function clearAdminSecret() {
   localStorage.removeItem(KEY);
+  try {
+    sessionStorage.removeItem(VERIFIED_KEY);
+  } catch {
+    // sessionStorage unavailable — ensureAdminSecret just re-verifies.
+  }
+}
+
+const VERIFIED_KEY = "adminSecretVerified";
+const ADMIN_VERIFY_API = "/.netlify/functions/admin-verify";
+
+// Confirm admin status UP FRONT: prompt for the password and check it against
+// the server before unlocking anything. Without this the first wrong password
+// only surfaces mid-action, after an optimistic UI update already happened.
+// The verified flag is per-session; the secret itself persists in localStorage.
+export async function ensureAdminSecret() {
+  try {
+    if (sessionStorage.getItem(VERIFIED_KEY) === "1" && localStorage.getItem(KEY)) {
+      return true;
+    }
+  } catch {
+    // ignore — fall through and verify again
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const secret = getAdminSecret();
+    if (!secret) return false; // prompt cancelled
+    try {
+      const res = await fetch(ADMIN_VERIFY_API, {
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+      if (res.ok) {
+        try {
+          sessionStorage.setItem(VERIFIED_KEY, "1");
+        } catch {
+          // non-fatal: we just re-verify next time
+        }
+        return true;
+      }
+      // Wrong secret: forget it so getAdminSecret() prompts again.
+      clearAdminSecret();
+      window.alert("Hibás admin jelszó.");
+    } catch {
+      return false; // network problem — don't nag, don't unlock
+    }
+  }
+  return false;
 }
 
 function adminHeaders(extra = {}) {

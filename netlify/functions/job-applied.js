@@ -7,7 +7,9 @@
 //   applied   → "Jelentkeztem"
 //   interview → "Interjú" (a sub-state; only meaningful while applied)
 //
-// GET  ?adminId=xxx
+// Every request needs `Authorization: Bearer $ADMIN_SECRET`.
+//
+// GET
 //   → { applied: ['job:src:url', ...], interview: [...], appliedCache: { 'job:src:url': {job}, ... } }
 //   (Key = jobKeyFor() in JobWatcher.jsx: url-keyed; title-keyed only when the
 //   entry has no url. Legacy 'job:src:title' rows are migrated by the frontend.)
@@ -27,12 +29,20 @@ const pool = new Pool({
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
-const ADMIN_VISITOR_IDS = new Set([
-  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
-  "69872482-1311-4702-a5e5-a782ca9f2669",
-  "82906f93-dfbb-4684-b2b1-a948b99553e0",
-  "b878ceed-55b7-47db-87ec-c4e2825246f8",
-]);
+// Auth is the ADMIN_SECRET bearer token, NOT a visitor-id allowlist.
+//
+// This used to gate on four hardcoded UUIDs — which were committed to a public
+// repo, so anyone could read them and both dump the shared applied list (GET)
+// and flip job_posts.hidden (the mirror below). `adminId` is still accepted, but
+// only as an attribution label for `applied_by`; it authorizes nothing.
+function authorized(event) {
+  const expected = (process.env.ADMIN_SECRET || process.env.CRON_SECRET || "").trim();
+  if (!expected) return false;
+  const hdr =
+    (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
+  const token = hdr.replace(/^Bearer\s+/i, "").trim();
+  return token.length > 0 && token === expected;
+}
 
 const ensureTable =
   globalThis.__ensureAdminAppliedTable ||
@@ -53,7 +63,7 @@ function corsHeaders(extra = {}) {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ...extra,
   };
 }
@@ -71,12 +81,9 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
 
-  // GET ?adminId=xxx → shared applied/interview lists + cache
+  // GET → shared applied/interview lists + cache
   if (event.httpMethod === "GET") {
-    const adminId = String(event.queryStringParameters?.adminId || "").trim();
-    if (!ADMIN_VISITOR_IDS.has(adminId)) {
-      return jsonResponse(403, { error: "Forbidden" });
-    }
+    if (!authorized(event)) return jsonResponse(401, { error: "Unauthorized" });
 
     try {
       await ensureTable;
@@ -102,6 +109,8 @@ exports.handler = async (event) => {
 
   // POST { adminId, jobKey, applied, interview, job? }
   if (event.httpMethod === "POST") {
+    if (!authorized(event)) return jsonResponse(401, { error: "Unauthorized" });
+
     const MAX_BODY_BYTES = 8192;
     const rawBody = event.body || "";
     const bodyBytes = event.isBase64Encoded
@@ -130,7 +139,6 @@ exports.handler = async (event) => {
         ? payload.job
         : {};
 
-    if (!ADMIN_VISITOR_IDS.has(adminId)) return jsonResponse(403, { error: "Forbidden" });
     if (!jobKey) return jsonResponse(400, { error: "jobKey is required" });
     if (jobKey.length > 512) return jsonResponse(400, { error: "jobKey too long" });
 
