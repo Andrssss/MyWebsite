@@ -124,9 +124,14 @@ function safeEqual(a, b) {
 
 // Multiple keys so separate devices/people can be revoked independently: drop
 // one env var and only that holder loses access, the others keep working.
-// Any `LITTLE_ADMIN`, `LITTLE_ADMIN_2`, `LITTLE_ADMIN_3`… is picked up
-// automatically — adding a device is an env change only, no code edit. The
-// `_\d+` suffix is required, so a typo'd name silently grants nobody access
+// Any `LITTLE_ADMIN`, `LITTLE_ADMIN_2`… (read-only tier) OR `ADMIN_1`, `ADMIN_2`…
+// (the real admins — same UUIDs as JobWatcher.jsx's hardcoded ADMIN_VISITOR_IDS,
+// renamed here 2026-07-23 so the env names distinguish the two tiers) is picked
+// up automatically — adding a device is an env change only, no code edit. Both
+// tiers see hidden rows here; the split only matters elsewhere (visitor-click.js
+// / daily-visitor.js exclude ADMIN_* clicks from analytics, not LITTLE_ADMIN*).
+// The digit suffix is required in both prefixes, so a typo'd name (or matching
+// `ADMIN_SECRET`, which has no trailing digits) silently grants nobody access
 // rather than being treated as a key.
 // Computed once per container: Netlify restarts containers when env changes.
 // `.trim()` is load-bearing: pasting a secret into the Netlify env UI very
@@ -134,14 +139,14 @@ function safeEqual(a, b) {
 // first — so an untrimmed key fails to match with NO error anywhere, which is
 // almost impossible to diagnose from the outside.
 const LITTLE_ADMIN_KEYS = Object.keys(process.env)
-  .filter((k) => /^LITTLE_ADMIN(_\d+)?$/.test(k))
+  .filter((k) => /^(LITTLE_ADMIN(_\d+)?|ADMIN_\d+)$/.test(k))
   .sort()
   .map((k) => (typeof process.env[k] === "string" ? process.env[k].trim() : ""))
   .filter((v) => v.length > 0);
 
 // One-line boot log so "is the key even configured?" is answerable from the
 // function log without exposing any value.
-console.log(`[jobs] little-admin keys configured: ${LITTLE_ADMIN_KEYS.length}`);
+console.log(`[jobs] little-admin/admin keys configured: ${LITTLE_ADMIN_KEYS.length}`);
 
 function isLittleAdmin(event) {
   const cookie = readCookie(event, LITTLE_ADMIN_COOKIE);
