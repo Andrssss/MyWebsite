@@ -83,10 +83,15 @@ exports.handler = async (event) => {
   if (event.httpMethod === "GET") {
     try {
       const { rows } = await pool.query(
-        `SELECT COUNT(DISTINCT visitor_cookie)::int AS mau
-         FROM daily_visitors
-         WHERE visit_date >= CURRENT_DATE - 29
-           AND visitor_type = 'user'`
+        `SELECT COUNT(*)::int AS mau
+         FROM (
+           SELECT visitor_cookie
+           FROM daily_visitors
+           WHERE visitor_type = 'user'
+           GROUP BY visitor_cookie
+           HAVING COUNT(DISTINCT visit_date) > 1
+              AND MAX(visit_date) >= CURRENT_DATE - 29
+         ) AS returning_visitors`
       );
       return jsonResponse(
         200,

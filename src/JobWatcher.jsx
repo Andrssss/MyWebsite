@@ -2321,7 +2321,7 @@ const JobWatcher = () => {
       {monthlyActiveUsers !== null && (
         <span
           className="wau-badge"
-          title="Egyedi látogatók az elmúlt 30 napban (admin nélkül)"
+          title="Visszatérő (legalább 2x látott) egyedi látogatók az elmúlt 30 napban (admin nélkül)"
         >
           👥 <strong>{monthlyActiveUsers}</strong>
         </span>

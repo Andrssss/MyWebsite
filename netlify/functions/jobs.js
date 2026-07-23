@@ -232,7 +232,7 @@ exports.handler = async (event) => {
                   first_seen AS "firstSeen",
                   experience, technologies, active
            FROM job_posts
-           WHERE id = $1`,
+           WHERE id = $1 AND hidden = false`,
           [id]
         );
         if (rows.length === 0) return jsonResponse(404, { error: "Nem található." });
