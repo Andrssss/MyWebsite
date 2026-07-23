@@ -693,8 +693,13 @@
   white-space: nowrap;
 }
 
+/* Teljes lila körvonal a rejtett kártyán. `outline` + negatív offset, nem
+   vastagabb border: így nem tolja el a layoutot, és a .job-card overflow:hidden
+   sem vágja le, mert befelé rajzolódik. */
 .job-card--hidden {
-  border-left: 3px solid #7c3aed;
+  outline: 2px solid #7c3aed;
+  outline-offset: -2px;
+  background: rgba(124, 58, 237, 0.08);
 }
 
 /* Elrejtés/visszaállítás gomb — csak megjelölt eszközön renderelődik. */

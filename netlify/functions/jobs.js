@@ -120,10 +120,16 @@ function safeEqual(a, b) {
 
 // Multiple keys so separate devices/people can be revoked independently: drop
 // one env var and only that holder loses access, the others keep working.
-// Add LITTLE_ADMIN_3… here if ever needed.
-function littleAdminKeys() {
-  return [process.env.LITTLE_ADMIN, process.env.LITTLE_ADMIN_2].filter(Boolean);
-}
+// Any `LITTLE_ADMIN`, `LITTLE_ADMIN_2`, `LITTLE_ADMIN_3`… is picked up
+// automatically — adding a device is an env change only, no code edit. The
+// `_\d+` suffix is required, so a typo'd name silently grants nobody access
+// rather than being treated as a key.
+// Computed once per container: Netlify restarts containers when env changes.
+const LITTLE_ADMIN_KEYS = Object.keys(process.env)
+  .filter((k) => /^LITTLE_ADMIN(_\d+)?$/.test(k))
+  .sort()
+  .map((k) => process.env[k])
+  .filter((v) => typeof v === "string" && v.length > 0);
 
 function isLittleAdmin(event) {
   const cookie = readCookie(event, LITTLE_ADMIN_COOKIE);
@@ -131,7 +137,7 @@ function isLittleAdmin(event) {
   // No early exit: every configured key is compared, so which key matched
   // (or that a second key exists at all) isn't observable from response timing.
   let ok = false;
-  for (const expected of littleAdminKeys()) {
+  for (const expected of LITTLE_ADMIN_KEYS) {
     if (safeEqual(cookie, expected)) ok = true;
   }
   return ok;

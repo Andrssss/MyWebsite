@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLinkedin } from "react-icons/fa";
-import { adminFetch, hasLittleAdminCookie } from "./adminAuth";
+import { adminFetch, purgeJobListCache } from "./adminAuth";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
@@ -625,12 +625,17 @@ const JobWatcher = () => {
   const debugMode = new URLSearchParams(window.location.search).has("debug");
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
+  // Admin-only controls are gated on a SERVER-CONFIRMED signal, not on the local
+  // cookie: jobs.js sends the `hidden` column to little-admin and to nobody else,
+  // so its mere presence proves the server validated the key. Faking the cookie
+  // client-side yields a response without `hidden` → the controls stay hidden.
+  const isLittleAdmin = useMemo(
+    () => jobs.some((j) => typeof j.hidden === "boolean"),
+    [jobs]
+  );
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
-  // Device marked with the LITTLE_ADMIN cookie → show the hide controls. Purely
-  // a rendering hint; every hide request is authorized server-side regardless.
-  const isLittleAdmin = useMemo(() => hasLittleAdminCookie(), []);
   const [q, setQ] = useState("");
   const [savedSearches, setSavedSearches] = useState(() => {
     const saved = localStorage.getItem("jobWatcherSavedSearches");
@@ -939,7 +944,11 @@ const JobWatcher = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: job.url, source: job.source, hidden: next }),
       });
-      if (!res.ok) {
+      if (res.ok) {
+        // The 5-min job-list cache still holds the pre-toggle value; drop it so
+        // a refresh doesn't resurrect the old hidden state.
+        purgeJobListCache();
+      } else {
         applyLocal(job.hidden);
         const data = await res.json().catch(() => ({}));
         // alert(), not setStatus(): `status` is never rendered anywhere, so the
