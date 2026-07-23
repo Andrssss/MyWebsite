@@ -1831,7 +1831,10 @@ const JobWatcher = () => {
                 nextActive.add(term);
                 setActiveSavedSearches(nextActive);
                 localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
-                setQ("");
+                // NEM ürítjük ki a mezőt: amíg q nem üres, a szűrés KIZÁRÓLAG
+                // erre a szövegre megy (ld. preTechJobs) — ha itt kitörölnénk,
+                // a lista visszaesne a MÁR aktív mentett keresések uniójára,
+                // és korábbi (elfelejtett bekapcsolt) chipek is visszaszivárognának.
               }
             }
           }}
