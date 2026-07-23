@@ -35,3 +35,27 @@ export async function adminFetch(url, options = {}) {
   if (res.status === 401) clearAdminSecret();
   return res;
 }
+
+// ── "Little admin" ─────────────────────────────────────────────────────────
+// Read-only elevated access: the backend returns `hidden` job rows when this
+// cookie matches the LITTLE_ADMIN env var. A SEPARATE, lower-privilege
+// credential from the ADMIN_SECRET above on purpose — if it leaks, someone sees
+// hidden ads, they cannot destroy data. It's a cookie (not a header) so the
+// ordinary job-list request carries it automatically with no extra plumbing.
+// Only the cookie NAME ships in the bundle; the value lives in the Netlify env
+// and in this one browser.
+const LITTLE_ADMIN_COOKIE = "jw_pref";
+
+export function markDeviceLittleAdmin(secret) {
+  const value = String(secret ?? window.prompt("LITTLE_ADMIN kulcs:") ?? "").trim();
+  if (!value) return false;
+  const secureFlag = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie =
+    `${LITTLE_ADMIN_COOKIE}=${encodeURIComponent(value)}` +
+    `; path=/; max-age=31536000; SameSite=Lax${secureFlag}`;
+  return true;
+}
+
+export function clearDeviceLittleAdmin() {
+  document.cookie = `${LITTLE_ADMIN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}

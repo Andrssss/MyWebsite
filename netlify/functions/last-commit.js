@@ -1,5 +1,11 @@
 const https = require("https");
 
+// Commit-üzenetek, amiket nem mutatunk a fronton (admin-only feature-ök).
+const HIDDEN_MESSAGE_PATTERNS = [
+  /backfill-hidden-applied/i,
+  /job_posts\.hidden/i,
+];
+
 exports.handler = async () => {
   const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const since = Date.now() - ONE_WEEK_MS;
@@ -40,6 +46,7 @@ exports.handler = async () => {
       date: commit?.commit?.author?.date || null,
     }))
     .filter((u) => u.message && u.date && new Date(u.date).getTime() >= since && u.message.startsWith("[jobs]"))
+    .filter((u) => !HIDDEN_MESSAGE_PATTERNS.some((re) => re.test(u.message)))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminFetch } from "./adminAuth";
+import { adminFetch, markDeviceLittleAdmin, clearDeviceLittleAdmin } from "./adminAuth";
 import "./Filters.css";
 
 const API = "/.netlify/functions/filters";
@@ -149,6 +149,24 @@ const Filters = () => {
     <div className="filters-page">
       <div className="filters-header">
         <h1>Filters</h1>
+        <button
+          className="filters-btn"
+          onClick={() => {
+            if (markDeviceLittleAdmin()) setError("Eszköz megjelölve. Frissítsd az állásfigyelőt.");
+          }}
+          title="Rejtett hirdetések megjelenítése ezen az eszközön"
+        >
+          Eszköz megjelölése
+        </button>
+        <button
+          className="filters-btn"
+          onClick={() => {
+            clearDeviceLittleAdmin();
+            setError("Eszköz jelölése törölve.");
+          }}
+        >
+          Jelölés törlése
+        </button>
         <button className="filters-btn" onClick={() => navigate("/allasfigyelo")}>← Vissza</button>
       </div>
 

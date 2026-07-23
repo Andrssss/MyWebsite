@@ -2070,9 +2070,13 @@ const JobWatcher = () => {
           const isApplied = appliedKeys.has(appliedKey);
           const isInterview = interviewKeys.has(appliedKey);
           const isInactive = job.active === false;
+          // `hidden` only ever arrives on a little-admin response (jobs.js sends
+          // the column to nobody else), so this badge simply never renders for
+          // ordinary visitors.
+          const isHidden = job.hidden === true;
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInterview ? " job-card--interview" : ""}${isInactive ? " job-card--inactive" : ""}`}>
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInterview ? " job-card--interview" : ""}${isInactive ? " job-card--inactive" : ""}${isHidden ? " job-card--hidden" : ""}`}>
               <div className="job-row">
                 <div className="job-title-group">
                   <a
@@ -2101,6 +2105,11 @@ const JobWatcher = () => {
                   {isInactive && (
                     <span className="job-inactive-badge" title="Ez az állás már nem szerepel a forrás listáján">
                       Lejárt
+                    </span>
+                  )}
+                  {isHidden && (
+                    <span className="job-hidden-badge" title="Rejtett – csak a megjelölt eszközön látszik, sima látogató nem kapja meg">
+                      Rejtett
                     </span>
                   )}
                 </div>

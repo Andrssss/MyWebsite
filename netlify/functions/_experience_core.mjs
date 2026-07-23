@@ -175,7 +175,9 @@ export function extractYearsFromText(text) {
     /\b\d+\s?(?:[-–]\s?\d+)?\s?\+?\s?(?:év|éves|eves|years?|yrs?)\b/gi,
     /\bminimum\s?\d+\s?(?:év|eves|years?|yrs?)\b/gi,
     /\bat least\s?\d+\s?\+?\s?(?:years?)\b/gi,
-    /\blegalabb\s+\d+\s?(?:ev|eves|year)\b/gi,
+    // Ékezetes és ékezet nélküli forma is ("Legalább 5 év" / "legalabb 5 ev") —
+    // a /i flag miatt a kis/nagy kezdőbetű mindkettőnél lefedve.
+    /\blegal[áa]bb\s+\d+\s?(?:[ée]ves|[ée]v|years?)\b/gi,
     /\btobb\s?eves\b/gi,
     /\bseveral\s?years?\b/gi,
   ];

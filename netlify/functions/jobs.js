@@ -1,5 +1,6 @@
 // netlify/functions/jobs.js
 const { neon } = require("@neondatabase/serverless");
+const crypto = require("crypto");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -75,7 +76,66 @@ function cacheSet(key, value) {
 
 const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=120",
+  // The response body now depends on the admin cookie, so shared caches must
+  // never serve one visitor's variant to another.
+  Vary: "Cookie",
 };
+
+// Admin ("little admin") responses contain hidden rows → they must NEVER be
+// stored by the shared Netlify CDN, only by that one browser.
+const PRIVATE_HEADERS = {
+  "Cache-Control": "private, no-store",
+  Vary: "Cookie",
+};
+
+// Read-only elevated access: seeing `hidden` job rows. Deliberately a SEPARATE
+// credential from ADMIN_SECRET (which authorizes destructive actions) — if this
+// one leaks, the blast radius is "someone sees hidden ads", not data loss.
+// The value lives only in the Netlify env + the admin's browser cookie; it is
+// never committed to source.
+const LITTLE_ADMIN_COOKIE = "jw_pref";
+
+function readCookie(event, name) {
+  const raw =
+    (event.headers && (event.headers.cookie || event.headers.Cookie)) || "";
+  for (const part of raw.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    if (part.slice(0, idx).trim() !== name) continue;
+    try {
+      return decodeURIComponent(part.slice(idx + 1).trim());
+    } catch {
+      return part.slice(idx + 1).trim();
+    }
+  }
+  return "";
+}
+
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length || ba.length === 0) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// Multiple keys so separate devices/people can be revoked independently: drop
+// one env var and only that holder loses access, the others keep working.
+// Add LITTLE_ADMIN_3… here if ever needed.
+function littleAdminKeys() {
+  return [process.env.LITTLE_ADMIN, process.env.LITTLE_ADMIN_2].filter(Boolean);
+}
+
+function isLittleAdmin(event) {
+  const cookie = readCookie(event, LITTLE_ADMIN_COOKIE);
+  if (!cookie) return false;
+  // No early exit: every configured key is compared, so which key matched
+  // (or that a second key exists at all) isn't observable from response timing.
+  let ok = false;
+  for (const expected of littleAdminKeys()) {
+    if (safeEqual(cookie, expected)) ok = true;
+  }
+  return ok;
+}
 
 // FIXED lista (key/label)
 // The `AI-scraped` bucket now uses ONE flat db source ("AI-scraped"); `prefix`
@@ -165,15 +225,23 @@ exports.handler = async (event) => {
     };
   }
 
+  // Does this request see hidden rows? Decided ONCE per request and folded into
+  // the cache key + response headers below.
+  const admin = isLittleAdmin(event);
+  const respHeaders = admin ? PRIVATE_HEADERS : CACHE_HEADERS;
+
   // Cache check BEFORE hitting db
   let cacheKey = null;
   if (method === "GET") {
     const qs = event.queryStringParameters || {};
     const qsSorted = Object.keys(qs).sort().map((k) => `${k}=${qs[k]}`).join("&");
-    cacheKey = `${path}?${qsSorted}`;
+    // `admin:` prefix is REQUIRED: without it an admin response (containing
+    // hidden rows) would be cached under the same key and then served to the
+    // next ordinary visitor — leaking exactly what `hidden` is meant to hide.
+    cacheKey = `${admin ? "a" : "p"}|${path}?${qsSorted}`;
     const cached = cacheGet(cacheKey);
     if (cached) {
-      return jsonResponse(200, cached, { ...CACHE_HEADERS, "X-Cache": "HIT" });
+      return jsonResponse(200, cached, { ...respHeaders, "X-Cache": "HIT" });
     }
   }
 
@@ -197,12 +265,21 @@ exports.handler = async (event) => {
           : null;
       const limit = Math.min(parseInt(qs.limit || "500", 10) || 5000, 5000);
 
+      // Hidden-row predicate. NOT user input — derived from the boolean above,
+      // so interpolating it into the SQL text is safe (no injection surface).
+      // Ordinary visitors get the hidden-filter; little-admin gets everything.
+      const HID = admin ? "TRUE" : "hidden = false";
+
+      // The `hidden` flag itself is only ever sent to little-admin, so the
+      // public response shape stays byte-for-byte what it was before.
+      const HIDCOL = admin ? ", hidden" : "";
+
       // GET /jobs/sources
       if (path.endsWith("/jobs/sources") || path.endsWith("/jobs/sources/")) {
         const rows = await query(
           `SELECT source, COUNT(*)::int AS count
            FROM job_posts
-           WHERE hidden = false
+           WHERE ${HID}
              AND ((source = ANY($1) AND first_seen >= NOW() - INTERVAL '30 days')
               OR (source <> ALL($1) AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')))
            GROUP BY source`,
@@ -222,7 +299,7 @@ exports.handler = async (event) => {
         });
 
         cacheSet(cacheKey, out);
-        return jsonResponse(200, out, { ...CACHE_HEADERS, "X-Cache": "MISS" });
+        return jsonResponse(200, out, { ...respHeaders, "X-Cache": "MISS" });
       }
 
       // GET /jobs/:id
@@ -230,14 +307,14 @@ exports.handler = async (event) => {
         const rows = await query(
           `SELECT source, title, url, company,
                   first_seen AS "firstSeen",
-                  experience, technologies, active
+                  experience, technologies, active${HIDCOL}
            FROM job_posts
-           WHERE id = $1 AND hidden = false`,
+           WHERE id = $1 AND ${HID}`,
           [id]
         );
         if (rows.length === 0) return jsonResponse(404, { error: "Nem található." });
         cacheSet(cacheKey, rows[0]);
-        return jsonResponse(200, rows[0], { ...CACHE_HEADERS, "X-Cache": "MISS" });
+        return jsonResponse(200, rows[0], { ...respHeaders, "X-Cache": "MISS" });
       }
 
       // GET /jobs?source=...
@@ -255,15 +332,15 @@ exports.handler = async (event) => {
           const rows = await query(
             `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active
+                    experience, technologies, active${HIDCOL}
              FROM job_posts
-             WHERE hidden = false AND (source = $1 OR source LIKE $2) ${timeClause}
+             WHERE ${HID} AND (source = $1 OR source LIKE $2) ${timeClause}
              ORDER BY first_seen DESC, id DESC
              LIMIT $3`,
             [fixedEntry.key, like, limit]
           );
           cacheSet(cacheKey, rows);
-          return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
+          return jsonResponse(200, rows, { ...respHeaders, "X-Cache": "MISS" });
         }
 
         const dbKeys = fixedEntry?.keys || [source];
@@ -272,42 +349,42 @@ exports.handler = async (event) => {
           timeRange === "24h"
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active
+                      experience, technologies, active${HIDCOL}
                FROM job_posts
-               WHERE hidden = false AND source = ANY($1)
+               WHERE ${HID} AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '24 hours'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
             : timeRange === "7d"
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active
+                      experience, technologies, active${HIDCOL}
                FROM job_posts
-               WHERE hidden = false AND source = ANY($1)
+               WHERE ${HID} AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '7 days'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
             : isTimeBased
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active
+                      experience, technologies, active${HIDCOL}
                FROM job_posts
-               WHERE hidden = false AND source = ANY($1)
+               WHERE ${HID} AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '30 days'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
             : `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active
+                      experience, technologies, active${HIDCOL}
                FROM job_posts
-               WHERE hidden = false AND source = ANY($1)
+               WHERE ${HID} AND source = ANY($1)
                  AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`;
 
         const rows = await query(sourceQuery, [dbKeys, limit]);
         cacheSet(cacheKey, rows);
-        return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
+        return jsonResponse(200, rows, { ...respHeaders, "X-Cache": "MISS" });
       }
 
       // GET /jobs
@@ -315,17 +392,17 @@ exports.handler = async (event) => {
         timeRange === "24h"
           ? `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active
+                    experience, technologies, active${HIDCOL}
              FROM job_posts
-             WHERE hidden = false AND first_seen >= NOW() - INTERVAL '24 hours'
+             WHERE ${HID} AND first_seen >= NOW() - INTERVAL '24 hours'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : timeRange === "7d"
           ? `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active
+                    experience, technologies, active${HIDCOL}
              FROM job_posts
-             WHERE hidden = false AND first_seen >= NOW() - INTERVAL '7 days'
+             WHERE ${HID} AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : timeRange === "30d"
@@ -335,16 +412,16 @@ exports.handler = async (event) => {
             // is what the UI sends with the 24h+7d filters both on (JobWatcher.jsx).
             `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active
+                    experience, technologies, active${HIDCOL}
              FROM job_posts
-             WHERE hidden = false AND first_seen >= NOW() - INTERVAL '30 days'
+             WHERE ${HID} AND first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active
+                    experience, technologies, active${HIDCOL}
              FROM job_posts
-             WHERE hidden = false
+             WHERE ${HID}
                AND ((source = ANY($2) AND first_seen >= NOW() - INTERVAL '30 days')
                 OR (source <> ALL($2) AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')))
              ORDER BY first_seen DESC, id DESC
@@ -352,7 +429,7 @@ exports.handler = async (event) => {
 
       const rows = await query(allQuery, timeRange ? [limit] : [limit, TIME_BASED_SOURCES_ARRAY]);
       cacheSet(cacheKey, rows);
-      return jsonResponse(200, rows, { ...CACHE_HEADERS, "X-Cache": "MISS" });
+      return jsonResponse(200, rows, { ...respHeaders, "X-Cache": "MISS" });
     }
 
     if (method === "DELETE") {
