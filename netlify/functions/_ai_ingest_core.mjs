@@ -166,9 +166,17 @@ function resolveExperience(job) {
 /* ── upsert (row fully built BEFORE insert — experience-write-policy) ── */
 
 async function upsertJob(client, source, job, resolvedExperience) {
+  // AI-scraped postings start hidden — this pipeline discovers new sites
+  // automatically with less vetting than a hand-written scraper, so a human
+  // reviews (job-hidden.js un-hide) before it reaches the public board.
+  // `hidden` is deliberately absent from the ON CONFLICT SET below: once a row
+  // exists, a re-ingest (the same posting found again on a later run) must
+  // never re-hide it or re-clobber an admin's un-hide decision — same
+  // anti-clobber policy already used here for `experience`.
+  const startsHidden = source === AI_SOURCE;
   await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen, hidden)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW(),$7)
      ON CONFLICT (source, url) DO UPDATE SET
         experience = CASE
           WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
@@ -178,7 +186,7 @@ async function upsertJob(client, source, job, resolvedExperience) {
         company = CASE
           WHEN job_posts.company IS NULL THEN EXCLUDED.company
           ELSE job_posts.company END`,
-    [source, job.title, job.url, resolvedExperience, job.company || null, job.technologies || null]
+    [source, job.title, job.url, resolvedExperience, job.company || null, job.technologies || null, startsHidden]
   );
 }
 
