@@ -59,3 +59,13 @@ export function markDeviceLittleAdmin(secret) {
 export function clearDeviceLittleAdmin() {
   document.cookie = `${LITTLE_ADMIN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
 }
+
+// Is this device marked? Used only to decide whether to RENDER admin controls —
+// it just checks the cookie exists, it does not validate the value. The server
+// is the only thing that actually authorizes anything, so a faked cookie here
+// buys nothing but a button that returns 401.
+export function hasLittleAdminCookie() {
+  return document.cookie
+    .split(";")
+    .some((c) => c.trim().startsWith(`${LITTLE_ADMIN_COOKIE}=`));
+}

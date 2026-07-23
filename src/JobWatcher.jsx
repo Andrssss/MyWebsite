@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLinkedin } from "react-icons/fa";
+import { adminFetch, hasLittleAdminCookie } from "./adminAuth";
 import "./JobWatcher.css";
 
 const API_BASE_URL = "/.netlify/functions";
@@ -627,6 +628,9 @@ const JobWatcher = () => {
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
+  // Device marked with the LITTLE_ADMIN cookie → show the hide controls. Purely
+  // a rendering hint; every hide request is authorized server-side regardless.
+  const isLittleAdmin = useMemo(() => hasLittleAdminCookie(), []);
   const [q, setQ] = useState("");
   const [savedSearches, setSavedSearches] = useState(() => {
     const saved = localStorage.getItem("jobWatcherSavedSearches");
@@ -915,6 +919,41 @@ const JobWatcher = () => {
       persistAdminApplied(key, true, nowInterview, job);
       return next;
     });
+  };
+
+  // Hide/unhide a posting independently of "jelentkeztem". Optimistic: the row
+  // flips locally straight away and rolls back if the server refuses.
+  const toggleHidden = async (job) => {
+    if (!job.url) return;
+    const next = !job.hidden;
+    const applyLocal = (value) =>
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.url === job.url && j.source === job.source ? { ...j, hidden: value } : j
+        )
+      );
+    applyLocal(next);
+    try {
+      const res = await adminFetch(`${API_BASE_URL}/job-hidden`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: job.url, source: job.source, hidden: next }),
+      });
+      if (!res.ok) {
+        applyLocal(job.hidden);
+        const data = await res.json().catch(() => ({}));
+        // alert(), not setStatus(): `status` is never rendered anywhere, so the
+        // admin would get no sign that the toggle silently rolled back.
+        window.alert(
+          res.status === 401
+            ? "Hibás vagy hiányzó admin jelszó — a rejtés nem mentődött el."
+            : data.error || "Nem sikerült a rejtés."
+        );
+      }
+    } catch (e) {
+      applyLocal(job.hidden);
+      window.alert(`Nem sikerült a rejtés: ${e.message}`);
+    }
   };
 
   const resetManualAppliedForm = () => {
@@ -2192,6 +2231,19 @@ const JobWatcher = () => {
                     title="Kézzel felvitt / lejárt jelentkezés adatainak szerkesztése"
                   >
                     ✎ Szerkesztés
+                  </button>
+                )}
+                {isLittleAdmin && job.url && (
+                  <button
+                    className={`job-hide-btn${isHidden ? " job-hide-btn--on" : ""}`}
+                    onClick={() => toggleHidden(job)}
+                    title={
+                      isHidden
+                        ? "Visszaállítás: újra látszik a nyilvános listán"
+                        : "Elrejtés a nyilvános listáról (a jelentkezés státuszt nem érinti)"
+                    }
+                  >
+                    {isHidden ? "👁 Visszaállítás" : "🚫 Elrejtés"}
                   </button>
                 )}
               </div>

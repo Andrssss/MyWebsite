@@ -697,6 +697,28 @@
   border-left: 3px solid #7c3aed;
 }
 
+/* Elrejtés/visszaállítás gomb — csak megjelölt eszközön renderelődik. */
+.job-hide-btn {
+  padding: 2px 10px;
+  border: 1px solid #7c3aed;
+  border-radius: 999px;
+  background: transparent;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.job-hide-btn:hover {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.job-hide-btn--on {
+  background: #7c3aed;
+  color: #fff;
+}
+
 .job-active-badge {
   display: inline-block;
   margin-left: 8px;
