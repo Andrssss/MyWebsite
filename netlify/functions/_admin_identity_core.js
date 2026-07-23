@@ -73,14 +73,16 @@ function isRecognizedAdmin(event) {
 }
 
 // Which applied-jobs bucket does this request belong to?
-//   'admin'        → one of the real ADMIN_* UUIDs (shared bucket, all 4 admins)
-//   'little:<uuid>' → a little-admin, own separate bucket (their own UUID)
-//   null           → visitor cookie matches neither tier
+//   'admin'  → one of the real ADMIN_* UUIDs (shared bucket, all real admins)
+//   'little' → any LITTLE_ADMIN* UUID (shared bucket, all little-admins together —
+//              separate from 'admin', but little-admins share ONE list among
+//              themselves too, same as the real admins do)
+//   null     → visitor cookie matches neither tier
 function resolveOwnerKey(event) {
   const cookie = readCookie(event, VISITOR_COOKIE);
   if (!cookie) return null;
   if (matchesAny(cookie, adminKeys())) return "admin";
-  if (matchesAny(cookie, littleAdminKeys())) return `little:${cookie}`;
+  if (matchesAny(cookie, littleAdminKeys())) return "little";
   return null;
 }
 

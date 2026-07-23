@@ -98,6 +98,28 @@ const ensureTable =
         if (err.code !== "42710" && err.code !== "42P16") throw err; // already exists / already a pk
       }
     }
+
+    // Collapse legacy little:<uuid> owner keys (one bucket per little-admin,
+    // the original design) into a single shared 'little' bucket (2026-07-24
+    // change: little-admins pool their applied list together, same as the real
+    // admins' 'admin' bucket). Naturally idempotent — once no `little:%` rows
+    // remain, both statements below match zero rows on every later cold start.
+    // Dedup first: two different little-admins may have marked the SAME
+    // job_key, which would collide once both collapse to the literal 'little'
+    // (job_key, applied_by) is the primary key. Keep exactly one row per
+    // job_key (the most recently touched), same tradeoff as any last-write-wins
+    // merge — no way to keep "both" once they share one identity.
+    await pool.query(
+      `DELETE FROM admin_applied_jobs
+        WHERE applied_by LIKE 'little:%'
+          AND ctid NOT IN (
+            SELECT DISTINCT ON (job_key) ctid
+              FROM admin_applied_jobs
+             WHERE applied_by LIKE 'little:%'
+             ORDER BY job_key, applied_at DESC, ctid DESC
+          )`
+    );
+    await pool.query(`UPDATE admin_applied_jobs SET applied_by = 'little' WHERE applied_by LIKE 'little:%'`);
   })();
 globalThis.__ensureAdminAppliedTable = ensureTable;
 
