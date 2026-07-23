@@ -14,6 +14,7 @@
 //   POST { url, hidden: true|false, source? }
 //   Header: Authorization: Bearer $ADMIN_SECRET
 const { Pool } = require("pg");
+const { bumpJobsCacheGeneration } = require("./_jobs_cache_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -88,6 +89,9 @@ exports.handler = async (event) => {
       : await pool.query(`UPDATE job_posts SET hidden = $1 WHERE url = $2`, [hidden, url]);
 
     if (!rowCount) return jsonResponse(404, { error: "Nincs ilyen hirdetés." });
+    // Awaited so the response only returns once jobs.js is guaranteed to stop
+    // serving the pre-change list on its NEXT request, not "eventually".
+    await bumpJobsCacheGeneration();
     return jsonResponse(200, { ok: true, hidden, updated: rowCount });
   } catch (err) {
     console.error("[job-hidden] error:", err);

@@ -27,6 +27,7 @@
 //   ownerKey, so nobody can write into someone else's bucket by lying about it.
 const { Pool } = require("pg");
 const { resolveOwnerKey, hasAdminSecret } = require("./_admin_identity_core");
+const { bumpJobsCacheGeneration } = require("./_jobs_cache_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -218,6 +219,7 @@ exports.handler = async (event) => {
       const jobUrl = typeof job.url === "string" ? job.url.trim() : "";
       if (jobUrl && ownerKey === "admin") {
         await pool.query(`UPDATE job_posts SET hidden = $1 WHERE url = $2`, [applied, jobUrl]);
+        await bumpJobsCacheGeneration();
       }
       return jsonResponse(200, { ok: true });
     } catch (err) {

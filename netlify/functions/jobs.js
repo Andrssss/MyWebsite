@@ -1,5 +1,6 @@
 // netlify/functions/jobs.js
 const { neon } = require("@neondatabase/serverless");
+const { getJobsCacheGeneration } = require("./_jobs_cache_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -71,6 +72,24 @@ function cacheSet(key, value) {
     if (oldestKey !== undefined) cache.delete(oldestKey);
   }
   cache.set(key, { t: Date.now(), v: value });
+}
+
+// Cross-container cache-bust — see _jobs_cache_core.js for why this can't just
+// be an in-process cache.clear() call from job-hidden.js. Fails open: if
+// Blobs has a hiccup, we skip invalidation rather than break the whole jobs
+// endpoint over a caching nicety.
+let lastSeenCacheGen;
+
+async function syncCacheGeneration() {
+  try {
+    const currentGen = await getJobsCacheGeneration();
+    if (currentGen !== lastSeenCacheGen) {
+      cache.clear();
+      lastSeenCacheGen = currentGen;
+    }
+  } catch (err) {
+    console.error("[jobs] cache-generation check failed (serving from existing cache):", err.message);
+  }
 }
 
 const CACHE_HEADERS = {
@@ -202,6 +221,12 @@ exports.handler = async (event) => {
   // the cache key + response headers below.
   const admin = isLittleAdmin(event);
   const respHeaders = admin ? PRIVATE_HEADERS : CACHE_HEADERS;
+
+  if (method === "GET") {
+    // Must happen BEFORE the cache-hit check below, or a stale in-memory entry
+    // (from before the most recent hide/unhide) could still be served this request.
+    await syncCacheGeneration();
+  }
 
   // Cache check BEFORE hitting db
   let cacheKey = null;
