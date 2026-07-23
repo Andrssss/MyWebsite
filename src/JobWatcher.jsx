@@ -1043,7 +1043,7 @@ const JobWatcher = () => {
   const [lastUpdates, setLastUpdates] = useState([]);
   const [commitsOpen, setCommitsOpen] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
-  const [weeklyActiveUsers, setWeeklyActiveUsers] = useState(null);
+  const [monthlyActiveUsers, setMonthlyActiveUsers] = useState(null);
   const [careerPagesOpen, setCareerPagesOpen] = useState(false);
 
   const openAllCareerPages = (pages) => {
@@ -1056,7 +1056,7 @@ const JobWatcher = () => {
     fetch(VISITOR_TRACK_API)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data && typeof data.wau === "number") setWeeklyActiveUsers(data.wau);
+        if (data && typeof data.mau === "number") setMonthlyActiveUsers(data.mau);
       })
       .catch(() => {});
   }, []);
@@ -2318,12 +2318,12 @@ const JobWatcher = () => {
         <FaLinkedin />
       </a>
 
-      {weeklyActiveUsers !== null && (
+      {monthlyActiveUsers !== null && (
         <span
           className="wau-badge"
-          title="Egyedi látogatók az elmúlt 7 napban (admin nélkül)"
+          title="Egyedi látogatók az elmúlt 30 napban (admin nélkül)"
         >
-          👥 <strong>{weeklyActiveUsers}</strong>
+          👥 <strong>{monthlyActiveUsers}</strong>
         </span>
       )}
     </div>

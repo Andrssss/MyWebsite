@@ -83,14 +83,14 @@ exports.handler = async (event) => {
   if (event.httpMethod === "GET") {
     try {
       const { rows } = await pool.query(
-        `SELECT COUNT(DISTINCT visitor_cookie)::int AS wau
+        `SELECT COUNT(DISTINCT visitor_cookie)::int AS mau
          FROM daily_visitors
-         WHERE visit_date >= CURRENT_DATE - 6
+         WHERE visit_date >= CURRENT_DATE - 29
            AND visitor_type = 'user'`
       );
       return jsonResponse(
         200,
-        { wau: rows[0]?.wau ?? 0 },
+        { mau: rows[0]?.mau ?? 0 },
         { "Cache-Control": "public, max-age=300" }
       );
     } catch (err) {

@@ -136,18 +136,20 @@ const JobStats = () => {
   const allTotal = allDays.reduce((s, d) => s + d.total_jobs, 0);
   const allIntern = allDays.reduce((s, d) => s + d.intern_jobs, 0);
   const allDaysCount = allDays.length || 1;
-  const avgTotal = (allTotal / allDaysCount).toFixed(1);
   const avgIntern = (allIntern / allDaysCount).toFixed(1);
   const avgRegular = ((allTotal - allIntern) / allDaysCount).toFixed(1);
-  const sortedDailyTotals = allDays
-    .map((d) => d.total_jobs)
-    .sort((a, b) => a - b);
-  const midIndex = Math.floor(sortedDailyTotals.length / 2);
-  const dailyMedian = sortedDailyTotals.length
-    ? (sortedDailyTotals.length % 2 === 0
-        ? ((sortedDailyTotals[midIndex - 1] + sortedDailyTotals[midIndex]) / 2).toFixed(1)
-        : sortedDailyTotals[midIndex])
-    : 0;
+
+  const median = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    if (!sorted.length) return 0;
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? ((sorted[mid - 1] + sorted[mid]) / 2).toFixed(1)
+      : sorted[mid];
+  };
+
+  const dailyRegularMedian = median(allDays.map((d) => d.total_jobs - d.intern_jobs));
+  const dailyInternMedian = median(allDays.map((d) => d.intern_jobs));
 
   /* ===== BAR CHART – utolsó 10 nap ===== */
   const barMax = Math.max(...last10.map((d) => d.total_jobs), 1);
@@ -251,12 +253,12 @@ const JobStats = () => {
           <span className="stats-avg-label">Napi átlag (diák/intern)</span>
         </div>
         <div className="stats-avg-card highlight">
-          <span className="stats-avg-number">{avgTotal}</span>
-          <span className="stats-avg-label">Átlag (összes)</span>
+          <span className="stats-avg-number">{dailyRegularMedian}</span>
+          <span className="stats-avg-label">Medián (junior/medior)</span>
         </div>
         <div className="stats-avg-card">
-          <span className="stats-avg-number">{dailyMedian}</span>
-          <span className="stats-avg-label">Medián (összes)</span>
+          <span className="stats-avg-number">{dailyInternMedian}</span>
+          <span className="stats-avg-label">Medián (diák/intern)</span>
         </div>
       </div>
 
