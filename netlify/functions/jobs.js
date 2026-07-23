@@ -202,8 +202,9 @@ exports.handler = async (event) => {
         const rows = await query(
           `SELECT source, COUNT(*)::int AS count
            FROM job_posts
-           WHERE (source = ANY($1) AND first_seen >= NOW() - INTERVAL '30 days')
-              OR (source <> ALL($1) AND (active = true OR first_seen >= NOW() - INTERVAL '30 days'))
+           WHERE hidden = false
+             AND ((source = ANY($1) AND first_seen >= NOW() - INTERVAL '30 days')
+              OR (source <> ALL($1) AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')))
            GROUP BY source`,
           [TIME_BASED_SOURCES_ARRAY]
         );
@@ -256,7 +257,7 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience, technologies, active
              FROM job_posts
-             WHERE (source = $1 OR source LIKE $2) ${timeClause}
+             WHERE hidden = false AND (source = $1 OR source LIKE $2) ${timeClause}
              ORDER BY first_seen DESC, id DESC
              LIMIT $3`,
             [fixedEntry.key, like, limit]
@@ -273,7 +274,7 @@ exports.handler = async (event) => {
                       first_seen AS "firstSeen",
                       experience, technologies, active
                FROM job_posts
-               WHERE source = ANY($1)
+               WHERE hidden = false AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '24 hours'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
@@ -282,7 +283,7 @@ exports.handler = async (event) => {
                       first_seen AS "firstSeen",
                       experience, technologies, active
                FROM job_posts
-               WHERE source = ANY($1)
+               WHERE hidden = false AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '7 days'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
@@ -291,7 +292,7 @@ exports.handler = async (event) => {
                       first_seen AS "firstSeen",
                       experience, technologies, active
                FROM job_posts
-               WHERE source = ANY($1)
+               WHERE hidden = false AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '30 days'
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`
@@ -299,7 +300,7 @@ exports.handler = async (event) => {
                       first_seen AS "firstSeen",
                       experience, technologies, active
                FROM job_posts
-               WHERE source = ANY($1)
+               WHERE hidden = false AND source = ANY($1)
                  AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')
                ORDER BY first_seen DESC, id DESC
                LIMIT $2`;
@@ -316,7 +317,7 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience, technologies, active
              FROM job_posts
-             WHERE first_seen >= NOW() - INTERVAL '24 hours'
+             WHERE hidden = false AND first_seen >= NOW() - INTERVAL '24 hours'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : timeRange === "7d"
@@ -324,7 +325,7 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience, technologies, active
              FROM job_posts
-             WHERE first_seen >= NOW() - INTERVAL '7 days'
+             WHERE hidden = false AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : timeRange === "30d"
@@ -336,15 +337,16 @@ exports.handler = async (event) => {
                     first_seen AS "firstSeen",
                     experience, technologies, active
              FROM job_posts
-             WHERE first_seen >= NOW() - INTERVAL '30 days'
+             WHERE hidden = false AND first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
                     experience, technologies, active
              FROM job_posts
-             WHERE (source = ANY($2) AND first_seen >= NOW() - INTERVAL '30 days')
-                OR (source <> ALL($2) AND (active = true OR first_seen >= NOW() - INTERVAL '30 days'))
+             WHERE hidden = false
+               AND ((source = ANY($2) AND first_seen >= NOW() - INTERVAL '30 days')
+                OR (source <> ALL($2) AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')))
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`;
 

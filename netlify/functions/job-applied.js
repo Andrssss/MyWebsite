@@ -154,6 +154,13 @@ exports.handler = async (event) => {
           [jobKey, JSON.stringify(job), applied, interview, adminId]
         );
       }
+      // Mirror "applied" onto job_posts.hidden: marking a job applied removes it
+      // from the public board, unapplying brings it back. Only possible when we
+      // know the row's identity (url) — url-less manual entries have no job_posts row.
+      const jobUrl = typeof job.url === "string" ? job.url.trim() : "";
+      if (jobUrl) {
+        await pool.query(`UPDATE job_posts SET hidden = $1 WHERE url = $2`, [applied, jobUrl]);
+      }
       return jsonResponse(200, { ok: true });
     } catch (err) {
       console.error("[job-applied] POST error:", err);
