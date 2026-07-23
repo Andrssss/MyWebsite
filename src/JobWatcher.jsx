@@ -1674,13 +1674,34 @@ const JobWatcher = () => {
 
     if (showAppliedOnly) {
       const apiKeys = new Set(list.map(jobKeyFor));
+
+      // A kereső/mentett-keresés szűrőt preTechJobs már alkalmazta a listára,
+      // de a cache-ből visszaszedett (API-listából már kikerült) jelentkezésekre
+      // NEM — azokra itt kell újra, különben a kereső figyelmen kívül hagyná
+      // az összes ilyen régi jelentkezést, és mindig az összesre "hatna".
+      const nq = q.trim().toLowerCase();
+      const activeSearchTerms = [...activeSavedSearches].filter((s) => savedSearches.includes(s));
+      const matchesSearch = (j) => {
+        const t = (j.title || "").toLowerCase();
+        const c = (j.company || "").toLowerCase();
+        if (nq) return t.includes(nq) || c.includes(nq);
+        if (activeSearchTerms.length > 0) {
+          return activeSearchTerms.some((s) => {
+            const sl = s.toLowerCase();
+            return t.includes(sl) || c.includes(sl);
+          });
+        }
+        return true;
+      };
+
       // Applied jobs no longer in the API list (expired / manual adds) come
       // from the cache, matched by their STORED key so legacy entries render.
       // cachedOnly + storedKey: ezekre jelenik meg a Szerkesztés gomb, és a
       // mentés a tárolt kulcsot cseréli (compactJob mindkettőt kiszűri a DB-ből).
       const onlyCached = Object.entries(appliedCache)
         .filter(([key]) => appliedKeys.has(key) && !apiKeys.has(key))
-        .map(([key, j]) => ({ ...j, cachedOnly: true, storedKey: key }));
+        .map(([key, j]) => ({ ...j, cachedOnly: true, storedKey: key }))
+        .filter(matchesSearch);
       list = [...list.filter((j) => appliedKeys.has(jobKeyFor(j))), ...onlyCached];
     }
 
@@ -1688,7 +1709,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [preTechJobs, techStates, globalTechCounts, showAppliedOnly, appliedKeys, appliedCache]);
+  }, [preTechJobs, techStates, globalTechCounts, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
 
   const activeTimeLabel = time7d
     ? "1 hét"
