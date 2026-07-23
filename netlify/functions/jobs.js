@@ -91,9 +91,13 @@ const PRIVATE_HEADERS = {
 // Read-only elevated access: seeing `hidden` job rows. Deliberately a SEPARATE
 // credential from ADMIN_SECRET (which authorizes destructive actions) — if this
 // one leaks, the blast radius is "someone sees hidden ads", not data loss.
-// The value lives only in the Netlify env + the admin's browser cookie; it is
-// never committed to source.
-const LITTLE_ADMIN_COOKIE = "jw_pref";
+//
+// The credential is the device's existing visitor UUID, matched against the
+// LITTLE_ADMIN* env vars. Same shape as the old ADMIN_VISITOR_IDS allowlist but
+// the values live ONLY in the Netlify env — never in source. That distinction is
+// the whole point: the four UUIDs committed to the public repo are burned and
+// must not be reused here (anyone can read them and set the cookie).
+const LITTLE_ADMIN_COOKIE = "jobWatcherVisitorId";
 
 function readCookie(event, name) {
   const raw =

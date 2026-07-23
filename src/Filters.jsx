@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminFetch, markDeviceLittleAdmin, clearDeviceLittleAdmin } from "./adminAuth";
+import { adminFetch, getDeviceVisitorId } from "./adminAuth";
 import "./Filters.css";
 
 const API = "/.netlify/functions/filters";
@@ -152,20 +152,17 @@ const Filters = () => {
         <button
           className="filters-btn"
           onClick={() => {
-            if (markDeviceLittleAdmin()) setError("Eszköz megjelölve. Frissítsd az állásfigyelőt.");
+            const id = getDeviceVisitorId();
+            if (!id) {
+              setError("Nincs eszköz-azonosító. Nyisd meg előbb az állásfigyelőt.");
+              return;
+            }
+            navigator.clipboard?.writeText(id).catch(() => {});
+            setError(`Eszköz-azonosító (vágólapra másolva): ${id}`);
           }}
-          title="Rejtett hirdetések megjelenítése ezen az eszközön"
+          title="Ezt az UUID-t kell egy LITTLE_ADMIN* env-változóba tenni a Netlify-on"
         >
-          Eszköz megjelölése
-        </button>
-        <button
-          className="filters-btn"
-          onClick={() => {
-            clearDeviceLittleAdmin();
-            setError("Eszköz jelölése törölve.");
-          }}
-        >
-          Jelölés törlése
+          Eszköz-azonosító
         </button>
         <button className="filters-btn" onClick={() => navigate("/allasfigyelo")}>← Vissza</button>
       </div>

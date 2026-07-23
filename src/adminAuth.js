@@ -37,19 +37,18 @@ export async function adminFetch(url, options = {}) {
 }
 
 // ── "Little admin" ─────────────────────────────────────────────────────────
-// Read-only elevated access: the backend returns `hidden` job rows when this
-// cookie matches the LITTLE_ADMIN env var. A SEPARATE, lower-privilege
-// credential from the ADMIN_SECRET above on purpose — if it leaks, someone sees
-// hidden ads, they cannot destroy data. It's a cookie (not a header) so the
-// ordinary job-list request carries it automatically with no extra plumbing.
-// Only the cookie NAME ships in the bundle; the value lives in the Netlify env
-// and in this one browser.
-const LITTLE_ADMIN_COOKIE = "jw_pref";
+// Read-only elevated access: jobs.js returns `hidden` rows when this device's
+// visitor UUID matches one of the LITTLE_ADMIN* env vars. Same shape as the old
+// ADMIN_VISITOR_IDS allowlist, except the accepted UUIDs live ONLY in the
+// Netlify env — never in source, which is what makes them a credential at all.
+// Nothing to set up per device: the visitor cookie already exists; you just
+// paste the device's UUID into the Netlify env.
+const VISITOR_COOKIE = "jobWatcherVisitorId";
 
 // JobWatcher caches the job list in localStorage for 5 minutes under a key that
-// does NOT encode admin-ness. Toggling the mark therefore has to drop that cache,
-// otherwise the board keeps serving the pre-toggle list (no hidden rows, or
-// stale hidden rows) and the change looks broken for up to 5 minutes.
+// does NOT encode admin-ness, so anything that changes what the server returns
+// (e.g. toggling `hidden`) has to drop that cache, otherwise the board keeps
+// serving the pre-change list for up to 5 minutes and looks broken.
 export function purgeJobListCache() {
   try {
     for (const key of Object.keys(localStorage)) {
@@ -60,20 +59,16 @@ export function purgeJobListCache() {
   }
 }
 
-export function markDeviceLittleAdmin(secret) {
-  const value = String(secret ?? window.prompt("LITTLE_ADMIN kulcs:") ?? "").trim();
-  if (!value) return false;
-  const secureFlag = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie =
-    `${LITTLE_ADMIN_COOKIE}=${encodeURIComponent(value)}` +
-    `; path=/; max-age=31536000; SameSite=Lax${secureFlag}`;
-  purgeJobListCache();
-  return true;
-}
-
-export function clearDeviceLittleAdmin() {
-  document.cookie = `${LITTLE_ADMIN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
-  purgeJobListCache();
+// This device's visitor UUID — the value to paste into a LITTLE_ADMIN* env var
+// to grant this browser read access to hidden rows.
+export function getDeviceVisitorId() {
+  for (const part of document.cookie.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    if (part.slice(0, idx).trim() !== VISITOR_COOKIE) continue;
+    return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return "";
 }
 
 // NOTE: deliberately no `hasLittleAdminCookie()` helper here. Gating admin UI on

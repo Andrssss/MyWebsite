@@ -2242,7 +2242,7 @@ const JobWatcher = () => {
                     ✎ Szerkesztés
                   </button>
                 )}
-                {isLittleAdmin && job.url && (
+                {(isLittleAdmin || isAdmin) && job.url && (
                   <button
                     className={`job-hide-btn${isHidden ? " job-hide-btn--on" : ""}`}
                     onClick={() => toggleHidden(job)}
