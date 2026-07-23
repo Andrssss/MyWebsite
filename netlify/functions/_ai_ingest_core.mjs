@@ -130,24 +130,21 @@ export function isSeniorLike(title, filters) {
 // phrase from extractBodyExperience) get used. Row must be fully built
 // BEFORE insert — no separate fetch-then-UPDATE (experience-write-policy).
 //
-// A level WORD (junior/medior/senior/...) in job.experience is only trusted
-// when the title itself says so (handled above) — a caller self-judging
-// "this reads like medior" from body years and writing that word directly
-// is exactly the 2026-07-21 bug report (flexinform "Automata szoftvertesztelő",
-// body said "Legalább 2 év", title said nothing, row got stamped "medior").
-// Strip a bare level word back to "-" rather than trusting it here.
-const LEVEL_WORD_RE = /(^|[^a-z0-9])(junior|medior|mid-level|mid level|szenior|senior|lead)([^a-z0-9]|$)/i;
-
-// The other 30 scrapers only ever put ONE of two shapes in this column: a
-// title-matched canonical label, or a years-phrase produced by
-// extractYearsFromText ("8 év", "3-5 év" — see _experience_core.mjs). The AI
-// pipeline's job.experience is caller-supplied free text (the routine's own
-// body judgment), so it can be neither — e.g. a literal quote from the
-// posting ("kezdő programozók jelentkezését is várjuk", 2026-07-22 bug
-// report) sailed straight into the DB untouched because it contained no bare
-// level word for the check above to catch. Re-run it through the same years
-// extractor every other source uses instead of trusting arbitrary prose.
-const CANONICAL_LEVELS = { diakmunka: "diákmunka", junior: "junior", medior: "medior" };
+// A level WORD (junior/medior/senior/...) in job.experience is NEVER trusted,
+// even when it's exactly one of the three canonical words — only a title
+// match (above) can produce a level label. Every prior attempt to carve out
+// an exception here has reintroduced the same bug: 2026-07-21 (flexinform
+// "Automata szoftvertesztelő", body said "Legalább 2 év", title said nothing,
+// row got stamped "medior" from the caller's own reading), 2026-07-22 (a
+// free-text sentence with no level word sailed through, fixed by routing
+// through extractYearsFromText), and 2026-07-23 (sysdata-pse.com
+// "Tesztautomatizálási mérnök" — title has no level word, the actual body has
+// NO years figure and NO junior/medior word anywhere, yet still got stamped
+// "medior", because that run's fix trusted job.experience whenever it
+// happened to equal one of the three canonical words verbatim — the AI's own
+// bare guess, not anything extracted from real text). The only two sources of
+// truth for a level label are the title (code-verified above) and an actual
+// years-of-experience figure in the body — nothing else, ever.
 function resolveExperience(job) {
   const fromTitle = isInternshipTitle(job.title) ? "diákmunka"
     : isJuniorTitle(job.title) ? "junior"
@@ -157,9 +154,6 @@ function resolveExperience(job) {
 
   const raw = job.experience && job.experience !== "-" ? job.experience.trim() : "-";
   if (raw === "-") return "-";
-  const canonical = CANONICAL_LEVELS[normalizeText(raw)];
-  if (canonical) return canonical;
-  if (LEVEL_WORD_RE.test(raw)) return "-";
   return extractYearsFromText(raw) || "-";
 }
 
