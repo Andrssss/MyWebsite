@@ -1,10 +1,9 @@
 const https = require("https");
 
 // Commit-üzenetek, amiket nem mutatunk a fronton (admin-only feature-ök).
-const HIDDEN_MESSAGE_PATTERNS = [
-  /backfill-hidden-applied/i,
-  /job_posts\.hidden/i,
-];
+// Egyetlen általános "hidden" minta — bármi, ami a hidden-sor/admin
+// funkciót érinti, előbb-utóbb kiírja azt a szót a commit üzenetébe.
+const HIDDEN_MESSAGE_PATTERNS = [/hidden/i];
 
 exports.handler = async () => {
   const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
