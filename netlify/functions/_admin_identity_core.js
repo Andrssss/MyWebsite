@@ -37,13 +37,22 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ba, bb);
 }
 
+// UUIDs are case-insensitive by spec, but an env var pasted with different
+// letter casing than the cookie's own crypto.randomUUID() output used to
+// fail the byte-exact safeEqual() silently — admin status just vanished,
+// taking hidden-row visibility with it. ADMIN_SECRET (safeEqual directly,
+// below) stays case-SENSITIVE on purpose — that's a real secret, not a UUID.
+function safeEqualCaseInsensitive(a, b) {
+  return safeEqual(String(a).toLowerCase(), String(b).toLowerCase());
+}
+
 // No early exit: every key is compared regardless of an earlier match, so
 // which key matched isn't observable from response timing.
 function matchesAny(value, keys) {
   if (!value) return false;
   let ok = false;
   for (const k of keys) {
-    if (safeEqual(value, k)) ok = true;
+    if (safeEqualCaseInsensitive(value, k)) ok = true;
   }
   return ok;
 }
