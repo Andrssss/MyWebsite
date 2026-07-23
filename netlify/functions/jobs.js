@@ -125,11 +125,19 @@ function safeEqual(a, b) {
 // `_\d+` suffix is required, so a typo'd name silently grants nobody access
 // rather than being treated as a key.
 // Computed once per container: Netlify restarts containers when env changes.
+// `.trim()` is load-bearing: pasting a secret into the Netlify env UI very
+// easily carries a trailing space or newline, and safeEqual compares length
+// first — so an untrimmed key fails to match with NO error anywhere, which is
+// almost impossible to diagnose from the outside.
 const LITTLE_ADMIN_KEYS = Object.keys(process.env)
   .filter((k) => /^LITTLE_ADMIN(_\d+)?$/.test(k))
   .sort()
-  .map((k) => process.env[k])
-  .filter((v) => typeof v === "string" && v.length > 0);
+  .map((k) => (typeof process.env[k] === "string" ? process.env[k].trim() : ""))
+  .filter((v) => v.length > 0);
+
+// One-line boot log so "is the key even configured?" is answerable from the
+// function log without exposing any value.
+console.log(`[jobs] little-admin keys configured: ${LITTLE_ADMIN_KEYS.length}`);
 
 function isLittleAdmin(event) {
   const cookie = readCookie(event, LITTLE_ADMIN_COOKIE);

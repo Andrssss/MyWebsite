@@ -14,7 +14,8 @@ const ALLOWED_ORIGIN =
 // Admin auth: a real server-side secret (never committed to source). Falls back
 // to CRON_SECRET so this keeps working until ADMIN_SECRET is set in Netlify.
 function authorized(event) {
-  const expected = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+  // Trimmed: see filters.js — a pasted trailing newline would silently reject all.
+  const expected = (process.env.ADMIN_SECRET || process.env.CRON_SECRET || "").trim();
   if (!expected) return false;
   const hdr =
     (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";

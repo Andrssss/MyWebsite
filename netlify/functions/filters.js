@@ -16,7 +16,9 @@ const ALLOWED_ORIGIN =
 // was public in the repo, so anyone could purge the DB. Falls back to
 // CRON_SECRET so this keeps working until ADMIN_SECRET is set in Netlify.
 function authorized(event) {
-  const expected = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
+  // Trimmed: a secret pasted into the Netlify env UI often carries a trailing
+  // newline, which would silently reject every request with no diagnosable error.
+  const expected = (process.env.ADMIN_SECRET || process.env.CRON_SECRET || "").trim();
   if (!expected) return false;
   const hdr =
     (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
