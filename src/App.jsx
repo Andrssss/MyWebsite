@@ -32,6 +32,10 @@ const AppContent = () => {
   const sidebarRef = useRef(null);
 
   const isHome = location.pathname === '/';
+  // Tárgy info és Állásfigyelő alatt elhalványul a háttérvideó (fade: .background-video transition)
+  const hideBackgroundVideo =
+    location.pathname.startsWith('/targy_info') ||
+    location.pathname.startsWith('/allasfigyelo');
   const sidebarCollapsed = (hasNavigatedAway || manuallyCollapsed) && !(location.pathname === '/targy_info' && subjectInfoLoading);
 
   useEffect(() => {
@@ -56,7 +60,7 @@ const AppContent = () => {
     <div className={`${isMobile ? 'container' : 'layout'} ${!isMobile && sidebarCollapsed ? 'sb-collapsed' : ''} ${isHome ? 'on-home' : ''}`}>
       <div className="particles-wrapper">
         <video
-          className={`background-video${location.pathname === '/targy_info' ? ' bg-hidden' : ''}`}
+          className={`background-video${hideBackgroundVideo ? ' bg-hidden' : ''}`}
           autoPlay
           loop
           muted

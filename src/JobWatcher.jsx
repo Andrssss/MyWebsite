@@ -190,12 +190,35 @@ const createVisitorId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 };
 
+// A látogatói UUID egyszerre analitika-azonosító ÉS a little-admin kulcs
+// (jobs.js a cookie-t hasonlítja a LITTLE_ADMIN* env-ekhez), ezért nem mindegy,
+// mennyire tartós. "Soha nem lejáró" cookie nincs: a Chrome 104+ MINDEN cookie
+// lejáratát 400 napra vágja, a Safari ITP a JS-ből írt cookie-t 7 napra, expires
+// nélkül pedig session-cookie lenne (böngészőzáráskor elveszne). Ezért:
+//   1) localStorage a forrás — annak nincs lejárata, túléli a cookie-vágást,
+//   2) a cookie-t MINDEN híváskor újraírjuk, így az ablak folyton előre tolódik
+//      (gördülő lejárat) — aktív használat mellett gyakorlatilag sosem jár le.
+// A cookie-ra továbbra is szükség van: a szerver csak azt látja.
+const VISITOR_ID_STORAGE = "jobWatcherVisitorId";
+const VISITOR_COOKIE_DAYS = 400; // a böngésző felső korlátja; feljebb vinni nincs értelme
+
 const getOrCreateVisitorId = () => {
-  const existing = readCookie(VISITOR_COOKIE_NAME);
-  if (existing) return existing;
-  const nextId = createVisitorId();
-  writeCookie(VISITOR_COOKIE_NAME, nextId, 365 * 2);
-  return nextId;
+  let id = readCookie(VISITOR_COOKIE_NAME);
+  if (!id) {
+    try {
+      id = localStorage.getItem(VISITOR_ID_STORAGE) || "";
+    } catch {
+      id = ""; // privát mód / letiltott storage — új azonosítót generálunk
+    }
+  }
+  if (!id) id = createVisitorId();
+  try {
+    localStorage.setItem(VISITOR_ID_STORAGE, id);
+  } catch {
+    // nem végzetes: marad a cookie a gördülő lejáratával
+  }
+  writeCookie(VISITOR_COOKIE_NAME, id, VISITOR_COOKIE_DAYS);
+  return id;
 };
 
 const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
