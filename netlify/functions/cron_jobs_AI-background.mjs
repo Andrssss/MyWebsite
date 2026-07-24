@@ -156,7 +156,8 @@ async function runSite(client, site) {
 
   console.log(
     `[AI - ${site.site}] mode=${site.mode} rows=${stats.rows} upserted=${stats.inserted} ` +
-    `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ok=${stats.ok} ` +
+    `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
+    `skip_location=${stats.skippedLocation} ok=${stats.ok} ` +
     `full_listing=${site.full_listing} complete=${stats.complete} ` +
     `cost=$${cost.toFixed(4)} reconcile=${JSON.stringify(stats.reconcile)}`
   );

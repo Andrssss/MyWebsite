@@ -257,7 +257,7 @@ async function handlePost(request) {
       console.log(
         `[ai-registry] ${AI_SOURCE}: rows=${stats.rows} inserted=${stats.inserted} ` +
         `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
-        `skip_non_it=${stats.skippedNonIt}`
+        `skip_non_it=${stats.skippedNonIt} skip_location=${stats.skippedLocation}`
       );
 
       // Record only what actually survived the gates, so the routine's knownUrls

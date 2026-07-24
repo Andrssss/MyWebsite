@@ -705,6 +705,10 @@ const JobWatcher = () => {
     const saved = localStorage.getItem("jobWatcherTime7d");
     return saved === null ? false : saved === "true";
   });
+  const [timeToday, setTimeToday] = useState(() => {
+    const saved = localStorage.getItem("jobWatcherTimeToday");
+    return saved === null ? false : saved === "true";
+  });
 
   const [sourcesOpen, setSourcesOpen] = useState(() => {
     const saved = localStorage.getItem("jobWatcherSourcesOpen");
@@ -1197,9 +1201,12 @@ const JobWatcher = () => {
     }
   };
 
-  const fetchJobs = async (next24h = time24h, next7d = time7d, force = false) => {
+  const fetchJobs = async (next24h = time24h, next7d = time7d, force = false, nextToday = timeToday) => {
     let effectiveRange = null;
-    if (next24h && next7d) effectiveRange = "30d";
+    // A "ma" a helyi éjfél óta eltelt idő, ami mindig < 24 óra, tehát a 24h-s
+    // backend-lekérés mindig lefedi — a naptári napra szűkítés a lista-oldalon történik.
+    if (nextToday) effectiveRange = TIME_RANGE_24H;
+    else if (next24h && next7d) effectiveRange = "30d";
     else if (next7d) effectiveRange = TIME_RANGE_7D;
     else if (next24h) effectiveRange = TIME_RANGE_24H;
 
@@ -1250,8 +1257,8 @@ const JobWatcher = () => {
   }, []);
 
   useEffect(() => {
-    fetchJobs(time24h, time7d);
-  }, [time24h, time7d]);
+    fetchJobs(time24h, time7d, false, timeToday);
+  }, [time24h, time7d, timeToday]);
 
   const toggleSources = () => {
     setSourcesOpen((prev) => {
@@ -1418,7 +1425,10 @@ const JobWatcher = () => {
       return !isInternSource && !isInternTitle && !internLike && !isInternExp;
     };
 
-    if (time24h && !time7d) {
+    if (timeToday) {
+      const todayStr = getTodayLocalDateString();
+      list = list.filter((j) => j.firstSeen && localDateStringFrom(j.firstSeen) === todayStr);
+    } else if (time24h && !time7d) {
       list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24);
     } else if (time7d) {
       list = list.filter((j) => j.firstSeen && hoursSince(j.firstSeen) <= 24 * 7);
@@ -1511,7 +1521,7 @@ const JobWatcher = () => {
     }
 
     return list;
-  }, [jobs, q, time24h, time7d, internMode, juniorMode, mediorMode, seniorMode, sourceStates, categoryStates, jobCategories, savedSearches, activeSavedSearches]);
+  }, [jobs, q, time24h, time7d, timeToday, internMode, juniorMode, mediorMode, seniorMode, sourceStates, categoryStates, jobCategories, savedSearches, activeSavedSearches]);
 
   /* =======================
      TECHNOLÓGIA SZŰRŐ
@@ -1604,6 +1614,8 @@ const JobWatcher = () => {
     localStorage.setItem("jobWatcherTime24h", "true");
     setTime7d(false);
     localStorage.setItem("jobWatcherTime7d", "false");
+    setTimeToday(false);
+    localStorage.setItem("jobWatcherTimeToday", "false");
     setAllSources("neutral");
     setAllCategories("neutral");
     setAllTechs("neutral");
@@ -1623,7 +1635,8 @@ const JobWatcher = () => {
       if (activeSearchTerms.length) reasons.push(`mentett keresés: ${activeSearchTerms.join(", ")}`);
     }
 
-    if (time7d) reasons.push("időszűrő: 1 hét");
+    if (timeToday) reasons.push("időszűrő: ma");
+    else if (time7d) reasons.push("időszűrő: 1 hét");
     else if (time24h) reasons.push("időszűrő: 24 óra");
 
     if (internMode) reasons.push("Gyakornok mód");
@@ -1647,7 +1660,7 @@ const JobWatcher = () => {
     else if (excludedTechs.length) reasons.push(`${excludedTechs.length} kizárt technológia`);
 
     return reasons;
-  }, [q, activeSavedSearches, savedSearches, time24h, time7d, internMode, juniorMode, mediorMode, seniorMode, sourceStates, categoryStates, techStates, globalTechCounts]);
+  }, [q, activeSavedSearches, savedSearches, time24h, time7d, timeToday, internMode, juniorMode, mediorMode, seniorMode, sourceStates, categoryStates, techStates, globalTechCounts]);
 
   const visibleJobs = useMemo(() => {
     let list = preTechJobs;
@@ -1711,7 +1724,9 @@ const JobWatcher = () => {
     );
   }, [preTechJobs, techStates, globalTechCounts, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
 
-  const activeTimeLabel = time7d
+  const activeTimeLabel = timeToday
+    ? "ma"
+    : time7d
     ? "1 hét"
     : time24h
     ? "24h"
@@ -1910,6 +1925,9 @@ const JobWatcher = () => {
           <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
             Frissítés
           </button>
+          <button className="job-btn" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
+            Szűrők törlése
+          </button>
           <button
             className="job-btn job-btn--openall"
             onClick={openAllFiltered}
@@ -1960,6 +1978,24 @@ const JobWatcher = () => {
           <label className="job-checkbox">
             <input
               type="checkbox"
+              checked={timeToday}
+              onChange={(e) => {
+                setTimeToday(e.target.checked);
+                localStorage.setItem("jobWatcherTimeToday", String(e.target.checked));
+                if (e.target.checked) {
+                  setTime24h(false);
+                  localStorage.setItem("jobWatcherTime24h", "false");
+                  setTime7d(false);
+                  localStorage.setItem("jobWatcherTime7d", "false");
+                }
+              }}
+            />
+            Csak mai
+          </label>
+
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
               checked={time24h}
               onChange={(e) => {
                 setTime24h(e.target.checked);
@@ -1967,6 +2003,8 @@ const JobWatcher = () => {
                 if (e.target.checked) {
                   setTime7d(false);
                   localStorage.setItem("jobWatcherTime7d", "false");
+                  setTimeToday(false);
+                  localStorage.setItem("jobWatcherTimeToday", "false");
                 }
               }}
             />
@@ -1983,6 +2021,8 @@ const JobWatcher = () => {
                 if (e.target.checked) {
                   setTime24h(false);
                   localStorage.setItem("jobWatcherTime24h", "false");
+                  setTimeToday(false);
+                  localStorage.setItem("jobWatcherTimeToday", "false");
                 }
               }}
             />

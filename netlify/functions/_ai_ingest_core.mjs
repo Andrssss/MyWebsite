@@ -123,6 +123,32 @@ export function isSeniorLike(title, filters) {
   return (filters || []).some((k) => blacklistRegex(k).test(n));
 }
 
+/* ── location filter (user rule 2026-07-24: default Budapest-only) ──
+   AI-scraped targets ANY Hungarian company's career page, unlike the hand
+   scrapers which mostly already skew Budapest. `job.location` is free text
+   the routine itself reads off the posting (see AI_SITES.md / the trigger
+   prompt) — deterministic keyword check here is a backstop matching the
+   isSeniorLike pattern above, NOT the primary decision (the routine is
+   expected to already skip clearly-non-Budapest postings before submitting,
+   per the trigger prompt's filter 6).
+   Trigger case: karrier.4iggroup.hu "Szeged - Hálózat üzemeltető" got saved
+   with no location awareness at all — the field existed in the schema but
+   was silently discarded before this fix, never gating anything.
+   Rule: reject ONLY when the location is a clearly stated OTHER place with no
+   Budapest/remote/nationwide qualifier anywhere in the string. Empty/missing
+   location (not clearly stated) is kept, per explicit user instruction. */
+
+const LOCATION_OK_HINTS = [
+  "budapest", "bp.", "bp,", "remote", "tavmunka", "home office", "homeoffice",
+  "orszagos", "magyarorszag", "barhol",
+];
+
+export function isNonBudapestLocation(location) {
+  const n = normalizeText(location);
+  if (!n) return false; // not clearly stated → keep (user rule)
+  return !LOCATION_OK_HINTS.some((hint) => n.includes(hint));
+}
+
 // Title beats body — SAME precedence every other scraper uses (see e.g.
 // cron_jobs_ALLASPORTAL-background.mjs): a title hit for diákmunka/junior/
 // medior always wins. Only when the title gives no signal ("-") does a
@@ -223,12 +249,14 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
   let skippedSenior = 0;
   let skippedCompany = 0;
   let skippedNonIt = 0;
+  let skippedLocation = 0;
 
   for (const job of jobs) {
     if (!job || !job.title || !job.url) continue;
     foundUrls.push(job.url);
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
     if (isSeniorLike(job.title, filters)) { skippedSenior++; continue; }
+    if (isNonBudapestLocation(job.location)) { skippedLocation++; continue; }
     // Évszám-alapú senior NEM dob többé (user-döntés 2026-07-20): a magas
     // évszámos AI-találatot is elmentjük, a frontend csak megjelöli (senior
     // badge). A cím-denylist (isSeniorLike) marad, mint minden scrapernél.
@@ -245,6 +273,6 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
 
   return {
     rows: jobs.length, inserted: insertedUrls.length, insertedUrls,
-    skippedSenior, skippedCompany, skippedNonIt, ok, complete, reconcile,
+    skippedSenior, skippedCompany, skippedNonIt, skippedLocation, ok, complete, reconcile,
   };
 }
