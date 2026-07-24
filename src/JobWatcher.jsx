@@ -1925,9 +1925,6 @@ const JobWatcher = () => {
           <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
             Frissítés
           </button>
-          <button className="job-btn" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
-            Szűrők törlése
-          </button>
           <button
             className="job-btn job-btn--openall"
             onClick={openAllFiltered}
@@ -2169,6 +2166,10 @@ const JobWatcher = () => {
         </div>
       </>
     )}
+
+    <button className="job-btn" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
+      Szűrők törlése
+    </button>
 
     {/* ===== TALÁLATOK ===== */}
     {!loading && (
