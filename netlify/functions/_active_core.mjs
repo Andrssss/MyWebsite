@@ -573,11 +573,21 @@ export const REVIVE_MAX_AGE_DAYS = 45;
 // ⚠️ Do NOT add a source here whose rows can be deactivated on PURPOSE (policy), e.g.
 // out-of-scope-location rows: they are ALIVE at their url, so this would resurrect them
 // every day. Such rows must be DELETED instead (profession's non-Budapest purge does).
+// startupjobs (2026-07-28): api.startup.jobs/v1/jobs only returns postings
+// PUBLISHED in the last 14 days — a time window, not a full current listing —
+// so absence from it never proves a job closed (same reasoning as talent's
+// rotating search results). Its scraper reconciles reactivate-only
+// (complete:false); the 404 sweep's default plain-404 rule is its only
+// deactivator. That default is UNVERIFIED here (no confirmed-dead posting
+// checked yet) — if rows stay stuck active well past closing, check a known-
+// dead startup.jobs page and add a BANNER_DEAD_SOURCES / REDIRECT_DEAD_SOURCES
+// entry instead.
 export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
   "profession-intern",
   "talent",
   "nofluffjobs",
   "bluebird",
+  "startupjobs",
 ]);
 
 /**

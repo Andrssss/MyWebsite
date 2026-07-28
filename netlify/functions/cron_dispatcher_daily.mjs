@@ -39,6 +39,12 @@ const TARGETS = [
   // Budapest, most junior/medior after the senior-skip — well under the <10-per-
   // source daily-tier rule. Added 2026-07-20.
   { name: "cron_jobs_NIX-background" },
+  // api.startup.jobs official REST API, role=engineering&country=HU. Tiny
+  // volume (well under 10) and the API itself only surfaces the last 14 days
+  // of postings, so hourly polling would buy nothing — daily is plenty.
+  // Reconciles reactivate-only (see cron_jobs_STARTUPJOBS-background.mjs
+  // header); the 404 sweep below is its sole deactivator. Added 2026-07-28.
+  { name: "cron_jobs_STARTUPJOBS-background" },
   // AI-scraped worker (cron_jobs_AI-background) is intentionally NOT triggered
   // yet — Phase 1 is in-session/manual extraction via ai-ingest.mjs (no
   // Anthropic API). When we automate it (intended cadence: every 5 hours), add
