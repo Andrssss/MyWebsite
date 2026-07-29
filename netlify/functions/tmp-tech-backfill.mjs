@@ -181,7 +181,16 @@ export default async (request) => {
         );
         results.push({ id: row.id, source: row.source, url: row.url, technologies: technologies || "(none)" });
       } catch (err) {
-        results.push({ id: row.id, source: row.source, url: row.url, error: err.message });
+        // One-off pass, no future automated retry (unlike enrichExperience's
+        // recurring healer) — leaving technologies NULL on a permanently-dead
+        // url (404/410/etc) would just make this same row get re-selected by
+        // every subsequent batch forever. Mark it '' (checked, no signal) so
+        // the backlog can actually reach zero.
+        await client.query(
+          `UPDATE job_posts SET technologies = '' WHERE id = $1 AND technologies IS NULL`,
+          [row.id]
+        );
+        results.push({ id: row.id, source: row.source, url: row.url, error: err.message, marked: "''" });
       }
       await sleep(500);
     }
