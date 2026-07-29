@@ -66,15 +66,33 @@ function professionPageUrl(baseUrl, page) {
   }
 }
 
+// Profession occasionally serves duplicate job URLs with an extra city
+// slug just before the numeric job id (e.g. "-budapest-2895930",
+// "-debrecen-2953010" / "-pecs-2953010" — same id, same posting, confirmed
+// live: both return the identical page, the slug text is ignored
+// server-side, see isBudapestLocation's comment above). A curated city list
+// (not "any trailing word") on purpose: stripping an arbitrary last word
+// would also eat legit company-suffix words like "-kft-"/"-zrt-", changing
+// the stored url for the vast majority of UNaffected rows and breaking their
+// ON CONFLICT (source, url) match against already-inserted rows.
+const DUPLICATE_CITY_SLUGS = [
+  "budapest", "debrecen", "szeged", "pecs", "gyor", "miskolc",
+  "kecskemet", "szekesfehervar", "nyiregyhaza", "szombathely",
+  "veszprem", "eger", "sopron",
+];
+const CITY_SLUG_RE = new RegExp(
+  `-(?:${DUPLICATE_CITY_SLUGS.join("|")})-(\\d+)(\\/pro)?\\/?$`,
+  "i"
+);
+
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
-    // Profession occasionally serves duplicate job URLs with an extra
-    // city slug just before the numeric job id (e.g. "-budapest-2895930").
-    // Normalize these to a single canonical path so dedupe/upsert works.
+    // Normalize duplicate city-slug URLs to a single canonical path so
+    // dedupe/upsert works — see DUPLICATE_CITY_SLUGS above.
     if (/^www\.profession\.hu$/i.test(u.hostname) && /^\/allas\//i.test(u.pathname)) {
-      u.pathname = u.pathname.replace(/-budapest-(\d+)(\/pro)?\/?$/i, "-$1$2");
+      u.pathname = u.pathname.replace(CITY_SLUG_RE, "-$1$2");
     }
 
     u.hash = "";
