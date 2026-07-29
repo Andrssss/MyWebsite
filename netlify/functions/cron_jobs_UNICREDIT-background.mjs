@@ -1,14 +1,29 @@
 /*
   UniCredit Bank Hungary scraper
   Platform: Avature SSR — jobs in static HTML on the list URL
-  URL pre-filters Budapest + IT job categories (no extra filtering needed)
+  URL pre-filters Budapest (no extra location filtering needed)
+
+  2026-07-29 (coverage audit): the URL used to ALSO pre-filter by a hardcoded
+  functional-area taxonomy (`&7620=[8883456,8883450,8883440,12016019]`) —
+  UniCredit's Avature backend renumbered/retired those ids at some point, so
+  the filtered query silently returned 0 real postings (200 OK, just a
+  Talent-Community CTA card) while the DB kept one stale row. The taxonomy
+  autocomplete widget (`AutocompleteSelectFieldUIWidget`) populates its
+  options via a client-side AJAX call with no ids present in the static
+  HTML, so there's no discoverable "correct" id to swap in. Removed the
+  category param entirely and replaced it with a code-side title keyword
+  gate (isItJob, same one the AI-scraped pipeline uses) so the scraper
+  doesn't start ingesting every Budapest banking/sales/compliance role —
+  this is also more robust than a hardcoded taxonomy id going forward.
 
   Flow:
-    1. GET list URL (jobRecordsPerPage=100)
+    1. GET list URL (Budapest), paginated via &jobOffset=N — the site caps
+       jobRecordsPerPage at 15 regardless of what's requested
     2. Parse <article class="article--result"> blocks → title + URL
-    3. Skip if isSeniorLike(title) OR title contains "senior"
-    4. Intern: isInternshipTitle(title)
-    5. Fetch detail page → extractBodyExperience for non-intern jobs
+    3. Skip if !isItJob(title) — not a dev/engineering/IT role
+    4. Skip if isSeniorLike(title) OR title contains "senior"
+    5. Intern: isInternshipTitle(title)
+    6. Fetch detail page → extractBodyExperience for non-intern jobs
 */
 
 import { Pool } from "pg";
@@ -17,6 +32,8 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
+import { loadCategories } from "./load_categories.mjs";
+import { isItJob } from "./_ai_ingest_core.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
@@ -31,12 +48,22 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const LIST_URL =
+// jobRecordsPerPage is a request hint the site ignores — it always returns 15
+// articles/page regardless (confirmed live 2026-07-29) and pages via
+// &jobOffset=N. The old category-filtered query never had more than ~2
+// results so this was never exercised; the unfiltered Budapest listing has
+// ~50, so pagination is now required or 35+ real postings would be silently
+// dropped (and reconcileActive would wrongly deactivate previously-seen ones).
+const UNICREDIT_PAGE_SIZE = 15;
+const LIST_URL_BASE =
   "https://careers.unicredit.eu/hu_HU/jobsuche/SearchJobs/" +
   "?1286=%5B1888%5D&1286_format=1068&" +
   "&12248=%5B12264283%5D&12248_format=8929" +
-  "&7620=%5B8883456%2C8883450%2C8883440%2C12016019%5D&7620_format=6375" +
-  "&listFilterMode=1&jobRecordsPerPage=100";
+  `&listFilterMode=1&jobRecordsPerPage=${UNICREDIT_PAGE_SIZE}`;
+
+function unicreditPageUrl(offset) {
+  return offset > 0 ? `${LIST_URL_BASE}&jobOffset=${offset}` : LIST_URL_BASE;
+}
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -142,30 +169,53 @@ async function upsertJob(client, source, item) {
 
 export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
   _filters = await loadFilters();
+  const categories = await loadCategories();
   const client = await pool.connect();
   try {
     await ensureTechnologiesColumn(client);
     const foundUrls = [];
-    let listHtml;
-    try {
-      listHtml = await fetchText(LIST_URL);
-    } catch (err) {
-      await logFetchError("cron_jobs_UNICREDIT-background", { url: LIST_URL, message: err.message });
-      console.error(`[unicredit] list fetch failed: ${err.message}`);
+
+    // Paginate the Budapest listing (see UNICREDIT_PAGE_SIZE comment above).
+    // MAX_PAGES is a generous safety cap, not an expected ceiling — current
+    // live volume is ~50/15 ≈ 4 pages.
+    const MAX_PAGES = 20;
+    const jobs = [];
+    let listFetchFailed = false;
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const offset = page * UNICREDIT_PAGE_SIZE;
+      const pageUrl = unicreditPageUrl(offset);
+      let pageHtml;
+      try {
+        pageHtml = await fetchText(pageUrl);
+      } catch (err) {
+        await logFetchError("cron_jobs_UNICREDIT-background", { url: pageUrl, message: err.message });
+        console.error(`[unicredit] list fetch failed (offset ${offset}): ${err.message}`);
+        listFetchFailed = true;
+        break;
+      }
+
+      const $page = cheerioLoad(pageHtml);
+      const articles = $page("article.article--result").toArray();
+      if (!articles.length) break; // natural end of listing
+
+      for (const el of articles) {
+        const $a = $page(el).find("h3.article__header__text__title--6 a").first();
+        const title = normalizeWhitespace($a.text());
+        const url = normalizeWhitespace($a.attr("href"));
+        if (title && url) jobs.push({ title, url });
+      }
+
+      console.log(`[unicredit] page offset=${offset}: ${articles.length} articles`);
+      if (articles.length < UNICREDIT_PAGE_SIZE) break; // short page = natural end
+    }
+
+    if (!jobs.length && listFetchFailed) {
+      console.error(`[unicredit] aborting — first page fetch failed and no jobs collected`);
       return;
     }
 
-    const $ = cheerioLoad(listHtml);
-    const articles = $("article.article--result").toArray();
-    console.log(`[unicredit] list: ${articles.length} jobs found`);
-
-    const jobs = [];
-    for (const el of articles) {
-      const $a = $(el).find("h3.article__header__text__title--6 a").first();
-      const title = normalizeWhitespace($a.text());
-      const url = normalizeWhitespace($a.attr("href"));
-      if (title && url) jobs.push({ title, url });
-    }
+    console.log(`[unicredit] list: ${jobs.length} jobs found across pagination`);
 
     // Intern-titled rows skip the detail fetch below (experience is already
     // known from the title) — but technologies still needs it. Fetch that once,
@@ -179,6 +229,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
+    let skippedNonIt = 0;
     let detailFetchFailed = 0;
 
     for (const job of jobs) {
@@ -186,6 +237,11 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
         if (!job.title) {
           skippedNoTitle++;
           console.log(`[unicredit] SKIP no-title → ${job.url}`);
+          continue;
+        }
+        if (!isItJob(job.title, categories)) {
+          skippedNonIt++;
+          console.log(`[unicredit] SKIP non-IT "${job.title}" → ${job.url}`);
           continue;
         }
         if (isSeniorLike(job.title)) {
@@ -253,12 +309,15 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
 
     console.log(
       `[unicredit] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
+      `skipped_senior=${skippedSenior}, skipped_non_it=${skippedNonIt}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
     );
 
-    // List fetch succeeded (we returned early otherwise) and detail failures no
-    // longer drop jobs from foundUrls, so the crawl is complete.
-    const complete = true;
+    // complete=false when pagination broke mid-way (listFetchFailed) — a
+    // partial listing must not be treated as the full current set, or
+    // reconcileActive would wrongly deactivate jobs on unseen pages. Detail
+    // (per-job) fetch failures don't affect this — they no longer drop jobs
+    // from foundUrls (see the catch above).
+    const complete = !listFetchFailed;
     const rc = await reconcileActive(client, "unicredit", foundUrls, { complete });
     console.log(`[unicredit] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {

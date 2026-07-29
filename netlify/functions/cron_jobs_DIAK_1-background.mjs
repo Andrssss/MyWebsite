@@ -4,9 +4,9 @@ console.log("CRON_JOBS_DIAK_1 LOADED");
 /* =========================
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
-  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
+  { key: "muisz", label: "Muisz – Informatikai+Mérnöki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3,4&locations=10" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
-  { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
+  { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
 ];
 */
@@ -199,9 +199,9 @@ function dedupeByUrl(items) {
 // =====================
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
-  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
+  { key: "muisz", label: "Muisz – Informatikai+Mérnöki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3,4&locations=10" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
-  { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
+  { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://app.tudatosdiak.hu/hu/jobs?searchIndustry%5B0%5D=7&searchMinHourlyWage=1000" },
 ];
 
@@ -821,7 +821,13 @@ function looksLikeJobUrl(sourceKey, url) {
   }
 
   if (sourceKey === "schonherz") {
-    if (!normalizeUrl(url).startsWith("https://schonherz.hu/diakmunka/budapest/fejleszto---tesztelo/")) return false;
+    const nu = normalizeUrl(url);
+    // informatikai---support added 2026-07-29 (coverage audit: real IT/support
+    // postings in that category were never scraped at all).
+    if (
+      !nu.startsWith("https://schonherz.hu/diakmunka/budapest/fejleszto---tesztelo/") &&
+      !nu.startsWith("https://schonherz.hu/diakmunka/budapest/informatikai---support/")
+    ) return false;
   }
 
   return true;
@@ -1143,45 +1149,64 @@ function extractSchonherz(html, baseUrl) {
   return dedupeByUrl(extractSchonherzFromHtml(html, baseUrl));
 }
 
-// Returns { jobs, complete } — complete=false when pagination broke mid-way
-// (page error) or the maxPages cap was hit while pages still had items. The
-// caller MUST pass this to reconcileActive: a partial list with complete=true
-// would wrongly deactivate every job on the unseen pages.
-async function fetchAllSchonherzJobs(initialHtml, baseUrl, { maxPages = 5 } = {}) {
-  const all = extractSchonherzFromHtml(initialHtml, baseUrl);
-  console.log(`[schonherz] page 0: ${all.length} items`);
-  let complete = false;
+// Budapest categories the scraper visits. Originally only fejleszto---tesztelo;
+// informatikai---support added 2026-07-29 (coverage audit: real IT/support
+// postings there — IT tanácsadó gyakornok, IT Technician, Programozó oktató —
+// were never scraped at all, the site has 9 categories total and only 1 was
+// covered). Other categories (adminisztratív, gazdasági, műszaki, etc.) were
+// sampled and found mostly non-IT, so left uncovered on purpose.
+const SCHONHERZ_CATEGORIES = ["fejleszto---tesztelo", "informatikai---support"];
 
-  for (let page = 1; page <= maxPages; page++) {
+// Returns { jobs, complete } — complete=false when any category's pagination
+// broke mid-way (page error) or its initial fetch failed. The caller MUST
+// pass this to reconcileActive: a partial list with complete=true would
+// wrongly deactivate every job on the unseen pages/categories.
+async function fetchAllSchonherzJobs({ maxPages = 5 } = {}) {
+  const all = [];
+  let complete = true;
+
+  for (const type of SCHONHERZ_CATEGORIES) {
+    const listUrl = `https://schonherz.hu/diakmunkak/budapest/${type}`;
+
+    let initialHtml;
     try {
-      const body = JSON.stringify({
-        office: "budapest",
-        type: "fejleszto---tesztelo",
-        text: "",
-        current: page,
-      });
-
-      const ajaxHtml = await fetchSchonherzPage(
-        "https://schonherz.hu/tobbdiakmunka/budapest/fejleszto---tesztelo",
-        body
-      );
-
-      if (!ajaxHtml || ajaxHtml.trim().length === 0) {
-        complete = true; // natural end of listing
-        break;
-      }
-
-      const pageItems = extractSchonherzFromHtml(ajaxHtml, baseUrl);
-      console.log(`[schonherz] page ${page}: ${pageItems.length} items`);
-
-      if (!pageItems.length) {
-        complete = true; // natural end of listing
-        break;
-      }
-      all.push(...pageItems);
+      initialHtml = await fetchText(listUrl);
     } catch (err) {
-      console.error(`[schonherz] page ${page} failed:`, err.message);
-      break; // partial listing — complete stays false
+      console.error(`[schonherz] category "${type}" initial fetch failed:`, err.message);
+      complete = false;
+      continue;
+    }
+
+    const catItems = extractSchonherzFromHtml(initialHtml, listUrl);
+    console.log(`[schonherz] category "${type}" page 0: ${catItems.length} items`);
+    all.push(...catItems);
+
+    for (let page = 1; page <= maxPages; page++) {
+      try {
+        const body = JSON.stringify({
+          office: "budapest",
+          type,
+          text: "",
+          current: page,
+        });
+
+        const ajaxHtml = await fetchSchonherzPage(
+          `https://schonherz.hu/tobbdiakmunka/budapest/${type}`,
+          body
+        );
+
+        if (!ajaxHtml || ajaxHtml.trim().length === 0) break; // natural end of listing
+
+        const pageItems = extractSchonherzFromHtml(ajaxHtml, listUrl);
+        console.log(`[schonherz] category "${type}" page ${page}: ${pageItems.length} items`);
+
+        if (!pageItems.length) break; // natural end of listing
+        all.push(...pageItems);
+      } catch (err) {
+        console.error(`[schonherz] category "${type}" page ${page} failed:`, err.message);
+        complete = false; // partial listing for this category
+        break;
+      }
     }
   }
 
@@ -1447,7 +1472,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       } else if (source === "muisz") {
         try {
-          merged = await fetchAllMuiszJobs({ categories: [3], locations: [10], limit: 12, maxPages: 20 });
+          // categories 3=Informatikai, 4=Mérnöki — 4 added 2026-07-29 (coverage audit: whole
+          // engineering category was never queried, real junior postings like "Tesztmérnök
+          // gyakornok", "Termékfejlesztő mérnök gyakornok" were missed entirely).
+          merged = await fetchAllMuiszJobs({ categories: [3, 4], locations: [10], limit: 12, maxPages: 20 });
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Muisz API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Muisz API error: ${e.message}` });
@@ -1455,7 +1483,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       } else if (source === "schonherz") {
         try {
-          const r = await fetchAllSchonherzJobs(html, p.url);
+          const r = await fetchAllSchonherzJobs();
           merged = r.jobs;
           sourceComplete = r.complete;
           if (!r.complete) console.log(`[schonherz] PARTIAL listing — deactivation will be skipped`);

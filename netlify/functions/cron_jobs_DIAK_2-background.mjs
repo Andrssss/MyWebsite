@@ -32,8 +32,11 @@ const YDIAK_SITEMAP_URL = "https://ydiak.hu/sitemap.xml";
 // fogja; a RÉGI formátum 200-redirectjét a REDIRECT_DEAD_SOURCES fedi továbbra is).
 const YDIAK_IT_DETAIL_RE = /^https:\/\/ydiak\.hu\/it-munka\/[^/?#]+$/;
 
+// kategória 12 = IT; 21 (nincs publikus UI-címke, tartalom alapján software-dev)
+// hozzáadva 2026-07-29 (coverage audit: 2 valódi junior dev poszt — JS Back-End
+// fejlesztő, React/React Native fejlesztő — ezen a kategórián ült, sosem lett lekérve).
 const QDIAK_API_URL =
-  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
+  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12,21&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
 
 /* ── shared helpers ─────────────────────────────────────────── */
 

@@ -2,10 +2,11 @@
 //
 // Standalone hide/unhide for a single job_posts row.
 //
-// Until now `hidden` was only ever a SIDE EFFECT of marking a job applied
-// (job-applied.js mirrors applied → hidden). This endpoint makes hiding an
-// independent action: bury a posting you don't want on the board without
-// claiming you applied to it.
+// `hidden` used to also be a SIDE EFFECT of marking a job applied
+// (job-applied.js mirrored applied → hidden), but that mirroring was removed
+// 2026-07-29 — applying to a job must not hide it from the public board.
+// This endpoint is now the only way to hide/unhide: bury a posting you don't
+// want on the board without claiming you applied to it.
 //
 // Auth = ADMIN_SECRET (the WRITE tier), deliberately NOT the LITTLE_ADMIN
 // cookie: that one is read-only by design, so a leaked LITTLE_ADMIN can never

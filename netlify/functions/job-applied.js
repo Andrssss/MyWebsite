@@ -27,7 +27,6 @@
 //   ownerKey, so nobody can write into someone else's bucket by lying about it.
 const { Pool } = require("pg");
 const { resolveOwnerKey, hasAdminSecret } = require("./_admin_identity_core");
-const { bumpJobsCacheGeneration } = require("./_jobs_cache_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -231,17 +230,6 @@ exports.handler = async (event) => {
                  applied_at = now()`,
           [jobKey, JSON.stringify(job), applied, interview, ownerKey]
         );
-      }
-      // Mirror "applied" onto job_posts.hidden — but ONLY for the real admins'
-      // shared bucket. This flag is PUBLIC (every visitor's board), so a
-      // little-admin's own personal applied-tracking must never touch it: their
-      // bucket is supposed to be private bookkeeping, not something that hides
-      // a job for everyone else. Only possible when we know the row's identity
-      // (url) — url-less manual entries have no job_posts row.
-      const jobUrl = typeof job.url === "string" ? job.url.trim() : "";
-      if (jobUrl && ownerKey === "admin") {
-        await pool.query(`UPDATE job_posts SET hidden = $1 WHERE url = $2`, [applied, jobUrl]);
-        await bumpJobsCacheGeneration();
       }
       return jsonResponse(200, { ok: true });
     } catch (err) {
