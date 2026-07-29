@@ -840,10 +840,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // rename its row away.
         const currentUrls = [...new Set([...merged.map((c) => c.url), ...foundBySource.get(source).urls])];
         const patternFor = VOLATILE_URL_PATTERNS[source];
-        // wherewework: a detail-fetch (elvárt évek kiolvasása) csak ÚJ url-nél fut.
+        // wherewework/otp: a detail-fetch (elvárt évek kiolvasása) csak ÚJ url-nél fut.
         // Meglévő sornál kidobott munka: az ON CONFLICT sosem írja felül az
-        // experience-t, a ~90 állásos lista újra-fetchelése percekig tartana.
-        const knownUrls = source === "wherewework"
+        // experience-t, a lista újra-fetchelése percekig tartana.
+        const knownUrls = (source === "wherewework" || source === "otp")
           ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
           : null;
         for (const item of matchedList) {
@@ -876,6 +876,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           } else if (source === "wherewework" && !knownUrls.has(item.url)) {
             const { experience: exp, technologies } = await fetchDetailExperience(item.url);
             if (exp) item.experience = exp;
+            item.technologies = technologies;
+            await sleep(400);
+          }
+          // A cím-alapú gyorsítóágak (otp junior/medior/gyakornok, wherewework
+          // gyakornok) fent nem fetchelnek body-t → technologies fetch nélkül
+          // maradna. ÚJ posztingnál pótoljuk egyszer, beszúrás ELŐTT (nem
+          // update-del utólag) — meglévő sornál a fetch kárba veszne, mert az
+          // upsert ON CONFLICT-je úgysem írná felül.
+          if (item.technologies === undefined && (source === "otp" || source === "wherewework") && !knownUrls.has(item.url)) {
+            const { technologies } = await fetchDetailExperience(item.url);
             item.technologies = technologies;
             await sleep(400);
           }

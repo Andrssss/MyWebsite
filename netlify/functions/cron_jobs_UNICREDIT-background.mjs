@@ -167,6 +167,14 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
       if (title && url) jobs.push({ title, url });
     }
 
+    // Intern-titled rows skip the detail fetch below (experience is already
+    // known from the title) — but technologies still needs it. Fetch that once,
+    // for genuinely NEW urls only: the upsert is ON CONFLICT DO NOTHING, so a
+    // fetch against an already-known url would just be thrown away.
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["unicredit"])).rows.map((r) => r.url)
+    );
+
     let newlyInserted = 0;
     let alreadyExisted = 0;
     let skippedSenior = 0;
@@ -192,6 +200,18 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
 
         if (isInternshipTitle(job.title)) {
           experience = "diákmunka";
+          if (!knownUrls.has(job.url)) {
+            await sleep(800);
+            try {
+              const detailHtml = await fetchText(job.url);
+              const normalizedHtml = detailHtml.replace(/–/g, "-");
+              technologies = extractTechnologies(normalizedHtml);
+            } catch (err) {
+              detailFetchFailed++;
+              await logFetchError("cron_jobs_UNICREDIT-background", { url: job.url, message: `technologies fetch: ${err.message}` });
+              console.error(`[unicredit] technologies fetch failed ${job.url}: ${err.message}`);
+            }
+          }
         } else {
           await sleep(800);
           try {

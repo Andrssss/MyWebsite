@@ -21,6 +21,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -484,10 +485,21 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
           j?.companyDescription ||
           null;
 
+        // minddiak.hu is a client-rendered Angular SPA (ng-version="13.4.0") —
+        // a plain GET of the detail url returns only the nav/footer shell, not
+        // the posting (verified live 2026-07-29, same blindness class as the
+        // zyntern Vue SPA fix). The full ad body IS already in this listing-API
+        // response though (description/requirements/advantages/offer, all raw
+        // HTML) — reuse it for extractTechnologies instead of a doomed 2nd fetch.
+        const techHtml = [j?.description, j?.requirements, j?.advantages, j?.offer]
+          .filter((s) => typeof s === "string" && s)
+          .join(" ");
+
         return {
           title: title ? String(title).slice(0, 300) : null,
           url: url || null,
           description: description ? String(description).slice(0, 800) : null,
+          techHtml: techHtml || null,
         };
       })
       .filter((x) => x.title && x.url);
@@ -1077,15 +1089,17 @@ const VOLATILE_URL_PATTERNS = {
 async function upsertJob(client, source, item) {
   // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
   // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
-  // (csak a zyntern ad company-t; a többi forrás itemjein a guard no-op)
+  // (csak a zyntern ad company-t; a többi forrás itemjein a guard no-op).
+  // technologies csak INSERT-kor íródik — a conflict-ág nem érinti, tehát egy
+  // már ismert sorra kárba veszne a fetch (lásd a hívó knownUrls-guardját).
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO UPDATE SET company = EXCLUDED.company
         WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
-    [source, item.title, item.url, item.experience ?? "-", item.company || null]
+    [source, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -1343,6 +1357,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
   const listToProcess = SOURCES.slice(batch * size, batch * size + size);
 
   const client = write ? await pool.connect() : null;
+  if (client) await ensureTechnologiesColumn(client);
 
   const stats = {
     ok: true,
@@ -1516,6 +1531,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // source, so migrateVolatileUrl must never rename its row away.
         const currentUrls = merged.map((c) => c.url);
         const patternFor = VOLATILE_URL_PATTERNS[source];
+        // minddiak/schonherz: nincs detail-fetch az experience-hez (mindkettő
+        // eleve "diákmunka"), de a technológiákhoz kell adat. Csak ÚJ url-nél
+        // dolgozzuk fel, és az eredményt EGYSZER, a beszúrással együtt írjuk —
+        // az upsertJob ON CONFLICT-je úgysem frissítené utólag (lásd ott).
+        const TECH_DETAIL_SOURCES = ["minddiak", "schonherz"];
+        const knownUrls = TECH_DETAIL_SOURCES.includes(source)
+          ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
+          : null;
         for (const item of matchedList) {
           item.experience = "diákmunka";
           try {
@@ -1523,6 +1546,20 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             if (pattern) {
               const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
               if (migrated) console.log(`[${source}] MIGRATED url → ${item.url}`);
+            }
+            if (source === "minddiak" && !knownUrls.has(item.url)) {
+              // Already have the full ad body from the listing API response
+              // (item.techHtml) — no separate fetch (the SPA detail page has
+              // no server-rendered content anyway, see fetchMinddiakJobsFromApi).
+              if (item.techHtml) item.technologies = extractTechnologies(`<body>${item.techHtml}</body>`);
+            } else if (source === "schonherz" && !knownUrls.has(item.url)) {
+              await sleep(500);
+              try {
+                const detailHtml = await fetchText(item.url);
+                item.technologies = extractTechnologies(detailHtml);
+              } catch (err) {
+                await logFetchError("cron_jobs_DIAK_1", { url: item.url, message: `technologies fetch: ${err.message}` });
+              }
             }
             await upsertJob(client, source, item);
             if (source === "minddiak") console.log(`[minddiak] SAVED: "${item.title}"  url=${item.url}`);

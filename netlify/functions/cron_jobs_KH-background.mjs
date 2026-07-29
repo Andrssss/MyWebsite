@@ -236,6 +236,14 @@ export default withTimeout("cron_jobs_KH-background", async () => {
     // source, so migrateVolatileUrl must never rename its row away.
     const currentUrls = dedup.map((r) => `${BASE}${r.url}`);
 
+    // Intern-titled rows skip the detail fetch below (experience is already
+    // known from the title) — but technologies still needs it. Fetch that once,
+    // for genuinely NEW urls only: the upsert is ON CONFLICT DO NOTHING, so a
+    // fetch against an already-known url would just be thrown away.
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["kh"])).rows.map((r) => r.url)
+    );
+
     let newlyInserted = 0;
     let migratedUrls = 0;
     let alreadyExisted = 0;
@@ -269,6 +277,17 @@ export default withTimeout("cron_jobs_KH-background", async () => {
 
         if (expLower === "szakmai gyakorlat" || isInternshipTitle(title)) {
           experience = "diákmunka";
+          if (!knownUrls.has(url)) {
+            await sleep(800);
+            try {
+              const detailHtml = await fetchText(url);
+              technologies = extractTechnologies(detailHtml);
+            } catch (err) {
+              detailFetchFailed++;
+              await logFetchError("cron_jobs_KH-background", { url, message: `technologies fetch: ${err.message}` });
+              console.error(`[kh] technologies fetch failed ${url}: ${err.message}`);
+            }
+          }
         } else {
           await sleep(800);
           try {
