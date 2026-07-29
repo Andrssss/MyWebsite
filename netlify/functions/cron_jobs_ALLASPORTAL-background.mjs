@@ -225,7 +225,11 @@ async function upsertJob(client, item) {
         technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
         company = CASE
           WHEN job_posts.company IS NULL THEN EXCLUDED.company
-          ELSE job_posts.company END;`,
+          ELSE job_posts.company END
+        WHERE ((job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
+               AND EXCLUDED.experience NOT IN ('-', ''))
+           OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
+           OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL);`,
     ["allasportal", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }

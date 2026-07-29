@@ -322,7 +322,11 @@ async function upsertJob(client, item) {
            AND EXCLUDED.experience NOT IN ('-', '')
           THEN EXCLUDED.experience ELSE job_posts.experience END,
         technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
-        company = COALESCE(job_posts.company, EXCLUDED.company);`,
+        company = COALESCE(job_posts.company, EXCLUDED.company)
+        WHERE ((job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
+               AND EXCLUDED.experience NOT IN ('-', ''))
+           OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
+           OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL);`,
     ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
