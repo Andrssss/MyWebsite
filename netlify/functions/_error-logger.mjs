@@ -1,5 +1,5 @@
 import { getStore } from "@netlify/blobs";
-import "./_db_audit.js";
+import { flushDbAudit } from "./_db_audit.js";
 
 const STORE_NAME = "fetch-error-logs";
 const RECOVERY_STORE_NAME = "recovery-logs";
@@ -138,6 +138,7 @@ export function withTimeout(cronJob, handler, limitMs) {
         const result = await handler(...args);
         await flushErrors(cronJob);
         await flushRecoveries(cronJob);
+        await flushDbAudit(cronJob);
         return result;
       } catch (err) {
         const elapsed = Date.now() - start;
@@ -148,6 +149,7 @@ export function withTimeout(cronJob, handler, limitMs) {
         });
         await flushErrors(cronJob);
         await flushRecoveries(cronJob);
+        await flushDbAudit(cronJob);
         throw err;
       }
     })();
@@ -164,6 +166,7 @@ export function withTimeout(cronJob, handler, limitMs) {
       console.error(`[${cronJob}] TIMEOUT after ${(elapsed / 1000).toFixed(1)}s`);
       await flushErrors(cronJob);
       await flushRecoveries(cronJob);
+      await flushDbAudit(cronJob);
 
       // Kill the process so the zombie handler doesn't keep running
       setTimeout(() => process.exit(0), 500);

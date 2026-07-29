@@ -1,20 +1,32 @@
-// Side-effect-only module: monkey-patches pg's Client.prototype.query so
-// every UPDATE / DELETE / upsert (INSERT ... ON CONFLICT DO UPDATE) that
-// actually changes a row gets one console.log line — kind, table, rowCount,
-// the statement itself. Silent when rowCount is 0 (guarded no-op writes,
-// e.g. backfill upserts that found nothing to fill, stay quiet — only real
-// mutations get logged). Plain INSERT (no ON CONFLICT) is not logged; that
-// wasn't asked for and is the expected/noisy common case.
+// Persists every real UPDATE / DELETE / upsert (INSERT ... ON CONFLICT DO
+// UPDATE) that actually changed a row into a Netlify Blob — not console
+// logs, so it survives past log retention and is queryable/listable later
+// instead of grepped out of `netlify logs`. Silent when rowCount is 0
+// (guarded no-op writes, e.g. a backfill upsert that found nothing to fill,
+// stay quiet). Plain INSERT (no ON CONFLICT) is not recorded — that's the
+// expected/high-volume common case, not what was asked for.
 //
-// CommonJS on purpose (not .mjs) so both `require("./_db_audit.js")` (the
-// plain .js functions) and `import "./_db_audit.js"` (the .mjs functions)
-// can pull it in for its side effect without any ESM/CJS interop risk.
+// Buffered in memory per invocation (same shape as _error-logger.mjs's
+// pendingErrors/pendingRecoveries) and flushed as ONE blob per run, on
+// purpose: a store.set() kicked off from deep inside a patched query() call
+// and never awaited by the top-level handler can get silently dropped when
+// the function freezes right after responding. Buffering + an explicit
+// awaited flush avoids that.
 //
-// Patches Client.prototype directly, so both `client.query(...)` and
-// `pool.query(...)` (which internally calls a real Client's query) are
-// covered — no per-call-site changes needed. Idempotent across repeated
-// requires/warm containers via the __dbAuditPatched guard.
+// CommonJS on purpose (not .mjs) so both `require("./_db_audit.js")` and
+// `import ... from "./_db_audit.js"` (the .mjs functions) work without any
+// ESM/CJS interop risk.
+//
+// Wiring:
+//   - Cron/background functions get this for free: withTimeout in
+//     _error-logger.mjs calls flushDbAudit(cronJob) automatically.
+//   - Plain HTTP handlers must opt in by wrapping their export:
+//       exports.handler = withDbAuditFlush("categories", async (event) => {...});
 const { Client } = require("pg");
+const { getStore } = require("@netlify/blobs");
+
+const STORE_NAME = "db-write-audit";
+let pendingWrites = [];
 
 if (!Client.prototype.__dbAuditPatched) {
   const originalQuery = Client.prototype.query;
@@ -30,10 +42,15 @@ if (!Client.prototype.__dbAuditPatched) {
     return { kind: kind === "INSERT" ? "UPSERT" : kind, table: m[2] };
   }
 
-  function logIfWritten(desc, sqlText, rowCount) {
+  function record(desc, sqlText, rowCount) {
     if (!rowCount) return;
-    const snippet = sqlText.replace(/\s+/g, " ").trim().slice(0, 220);
-    console.log(`[db-audit] ${desc.kind} ${desc.table} rowCount=${rowCount} :: ${snippet}`);
+    pendingWrites.push({
+      time: new Date().toISOString(),
+      kind: desc.kind,
+      table: desc.table,
+      rowCount,
+      sql: sqlText.replace(/\s+/g, " ").trim().slice(0, 220),
+    });
   }
 
   Client.prototype.query = function (...args) {
@@ -48,7 +65,7 @@ if (!Client.prototype.__dbAuditPatched) {
     if (typeof args[lastIdx] === "function") {
       const userCb = args[lastIdx];
       args[lastIdx] = function (err, result) {
-        if (!err) logIfWritten(desc, rawSql, result?.rowCount);
+        if (!err) record(desc, rawSql, result?.rowCount);
         return userCb.apply(this, arguments);
       };
       return originalQuery.apply(this, args);
@@ -56,10 +73,46 @@ if (!Client.prototype.__dbAuditPatched) {
 
     const result = originalQuery.apply(this, args);
     if (result && typeof result.then === "function") {
-      result.then((r) => logIfWritten(desc, rawSql, r?.rowCount)).catch(() => {});
+      result.then((r) => record(desc, rawSql, r?.rowCount)).catch(() => {});
     }
     return result;
   };
 
   Client.prototype.__dbAuditPatched = true;
 }
+
+/** Flush queued writes for this invocation into ONE "db-write-audit" blob. */
+async function flushDbAudit(jobName) {
+  if (pendingWrites.length === 0) return;
+  const writes = pendingWrites;
+  pendingWrites = [];
+  try {
+    const store = getStore(STORE_NAME);
+    const now = new Date();
+    const ts = now.toISOString().replace(/[:.]/g, "-");
+    const key = `${jobName || "unknown"}/${ts}.json`;
+    const entry = {
+      jobName: jobName || "unknown",
+      date: now.toISOString(),
+      writeCount: writes.length,
+      writes,
+    };
+    await store.set(key, JSON.stringify(entry, null, 2));
+    console.log(`[db-audit] ${jobName}: flushed ${writes.length} write(s) to blob`);
+  } catch (err) {
+    console.error(`[db-audit] flush failed: ${err.message}`);
+  }
+}
+
+/** Wrap a plain HTTP handler export so its writes flush before it returns. */
+function withDbAuditFlush(jobName, handler) {
+  return async (...args) => {
+    try {
+      return await handler(...args);
+    } finally {
+      await flushDbAudit(jobName);
+    }
+  };
+}
+
+module.exports = { flushDbAudit, withDbAuditFlush };

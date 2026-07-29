@@ -1,6 +1,6 @@
 // netlify/functions/reviews.js
 const { Pool } = require("pg");
-require("./_db_audit.js");
+const { withDbAuditFlush } = require("./_db_audit.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 
@@ -24,7 +24,7 @@ function jsonResponse(statusCode, body) {
   };
 }
 
-exports.handler = async (event, context) => {
+exports.handler = withDbAuditFlush("reviews", async (event, context) => {
   const client = await pool.connect();
   try {
     const method = event.httpMethod;
@@ -297,6 +297,6 @@ exports.handler = async (event, context) => {
   } finally {
     client.release();
   }
-};
+});
 
 

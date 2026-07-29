@@ -17,7 +17,7 @@
 //     -d '{"url":"https://example.hu/allas/1","active":false}'
 
 import { Pool } from "pg";
-import "./_db_audit.js";
+import { withDbAuditFlush } from "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -38,7 +38,7 @@ function authorized(request) {
   return token === expected;
 }
 
-export default async (request) => {
+export default withDbAuditFlush("fix-job-field", async (request) => {
   if (!authorized(request)) return json(401, { error: "Unauthorized" });
   if (request.method !== "POST") return json(405, { error: "POST only" });
 
@@ -93,4 +93,4 @@ export default async (request) => {
   } finally {
     client.release();
   }
-};
+});

@@ -26,7 +26,7 @@
 //   `applied_by` is NOT client-supplied — it's always the caller's resolved
 //   ownerKey, so nobody can write into someone else's bucket by lying about it.
 const { Pool } = require("pg");
-require("./_db_audit.js");
+const { withDbAuditFlush } = require("./_db_audit.js");
 const { resolveOwnerKey, hasAdminSecret } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -141,7 +141,7 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
   };
 }
 
-exports.handler = async (event) => {
+exports.handler = withDbAuditFlush("job-applied", async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
@@ -240,4 +240,4 @@ exports.handler = async (event) => {
   }
 
   return jsonResponse(405, { error: "Method not allowed" });
-};
+});

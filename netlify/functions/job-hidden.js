@@ -15,7 +15,7 @@
 //   POST { url, hidden: true|false, source? }
 //   Header: Authorization: Bearer $ADMIN_SECRET
 const { Pool } = require("pg");
-require("./_db_audit.js");
+const { withDbAuditFlush } = require("./_db_audit.js");
 const { bumpJobsCacheGeneration } = require("./_jobs_cache_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -54,7 +54,7 @@ function jsonResponse(statusCode, body) {
   return { statusCode, headers: corsHeaders(), body: JSON.stringify(body) };
 }
 
-exports.handler = async (event) => {
+exports.handler = withDbAuditFlush("job-hidden", async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
@@ -99,4 +99,4 @@ exports.handler = async (event) => {
     console.error("[job-hidden] error:", err);
     return jsonResponse(500, { error: "Szerver hiba" });
   }
-};
+});

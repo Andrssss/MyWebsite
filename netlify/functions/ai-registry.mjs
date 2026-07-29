@@ -41,7 +41,7 @@
 //          "rejected":["SomeCorp"]}'
 
 import { Pool } from "pg";
-import "./_db_audit.js";
+import { withDbAuditFlush } from "./_db_audit.js";
 import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
@@ -318,9 +318,9 @@ async function handlePost(request) {
   });
 }
 
-export default async (request) => {
+export default withDbAuditFlush("ai-registry", async (request) => {
   if (!authorized(request)) return json(401, { error: "Unauthorized", ...authDiagnostic(request) });
   if (request.method === "GET") return handleGet();
   if (request.method === "POST") return handlePost(request);
   return json(405, { error: "GET or POST only" });
-};
+});

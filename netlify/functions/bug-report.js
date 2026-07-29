@@ -1,6 +1,6 @@
 // netlify/functions/bug-report.js
 const { Pool } = require("pg");
-require("./_db_audit.js");
+const { withDbAuditFlush } = require("./_db_audit.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -94,7 +94,7 @@ function checkRateLimit(rateLimitKey) {
   return 0;
 }
 
-exports.handler = async (event) => {
+exports.handler = withDbAuditFlush("bug-report", async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
@@ -182,4 +182,4 @@ exports.handler = async (event) => {
     console.error("[bug-report] POST error:", err);
     return jsonResponse(500, { error: "Server error" });
   }
-};
+});

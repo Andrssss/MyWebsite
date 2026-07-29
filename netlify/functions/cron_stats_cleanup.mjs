@@ -8,7 +8,7 @@
 import { getStore } from "@netlify/blobs";
 import pkg from "pg";
 const { Pool } = pkg;
-import "./_db_audit.js";
+import { withDbAuditFlush } from "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -44,7 +44,7 @@ function monthRangeForPreviousMonth() {
   };
 }
 
-export default async function handler() {
+export default withDbAuditFlush("cron_stats_cleanup", async function handler() {
   const client = await pool.connect();
   try {
     // Az előző teljes hónap intervalluma: [monthStart, monthEnd)
@@ -106,4 +106,4 @@ export default async function handler() {
   } finally {
     client.release();
   }
-}
+});
