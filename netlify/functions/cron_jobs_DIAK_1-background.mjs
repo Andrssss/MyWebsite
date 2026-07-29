@@ -4,7 +4,7 @@ console.log("CRON_JOBS_DIAK_1 LOADED");
 /* =========================
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
-  { key: "muisz", label: "Muisz – Informatikai+Mérnöki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3,4&locations=10" },
+  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
@@ -199,7 +199,7 @@ function dedupeByUrl(items) {
 // =====================
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
-  { key: "muisz", label: "Muisz – Informatikai+Mérnöki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3,4&locations=10" },
+  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://app.tudatosdiak.hu/hu/jobs?searchIndustry%5B0%5D=7&searchMinHourlyWage=1000" },
@@ -1472,10 +1472,11 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       } else if (source === "muisz") {
         try {
-          // categories 3=Informatikai, 4=Mérnöki — 4 added 2026-07-29 (coverage audit: whole
-          // engineering category was never queried, real junior postings like "Tesztmérnök
-          // gyakornok", "Termékfejlesztő mérnök gyakornok" were missed entirely).
-          merged = await fetchAllMuiszJobs({ categories: [3, 4], locations: [10], limit: 12, maxPages: 20 });
+          // categories 3=Informatikai, 4=Mérnöki. 4 was added 2026-07-29 (coverage
+          // audit: whole engineering category was never queried) then reverted the
+          // same day — it's dominated by non-IT engineering internships (mechanical/
+          // civil/electrical), not the missed IT postings the audit was chasing.
+          merged = await fetchAllMuiszJobs({ categories: [3], locations: [10], limit: 12, maxPages: 20 });
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Muisz API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Muisz API error: ${e.message}` });
