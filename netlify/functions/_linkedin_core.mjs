@@ -5,7 +5,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
-import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mjs";
+import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -334,14 +334,6 @@ export async function processLinkedInSources(sources, jobName) {
   let blocked = false;
 
   try {
-    // Blocklistás cégek korábbi sorainak kitakarítása (idempotens, csak az
-    // első deploy utáni futásnál / listabővítésnél töröl ténylegesen).
-    try {
-      await purgeBlockedCompanies(client, "LinkedIn");
-    } catch (err) {
-      console.error(`${jobName}: company-blocklist purge failed: ${err.message}`);
-    }
-
     for (const p of sources) {
       if (blocked) {
         console.warn(`${jobName}: aborting remaining sources after LinkedIn block.`);

@@ -41,6 +41,7 @@
 //          "rejected":["SomeCorp"]}'
 
 import { Pool } from "pg";
+import "./_db_audit.js";
 import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";

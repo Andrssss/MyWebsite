@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import "./_db_audit.js";
 
 const STORE_NAME = "fetch-error-logs";
 const RECOVERY_STORE_NAME = "recovery-logs";

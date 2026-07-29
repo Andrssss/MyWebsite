@@ -43,7 +43,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mjs";
+import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
@@ -284,8 +284,6 @@ async function walkSlice(slice) {
 }
 
 async function scrapeAllasportal(client) {
-  await purgeBlockedCompanies(client, "allasportal");
-
   const seen = new Set();
   const allItems = [];
   const foundUrls = [];

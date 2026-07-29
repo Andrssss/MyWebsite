@@ -8,6 +8,7 @@
 // INVARIANT: only add sites we do NOT already have a hand scraper for.
 
 const { Pool } = require("pg");
+require("./_db_audit.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");

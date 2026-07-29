@@ -1,5 +1,6 @@
 // netlify/functions/reviews.js
 const { Pool } = require("pg");
+require("./_db_audit.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 

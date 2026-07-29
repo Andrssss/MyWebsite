@@ -17,6 +17,7 @@
 //     -d '{"url":"https://example.hu/allas/1","active":false}'
 
 import { Pool } from "pg";
+import "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");

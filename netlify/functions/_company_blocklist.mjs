@@ -1,9 +1,12 @@
 /*
   Cég-blocklist (user-döntés 2026-07-10/11): ezeknek a cégeknek a hirdetéseit
-  az ide bekötött források nem mentik, a korábban bekerült soraikat a run eleji
-  purge törli. Normalizált (ékezet-/kisbetű-független) PONTOS cégnév-egyezés —
-  szándékosan nem substring, nehogy pl. egy "Bosch Rexroth"-ot vagy a
-  "best-speed kft. - magyar telekom hivatalos partnere"-t is elkapja.
+  az ide bekötött források nem mentik — isBlockedCompany insert előtt szűr,
+  a korábban bekerült sorokat 2026-07-29-én egyszeri kézi törlés takarította
+  el (a run eleji purge azóta nincs, dead weight volt: a szűrő már eleve
+  megakadályozza az insertet, törölni valóján nem maradt). Normalizált
+  (ékezet-/kisbetű-független) PONTOS cégnév-egyezés — szándékosan nem
+  substring, nehogy pl. egy "Bosch Rexroth"-ot vagy a "best-speed kft. -
+  magyar telekom hivatalos partnere"-t is elkapja.
 
   A listák FORRÁSONKÉNT külön élnek (LISTS_BY_SOURCE), mert ugyanaz a cég
   forrásonként más-más néven hirdet (LinkedIn: "deutsche telekom" /
@@ -55,21 +58,4 @@ const _setsBySource = new Map(
 export function isBlockedCompany(company, source) {
   const set = _setsBySource.get(source);
   return !!set && company != null && set.has(normalizeText(company));
-}
-
-// Idempotens takarítás — az egyszeri kézi törlések (2026-07-10/11) után azt
-// fedi le, ha a blocklist előtti deployolt kód még visszainsertelt párat,
-// vagy ha a lista később bővül.
-export async function purgeBlockedCompanies(client, source) {
-  const list = LISTS_BY_SOURCE[source];
-  if (!list) return 0;
-  const { rowCount } = await client.query(
-    `DELETE FROM job_posts
-      WHERE source = $1 AND lower(company) = ANY($2::text[])`,
-    [source, list.map((c) => c.toLowerCase())]
-  );
-  if (rowCount > 0) {
-    console.log(`[${source}] company-blocklist purge: ${rowCount} sor törölve`);
-  }
-  return rowCount;
 }

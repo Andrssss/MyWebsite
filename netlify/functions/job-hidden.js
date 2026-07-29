@@ -15,6 +15,7 @@
 //   POST { url, hidden: true|false, source? }
 //   Header: Authorization: Bearer $ADMIN_SECRET
 const { Pool } = require("pg");
+require("./_db_audit.js");
 const { bumpJobsCacheGeneration } = require("./_jobs_cache_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;

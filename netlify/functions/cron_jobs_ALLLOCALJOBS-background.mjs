@@ -61,7 +61,7 @@ import { loadCategories } from "./load_categories.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isItJob } from "./_ai_ingest_core.mjs";
-import { isBlockedCompany, purgeBlockedCompanies } from "./_company_blocklist.mjs";
+import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
@@ -405,7 +405,6 @@ async function scrapeAlllocaljobs(client) {
   // lista ~165 oldala önmagában percek, utána indítva a számlálót a kettő összege
   // átlépné a withTimeout 14 percét.
   const runStart = Date.now();
-  await purgeBlockedCompanies(client, "alllocaljobs");
 
   const jar = makeJar();
   const seen = new Set();

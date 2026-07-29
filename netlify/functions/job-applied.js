@@ -26,6 +26,7 @@
 //   `applied_by` is NOT client-supplied — it's always the caller's resolved
 //   ownerKey, so nobody can write into someone else's bucket by lying about it.
 const { Pool } = require("pg");
+require("./_db_audit.js");
 const { resolveOwnerKey, hasAdminSecret } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;

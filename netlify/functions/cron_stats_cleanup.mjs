@@ -8,6 +8,7 @@
 import { getStore } from "@netlify/blobs";
 import pkg from "pg";
 const { Pool } = pkg;
+import "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
