@@ -9,9 +9,6 @@
 [functions."download-folder"]
   timeout = 26
 
-[functions."tmp-talent-tech-resweep"]
-  timeout = 26
-
 [functions."cron_jobs_HAYS-background"]
   external_node_modules = ["playwright-core", "playwright", "@sparticuz/chromium"]
   included_files = ["node_modules/@sparticuz/chromium/**"]
