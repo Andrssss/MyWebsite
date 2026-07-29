@@ -505,10 +505,23 @@ export function extractTechnologies(html) {
   // Scoped selectors are a substring/generic-id match (e.g. #job-details),
   // so they can lock onto an unrelated element (profession.hu's hidden
   // "Állás részletei" heading uses that exact id) and yield real-but-wrong
-  // text. Zero keyword hits on "found" text is the signal something other
-  // than the actual description got matched — fall back to the full body
-  // rather than reporting no technologies at all.
-  if (!found.size) {
+  // text. A SHORT scoped text (a heading/label, not a real description) is
+  // the actual signal something other than the description got matched —
+  // fall back to the full body in that case rather than reporting no
+  // technologies at all.
+  //
+  // Zero keyword hits alone is NOT that signal: a long, genuinely-scoped
+  // description can legitimately mention none of TECH_KEYWORDS (e.g. a
+  // non-software/architecture role) — falling back to the full body then
+  // picks up unrelated sidebar content instead (talent.com's "Hasonló
+  // munkák" related-jobs widget, confirmed live 2026-07-29: a Kyndryl
+  // "Mainframe Application Architecture" posting with a real ~5000-char
+  // description mentioning no tracked tech got stamped with Java/Angular/
+  // Spring Boot/Django/Next.js — all pulled from OTHER postings' titles
+  // listed elsewhere on the same page). MIN_TRUSTED_LENGTH is chosen well
+  // above "Állás részletei" (~16 chars) and well below any real posting.
+  const MIN_TRUSTED_LENGTH = 200;
+  if (!found.size && text.length < MIN_TRUSTED_LENGTH) {
     const bodyText = normalizeWhitespace($("body").text());
     if (bodyText !== text) found = matchKeywords(bodyText);
   }
