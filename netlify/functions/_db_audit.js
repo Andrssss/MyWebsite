@@ -22,13 +22,29 @@
 //     _error-logger.mjs calls flushDbAudit(cronJob) automatically.
 //   - Plain HTTP handlers must opt in by wrapping their export:
 //       exports.handler = withDbAuditFlush("categories", async (event) => {...});
-const { Client } = require("pg");
+// pg is required defensively: this module is imported by _error-logger.mjs,
+// which is imported by every cron/background function for withTimeout —
+// INCLUDING ones that never touch Postgres themselves (e.g. cron_scheduler.mjs,
+// which only POSTs to trigger other functions). Netlify's per-function bundler
+// only ships the node_modules a function's OWN import graph is found to need;
+// cron_scheduler.mjs never needed 'pg' before, so it wasn't bundled for it —
+// an unconditional require("pg") here crashed that function's every single
+// invocation for ~23h (2026-07-30 incident) with MODULE_NOT_FOUND, silently
+// taking down the entire hourly scraper grid it dispatches. If 'pg' isn't
+// resolvable, this function's bundle has no Postgres client to patch anyway,
+// so there's nothing lost by no-op'ing instead of crashing.
+let Client = null;
+try {
+  ({ Client } = require("pg"));
+} catch {
+  Client = null;
+}
 const { getStore } = require("@netlify/blobs");
 
 const STORE_NAME = "db-write-audit";
 let pendingWrites = [];
 
-if (!Client.prototype.__dbAuditPatched) {
+if (Client && !Client.prototype.__dbAuditPatched) {
   const originalQuery = Client.prototype.query;
 
   const STMT_RE = /^\s*(INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?([a-zA-Z_][\w."]*)/i;
