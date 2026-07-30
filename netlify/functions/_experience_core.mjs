@@ -39,11 +39,20 @@ function normalizeText(s) {
 export const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetsegprogram", "tehetségprogram", "talent",  "graduate", "student", "students", "early career",
+  "tehetsegprogram", "tehetségprogram", "talent", "student", "students", "early career",
 ];
 
+// "graduate" (e.g. "New College Graduate", "Graduate Software Engineer") means
+// someone who has ALREADY finished their studies and is being hired as a
+// full-time entry-level employee — that's "junior", not "diákmunka" (which in
+// this app specifically means still-enrolled/part-time student work). Titles
+// that are genuinely internship-shaped despite also saying "graduate" (e.g.
+// "Graduate Trainee Program") still resolve to diákmunka via the separate
+// "intern"/"trainee" keyword above — isInternshipTitle is checked first.
+// Fixed 2026-07-30 after NVIDIA's "Formal Verification Engineer - New College
+// Graduate" AI-scraped find got mislabeled diákmunka.
 export const JUNIOR_KEYWORDS = [
-  "junior",
+  "junior", "graduate",
 ];
 
 export const MID_KEYWORDS = [
