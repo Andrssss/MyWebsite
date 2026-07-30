@@ -338,7 +338,7 @@ export const SWEEP_EXCLUDED_SOURCES = new Set(["LinkedIn", "tudasdiak"]);
 // does NOT contain it — SPA bundles ship such texts as i18n templates on EVERY
 // page (talent/trenkwalder/qdiak/nofluffjobs all do).
 //
-// talent: the visible "Már nem fogadnak jelentkezéseket" banner is rendered
+// talent: the visible "no longer accepting applications" banner is rendered
 // from the job object's `system_status` (2 = expired, 1 = live) in the
 // Next.js flight payload. The page embeds SEVERAL job objects (related jobs
 // too!), so the status MUST be read from the object anchored at the url's own
@@ -348,10 +348,24 @@ export const SWEEP_EXCLUDED_SOURCES = new Set(["LinkedIn", "tudasdiak"]);
 // when talent SSR-renders the banner (2026-07-01 behaviour), it appears as
 // element text `>Már nem fogadnak…<` — the i18n dict form is always
 // `:"Már nem fogadnak…"`, so the tag boundary keeps it false-positive-free.
+//
+// REGRESSION found 2026-07-30: talent silently switched the SSR banner from
+// Hungarian to English at some point after the 07-06 validation (our sweep
+// still sends `Accept-Language: hu-HU,hu;q=0.9,en;q=0.8`, so it's talent's
+// own locale choice, not a header problem on our end) — two jobs the user
+// flagged as visibly showing "No longer accepting applications" produced
+// ZERO matches on the Hungarian regex, so they sat active indefinitely.
+// Confirmed via a live control job (a currently-listed talent posting) that
+// the rendered `>No longer accepting applications<` span is genuinely
+// absent when live and present (exactly once, as a real element — not the
+// i18n dict copy) on both flagged dead postings. Added as a second
+// tag-boundary-anchored check, same false-positive-safe shape as the
+// Hungarian one, so whichever language talent actually serves gets caught.
 export const BANNER_DEAD_SOURCES = {
   bluebird: "az álláshirdetés lejárt",
   talent: (row, body) => {
     if (/>\s*Már nem fogadnak jelentkezéseket\s*</i.test(body)) return true;
+    if (/>\s*No longer accepting applications\s*</i.test(body)) return true;
     const id = (row.url.match(/[?&]id=(\d+)/) || [])[1];
     if (!id) return false;
     let i = body.indexOf(`\\"id\\":\\"${id}\\"`); // flight-payload (escaped) form

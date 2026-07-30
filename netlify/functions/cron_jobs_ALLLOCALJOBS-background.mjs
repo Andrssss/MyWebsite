@@ -52,6 +52,22 @@
   reconcile confirmDead-kapuja előbb SESSION-nel lekéri, és csak akkor deaktivál,
   ha az a saját urljén requested_vacancy_not_found-ra redirectel. Így a lapozó-
   unió tűréséből (90%) kicsúszó, de ÉLŐ sorok nem esnek ki tévesen.
+
+  ⚠️ 2026-07-30 (user-jelzés, élő 294-soros ellenőrzéssel megerősítve): a site
+  KERESŐ-indexe ELMARAD az egyes hirdetések záródásától — egy már halott állás
+  (saját urlje session-nel lekérve requested_vacancy_not_found-ra redirectel)
+  simán TOVÁBBRA IS kártyaként szerepelhet a slice/böngésző-listákban, azaz a
+  foundUrls-ben — ez 69/294 aktívnak jelölt sort érintett élőben mérve, tehát a
+  fenti confirmDead-kapu (ami csak a listából-KIESETT sorokra fut) ezeket sosem
+  éri el. Első nekifutásra egy soronkénti véletlen-mintás kiegészítést kapott ez
+  a fájl (`reconcileActive`'s `confirmDeadExtraLimit`) — user-döntés alapján ez
+  KIDOBVA (részleges/valószínűségi lefedés, nem garantált). A tényleges fix:
+  külön napi teljes-lefedettségű sweep, lásd `cron_alllocaljobs_deepsweep-
+  background.mjs` — MINDEN aktív alllocaljobs sort végigellenőriz session-nel,
+  naponta egyszer (cron_dispatcher_daily triggereli, 14:00 UTC), nem csak egy
+  random részhalmazt óránként. A session-fetch gépezet (makeJar/fetchWithSession/
+  fixLocationEncoding) `_alllocaljobs_core.mjs`-be lett kiemelve, hogy a két
+  fájl (ez + a deepsweep) ne két külön, idővel szétdriftelő másolatot tartson.
 */
 
 import { Pool } from "pg";
@@ -62,6 +78,7 @@ import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isItJob } from "./_ai_ingest_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
+import { BASE, makeJar, fetchWithSession } from "./_alllocaljobs_core.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
@@ -77,9 +94,6 @@ const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
 });
-
-const BASE = "https://hu.alllocaljobs.com";
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 // Kereső-szeletek uniója (darabszámok 2026-07-10-én). Egy állás több slice-ban
 // is felbukkanhat (url-dedupe kezeli); a gyakornok/junior slice nem-IT sorait a
@@ -169,74 +183,6 @@ function isSeniorLike(title) {
   const n = normalizeText(title);
   return _filters.some((k) => _blacklistRegex(k).test(n));
 }
-/* ── session-aware fetch ─────────────────────────────────────── */
-
-// Minimál cookie jar: egy hoszt, path/expiry nem érdekes — a PHP session
-// cookie átvitele a cél a lapozáshoz és a detail oldalakhoz.
-function makeJar() {
-  const store = new Map();
-  return {
-    absorb(res) {
-      const set = res.headers.getSetCookie?.() ?? [];
-      for (const c of set) {
-        const [pair] = c.split(";");
-        const eq = pair.indexOf("=");
-        if (eq > 0) store.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
-      }
-    },
-    header() {
-      return [...store.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
-    },
-  };
-}
-
-// A Location fejlécben a szerver NYERS UTF-8 bájtokat küld (/állás), amit az
-// undici latin1-ként ad vissza → a naiv new URL() dupla-encode-ol
-// (%C3%83%C2%A1…) és 404 lesz (élőben megfigyelve 2026-07-10). A latin1→utf8
-// visszafejtés helyreállítja; ha a roundtrip érvénytelen UTF-8-at jelez
-// (U+FFFD), marad az eredeti string.
-function fixLocationEncoding(loc) {
-  const decoded = Buffer.from(loc, "latin1").toString("utf8");
-  return decoded.includes("�") ? loc : decoded;
-}
-
-// Redirect-követés kézzel, hogy a lánc KÖZBEN kapott set-cookie is a jarba
-// kerüljön (a detail oldal pont így kap sessiont) — fetch redirect:"follow"
-// ezt eldobná.
-async function fetchWithSession(url, jar, extraHeaders = {}) {
-  let current = url;
-  for (let hop = 0; hop < 6; hop++) {
-    const headers = {
-      "User-Agent": UA,
-      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-      ...extraHeaders,
-    };
-    const cookie = jar.header();
-    if (cookie) headers.Cookie = cookie;
-
-    const res = await fetch(current, {
-      redirect: "manual",
-      headers,
-      signal: AbortSignal.timeout(25000),
-    });
-    jar.absorb(res);
-
-    if ([301, 302, 303, 307, 308].includes(res.status)) {
-      const loc = res.headers.get("location");
-      if (!loc) throw new Error(`HTTP ${res.status} (no Location) for ${current}`);
-      current = new URL(fixLocationEncoding(loc), current).toString();
-      continue;
-    }
-    const body = await res.text();
-    if (res.status < 200 || res.status >= 300) {
-      throw new Error(`HTTP ${res.status} for ${current}`);
-    }
-    return { body, finalUrl: current };
-  }
-  throw new Error(`Too many redirects for ${url}`);
-}
-
 /* ── extraction ─────────────────────────────────────────────── */
 
 // A detail-oldal alján egy "Hasonló munkák, amelyeket még nem látott:" szekció ül,

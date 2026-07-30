@@ -59,6 +59,11 @@ const TARGETS = [
   // now returns HTTP 404 (see _active_core.mjs sweepActive404). Once/day is
   // plenty — the per-source reconcile handles the common case hourly.
   { name: "cron_404sweep-background" },
+  // Full session-aware dead-check across EVERY active alllocaljobs row, once a
+  // day (see that file's header: the hourly scraper's own confirmDead gate
+  // can't reach rows the site's listing keeps showing even after they've
+  // individually closed — this is the guaranteed-coverage complement to it).
+  { name: "cron_alllocaljobs_deepsweep-background" },
 ];
 
 export default withTimeout("cron_dispatcher_daily", async () => {
