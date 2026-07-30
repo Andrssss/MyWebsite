@@ -399,6 +399,18 @@ export const BANNER_DEAD_SOURCES = {
     const m = body.slice(i, i + 400).match(/"status"\s*:\s*"([A-Z_]+)"/);
     return !!m && (m[1] === "DISABLED" || m[1] === "EXPIRED");
   },
+  // "AI-scraped" is one flat source spanning many unrelated companies' own
+  // career pages, so — unlike every other entry here — a plain-string rule
+  // would risk false-positiving on some other AI-scraped domain that happens
+  // to share wording. Scoped per-domain instead; add more domain branches
+  // here as new AI-scraped ATS platforms are found to soft-404.
+  // atj.graphisoft.com (Jobvite-style ATS): a filled posting stays HTTP 200
+  // with this exact phrase — found 2026-07-30 when Graphisoft's "Junior AI
+  // Engineer" closed within minutes of being AI-discovered.
+  "AI-scraped": (row, body) => {
+    if (row.url.includes("atj.graphisoft.com") && /sorry,\s*this position has been filled/i.test(body)) return true;
+    return false;
+  },
 
   // Added 2026-07-22, each validated by fetching a currently-active listed job
   // for that exact source and confirming the phrase is ABSENT (the project's
