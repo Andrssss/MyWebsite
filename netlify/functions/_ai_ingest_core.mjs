@@ -42,7 +42,13 @@ export function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    u.hash = "";
+    // Fragment is KEPT (not stripped) — some career sites (e.g. KNBSZ,
+    // 2026-07-31) render every posting as its own #anchor section on one
+    // single-page listing with no separate server-rendered URL per job. The
+    // fragment is the only thing that makes those postings distinct rows.
+    // Safe pipeline-wide: none of the ~30 hand scrapers produce URLs with a
+    // hash component, so this only changes behavior for sites shaped like
+    // KNBSZ, never for existing sources.
     TRACKING.forEach((p) => u.searchParams.delete(p));
     return u.toString().replace(/\?$/, "");
   } catch {
