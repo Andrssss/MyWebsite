@@ -24,7 +24,7 @@ export default async (request) => {
   const client = await pool.connect();
   try {
     const res = await client.query(
-      `SELECT source, title, url, company, location, experience, technologies, hidden, active, first_seen
+      `SELECT source, title, url, company, experience, technologies, hidden, active, first_seen
        FROM job_posts WHERE source = 'AI-scraped' ORDER BY first_seen DESC`
     );
     return json(200, { count: res.rows.length, rows: res.rows });
