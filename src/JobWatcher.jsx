@@ -13,140 +13,6 @@ const VISITOR_COOKIE_NAME = "jobWatcherVisitorId";
 const DAILY_VISITOR_SENT_KEY = "jobWatcherVisitorSentDate";
 const ONE_MINUTE_MS = 60 * 1000;
 
-const CAREER_PAGES = [
-  { label: "Dolphio – gyakornok, szoftverfejlesztés", url: "https://www.dolphio.hu/dolphiokarrier/?search_keywords=&selected_category=gyakornok&selected_jobtype=szoftverfejlesztes&selected_location=budapest" },
-  { label: "Yettel / CEE Telecom Group", url: "https://jobs.ceetelcogroup.com/yettel/search/?createNewAlert=false&q=gyakornok&optionsFacetsDD_country=&optionsFacetsDD_lang=&optionsFacetsDD_department=" },
-  { label: "Accenture", url: "https://www.accenture.com/hu-en/careers/jobsearch?jk=Technology&sb=0&vw=1&is_rj=0&pg=1" },
-  { label: "AVL", url: "https://jobs.avl.com/search/?createNewAlert=false&q=&locationsearch=Budapest" },
-  { label: "DSS", url: "https://dss.hu/karrier/" },
-  { label: "Flexiton", url: "http://www.flexiton.hu/language/hu/karrier/" },
-  { label: "BKK", url: "https://bkk.karrierportal.hu/allasok" },
-  { label: "Prolan", url: "https://prolan.hrfelho.hu/allasajanlataink" },
-  { label: "DPD", url: "https://dpd.karrierportal.hu/allasok?_gl=1*l17chi*_ga*Njc0NjM3MDU4LjE3NDYxMDU5OTE.*_ga_Q3RB6RNZ25*MTc0NjEwNTk5MS4xLjAuMTc0NjEwNTk5MS42MC4wLjA." },
-  { label: "Cytocast", url: "https://www.cytocast.com/work-with-us/" },
-  { label: "IBS Budapest", url: "https://www.ibs-b.hu/hu/ibs/allasajanlatok-jobs/" },
-  { label: "Everengine", url: "https://everengine.com/allasajanlatok/" },
-  { label: "MAVIR", url: "https://karrier.mavir.hu/jobs?category=4893&jobworktype=0" },
-  { label: "OKFŐ", url: "https://okfo.gov.hu/Palyazatok_allashirdetesek/allashirdetesek/okfo-allashirdetesei" },
-  { label: "Telvice", url: "https://www.telvice.hu/karrier/" },
-  { label: "Enco Software", url: "https://www.karrier.encosoftware.hu/" },
-  { label: "Diagnosticum", url: "http://www.diagnosticum.hu/allas_con20211210" },
-  { label: "4Dsoft", url: "https://karrier.4dsoft.hu/jobs" },
-  { label: "Verizon (Indeed)", url: "https://hu.indeed.com/cmp/Verizon/jobs?q=intern&l=Budapest#cmp-skip-header-mobile" },
-  { label: "UiCentric", url: "https://rc.uicentric.com/careers/" },
-  { label: "Suit Solutions", url: "https://www.suitsolutions.eu/rolunk/karrier" },
-  { label: "IdomSoft", url: "https://career.idomsoft.hu/jobs/budapest/" },
-  { label: "Adverticum", url: "https://adverticum.net/rolunk/allas/" },
-  { label: "aiMotive", url: "https://aimotive.com/career" },
-  { label: "BCA", url: "https://bca.hu/karrier" },
-  { label: "Cloudera", url: "https://cloudera.wd5.myworkdayjobs.com/External_Career?locationCountry=9db257f5937e4421b2fac64eec6832f8" },
-  { label: "Deutsche Telekom IT Solutions", url: "https://www.deutschetelekomitsolutions.hu/nyitott-poziciok/" },
-  { label: "Digital Thinkers", url: "https://digitalthinkers.com/career" },
-  { label: "Dolphio – összes", url: "https://www.dolphio.hu/dolphiokarrier/?search_keywords=&selected_category=-1&selected_jobtype=-1&selected_location=budapest" },
-  { label: "EDM Designer (blog)", url: "https://blog.edmdesigner.com/jobs/" },
-  { label: "Catworkx", url: "https://catworkx.one/hu/jobs/job-openings" },
-  { label: "ExxonMobil", url: "https://jobs.exxonmobil.com/search/?createNewAlert=false&q=&locationsearch=HU&optionsFacetsDD_department=&optionsFacetsDD_shifttype=&optionsFacetsDD_country=" },
-  { label: "Ericsson", url: "https://jobs.ericsson.com/careers?page=1&jobPipeline=careersite&query=intern&start=0&location=Hungary&pid=563121763871350&sort_by=solr&filter_include_remote=1" },
-  { label: "eGroup", url: "https://www.egroup.hu/hu/company-vallalat/career/" },
-  { label: "Femtonics", url: "https://femtonics.eu/careers/" },
-  { label: "MVM", url: "https://mvm.karrierportal.hu/allasok?q=d29ya3BsYWNlcy1jb3VudHklNUIlNUQlM0RCdWRhcGVzdCUyNnNwZWNpYWxpdGllcyU1QiU1RCUzRElUJTIwYml6dG9ucyVDMyVBMWd0ZWNobmlrYSUyNnNwZWNpYWxpdGllcyU1QiU1RCUzRElUJTIwcHJvZ3JhbW96JUMzJUExcyUyQyUyMEZlamxlc3p0JUMzJUE5cyUyNnNwZWNpYWxpdGllcyU1QiU1RCUzRElUJTIwJUMzJUJDemVtZWx0ZXQlQzMlQTlzJTJDJTIwVGVsZWtvbW11bmlrJUMzJUExY2klQzMlQjMlMjYuuzzuuzz#!" },
-  { label: "EPAM", url: "https://careers.epam.hu/careers/job-listings?country=Hungary" },
-  { label: "Gravity Research", url: "https://www.gravityresearch.com/careers/" },
-  { label: "GoTo", url: "https://goto.wd5.myworkdayjobs.com/GoToCareers?locationCountry=9db257f5937e4421b2fac64eec6832f8" },
-  { label: "Loxon", url: "https://www.loxon.eu/career/" },
-  { label: "Suzuki", url: "https://karrier.suzuki.hu/allasok?q=c3BlY2lhbGl0eSU1QiU1RCUzRElUJTI2#!" },
-  { label: "Mediso", url: "https://mediso.com/global/hu/career" },
-  { label: "Meltwater", url: "https://meltwatercareers.ttcportals.com/search/jobs/in/country/hungary" },
-  { label: "Gloster", url: "https://karrier.gloster.hu/DataCenter/Registration/JobAdvertisements/" },
-  { label: "Munch", url: "https://careers.munch.eco/#jobs" },
-  { label: "Oracle Cloud (software testing)", url: "https://fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs?keyword=software+testing&location=Hungary&locationId=300000000471730&locationLevel=country&mode=location" },
-  { label: "Novartis", url: "https://www.novartis.com/hu-hu/karrier/poziciok-keresese?country%5B0%5D=LOC_HU&field_alternative_country%5B0%5D=LOC_HU" },
-  { label: "Oncompass Medicine", url: "https://oncompassmedicine.com/career" },
-  { label: "QLM (Hrmaster)", url: "https://hrmaster.qlm.hu/DataCenter/Registration/JobAdvertisements/allasok" },
-  { label: "RR Software", url: "https://karrier.rrsoftware.hu/DataCenter/Registration/JobAdvertisements/allasok" },
-  { label: "SAP", url: "https://jobs.sap.com/go/SAP-Jobs-in-Budapest/912901/?q=&q2=&alertId=&locationsearch=&title=intern&location=" },
-  { label: "Sigma Technology", url: "https://sigmatechnology.com/open-positions/?country=Hungary" },
-  { label: "ThyssenKrupp", url: "https://jobs.thyssenkrupp.com/hu?filter=jobField%3AIT%2CjobField%3AM%C3%A9rn%C3%B6k+%C3%A9s+tudom%C3%A1ny&location=Budapest%2C+K%C3%B6z%C3%A9p-Magyarorsz%C3%A1g%2C+Magyarorsz%C3%A1g&lat=47.4978789&lng=19.0402383&placeId=51f08ba60e4d0a3340592a6fec7ebabf4740f00101f90164fb120000000000c00208" },
-  { label: "Post CH", url: "https://job.post.ch/" },
-  { label: "Trioda", url: "https://www.trioda.hu/karrier" },
-];
-
-// AI által kutatott, kiegészítő lista (nincs átfedésben a fenti CAREER_PAGES listával)
-const CAREER_PAGES_AI = [
-  { label: "CIB Bank", url: "https://www.cib.hu/en/Maganszemelyek/rolunk/karrier.html" },
-  { label: "Gránit Bank", url: "https://granitbank.hu/karrier" },
-  { label: "MagNet Bank", url: "https://www.magnetbank.hu/karrier" },
-  { label: "Magyar Nemzeti Bank", url: "https://www.mnb.hu/a-jegybank/karrier" },
-  { label: "SEON", url: "https://seon.io/careers/" },
-  { label: "Allianz Hungária", url: "https://www.allianz.hu/hu_HU/lakossagi/karrier/nyitott-pozicioink.html" },
-  { label: "Generali Biztosító", url: "https://www.generali.hu/rolunk/karrier-a-generalinal.aspx" },
-  { label: "Groupama", url: "https://groupama.karrierportal.hu/allasok" },
-  { label: "Alfa Biztosító", url: "https://karrier.alfa.hu/allasok" },
-  { label: "UNIQA Biztosító", url: "https://uniqa.karrierportal.hu/allasok" },
-  { label: "Magyar Telekom", url: "https://www.telekom.hu/karrier/jobs" },
-  { label: "Yettel – gyakornoki program", url: "https://www.yettel.hu/karrier/gyakornoki-program" },
-  { label: "T-Systems Magyarország", url: "https://careers.telekom.com/en/jobs/itsh-hu" },
-  { label: "Vodafone Magyarország", url: "https://careers.vodafone.com/key/vodafone-hungary-career.html?locale=hu_HU" },
-  { label: "KPMG Hungary – gyakornok/pályakezdő", url: "https://kpmg.hrfelho.hu/allasajanlataink/gyakornok-palyakezdo" },
-  { label: "PwC Hungary – pályakezdők", url: "https://jobs-cee.pwc.com/hu/hu/palyakezdok" },
-  { label: "Deloitte Hungary", url: "https://www.deloitte.com/hu/hu/careers.html" },
-  { label: "EY Hungary", url: "https://www.ey.com/hu_hu/careers" },
-  { label: "IBM Hungary", url: "https://www.ibm.com/hu-en/employment/" },
-  { label: "BDO Hungary – gyakornokok", url: "https://www.bdo.hu/hu-hu/karrier-a-bdo-nal/gyakornokok" },
-  { label: "RSM Hungary", url: "https://www.rsm.hu/karrier" },
-  { label: "Forvis Mazars Hungary", url: "https://careers-hu.forvismazars.com/" },
-  { label: "Cognizant Hungary", url: "https://www.cognizant.com/hu/en/careers" },
-  { label: "Nagarro Hungary", url: "https://www.nagarro.com/en/careers/hungary" },
-  { label: "Genpact", url: "https://www.genpact.com/careers" },
-  { label: "Xapt", url: "https://xapt.com/career" },
-  { label: "Bosch Hungary – gyakornoki program", url: "https://www.bosch.hu/karrier/tanulok-palyakezdok/gyakornoki-program/" },
-  { label: "Knorr-Bremse (Budapest)", url: "https://careers.knorr-bremse.com/search/?locationsearch=Budapest" },
-  { label: "Audi Hungaria – gyakorlat", url: "https://www.audi.hu/gyakorlat/" },
-  { label: "Continental Hungary", url: "https://www.continental.com/hu-hu/karrier/" },
-  { label: "Tesco Technology (Budapest)", url: "https://careers.smartrecruiters.com/TescoTechnologyCE/hungary" },
-  { label: "Morgan Stanley – students/graduates", url: "https://www.morganstanley.com/people-opportunities/students-graduates" },
-  { label: "Wizz Air", url: "https://careers.wizzair.com/viewalljobs/" },
-  { label: "Nokia Hungary", url: "https://www.nokia.com/careers/our-locations/hungary/" },
-  { label: "Diageo Hungary", url: "https://www.diageo.com/en/careers/locations/europe/hungary" },
-  { label: "National Instruments / Emerson (Debrecen)", url: "https://www.ni.com/hu/about-ni/careers/debrecen.html" },
-  { label: "MOL Group – gyakornokok", url: "https://karrier.mol.hu/hu/gyakornokok" },
-  { label: "NISZ Zrt", url: "https://karrier.nisz.hu/" },
-  { label: "Digic Pictures", url: "https://career.digicpictures.com/jobs" },
-  { label: "Betsson Group (Hubsson)", url: "https://www.betssongroup.com/what-we-do/all-countries/hungary/" },
-  { label: "Richter Gedeon", url: "https://careers.gedeonrichter.com/" },
-  { label: "Turbine", url: "https://turbine.ai/careers" },
-  { label: "GLS Hungary", url: "https://gls-group.com/HU/hu/karrier/" },
-  { label: "Waberer's", url: "https://karrier.waberers.com/" },
-  { label: "Shapr3D", url: "https://www.shapr3d.com/company/careers" },
-  { label: "Tresorit", url: "https://tresorit.com/m/careers" },
-  { label: "Bitrise", url: "https://bitrise.io/careers" },
-  { label: "NNG", url: "https://careers.nng.com/" },
-  { label: "evosoft Hungary (Siemens)", url: "https://www.evosoft.hu/open-positions" },
-  { label: "One Identity Hungary", url: "https://www.oneidentity.com/company/careers-hungary.aspx" },
-  { label: "Silent Signal", url: "https://silentsignal.hu/karrier" },
-  { label: "Cursor Insight", url: "https://www.cursorinsight.com/html/en/jobs.html" },
-  { label: "Graphisoft", url: "https://careers.graphisoft.com/" },
-  { label: "Colossyan", url: "https://www.colossyan.com/careers/" },
-  { label: "Docler Holding", url: "https://careers.doclerholding.com/" },
-];
-
-// Job aggregátor/board oldalak, amiket (egyelőre) nem scrapelünk automatikusan
-// (profession.hu, nofluffjobs, linkedin, jobline, talent.com stb. már megvan)
-const CAREER_PAGES_AGGREGATORS = [
-  { label: "Jooble", url: "https://hu.jooble.org/SearchResult?date=8&p=3&rgns=Budapest" },
-  { label: "Indeed HU – junior IT, Budapest", url: "https://hu.indeed.com/q-junior-it-l-budapest-%C3%A1ll%C3%A1sok.html" },
-  { label: "CVonline.hu – IT/Telekom, Budapest", url: "https://www.cvonline.hu/en/jobs/it-telecommunications/budapest" },
-  { label: "Jobsora – informatikus, Budapest", url: "https://hu.jobsora.com/%C3%A1ll%C3%A1sok-informatikus-budapest" },
-  { label: "Állásportál.hu – informatika, Budapest", url: "https://allasportal.hu/v-budapest/k-informatika/" },
-  { label: "Jobrapido – informatikus, Budapest", url: "https://hu.jobrapido.com/?w=informatikus&l=Budapest" },
-  { label: "Jobtome – Budapest", url: "https://hu.jobtome.com/budapest-jobs" },
-  { label: "Careerjet – Budapest", url: "https://www.careerjet.hu/allasok/Budapest" },
-  { label: "Jófogás Állás – IT/Telekom, Budapest", url: "https://allas.jofogas.hu/budapest/it-telekommunikacio" },
-  { label: "Glassdoor – junior software dev, Budapest", url: "https://www.glassdoor.com/Job/budapest-junior-software-developer-jobs-SRCH_IL.0,8_IC3125126_KO9,34.htm" },
-  { label: "Wellfound (AngelList) – Budapest", url: "https://wellfound.com/location/budapest" },
-  { label: "EURES – HU állások", url: "https://europa.eu/eures/portal/jv-se/search?page=1&resultsPerPage=10&orderBy=BEST_MATCH&locationCodes=hu&lang=en" },
-];
-
 const getTodayLocalDateString = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -1156,13 +1022,6 @@ const JobWatcher = () => {
   const [commitsOpen, setCommitsOpen] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [monthlyActiveUsers, setMonthlyActiveUsers] = useState(null);
-  const [careerPagesOpen, setCareerPagesOpen] = useState(false);
-
-  const openAllCareerPages = (pages) => {
-    pages.forEach(({ url }) => {
-      window.open(url, "_blank", "noopener,noreferrer");
-    });
-  };
 
   useEffect(() => {
     fetch(VISITOR_TRACK_API)
@@ -1803,15 +1662,6 @@ const JobWatcher = () => {
   return (
   <div className="job-watcher">
     <div className="job-watcher-header">
-      <div className="job-header-actions">
-        <button
-          className="job-fab-btn"
-          onClick={() => setCareerPagesOpen((v) => !v)}
-          aria-label="Karrier oldalak megnyitása"
-        >
-          Karrier oldalak 🔗
-        </button>
-      </div>
       <div>
           <h1>Automata scraper</h1>
           <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni. Sajnos az a feltételezés, hogy egyetem után rögtön találsz munkát az hibás. HA nem voltál gyakornok egyetem alatt, akkor nagy eséllyel munkanélküli leszel egyetem után !!!!</p>
@@ -1863,30 +1713,33 @@ const JobWatcher = () => {
       </div>
 
       <div className="job-actions">
-        <input
-          className="job-search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Keresés pozícióra vagy cégre…"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              const term = q.trim();
-              if (term && !savedSearches.includes(term)) {
-                const nextSaved = [...savedSearches, term];
-                setSavedSearches(nextSaved);
-                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
-                const nextActive = new Set(activeSavedSearches);
-                nextActive.add(term);
-                setActiveSavedSearches(nextActive);
-                localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
-                // NEM ürítjük ki a mezőt: amíg q nem üres, a szűrés KIZÁRÓLAG
-                // erre a szövegre megy (ld. preTechJobs) — ha itt kitörölnénk,
-                // a lista visszaesne a MÁR aktív mentett keresések uniójára,
-                // és korábbi (elfelejtett bekapcsolt) chipek is visszaszivárognának.
+        <div className="job-search-wrap">
+          <span className="job-search-icon" aria-hidden="true">🔍</span>
+          <input
+            className="job-search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Keresés pozícióra vagy cégre…"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                const term = q.trim();
+                if (term && !savedSearches.includes(term)) {
+                  const nextSaved = [...savedSearches, term];
+                  setSavedSearches(nextSaved);
+                  localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
+                  const nextActive = new Set(activeSavedSearches);
+                  nextActive.add(term);
+                  setActiveSavedSearches(nextActive);
+                  localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+                  // NEM ürítjük ki a mezőt: amíg q nem üres, a szűrés KIZÁRÓLAG
+                  // erre a szövegre megy (ld. preTechJobs) — ha itt kitörölnénk,
+                  // a lista visszaesne a MÁR aktív mentett keresések uniójára,
+                  // és korábbi (elfelejtett bekapcsolt) chipek is visszaszivárognának.
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+        </div>
         {savedSearches.length > 0 && (
           <div className="job-saved-searches">
             {savedSearches.map((s) => {
@@ -2578,85 +2431,6 @@ const JobWatcher = () => {
             >
               {bugSending ? "Küldés…" : "Küldés"}
             </button>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {careerPagesOpen && (
-      <div
-        className="howto-modal-overlay"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setCareerPagesOpen(false);
-        }}
-      >
-        <div className="howto-modal career-modal" role="dialog" aria-modal="true" aria-label="Karrier oldalak">
-          <div className="howto-modal-header">
-            <span className="howto-modal-title">Karrier oldalak 🔗</span>
-            <button className="bug-modal-close" onClick={() => setCareerPagesOpen(false)} aria-label="Bezárás">✕</button>
-          </div>
-          <p className="howto-modal-info">
-            Cégek karrier oldalai, amiket (egyelőre) nem scrapelünk. {CAREER_PAGES.length + CAREER_PAGES_AI.length + CAREER_PAGES_AGGREGATORS.length} link összesen.
-          </p>
-
-          <div className="career-section-header">
-            <span>Saját lista ({CAREER_PAGES.length})</span>
-            <button className="career-open-all-btn" onClick={() => openAllCareerPages(CAREER_PAGES)}>
-              Összes megnyitása
-            </button>
-          </div>
-          <div className="career-pages-grid">
-            {CAREER_PAGES.map(({ label, url }) => (
-              <a
-                key={url}
-                className="career-page-btn"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-
-          <div className="career-section-header career-section-header--ai">
-            <span>AI-kutatott lista ({CAREER_PAGES_AI.length})</span>
-            <button className="career-open-all-btn" onClick={() => openAllCareerPages(CAREER_PAGES_AI)}>
-              Összes megnyitása
-            </button>
-          </div>
-          <div className="career-pages-grid">
-            {CAREER_PAGES_AI.map(({ label, url }) => (
-              <a
-                key={url}
-                className="career-page-btn career-page-btn--ai"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-
-          <div className="career-section-header career-section-header--agg">
-            <span>Job aggregátorok, amiket nem scrapelünk ({CAREER_PAGES_AGGREGATORS.length})</span>
-            <button className="career-open-all-btn" onClick={() => openAllCareerPages(CAREER_PAGES_AGGREGATORS)}>
-              Összes megnyitása
-            </button>
-          </div>
-          <div className="career-pages-grid">
-            {CAREER_PAGES_AGGREGATORS.map(({ label, url }) => (
-              <a
-                key={url}
-                className="career-page-btn career-page-btn--agg"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {label}
-              </a>
-            ))}
           </div>
         </div>
       </div>

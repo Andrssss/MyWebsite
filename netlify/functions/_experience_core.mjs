@@ -444,10 +444,7 @@ export const TECH_KEYWORDS = [
   ["smoke testing", "Smoke Testing"], ["exploratory testing", "Exploratory Testing"],
   ["api testing", "API Testing"], ["cross-browser testing", "Cross-browser Testing"],
   ["mobile testing", "Mobile Testing"], ["usability testing", "Usability Testing"],
-  ["black-box testing", "Black-box Testing"], ["black box testing", "Black-box Testing"],
-  ["white-box testing", "White-box Testing"], ["white box testing", "White-box Testing"],
-  ["end-to-end testing", "End-to-End Testing"], ["e2e testing", "End-to-End Testing"],
-  ["quality assurance", "Quality Assurance"],
+
 
   // collaboration / project tools
   ["jira", "Jira"], ["confluence", "Confluence"], ["postman", "Postman"],
