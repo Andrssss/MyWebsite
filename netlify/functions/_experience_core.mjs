@@ -373,60 +373,115 @@ export const TECH_KEYWORDS = [
 
   // backend / frameworks
   ["node.js", "Node.js"], ["nodejs", "Node.js"], ["express", "Express"], ["nestjs", "NestJS"],
-  [".net", ".NET"], ["asp.net", "ASP.NET"], ["spring boot", "Spring Boot"], ["spring", "Spring"],
+  [".net", ".NET"], [".net framework", ".NET Framework"], ["asp.net", "ASP.NET"],
+  ["spring boot", "Spring Boot"], ["spring", "Spring"],
   ["django", "Django"], ["flask", "Flask"], ["fastapi", "FastAPI"], ["laravel", "Laravel"],
   ["symfony", "Symfony"], ["rails", "Ruby on Rails"], ["hibernate", "Hibernate"],
   ["entity framework", "Entity Framework"], ["wpf", "WPF"], ["j2ee", "Java EE"],
-  ["java ee", "Java EE"], ["jee", "Java EE"], ["quarkus", "Quarkus"], ["graphql", "GraphQL"],
+  ["java ee", "Java EE"], ["jee", "Java EE"], ["java se", "Java SE"], ["jpa", "JPA"],
+  ["quarkus", "Quarkus"], ["graphql", "GraphQL"], ["grpc", "gRPC"], ["linq", "LINQ"],
+  ["razor", "Razor"], ["blazor", "Blazor"], ["maui", "MAUI"], ["akka", "Akka"],
   ["redux", "Redux"], ["angularjs", "AngularJS"], ["xamarin", "Xamarin"], ["swiftui", "SwiftUI"],
   ["firebase", "Firebase"], ["supabase", "Supabase"], ["liquibase", "Liquibase"],
+  ["cakephp", "CakePHP"], ["yii", "Yii"], ["weblogic", "WebLogic"], ["glassfish", "GlassFish"],
+  ["wildfly", "WildFly"], ["delphi", "Delphi"], ["liferay", "Liferay"], ["joomla", "Joomla"],
+  ["drupal", "Drupal"], ["wordpress", "WordPress"], ["woocommerce", "WooCommerce"], ["wcf", "WCF"],
+  ["webassembly", "WebAssembly"],
 
   // data / databases
   ["postgresql", "PostgreSQL"], ["postgres", "PostgreSQL"], ["mysql", "MySQL"],
   ["mssql", "MSSQL"], ["sql server", "SQL Server"], ["oracle", "Oracle"], ["mongodb", "MongoDB"],
-  ["power bi", "Power BI"], ["redis", "Redis"], ["elasticsearch", "Elasticsearch"],
+  ["power bi", "Power BI"], ["powerbi", "Power BI"], ["redis", "Redis"],
+  ["elasticsearch", "Elasticsearch"], ["opensearch", "OpenSearch"], ["kibana", "Kibana"],
   ["elk", "ELK Stack"], ["sqlite", "SQLite"], ["mariadb", "MariaDB"], ["nosql", "NoSQL"],
   ["spark", "Apache Spark"], ["t-sql", "T-SQL"], ["delta lake", "Delta Lake"],
+  ["databricks", "Databricks"], ["snowflake", "Snowflake"], ["dataiku", "Dataiku"],
+  ["pandas", "Pandas"], ["numpy", "NumPy"], ["tableau", "Tableau"],
+  ["dynamics 365", "Dynamics 365"], ["d365", "Dynamics 365"], ["dynamodb", "DynamoDB"],
+  ["redshift", "Redshift"], ["kdb", "kdb+/q"], ["db2", "DB2"],
 
   // cloud / devops
   ["aws", "AWS"], ["azure", "Azure"], ["gcp", "GCP"], ["google cloud", "GCP"],
   ["docker", "Docker"], ["kubernetes", "Kubernetes"], ["openshift", "OpenShift"], ["helm", "Helm"],
-  ["github actions", "GitHub Actions"], ["ci/cd", "CI/CD"], ["linux", "Linux"],
-  ["jenkins", "Jenkins"], ["gitlab", "GitLab"], ["ansible", "Ansible"], ["terraform", "Terraform"],
-  ["prometheus", "Prometheus"], ["grafana", "Grafana"], ["rabbitmq", "RabbitMQ"], ["kafka", "Kafka"],
+  ["github actions", "GitHub Actions"], ["github", "GitHub"], ["ci/cd", "CI/CD"], ["linux", "Linux"],
+  ["unix", "UNIX"], ["jenkins", "Jenkins"], ["gitlab", "GitLab"], ["ansible", "Ansible"],
+  ["puppet", "Puppet"], ["terraform", "Terraform"],
+  ["prometheus", "Prometheus"], ["grafana", "Grafana"], ["datadog", "Datadog"],
+  ["pagerduty", "PagerDuty"], ["nagios", "Nagios"],
+  ["rabbitmq", "RabbitMQ"], ["kafka", "Kafka"], ["activemq", "ActiveMQ"],
   ["azure devops", "Azure DevOps"], ["argocd", "ArgoCD"], ["vmware", "VMware"], ["kvm", "KVM"],
+  ["proxmox", "Proxmox"], ["openstack", "OpenStack"], ["tanzu", "Tanzu"], ["xen", "Xen"],
+  ["aks", "AKS"], ["eks", "EKS"], ["lambda", "Lambda"], ["cloudformation", "CloudFormation"],
+  ["cloudwatch", "CloudWatch"], ["azure synapse", "Azure Synapse"],
+  ["azure data factory", "Azure Data Factory"], ["azure monitor", "Azure Monitor"],
+  ["azure bicep", "Bicep"], ["bicep", "Bicep"], ["microsoft graph", "Microsoft Graph"],
+  ["entra id", "Entra ID"], ["sccm", "SCCM"], ["microsoft intune", "Microsoft Intune"],
+  ["dbt", "dbt"], ["redmine", "Redmine"],
 
   // tools / practices
   ["git", "Git"],
   ["rest api", "REST API"], ["rest apis", "REST API"],
   ["selenium", "Selenium"], ["maven", "Maven"], ["gradle", "Gradle"],
+  ["json", "JSON"], ["xml", "XML"], ["uml", "UML"], ["bpmn", "BPMN"], ["solid", "SOLID"],
+  ["infrastructure as code", "Infrastructure as Code"], ["swagger", "Swagger"],
+  ["openapi", "OpenAPI"], ["scrum", "Scrum"], ["kanban", "Kanban"], ["itil", "ITIL"],
+  ["itsm", "ITSM"], ["cmdb", "CMDB"], ["etl", "ETL"], ["elt", "ELT"],
 
   // testing
   ["cypress", "Cypress"], ["playwright", "Playwright"], ["jmeter", "JMeter"],
-  ["soapui", "SoapUI"], ["testng", "TestNG"], ["ranorex", "Ranorex"], ["sonarqube", "SonarQube"],
-  ["appium", "Appium"], ["bugzilla", "Bugzilla"],
+  ["soapui", "SoapUI"], ["testng", "TestNG"], ["junit", "JUnit"], ["jest", "Jest"],
+  ["mocha", "Mocha"], ["mockito", "Mockito"], ["ranorex", "Ranorex"], ["sonarqube", "SonarQube"],
+  ["appium", "Appium"], ["bugzilla", "Bugzilla"], ["katalon", "Katalon"], ["tosca", "Tosca"],
+  ["loadrunner", "LoadRunner"], ["robot framework", "Robot Framework"],
+  ["rest-assured", "REST Assured"], ["restassured", "REST Assured"], ["testrail", "TestRail"],
+  ["zephyr", "Zephyr"], ["rxjava", "RxJava"], ["insomnia", "Insomnia"], ["tdd", "TDD"],
+  ["uat", "UAT"],
 
   // collaboration / project tools
   ["jira", "Jira"], ["confluence", "Confluence"], ["postman", "Postman"],
+  ["atlassian", "Atlassian"], ["excel", "Excel"], ["powerpoint", "PowerPoint"],
+  ["visio", "Visio"], ["visual studio", "Visual Studio"], ["intellij", "IntelliJ"],
+  ["android studio", "Android Studio"],
 
   // systems / infra / security
-  ["powershell", "PowerShell"], ["windows server", "Windows Server"], ["windows", "Windows"],
+  ["powershell", "PowerShell"], ["vbscript", "VBScript"],
+  ["windows server", "Windows Server"], ["windows", "Windows"],
   ["active directory", "Active Directory"], ["ldap", "LDAP"], ["kerberos", "Kerberos"],
   ["openssh", "OpenSSH"], ["cisco", "Cisco"], ["nginx", "NGINX"], ["zabbix", "Zabbix"],
   ["jwt", "JWT"], ["siem", "SIEM"], ["aspice", "ASPICE"], ["microsoft 365", "Microsoft 365"],
-  ["m365", "Microsoft 365"], ["etl", "ETL"],
+  ["m365", "Microsoft 365"], ["office 365", "Microsoft 365"],
+  ["microsoft office", "Microsoft Office"], ["ms office", "Microsoft Office"],
+  ["group policy", "Group Policy"], ["microsoft exchange", "Microsoft Exchange"],
+  ["hashicorp vault", "HashiCorp Vault"], ["keycloak", "Keycloak"], ["cyberark", "CyberArk"],
+  ["big-ip", "F5 BIG-IP"], ["fortinet", "Fortinet"], ["palo alto", "Palo Alto Networks"],
+  ["meraki", "Cisco Meraki"], ["wireshark", "Wireshark"], ["openssl", "OpenSSL"],
+  ["vpn", "VPN"], ["dns", "DNS"], ["dhcp", "DHCP"], ["tcp/ip", "TCP/IP"], ["vlan", "VLAN"],
+  ["acl", "ACL"], ["websocket", "WebSockets"], ["websockets", "WebSockets"],
+  ["mqtt", "MQTT"], ["lamp", "LAMP"], ["lemp", "LEMP"], ["iptables", "iptables"],
+  ["fail2ban", "fail2ban"], ["cpanel", "cPanel"], ["graylog", "Graylog"], ["ajax", "Ajax"],
+  ["rpa", "RPA"], ["uipath", "UiPath"], ["sharepoint", "SharePoint"],
+  ["scada", "SCADA"], ["modbus", "Modbus"], ["erp", "ERP"], ["mes", "MES"], ["voip", "VoIP"],
+  ["mdm", "MDM"],
 
   // data / AI
   ["machine learning", "Machine Learning"], ["deep learning", "Deep Learning"],
-  ["nlp", "NLP"], ["llm", "LLM"],
+  ["nlp", "NLP"], ["llm", "LLM"], ["llms", "LLM"], ["pytorch", "PyTorch"],
+  ["tensorflow", "TensorFlow"], ["xgboost", "XGBoost"], ["langchain", "LangChain"],
+  ["prompt engineering", "Prompt Engineering"], ["ai agents", "AI Agents"],
+  ["rag", "RAG"], ["mcp", "MCP"],
 
   // mobile
-  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"],
+  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"], ["ionic", "Ionic"],
+  ["cocoapods", "CocoaPods"], ["rxswift", "RxSwift"], ["uikit", "UIKit"], ["xctest", "XCTest"],
+  ["mvvm", "MVVM"],
 ];
 
 function techBoundaryRegex(keyword) {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+  // Right boundary also accepts a directly-following digit — a version-number
+  // suffix (HTML5, CSS3, C++11, C++20, PHP7, Vue3) otherwise fails to match
+  // since a digit counts as "still part of the word" under [^a-z0-9] alone.
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$|\\d)`, "i");
 }
 
 // Extracts a comma-joined list of recognized technology keywords from an
