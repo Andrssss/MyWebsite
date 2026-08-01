@@ -1870,24 +1870,6 @@ const JobWatcher = () => {
           <label className="job-checkbox">
             <input
               type="checkbox"
-              checked={!timeToday && !time24h && !time7d}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setTimeToday(false);
-                  localStorage.setItem("jobWatcherTimeToday", "false");
-                  setTime24h(false);
-                  localStorage.setItem("jobWatcherTime24h", "false");
-                  setTime7d(false);
-                  localStorage.setItem("jobWatcherTime7d", "false");
-                }
-              }}
-            />
-            Összes
-          </label>
-
-          <label className="job-checkbox">
-            <input
-              type="checkbox"
               checked={timeToday}
               onChange={(e) => {
                 setTimeToday(e.target.checked);
@@ -1937,6 +1919,24 @@ const JobWatcher = () => {
               }}
             />
             Új (1 hét)
+          </label>
+
+          <label className="job-checkbox">
+            <input
+              type="checkbox"
+              checked={!timeToday && !time24h && !time7d}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setTimeToday(false);
+                  localStorage.setItem("jobWatcherTimeToday", "false");
+                  setTime24h(false);
+                  localStorage.setItem("jobWatcherTime24h", "false");
+                  setTime7d(false);
+                  localStorage.setItem("jobWatcherTime7d", "false");
+                }
+              }}
+            />
+            Összes
           </label>
           </div>
         </div>
