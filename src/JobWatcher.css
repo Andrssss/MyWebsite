@@ -197,6 +197,18 @@
   display: contents;
 }
 
+/* Csoport-wrapperek a szint- és frissesség-checkboxok köré. Mobilon
+   "contents"-ként átlátszóak, hogy a checkboxok a job-actions grid
+   közvetlen elemei maradjanak (2 oszlopos mobil elrendezés ne törjön el);
+   csak 900px felett válnak valódi (kereten belüli) csoport-dobozzá. */
+.job-filter-group {
+  display: contents;
+}
+
+.job-filter-group-label {
+  display: none;
+}
+
 @media (min-width: 900px) {
   .job-actions {
     display: grid;
@@ -229,6 +241,94 @@
     flex-wrap: nowrap;
     grid-area: btns;
     justify-content: flex-end;
+  }
+
+  /* Vizuálisan elválasztja a keresés/gombok sort a szűrő-csoportoktól. */
+  .job-filters {
+    padding-top: 14px;
+    margin-top: 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  /* A "Csak gyakornok/junior/medior/senior" és "Csak mai/24h/1hét"
+     checkboxok most egy-egy szegmentált-vezérlő-szerű dobozban ülnek,
+     ahelyett hogy egy hosszú, azonos súlyú sorban lógnának. */
+  .job-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+  }
+
+  .job-filter-group-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    padding: 0 8px 0 6px;
+    white-space: nowrap;
+  }
+
+  .job-filter-group .job-checkbox {
+    border: none;
+    background: transparent;
+    padding: 7px 12px;
+  }
+
+  .job-filter-group .job-checkbox:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .job-filter-group .job-checkbox:has(input:checked) {
+    box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
+  }
+
+  /* Források / Kategóriák / Technológiák fejlécsorok: kártyaszerű keret,
+     a tömeges kijelölés gombok jobbra rendezve a nyitó/csukó gombtól. */
+  .job-tabs-header {
+    justify-content: space-between;
+    padding: 10px 14px;
+    margin: 10px 0;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+  }
+
+  /* "Szűrők törlése" + találat-összegzés egy sorban: az összegzés balra,
+     a törlés gomb jobbra kerül (order), a DOM-sorrend mobilon marad. */
+  .job-toolbar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 4px 0 8px;
+  }
+
+  .job-toolbar-footer .job-status {
+    order: 1;
+    margin: 0;
+  }
+
+  .job-toolbar-footer .job-btn--ghost {
+    order: 2;
+  }
+
+  .job-btn.job-btn--ghost {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ccc;
+    box-shadow: none;
+  }
+
+  .job-btn.job-btn--ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.09);
+    box-shadow: none;
+    color: #fff;
   }
 }
 

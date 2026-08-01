@@ -1969,6 +1969,8 @@ const JobWatcher = () => {
         </div>
 
         <div className="job-filters">
+          <div className="job-filter-group job-filter-group--level">
+          <span className="job-filter-group-label">Szint</span>
           <label className="job-checkbox">
             <input
               type="checkbox"
@@ -2004,7 +2006,10 @@ const JobWatcher = () => {
             />
             Csak senior
           </label>
+          </div>
 
+          <div className="job-filter-group job-filter-group--time">
+          <span className="job-filter-group-label">Frissesség</span>
           <label className="job-checkbox">
             <input
               type="checkbox"
@@ -2058,6 +2063,7 @@ const JobWatcher = () => {
             />
             Csak új (1 hét)
           </label>
+          </div>
         </div>
       </div>
     </div>
@@ -2200,16 +2206,18 @@ const JobWatcher = () => {
       </>
     )}
 
-    <button className="job-btn" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
-      Szűrők törlése
-    </button>
+    <div className="job-toolbar-footer">
+      <button className="job-btn job-btn--ghost" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
+        Szűrők törlése
+      </button>
 
-    {/* ===== TALÁLATOK ===== */}
-    {!loading && (
-      <div className="job-status">
-        Aktív időszűrő: {activeTimeLabel} · Találatok: {visibleJobs.length}
-      </div>
-    )}
+      {/* ===== TALÁLATOK ===== */}
+      {!loading && (
+        <div className="job-status">
+          Aktív időszűrő: {activeTimeLabel} · Találatok: {visibleJobs.length}
+        </div>
+      )}
+    </div>
 
     {loading ? (
       <div className="job-status">Betöltés…</div>
