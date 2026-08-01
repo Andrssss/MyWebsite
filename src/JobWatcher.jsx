@@ -1253,6 +1253,8 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
+      setMediorMode(false);
+      localStorage.setItem("jobWatcherMediorMode", false);
       setSeniorMode(false);
       localStorage.setItem("jobWatcherSeniorMode", false);
     }
@@ -1264,6 +1266,8 @@ const JobWatcher = () => {
     if (checked) {
       setInternMode(false);
       localStorage.setItem("jobWatcherInternMode", false);
+      setJuniorMode(false);
+      localStorage.setItem("jobWatcherJuniorMode", false);
       setSeniorMode(false);
       localStorage.setItem("jobWatcherSeniorMode", false);
     }
@@ -1830,7 +1834,7 @@ const JobWatcher = () => {
               checked={internMode}
               onChange={(e) => handleInternToggle(e.target.checked)}
             />
-            Csak gyakornok
+            Gyakornok
           </label>
 
           <label className="job-checkbox">
@@ -1839,7 +1843,7 @@ const JobWatcher = () => {
               checked={juniorMode}
               onChange={(e) => handleJuniorToggle(e.target.checked)}
             />
-            Csak junior
+            Junior
           </label>
 
           <label className="job-checkbox">
@@ -1848,7 +1852,7 @@ const JobWatcher = () => {
               checked={mediorMode}
               onChange={(e) => handleMediorToggle(e.target.checked)}
             />
-            Csak medior
+            Medior
           </label>
 
           <label className="job-checkbox">
@@ -1857,7 +1861,7 @@ const JobWatcher = () => {
               checked={seniorMode}
               onChange={(e) => handleSeniorToggle(e.target.checked)}
             />
-            Csak senior
+            Senior
           </label>
           </div>
 
@@ -1878,7 +1882,7 @@ const JobWatcher = () => {
                 }
               }}
             />
-            Csak mai
+            Mai
           </label>
 
           <label className="job-checkbox">
@@ -1896,7 +1900,7 @@ const JobWatcher = () => {
                 }
               }}
             />
-            Csak új (24h)
+            Új (24h)
           </label>
 
           <label className="job-checkbox">
@@ -1914,7 +1918,7 @@ const JobWatcher = () => {
                 }
               }}
             />
-            Csak új (1 hét)
+            Új (1 hét)
           </label>
           </div>
         </div>

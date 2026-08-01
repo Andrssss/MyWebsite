@@ -12,7 +12,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -282,6 +282,10 @@ const SOURCES = [
           } catch (err) {
             await logFetchError("cron_jobs_A_K", { url: it.url, message: err.message });
           }
+        }
+        if (isSeniorExperience(it.experience)) {
+          console.log(`SKIP senior exp="${it.experience}" "${it.title}"`);
+          continue;
         }
         try {
           await upsertJob(client, "karrierhungaria", it);

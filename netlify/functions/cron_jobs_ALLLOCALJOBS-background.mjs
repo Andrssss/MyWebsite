@@ -82,6 +82,7 @@ import { BASE, makeJar, fetchWithSession } from "./_alllocaljobs_core.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
+  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -458,6 +459,11 @@ async function scrapeAlllocaljobs(client) {
       } catch (err) {
         await logFetchError("cron_jobs_ALLLOCALJOBS-background", { url: item.url, message: `detail: ${err.message}` });
       }
+    }
+
+    if (isSeniorExperience(item.experience)) {
+      skippedSenior++;
+      continue;
     }
 
     if (known.has(item.url)) {

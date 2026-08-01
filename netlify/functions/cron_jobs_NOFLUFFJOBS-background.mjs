@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -415,6 +415,10 @@ async function scrapeNofluffjobs(client) {
       if (exp) item.experience = exp;
       item.technologies = technologies;
       await sleep(400);
+    }
+    if (isSeniorExperience(item.experience)) {
+      console.log(`[nofluffjobs]   SKIP senior exp="${item.experience}" "${item.title}"`);
+      continue;
     }
     const migrated = await migrateVolatileUrl(
       client, "nofluffjobs", item.url, volatileUrlPattern(item.url), currentUrls

@@ -13,7 +13,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
-import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS } from "./_experience_core.mjs";
+import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -331,6 +331,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
           await logFetchError("cron_jobs_T", { url: job.url, message: err.message, extra: { source: "talent" } });
         }
       }
+      if (isSeniorExperience(job.experience)) continue;
       await upsertJob(client, "talent", job);
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);

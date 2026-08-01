@@ -29,7 +29,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, pruneStaleIdDuplicates } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -888,6 +888,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             const { technologies } = await fetchDetailExperience(item.url);
             item.technologies = technologies;
             await sleep(400);
+          }
+          if (isSeniorExperience(item.experience)) {
+            console.log(`${tag}     SKIP senior [${item.experience}] "${item.title}"`);
+            continue;
           }
           console.log(`${tag}     upsert: [${item.experience ?? '-'}] "${item.title}"`);
           await upsertJob(client, source, item);

@@ -21,7 +21,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 
 let _filters = [];
@@ -340,7 +340,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
           continue;
         }
 
-        if (isSeniorLike(parsed.title)) {
+        if (isSeniorLike(parsed.title) || isSeniorExperience(parsed.experience)) {
           skippedSenior++;
           console.log(`[mbh] SKIP senior "${parsed.title}" → ${detailUrl}`);
           continue;

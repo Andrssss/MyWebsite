@@ -18,6 +18,7 @@ import {
   extractKukaExperience,
   extractTechnologies,
   INTERNSHIP_KEYWORDS,
+  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -494,6 +495,9 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
           if (migrated) console.log(`[dreamjobs] MIGRATED url → ${job.url}`);
         }
         await enrichIfNew(job, known.get("dreamjobs"), extractBodyExperience, "cron_jobs_MIX");
+        // Ideiglenes döntés (2026-08-01): a senior-flag pontos, de a nem-LinkedIn
+        // forrásoknál insert előtt is kizárjuk — ne is kerüljön be a DB-be.
+        if (isSeniorExperience(job.experience)) continue;
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
@@ -511,6 +515,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
       for (const job of melonJobs) {
         await enrichIfNew(job, known.get("melonjobs"), extractBodyExperience, "cron_jobs_MIX");
+        if (isSeniorExperience(job.experience)) continue;
         await upsertJob(client, "melonjobs", job);
       }
       console.log(`melonjobs: ${melonJobs.length} jobs processed`);
@@ -531,6 +536,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
       for (const job of kukaJobs) {
         await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX");
+        if (isSeniorExperience(job.experience)) continue;
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);

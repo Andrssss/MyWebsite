@@ -22,7 +22,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -257,7 +257,7 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
           continue;
         }
 
-        if (isSeniorLike(parsed.title)) {
+        if (isSeniorLike(parsed.title) || isSeniorExperience(parsed.experience)) {
           skippedSenior++;
           console.log(`[eudiakok] SKIP senior "${parsed.title}" → ${detailUrl}`);
           continue;

@@ -186,16 +186,17 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   align-items: center;
-  gap: 4px;
-  padding: 6px;
+  gap: 2px;
+  padding: 4px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   grid-column: 1 / -1;
-  /* halvány elhalványulás a jobb szélen, jelzi hogy görgethető, ha a
-     chipek nem férnek ki egy képernyőnyi szélességbe */
-  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  /* halvány elhalványulás a jobb szélen — csak akkor látszik, ha egy nagyon
+     keskeny képernyőn mégsem fér ki minden chip; normál esetben minden chip
+     látszik görgetés nélkül. */
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
 }
 
 .job-filter-group::-webkit-scrollbar {
@@ -205,21 +206,31 @@
 .job-filter-group-label {
   display: inline-block;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: #888;
-  padding: 0 8px 0 6px;
+  padding: 0 6px 0 4px;
   white-space: nowrap;
 }
 
+/* A csoportdobozon belül a checkboxok apró, jelölő-nélküli chipek: a natív
+   pipa négyzet (ld. lejjebb) el van rejtve, az állapotot kizárólag a háttérszín
+   jelzi — ugyanaz a minta, mint a Források/Kategóriák tab-chipeknél
+   (.job-tab.active). Ez kell ahhoz, hogy mind a 4/3 chip kiférjen egy sorban. */
 .job-filter-group .job-checkbox {
   border: none;
   background: transparent;
-  padding: 7px 12px;
+  padding: 6px 10px;
   width: auto;
   flex-shrink: 0;
+  font-size: 13px;
+  gap: 0;
+}
+
+.job-filter-group .job-checkbox input {
+  display: none;
 }
 
 .job-filter-group .job-checkbox:hover {
@@ -451,25 +462,25 @@
    megjelenés, mint a Jelentkezések togglé — a Frissítés/Mind megnyitása
    marad az egyetlen két kiemelt (élénk színű) elsődleges akció a sorban. */
 .job-btn-stats {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ccc;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #e5e5e5;
 }
 
 .job-btn-stats:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.19);
   box-shadow: none;
   transform: translateY(-1px);
 }
 
 .job-btn--toggle {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ccc;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #e5e5e5;
 }
 
 .job-btn--toggle:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.19);
   box-shadow: none;
   transform: none;
 }
@@ -1094,14 +1105,14 @@ html, body {
 }
 
 .job-btn.job-btn--ghost {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #ccc;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #e5e5e5;
   box-shadow: none;
 }
 
 .job-btn.job-btn--ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.19);
   box-shadow: none;
   color: #fff;
 }

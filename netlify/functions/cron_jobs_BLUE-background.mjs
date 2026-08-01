@@ -15,7 +15,7 @@ import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractBluebirdExperience, extractTechnologies } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractBluebirdExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -292,6 +292,10 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
           } catch (err) {
             await logFetchError("cron_jobs_BLUE", { url: it.url, message: err.message });
           }
+        }
+        if (isSeniorExperience(it.experience)) {
+          console.log(`SKIP senior exp="${it.experience}" "${it.title}"`);
+          continue;
         }
         try {
           await upsertJob(client, p.key, it);
