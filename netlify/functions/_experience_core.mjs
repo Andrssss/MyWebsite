@@ -684,6 +684,11 @@ export async function enrichExperience({
 
     let success = 0;
     let failed = 0;
+    // Fetches must stay sequential (one HTTP round-trip + a politeness sleep
+    // per row), but the DB writes don't — collect them here and flush as at
+    // most two batched UPDATEs after the loop instead of one UPDATE per row.
+    const successRows = []; // { id, experience, technologies }
+    const failedRows = []; // { id, experience }
 
     for (const row of rows) {
       try {
@@ -703,14 +708,7 @@ export async function enrichExperience({
           experience = "medior";
         }
 
-        // Tech precedence: fresh extract > existing value > '' marker (the
-        // marker says "body checked, no keyword" so the cross-source
-        // technologies backfill never re-fetches this row).
-        await client.query(
-          `UPDATE job_posts SET experience = $1, technologies = COALESCE($3, technologies, '') WHERE id = $2`,
-          [experience || "-", row.id, technologies]
-        );
-
+        successRows.push({ id: row.id, experience: experience || "-", technologies: technologies ?? null });
         success++;
         await sleep(sleepMs);
       } catch (err) {
@@ -728,13 +726,34 @@ export async function enrichExperience({
           : isMidLevelTitle(row.title) ? "medior"
           : "-";
 
-        await client.query(
-          `UPDATE job_posts SET experience = $1 WHERE id = $2`,
-          [fallback, row.id]
-        );
-
+        failedRows.push({ id: row.id, experience: fallback });
         failed++;
       }
+    }
+
+    // Tech precedence: fresh extract > existing value > '' marker (the
+    // marker says "body checked, no keyword" so the cross-source
+    // technologies backfill never re-fetches this row).
+    if (successRows.length) {
+      await client.query(
+        `UPDATE job_posts AS jp
+            SET experience = v.experience,
+                technologies = COALESCE(v.technologies, jp.technologies, '')
+           FROM unnest($1::int[], $2::text[], $3::text[]) AS v(id, experience, technologies)
+          WHERE jp.id = v.id`,
+        [successRows.map(r => r.id), successRows.map(r => r.experience), successRows.map(r => r.technologies)]
+      );
+    }
+    // Failed rows only get the title-based fallback experience — technologies
+    // stays untouched (a fetch failure must not stamp the "checked, no tech" marker).
+    if (failedRows.length) {
+      await client.query(
+        `UPDATE job_posts AS jp
+            SET experience = v.experience
+           FROM unnest($1::int[], $2::text[]) AS v(id, experience)
+          WHERE jp.id = v.id`,
+        [failedRows.map(r => r.id), failedRows.map(r => r.experience)]
+      );
     }
 
     console.log(`[experience:${tag}] done — success: ${success}, failed: ${failed}`);
