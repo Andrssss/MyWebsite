@@ -19,7 +19,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, pruneStaleIdDuplicates } from "./_active_core.mjs";
-import { isInternshipTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -253,6 +253,15 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
 
         let source = "erste";
         let experience = isIntern ? "diákmunka" : expCombined || "-";
+
+        // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak
+        // cím-denylist dob" szabály mellett most az experience-alapú senior-flag
+        // is kizár insert előtt.
+        if (isSeniorExperience(experience)) {
+          skippedSenior++;
+          console.log(`[erste] SKIP senior-experience [${experience}] "${title}" → ${url}`);
+          continue;
+        }
 
         const pattern = volatileUrlPattern(url);
         let migrated = pattern

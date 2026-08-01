@@ -15,7 +15,7 @@ import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -159,7 +159,7 @@ export default withTimeout("cron_jobs_CG-background", async () => {
           skippedInvalid += 1;
           continue;
         }
-        if (isSeniorLike(item.title)) {
+        if (isSeniorLike(item.title) || isSeniorExperience(item.experience)) {
           skippedSenior += 1;
           continue;
         }

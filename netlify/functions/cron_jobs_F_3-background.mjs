@@ -5,7 +5,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, flushErrors, flushRecoveries } from "./_error-logger.mjs";
-import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
@@ -222,6 +222,11 @@ export default async (request) => {
         }
 
         const experience = detectExperience(entry.title, entry.cardText);
+        if (isSeniorExperience(experience)) {
+          skippedSenior++;
+          console.log(`[workly] SKIP senior-experience [${experience}] "${entry.title}"`);
+          continue;
+        }
         foundUrls.push(entry.url);
         const res = await client.query(
           `INSERT INTO job_posts (source, title, url, experience, first_seen)

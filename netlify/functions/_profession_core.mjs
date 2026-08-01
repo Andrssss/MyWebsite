@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies } from "./_experience_core.mjs";
+import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -771,6 +771,11 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         }
       }
       delete item.detailHtml;
+
+      if (isSeniorExperience(item.experience)) {
+        console.log(`[${source}] SKIP senior-experience [${item.experience}] "${item.title}" → ${item.url}`);
+        continue;
+      }
 
       const pattern = volatileUrlPattern(item.url);
       if (pattern) {

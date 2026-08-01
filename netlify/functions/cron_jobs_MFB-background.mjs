@@ -22,7 +22,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { isInternshipTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -237,6 +237,12 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           // extract year range like "(2-5 év)" → "2-5 év"
           const m = careerLevel.match(/\(([^)]+)\)/);
           experience = m ? m[1].trim() : (careerLevel || "-");
+        }
+
+        if (isSeniorExperience(experience)) {
+          skippedSenior++;
+          console.log(`[mfb] SKIP senior-experience [${experience}] "${title}" → ${url}`);
+          continue;
         }
 
         const pattern = volatileUrlPattern(url);

@@ -48,6 +48,7 @@ import {
   isMidLevelTitle,
   extractBodyExperience,
   extractTechnologies,
+  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -305,6 +306,15 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
           : rank != null ? RANK_EXPERIENCE[rank]
           : (contentYears || "-");
         const technologies = extractTechnologies(contentHtml);
+
+        // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak
+        // cím-denylist dob" szabály mellett most az experience-alapú senior-flag
+        // (taxonómia-senior/lead VAGY magas leírás-évszám) is kizár insert előtt.
+        if (isSeniorExperience(experience)) {
+          skippedSenior++;
+          console.log(`[nix] SKIP senior-experience [${experience}] "${title}" → ${url}`);
+          continue;
+        }
 
         const wasNew = await upsertJob(client, "nix", { title, url, experience, technologies });
         foundUrls.push(url);

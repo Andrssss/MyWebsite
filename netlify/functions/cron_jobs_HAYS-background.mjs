@@ -63,6 +63,7 @@ import {
   isMidLevelTitle,
   extractBodyExperience,
   extractTechnologies,
+  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 const SOURCE = "Hays";
@@ -307,6 +308,11 @@ const _runJob = withTimeout("cron_jobs_HAYS-background", async () => {
         ? "medior"
         : extractBodyExperience(descHtml) || "-";
       const technologies = extractTechnologies(descHtml);
+
+      if (isSeniorExperience(experience)) {
+        skippedSenior++;
+        continue;
+      }
 
       const wasNew = await upsertJob(client, { title, url, experience, technologies });
       if (wasNew) newCount++;

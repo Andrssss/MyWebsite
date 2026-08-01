@@ -288,6 +288,12 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           }
         }
 
+        if (isSeniorExperience(experience)) {
+          skippedSenior++;
+          console.log(`[unicredit] SKIP senior-experience [${experience}] "${job.title}" → ${job.url}`);
+          continue;
+        }
+
         const wasNew = await upsertJob(client, source, {
           title: job.title,
           url: job.url,

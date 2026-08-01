@@ -16,7 +16,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
-  extractYearsFromText,
+  extractYearsFromText, isSeniorExperience,
 } from "./_experience_core.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
@@ -267,10 +267,11 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
     if (isSeniorLike(job.title, filters)) { skippedSenior++; continue; }
     if (isNonBudapestLocation(job.location)) { skippedLocation++; continue; }
-    // Évszám-alapú senior NEM dob többé (user-döntés 2026-07-20): a magas
-    // évszámos AI-találatot is elmentjük, a frontend csak megjelöli (senior
-    // badge). A cím-denylist (isSeniorLike) marad, mint minden scrapernél.
     const resolvedExperience = resolveExperience(job);
+    // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "évszám-
+    // alapú senior nem dob" szabály megfordult — most az experience-alapú
+    // senior-flag is kizár insert előtt, mint minden más (nem-LinkedIn) scrapernél.
+    if (isSeniorExperience(resolvedExperience)) { skippedSenior++; continue; }
     if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
     await upsertJob(client, source, job, resolvedExperience);
     insertedUrls.push(job.url);

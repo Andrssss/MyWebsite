@@ -49,6 +49,7 @@ import {
   isMidLevelTitle,
   extractBodyExperience,
   extractTechnologies,
+  isSeniorExperience,
 } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -249,6 +250,12 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
           const experience = titleExperience(title) ?? extractBodyExperience(descriptionHtml) ?? "-";
           const technologies = extractTechnologies(descriptionHtml);
           const company = normalizeWhitespace(job?.company?.name) || null;
+
+          if (isSeniorExperience(experience)) {
+            skippedSenior++;
+            console.log(`[startupjobs] SKIP senior-experience [${experience}] "${title}" → ${url}`);
+            continue;
+          }
 
           const wasNew = await upsertJob(client, "startupjobs", { title, url, experience, company, technologies });
           foundUrls.push(url);

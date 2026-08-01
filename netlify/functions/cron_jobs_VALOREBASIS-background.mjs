@@ -24,7 +24,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 
 let _filters = [];
@@ -268,7 +268,7 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
       console.log(`[valorebasis] ${catUrl.split("/").pop()} → ${jobs.length} active jobs`);
 
       for (const job of jobs) {
-        if (isSeniorLike(job.title)) {
+        if (isSeniorLike(job.title) || isSeniorExperience(job.experience)) {
           skippedSenior++;
           console.log(`[valorebasis] SKIP senior "${job.title}"`);
           continue;

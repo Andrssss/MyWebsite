@@ -20,7 +20,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, pruneStaleIdDuplicates } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -311,6 +311,15 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
             console.error(`[raiffeisen] detail fetch failed ${url}: ${err.message}`);
             experience = level || "-";
           }
+        }
+
+        // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak
+        // cím-denylist dob" szabály mellett most az experience-alapú senior-flag
+        // is kizár insert előtt — nem csak a frontend/statisztika szűri utólag.
+        if (isSeniorExperience(experience)) {
+          skippedSenior++;
+          console.log(`[raiffeisen] SKIP senior-experience [${experience}] "${title}" → ${url}`);
+          continue;
         }
 
         const pattern = volatileUrlPattern(url);
