@@ -1,5 +1,6 @@
 // netlify/functions/daily-visitor.js
 const { Pool } = require("pg");
+const { withDbAuditFlush } = require("./_db_audit.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -75,7 +76,7 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
   };
 }
 
-exports.handler = async (event) => {
+exports.handler = withDbAuditFlush("daily-visitor", async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
@@ -165,4 +166,4 @@ exports.handler = async (event) => {
     console.error("[daily-visitor] Error:", err);
     return jsonResponse(500, { error: "Server error" });
   }
-};
+});

@@ -1,10 +1,13 @@
-// Persists every real UPDATE / DELETE / upsert (INSERT ... ON CONFLICT DO
-// UPDATE) that actually changed a row into a Netlify Blob — not console
-// logs, so it survives past log retention and is queryable/listable later
-// instead of grepped out of `netlify logs`. Silent when rowCount is 0
-// (guarded no-op writes, e.g. a backfill upsert that found nothing to fill,
-// stay quiet). Plain INSERT (no ON CONFLICT) is not recorded — that's the
-// expected/high-volume common case, not what was asked for.
+// Persists every real INSERT / UPDATE / DELETE that actually changed a row
+// into a Netlify Blob — not console logs, so it survives past log retention
+// and is queryable/listable later instead of grepped out of `netlify logs`.
+// Silent when rowCount is 0 (guarded no-op writes, e.g. a backfill upsert
+// that found nothing to fill, or an `ON CONFLICT DO NOTHING` that hit the
+// conflict, stay quiet). `INSERT ... ON CONFLICT DO UPDATE` is labeled
+// "UPSERT"; a plain INSERT (no ON CONFLICT) is labeled "INSERT" — both are
+// recorded (2026-08-01: plain INSERT used to be excluded as "expected/
+// high-volume", which turned out to hide most of a scraper's write volume
+// when attributing a DB-activity spike — see the "DB write-audit tool" memory).
 //
 // Buffered in memory per invocation (same shape as _error-logger.mjs's
 // pendingErrors/pendingRecoveries) and flushed as ONE blob per run, on
@@ -54,8 +57,10 @@ if (Client && !Client.prototype.__dbAuditPatched) {
     const m = STMT_RE.exec(sql);
     if (!m) return null;
     const kind = m[1].toUpperCase();
-    if (kind === "INSERT" && !/ON\s+CONFLICT/i.test(sql)) return null;
-    return { kind: kind === "INSERT" ? "UPSERT" : kind, table: m[2] };
+    if (kind === "INSERT") {
+      return { kind: /ON\s+CONFLICT/i.test(sql) ? "UPSERT" : "INSERT", table: m[2] };
+    }
+    return { kind, table: m[2] };
   }
 
   function record(desc, sqlText, rowCount) {
