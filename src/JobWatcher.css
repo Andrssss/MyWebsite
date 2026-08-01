@@ -769,6 +769,13 @@
   color: #fff;
 }
 
+/* A "Jelentkeztem?" gomb (.job-applied-btn) margin-left: auto-val tolja magát
+   (és mindent utána) jobbra. Ha az a gomb nincs kirenderelve, ezt a Kiemelés
+   gombnak kell átvennie, különben a dátum mellett marad ragadva balra. */
+.job-highlight-btn--pushed {
+  margin-left: auto;
+}
+
 .job-active-badge {
   display: inline-block;
   margin-left: 8px;

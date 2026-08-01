@@ -2374,7 +2374,7 @@ const JobWatcher = () => {
                   </button>
                 )}
                 <button
-                  className={`job-highlight-btn${isHighlighted ? " job-highlight-btn--on" : ""}`}
+                  className={`job-highlight-btn${isHighlighted ? " job-highlight-btn--on" : ""}${(isVisited || isApplied) ? "" : " job-highlight-btn--pushed"}`}
                   onClick={() => toggleHighlight(appliedKey)}
                   title={
                     isHighlighted
