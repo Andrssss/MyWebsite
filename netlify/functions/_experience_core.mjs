@@ -376,28 +376,52 @@ export const TECH_KEYWORDS = [
   [".net", ".NET"], ["asp.net", "ASP.NET"], ["spring boot", "Spring Boot"], ["spring", "Spring"],
   ["django", "Django"], ["flask", "Flask"], ["fastapi", "FastAPI"], ["laravel", "Laravel"],
   ["symfony", "Symfony"], ["rails", "Ruby on Rails"], ["hibernate", "Hibernate"],
+  ["entity framework", "Entity Framework"], ["wpf", "WPF"], ["j2ee", "Java EE"],
+  ["java ee", "Java EE"], ["jee", "Java EE"], ["quarkus", "Quarkus"], ["graphql", "GraphQL"],
+  ["redux", "Redux"], ["angularjs", "AngularJS"], ["xamarin", "Xamarin"], ["swiftui", "SwiftUI"],
+  ["firebase", "Firebase"], ["supabase", "Supabase"], ["liquibase", "Liquibase"],
 
   // data / databases
   ["postgresql", "PostgreSQL"], ["postgres", "PostgreSQL"], ["mysql", "MySQL"],
   ["mssql", "MSSQL"], ["sql server", "SQL Server"], ["oracle", "Oracle"], ["mongodb", "MongoDB"],
-  ["power bi", "Power BI"], 
+  ["power bi", "Power BI"], ["redis", "Redis"], ["elasticsearch", "Elasticsearch"],
+  ["elk", "ELK Stack"], ["sqlite", "SQLite"], ["mariadb", "MariaDB"], ["nosql", "NoSQL"],
+  ["spark", "Apache Spark"], ["t-sql", "T-SQL"], ["delta lake", "Delta Lake"],
 
   // cloud / devops
-  ["aws", "AWS"], ["azure", "Azure"], 
-  ["docker", "Docker"], ["kubernetes", "Kubernetes"],
+  ["aws", "AWS"], ["azure", "Azure"], ["gcp", "GCP"], ["google cloud", "GCP"],
+  ["docker", "Docker"], ["kubernetes", "Kubernetes"], ["openshift", "OpenShift"], ["helm", "Helm"],
   ["github actions", "GitHub Actions"], ["ci/cd", "CI/CD"], ["linux", "Linux"],
+  ["jenkins", "Jenkins"], ["gitlab", "GitLab"], ["ansible", "Ansible"], ["terraform", "Terraform"],
+  ["prometheus", "Prometheus"], ["grafana", "Grafana"], ["rabbitmq", "RabbitMQ"], ["kafka", "Kafka"],
+  ["azure devops", "Azure DevOps"], ["argocd", "ArgoCD"], ["vmware", "VMware"], ["kvm", "KVM"],
 
   // tools / practices
   ["git", "Git"],
-  ["rest api", "REST API"], 
-  ["selenium", "Selenium"],
+  ["rest api", "REST API"], ["rest apis", "REST API"],
+  ["selenium", "Selenium"], ["maven", "Maven"], ["gradle", "Gradle"],
+
+  // testing
+  ["cypress", "Cypress"], ["playwright", "Playwright"], ["jmeter", "JMeter"],
+  ["soapui", "SoapUI"], ["testng", "TestNG"], ["ranorex", "Ranorex"], ["sonarqube", "SonarQube"],
+  ["appium", "Appium"], ["bugzilla", "Bugzilla"],
+
+  // collaboration / project tools
+  ["jira", "Jira"], ["confluence", "Confluence"], ["postman", "Postman"],
+
+  // systems / infra / security
+  ["powershell", "PowerShell"], ["windows server", "Windows Server"], ["windows", "Windows"],
+  ["active directory", "Active Directory"], ["ldap", "LDAP"], ["kerberos", "Kerberos"],
+  ["openssh", "OpenSSH"], ["cisco", "Cisco"], ["nginx", "NGINX"], ["zabbix", "Zabbix"],
+  ["jwt", "JWT"], ["siem", "SIEM"], ["aspice", "ASPICE"], ["microsoft 365", "Microsoft 365"],
+  ["m365", "Microsoft 365"], ["etl", "ETL"],
 
   // data / AI
   ["machine learning", "Machine Learning"], ["deep learning", "Deep Learning"],
   ["nlp", "NLP"], ["llm", "LLM"],
 
   // mobile
-  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"], 
+  ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"],
 ];
 
 function techBoundaryRegex(keyword) {
