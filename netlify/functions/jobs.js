@@ -296,6 +296,7 @@ exports.handler = async (event) => {
           }
           return { source: s.key, label: s.label, count };
         });
+        out.sort((a, b) => a.label.localeCompare(b.label, "hu"));
 
         cacheSet(cacheKey, out);
         return jsonResponse(200, out, { ...respHeaders, "X-Cache": "MISS" });

@@ -1196,6 +1196,19 @@ html, body {
   cursor: not-allowed;
 }
 
+/* Technológia-kereső: csak a chip-lista megjelenítését szűri, kisebb és
+   kevésbé hangsúlyos, mint a fő pozíció/cég kereső. */
+.job-tech-search-wrap {
+  margin: 8px 0;
+}
+
+.job-tech-search {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 12px 7px 36px;
+  font-size: 13px;
+}
+
 
 .job-experience {
   margin-left: 1rem;

@@ -622,6 +622,7 @@ const JobWatcher = () => {
     const saved = localStorage.getItem("jobWatcherTechOpen");
     return saved !== null ? saved === "true" : false;
   });
+  const [techSearch, setTechSearch] = useState("");
 
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
@@ -1457,6 +1458,15 @@ const JobWatcher = () => {
     [globalTechCounts, techCounts]
   );
 
+  // A keresőmező csak a chip-lista MEGJELENÍTÉSÉT szűri — a state-eket
+  // (kijelölés, számlálás) nem érinti, tehát egy elrejtett chip kijelölése
+  // is megmarad, csak a keresés törlésekor látszik újra.
+  const visibleTechList = useMemo(() => {
+    const term = techSearch.trim().toLowerCase();
+    if (!term) return techList;
+    return techList.filter((tech) => tech.toLowerCase().includes(term));
+  }, [techList, techSearch]);
+
   /* Tech toggle (3-state). 0 találatos chip csak akkor kattintható, ha van
      rajta mentett állapot (hogy vissza lehessen venni) — újat nem lehet
      0-ra állítani. */
@@ -1668,7 +1678,7 @@ const JobWatcher = () => {
     <div className="job-watcher-header">
       <div>
           <h1>Automata scraper</h1>
-          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni. Sajnos az a feltételezés, hogy egyetem után rögtön találsz munkát az hibás. HA nem voltál gyakornok egyetem alatt, akkor nagy eséllyel munkanélküli leszel egyetem után !!!!</p>
+          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
           <div className="job-linkedin-notice">
             <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
             <p>
@@ -2052,9 +2062,24 @@ const JobWatcher = () => {
           )}
         </div>
 
+        {techOpen && (
+          <div className="job-search-wrap job-tech-search-wrap">
+            <span className="job-search-icon" aria-hidden="true">🔍</span>
+            <input
+              className="job-search job-tech-search"
+              value={techSearch}
+              onChange={(e) => setTechSearch(e.target.value)}
+              placeholder="Technológia keresése…"
+            />
+          </div>
+        )}
+
         <div className={`job-tabs-wrapper job-tabs-wrapper--tech ${techOpen ? "open" : ""}`}>
+          {techOpen && visibleTechList.length === 0 && (
+            <div className="job-status">Nincs egyező technológia.</div>
+          )}
           <div className="job-tabs">
-            {techList.map((tech) => {
+            {visibleTechList.map((tech) => {
               const state = techStates[tech] || "neutral";
               const count = techCounts[tech] || 0;
               // 0 találatos chipet nem lehet ÚJONNAN állítani — de ha van rajta
