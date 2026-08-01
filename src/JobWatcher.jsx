@@ -226,6 +226,9 @@ const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
 const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
 const INTERVIEW_KEYS_STORAGE = "jobWatcherInterviewKeys";
+// Purely client-side bookmark: no API call, no server state — just a local
+// highlight so a visitor can pick postings out of the list on their own device.
+const HIGHLIGHTED_KEYS_STORAGE = "jobWatcherHighlightedKeys";
 
 // Shared admin applied/interview list lives in the DB (see job-applied.js).
 const JOB_APPLIED_API = "/.netlify/functions/job-applied";
@@ -393,6 +396,22 @@ const loadInterviewKeys = () => {
 const saveInterviewKeys = (set) => {
   try {
     localStorage.setItem(INTERVIEW_KEYS_STORAGE, JSON.stringify([...set]));
+  } catch {
+    // silent
+  }
+};
+
+const loadHighlightedKeys = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(HIGHLIGHTED_KEYS_STORAGE) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
+const saveHighlightedKeys = (set) => {
+  try {
+    localStorage.setItem(HIGHLIGHTED_KEYS_STORAGE, JSON.stringify([...set]));
   } catch {
     // silent
   }
@@ -741,6 +760,7 @@ const JobWatcher = () => {
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
   const [interviewKeys, setInterviewKeys] = useState(() => loadInterviewKeys());
+  const [highlightedKeys, setHighlightedKeys] = useState(() => loadHighlightedKeys());
   const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
   const [showAppliedOnly, setShowAppliedOnly] = useState(false);
 
@@ -953,6 +973,19 @@ const JobWatcher = () => {
       saveInterviewKeys(next);
       // Interview is only tickable on applied jobs, so applied stays true.
       persistAdminApplied(key, true, nowInterview, job);
+      return next;
+    });
+  };
+
+  // Purely local bookmark, no API call — just so a visitor can pick a posting
+  // out of the list on their own device. Persisted the same way as
+  // applied/interview keys, but independent of them.
+  const toggleHighlight = (key) => {
+    setHighlightedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveHighlightedKeys(next);
       return next;
     });
   };
@@ -2214,9 +2247,10 @@ const JobWatcher = () => {
           // the column to nobody else), so this badge simply never renders for
           // ordinary visitors.
           const isHidden = job.hidden === true;
+          const isHighlighted = highlightedKeys.has(appliedKey);
 
           return (
-            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInterview ? " job-card--interview" : ""}${isInactive ? " job-card--inactive" : ""}${isHidden ? " job-card--hidden" : ""}`}>
+            <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInterview ? " job-card--interview" : ""}${isInactive ? " job-card--inactive" : ""}${isHidden ? " job-card--hidden" : ""}${isHighlighted ? " job-card--highlighted" : ""}`}>
               <div className="job-row">
                 <div className="job-title-group">
                   <a
@@ -2250,6 +2284,11 @@ const JobWatcher = () => {
                   {isHidden && (
                     <span className="job-hidden-badge" title="Rejtett – csak a megjelölt eszközön látszik, sima látogató nem kapja meg">
                       Rejtett
+                    </span>
+                  )}
+                  {isHighlighted && (
+                    <span className="job-highlight-badge" title="Kiemelve – ez csak a te eszközödön látszik így, senki másnak">
+                      Kiemelt
                     </span>
                   )}
                 </div>
@@ -2334,6 +2373,17 @@ const JobWatcher = () => {
                     ✎ Szerkesztés
                   </button>
                 )}
+                <button
+                  className={`job-highlight-btn${isHighlighted ? " job-highlight-btn--on" : ""}`}
+                  onClick={() => toggleHighlight(appliedKey)}
+                  title={
+                    isHighlighted
+                      ? "Kiemelés visszavonása (csak ezen az eszközön)"
+                      : "Kiemelés (csak ezen az eszközön, senki más nem látja)"
+                  }
+                >
+                  {isHighlighted ? "★ Kiemelve" : "☆ Kiemelés"}
+                </button>
                 {(isLittleAdmin || isAdmin) && job.url && (
                   <button
                     className={`job-hide-btn${isHidden ? " job-hide-btn--on" : ""}`}

@@ -724,6 +724,52 @@
   color: #fff;
 }
 
+/* Kiemelés — tisztán kliens-oldali könyvjelző (localStorage, nincs API hívás).
+   Ugyanaz a "teljes körvonalas kártya" megjelenés mint a rejtettnél, csak
+   más színben, hogy a kettő ne legyen összetéveszthető. */
+.job-highlight-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* box-shadow, nem outline: a rejtett kártya outline-ját használja a "hidden"
+   jelzés, box-shadow más CSS tulajdonság, így a két jelölés egyszerre is
+   látszik, ha egy admin saját magának ki is emel egy rejtett hirdetést. */
+.job-card--highlighted {
+  box-shadow: inset 0 0 0 2px #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.job-highlight-btn {
+  padding: 2px 10px;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  background: transparent;
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.job-highlight-btn:hover {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.job-highlight-btn--on {
+  background: #f59e0b;
+  color: #fff;
+}
+
 .job-active-badge {
   display: inline-block;
   margin-left: 8px;
