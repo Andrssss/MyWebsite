@@ -1190,10 +1190,10 @@ html, body {
   max-height: 2000px;
 }
 
-/* 0 találatos (és állítatlan) tech chip: látszik, de nem kattintható */
-.job-tab--disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+/* 0 találatos tech chip: halványabb, de továbbra is kattintható — előre
+   kijelölhető egy szűrő, ami majd magától életbe lép, ha lesz rá találat. */
+.job-tab--sleeping {
+  opacity: 0.45;
 }
 
 /* Technológia-kereső: csak a chip-lista megjelenítését szűri, kisebb és

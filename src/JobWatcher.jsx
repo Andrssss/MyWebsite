@@ -623,6 +623,7 @@ const JobWatcher = () => {
     return saved !== null ? saved === "true" : false;
   });
   const [techSearch, setTechSearch] = useState("");
+  const [allTechLabels, setAllTechLabels] = useState([]);
 
   const [clickedKeys, setClickedKeys] = useState(() => loadClickedKeys());
   const [appliedKeys, setAppliedKeys] = useState(() => loadAppliedKeys());
@@ -1094,6 +1095,21 @@ const JobWatcher = () => {
     }
   };
 
+  // Minden technológia, amit az extractTechnologies felismer — nem csak
+  // ami az épp betöltött jobokban előfordul. Így egy tech akkor is
+  // megjelenik (0 találattal) a chip-listában, ha még egyetlen betöltött
+  // állásban sincs benne — amint bekerül egy új állásba, a chip magától
+  // aktívvá válik, nem kell hozzá semmit újratölteni.
+  const fetchTechnologies = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/jobs/technologies`);
+      const data = await res.json();
+      if (Array.isArray(data)) setAllTechLabels(data);
+    } catch {
+      setAllTechLabels([]);
+    }
+  };
+
   const fetchJobs = async (next24h = time24h, next7d = time7d, force = false, nextToday = timeToday) => {
     let effectiveRange = null;
     // A "ma" a helyi éjfél óta eltelt idő, ami mindig < 24 óra, tehát a 24h-s
@@ -1147,6 +1163,7 @@ const JobWatcher = () => {
   useEffect(() => {
     fetchSources();
     fetchCategories();
+    fetchTechnologies();
   }, []);
 
   useEffect(() => {
@@ -1447,16 +1464,19 @@ const JobWatcher = () => {
     return counts;
   }, [preTechJobs]);
 
-  // Chipek: minden globálisan létező tech, az aktuális (dinamikus) darabszám
-  // szerint rendezve — a 0-sok a sor végére süllyednek.
-  const techList = useMemo(
-    () =>
-      Object.keys(globalTechCounts).sort(
-        (a, b) =>
-          (techCounts[b] || 0) - (techCounts[a] || 0) || a.localeCompare(b)
-      ),
-    [globalTechCounts, techCounts]
-  );
+  // Chipek: a teljes ismert tech-lista (allTechLabels, a backend
+  // /jobs/technologies-ből — MINDEN felismerhető tech, függetlenül attól,
+  // hogy van-e rá épp betöltött állás) UNIÓJA a betöltött jobokban ténylegesen
+  // előforduló technológiákkal (globalTechCounts — legacy/eltérő címkék miatt
+  // a biztonság kedvéért), az aktuális (dinamikus) darabszám szerint rendezve
+  // — a 0-sok a sor végére süllyednek.
+  const techList = useMemo(() => {
+    const labels = new Set(allTechLabels);
+    for (const tech of Object.keys(globalTechCounts)) labels.add(tech);
+    return [...labels].sort(
+      (a, b) => (techCounts[b] || 0) - (techCounts[a] || 0) || a.localeCompare(b)
+    );
+  }, [allTechLabels, globalTechCounts, techCounts]);
 
   // A keresőmező csak a chip-lista MEGJELENÍTÉSÉT szűri — a state-eket
   // (kijelölés, számlálás) nem érinti, tehát egy elrejtett chip kijelölése
@@ -2082,18 +2102,18 @@ const JobWatcher = () => {
             {visibleTechList.map((tech) => {
               const state = techStates[tech] || "neutral";
               const count = techCounts[tech] || 0;
-              // 0 találatos chipet nem lehet ÚJONNAN állítani — de ha van rajta
-              // mentett state, kattintható marad, hogy vissza lehessen venni.
-              const disabled = count === 0 && state === "neutral";
+              // 0 találatos chip is kattintható (előre kijelölhető egy még
+              // egyetlen betöltött állásban sem szereplő technológia is) —
+              // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
+              // amint lesz rá találat, a szűrő magától életbe lép.
               let cls = "job-tab";
               if (state === "selected") cls += " active";
               if (state === "excluded") cls += " highlighted";
-              if (disabled) cls += " job-tab--disabled";
+              if (count === 0) cls += " job-tab--sleeping";
               return (
                 <button
                   key={tech}
                   className={cls}
-                  disabled={disabled}
                   onClick={() => handleTechClick(tech)}
                 >
                   {tech}

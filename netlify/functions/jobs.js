@@ -1,6 +1,7 @@
 // netlify/functions/jobs.js
 const { neon } = require("@neondatabase/serverless");
 const { getJobsCacheGeneration } = require("./_jobs_cache_core");
+const { TECH_KEYWORDS } = require("./_tech_keywords");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -300,6 +301,18 @@ exports.handler = async (event) => {
 
         cacheSet(cacheKey, out);
         return jsonResponse(200, out, { ...respHeaders, "X-Cache": "MISS" });
+      }
+
+      // GET /jobs/technologies — every technology extractTechnologies() can
+      // recognize, not just ones a currently-loaded job happens to have. Lets
+      // the frontend list (and filter by) a tech before any loaded posting
+      // has it yet.
+      if (path.endsWith("/jobs/technologies") || path.endsWith("/jobs/technologies/")) {
+        const labels = [...new Set(TECH_KEYWORDS.map(([, label]) => label))].sort((a, b) =>
+          a.localeCompare(b, "hu")
+        );
+        cacheSet(cacheKey, labels);
+        return jsonResponse(200, labels, { ...respHeaders, "X-Cache": "MISS" });
       }
 
       // GET /jobs/:id
