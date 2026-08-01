@@ -176,11 +176,15 @@
 
 /* Csoport-doboz a szint- és frissesség-checkboxok köré (minden méreten).
    grid-column: 1/-1, hogy mobilon a 2 oszlopos job-actions gridben a teljes
-   szélességet elfoglalja — a checkboxok a dobozon belül tördelődnek, nem a
-   gridben külön-külön cellákként. */
+   szélességet elfoglalja. A checkboxok EGY sorban maradnak (nowrap) —
+   keskeny képernyőn nem tördelődnek, hanem a doboz oldalra görgethető,
+   így a "Szint"/"Frissesség" chipek mindig egy sorban látszanak. */
 .job-filter-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   align-items: center;
   gap: 4px;
   padding: 6px;
@@ -188,10 +192,19 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   grid-column: 1 / -1;
+  /* halvány elhalványulás a jobb szélen, jelzi hogy görgethető, ha a
+     chipek nem férnek ki egy képernyőnyi szélességbe */
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+}
+
+.job-filter-group::-webkit-scrollbar {
+  display: none;
 }
 
 .job-filter-group-label {
   display: inline-block;
+  flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -206,6 +219,7 @@
   background: transparent;
   padding: 7px 12px;
   width: auto;
+  flex-shrink: 0;
 }
 
 .job-filter-group .job-checkbox:hover {
@@ -214,6 +228,14 @@
 
 .job-filter-group .job-checkbox:has(input:checked) {
   box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
+}
+
+/* Aktív (zöld) chipen hover NE szürkére váltson (azt az általános
+   .job-filter-group .job-checkbox:hover szabály tenné) — helyette egy
+   sötétebb zöldre, ugyanaz a minta mint a .job-btn--toggle.active hovernél. */
+.job-filter-group .job-checkbox:has(input:checked):hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
 }
 
 @media (min-width: 900px) {
