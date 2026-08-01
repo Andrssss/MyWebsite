@@ -69,6 +69,24 @@ function isWorklyJobUrl(url) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// Listing cards only carry a company logo image (alt=""), no text — the clean
+// name only exists on the detail page (breadcrumb link + `.company-data-wrapper
+// p.name`, both server-rendered, unlike minddiak's Angular SPA). Only called for
+// brand-new urls, before insert (see experience-write-policy: no fetch-then-UPDATE
+// on already-known rows).
+function extractCompanyFromDetail(html) {
+  const $ = cheerioLoad(html);
+  const breadcrumbName = normalizeWhitespace($(".job-breadcrumb-wrapper a").first().text());
+  if (breadcrumbName) return breadcrumbName.slice(0, 200);
+  const dataName = normalizeWhitespace($(".company-data-wrapper p.name").first().text());
+  if (dataName) return dataName.slice(0, 200);
+  return null;
+}
+
 function detectExperience(title, cardText) {
   const c = normalizeText(cardText ?? "");
   if (isInternshipTitle(title) || c.includes("szakmai gyakorlat")) return "diákmunka";
@@ -176,6 +194,9 @@ export default async (request) => {
 
   _filters = await loadFilters();
   const client = await pool.connect();
+  const knownUrls = new Set(
+    (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [SOURCE])).rows.map((r) => r.url)
+  );
 
   let newlyInserted = 0;
   let alreadyExisted = 0;
@@ -228,12 +249,24 @@ export default async (request) => {
           continue;
         }
         foundUrls.push(entry.url);
+
+        let company = null;
+        if (!knownUrls.has(entry.url)) {
+          try {
+            await sleep(500);
+            const detailHtml = await fetchText(entry.url);
+            company = extractCompanyFromDetail(detailHtml);
+          } catch (err) {
+            await logFetchError(JOB_NAME, { url: entry.url, message: `company fetch: ${err.message}` });
+          }
+        }
+
         const res = await client.query(
-          `INSERT INTO job_posts (source, title, url, experience, first_seen)
-           VALUES ($1,$2,$3,$4,NOW())
+          `INSERT INTO job_posts (source, title, url, experience, company, first_seen)
+           VALUES ($1,$2,$3,$4,$5,NOW())
            ON CONFLICT (source, url) DO NOTHING
            RETURNING id;`,
-          [SOURCE, entry.title, entry.url, experience]
+          [SOURCE, entry.title, entry.url, experience, company]
         );
         if (res.rowCount > 0) {
           newlyInserted++;

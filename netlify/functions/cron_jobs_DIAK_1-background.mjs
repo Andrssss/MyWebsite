@@ -99,6 +99,55 @@ function normalizeWhitespace(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
+function decodeHtmlEntities(s) {
+  return String(s ?? "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// minddiak's API exposes no clean company field — the employer name only ever
+// shows up as free text at the start of `companyDescription` (e.g. "A Lesaffre
+// a világ egyik..." / "Partnerünk, a PEPCO Hungary Kft. Lengyelországban...").
+// Best-effort heuristic (2026-08-01, user-approved despite known imprecision):
+// capture the capitalized-word run right after "A/Az" or after a "Partnerünk/
+// Partnercégünk/Megbízónk, a" apposition, truncating at a legal-form suffix
+// (Kft./Zrt./Nyrt./...) when present. Verified against an 80-posting live
+// sample: ~1 in 80 grabs one extra trailing word (still recognizable, never a
+// wrong company); genuinely anonymous postings ("Partnerünk kedvező üzemanyag
+// árak...", "Nemzetközi megbízónk fő tevékenysége...") correctly yield null
+// since no capitalized name follows the intro phrase.
+const MD_CAP = "A-ZÁÉÍÓÖŐÚÜŰ";
+const MD_LOW = "a-záéíóöőúüű";
+const MD_TOKEN = `[${MD_CAP}][\\w${MD_CAP}${MD_LOW}.\\-]*`;
+const MD_NAME_RUN = `${MD_TOKEN}(?:\\s+(?:&|és|${MD_TOKEN}))*`;
+const MD_LEGAL_SUFFIXES = new Set(["kft", "zrt", "nyrt", "bt", "rt", "kht"]);
+
+function extractMinddiakCompany(rawDescription) {
+  const text = decodeHtmlEntities(rawDescription);
+  if (!text) return null;
+
+  let m =
+    text.match(new RegExp(`^(?:Nemzetközi\\s+)?(?:Partner(?:ünk|cégünk)|Megbízónk),\\s+a\\s+(${MD_NAME_RUN})[,.]`)) ||
+    text.match(new RegExp(`^A[z]?\\s+(${MD_NAME_RUN})\\s+[${MD_LOW}]`)) ||
+    text.match(/^([A-Z][A-Za-z0-9&]{1,24})\s+is\s+(?:a|one of|the)\b/) ||
+    text.match(/\b([A-Z][A-Za-z0-9]{1,24})['’]s\s+(?:purpose|corporate|mission|history|team)\b/);
+  if (!m) return null;
+
+  let name = m[1].replace(/[\s\-]+$/, "").trim();
+  const tokens = name.split(/\s+/);
+  const suffixIdx = tokens.findIndex((t) => MD_LEGAL_SUFFIXES.has(t.replace(/\.$/, "").toLowerCase()));
+  if (suffixIdx !== -1) {
+    tokens.length = suffixIdx + 1;
+    if (!tokens[suffixIdx].endsWith(".")) tokens[suffixIdx] += ".";
+    name = tokens.join(" ");
+  }
+  return name.slice(0, 200);
+}
 
 
 function extractZynternFromApiPayload(payload) {
@@ -500,6 +549,7 @@ async function fetchMinddiakJobsFromApi({ limit = 50, maxPages = 20, debug = fal
           url: url || null,
           description: description ? String(description).slice(0, 800) : null,
           techHtml: techHtml || null,
+          company: extractMinddiakCompany(j?.companyDescription),
         };
       })
       .filter((x) => x.title && x.url);
