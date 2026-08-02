@@ -1718,7 +1718,7 @@ const JobWatcher = () => {
                     </li>
                   ))}
                 </ul>
-                {lastUpdates.length > 3 && (
+                {lastUpdates.length > 2 && (
                   <>
                     <button
                       className="job-commits-toggle"
