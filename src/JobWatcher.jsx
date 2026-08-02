@@ -1698,7 +1698,7 @@ const JobWatcher = () => {
     <div className="job-watcher-header">
       <div>
           <h1>Automata scraper</h1>
-          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve ami nem, mivel nèha kedve tàmad, a folyamatos fejlesztès miatt. Szólj, ha vmit szeretnèl itt látni.</p>
+          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve az AI agentek, azok reggel futnak, ha van még tokenem.</p>
           <div className="job-linkedin-notice">
             <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
             <p>
