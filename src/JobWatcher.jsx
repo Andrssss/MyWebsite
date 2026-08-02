@@ -1712,7 +1712,7 @@ const JobWatcher = () => {
             {lastUpdates.length > 0 ? (
               <>
                 <ul>
-                  {lastUpdates.slice(0, 3).map((u, i) => (
+                  {lastUpdates.slice(0, 2).map((u, i) => (
                     <li key={`${u.date.toISOString()}-${i}`}>
                       {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
                     </li>
