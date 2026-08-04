@@ -131,12 +131,8 @@ console.log(
 const isLittleAdmin = isRecognizedAdmin;
 
 // FIXED lista (key/label)
-// The `AI-scraped` bucket now uses ONE flat db source ("AI-scraped"); `prefix`
-// stays only to also catch any legacy `AI - <slug>` rows still around during the
-// migration (see ai-registry.mjs migrateLegacyAiSources). Matches source = key
-// OR source LIKE 'AI - %'.
 const FIXED = [
-  { key: "AI-scraped", label: "AI-scraped", prefix: "AI - " },
+  { key: "AI-scraped", label: "AI-scraped" },
 
   { key: "karrierhungaria", label: "Karrier Hungaria" },
 
@@ -288,13 +284,8 @@ exports.handler = async (event) => {
 
         const map = new Map(rows.map((r) => [r.source, r]));
         const out = FIXED.map((s) => {
-          let count;
-          if (s.prefix) {
-            count = rows.reduce((sum, r) => (r.source === s.key || r.source.startsWith(s.prefix) ? sum + r.count : sum), 0);
-          } else {
-            const dbKeys = s.keys || [s.key];
-            count = dbKeys.reduce((sum, k) => sum + (map.get(k)?.count ?? 0), 0);
-          }
+          const dbKeys = s.keys || [s.key];
+          const count = dbKeys.reduce((sum, k) => sum + (map.get(k)?.count ?? 0), 0);
           return { source: s.key, label: s.label, count };
         });
         out.sort((a, b) => a.label.localeCompare(b.label, "hu"));
@@ -333,29 +324,6 @@ exports.handler = async (event) => {
       // GET /jobs?source=...
       if (source) {
         const fixedEntry = FIXED.find((s) => s.key === source);
-
-        // Prefix bucket (e.g. ai-scraped → every `AI - %` source). Not time-based.
-        if (fixedEntry?.prefix) {
-          const like = fixedEntry.prefix + "%";
-          const timeClause =
-            timeRange === "24h" ? "AND first_seen >= NOW() - INTERVAL '24 hours'"
-            : timeRange === "7d" ? "AND first_seen >= NOW() - INTERVAL '7 days'"
-            : timeRange === "30d" ? "AND first_seen >= NOW() - INTERVAL '30 days'"
-            : "AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')";
-          const rows = await query(
-            `SELECT source, title, url, company,
-                    first_seen AS "firstSeen",
-                    experience, technologies, active${HIDCOL}
-             FROM job_posts
-             WHERE ${HID} AND (source = $1 OR source LIKE $2) ${timeClause}
-             ORDER BY first_seen DESC, id DESC
-             LIMIT $3`,
-            [fixedEntry.key, like, limit]
-          );
-          cacheSet(cacheKey, rows);
-          return jsonResponse(200, rows, { ...respHeaders, "X-Cache": "MISS" });
-        }
-
         const dbKeys = fixedEntry?.keys || [source];
         const isTimeBased = dbKeys.every((k) => TIME_BASED_SOURCES.has(k));
         const sourceQuery =
