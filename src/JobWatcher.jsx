@@ -1650,12 +1650,12 @@ const JobWatcher = () => {
     localStorage.setItem("jobWatcherMediorMode", "false");
     setSeniorMode(false);
     localStorage.setItem("jobWatcherSeniorMode", "false");
-    setTime24h(true);
-    localStorage.setItem("jobWatcherTime24h", "true");
+    setTime24h(false);
+    localStorage.setItem("jobWatcherTime24h", "false");
     setTime7d(false);
     localStorage.setItem("jobWatcherTime7d", "false");
-    setTimeToday(false);
-    localStorage.setItem("jobWatcherTimeToday", "false");
+    setTimeToday(true);
+    localStorage.setItem("jobWatcherTimeToday", "true");
     setAllSources("neutral");
     setAllCategories("neutral");
     setAllTechs("neutral");
