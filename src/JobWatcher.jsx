@@ -621,19 +621,9 @@ const JobWatcher = () => {
     return saved === null ? false : saved === "true";
   });
 
-  const [sourcesOpen, setSourcesOpen] = useState(() => {
-    const saved = localStorage.getItem("jobWatcherSourcesOpen");
-    return saved !== null ? saved === "true" : true;
-  });
-
   const [categoryStates, setCategoryStates] = useState(() => {
     const saved = localStorage.getItem("jobWatcherCategoryStates");
     return saved ? JSON.parse(saved) : {};
-  });
-
-  const [categoriesOpen, setCategoriesOpen] = useState(() => {
-    const saved = localStorage.getItem("jobWatcherCategoriesOpen");
-    return saved !== null ? saved === "true" : true;
   });
 
   // Technológia-szűrő állapotok — a mentett state AKKOR IS megmarad, ha az
@@ -644,10 +634,12 @@ const JobWatcher = () => {
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [techOpen, setTechOpen] = useState(() => {
-    const saved = localStorage.getItem("jobWatcherTechOpen");
-    return saved !== null ? saved === "true" : false;
-  });
+  // Források/Kategóriák/Technológiák a Szint/Frissesség sorokkal azonos
+  // .job-filter-group választó mögött élnek; mindegyik saját magát nyitja/
+  // csukja (nincs közös overlay/panel-gate a három fölött).
+  const [sourcesSectionOpen, setSourcesSectionOpen] = useState(false);
+  const [categoriesSectionOpen, setCategoriesSectionOpen] = useState(false);
+  const [techSectionOpen, setTechSectionOpen] = useState(false);
   const [techSearch, setTechSearch] = useState("");
   const [allTechLabels, setAllTechLabels] = useState([]);
 
@@ -1196,10 +1188,38 @@ const JobWatcher = () => {
     fetchJobs(time24h, time7d, false, timeToday);
   }, [time24h, time7d, timeToday]);
 
-  const toggleSources = () => {
-    setSourcesOpen((prev) => {
-      localStorage.setItem("jobWatcherSourcesOpen", !prev);
-      return !prev;
+  /* Források/Kategóriák/Technológiák közül csak egy lehet nyitva egyszerre —
+     az egyik megnyitása a másik kettőt automatikusan csukja. */
+  const toggleSourcesSection = () => {
+    setSourcesSectionOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setCategoriesSectionOpen(false);
+        setTechSectionOpen(false);
+      }
+      return next;
+    });
+  };
+
+  const toggleCategoriesSection = () => {
+    setCategoriesSectionOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setSourcesSectionOpen(false);
+        setTechSectionOpen(false);
+      }
+      return next;
+    });
+  };
+
+  const toggleTechSection = () => {
+    setTechSectionOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setSourcesSectionOpen(false);
+        setCategoriesSectionOpen(false);
+      }
+      return next;
     });
   };
 
@@ -2065,164 +2085,148 @@ const JobWatcher = () => {
     {/* ===== AKTÍV SZŰRŐK (forrás + kategória + tech összesítve) ===== */}
     <ActiveFilterSummary items={activeFilterChips} />
 
-    {/* ===== FORRÁS TAB TOGGLE ===== */}
-    <div className="job-tabs-header">
+    {/* ===== SZŰRŐK VÁLASZTÓ =====
+        Ugyanaz a minta, mint a Szint/Frissesség soroké fentebb: sötét kártya,
+        zöld nagybetűs címke, utána lapos pill-gombok. A Források/Kategóriák/
+        Technológiák pill zöldre vált, ha a saját tartalma épp nyitva van —
+        ez maga a nyitó/csukó vezérlő, nincs mellette külön gomb. Egyszerre
+        csak egy lehet nyitva (a toggle-ök becsukják a másik kettőt). */}
+    <div className="job-filter-group">
+      <span className="job-filter-group-label">Szűrők</span>
       <button
-        className="job-tabs-toggle"
-        onClick={toggleSources}
+        className={`job-filter-group-btn${sourcesSectionOpen ? " active" : ""}`}
+        onClick={toggleSourcesSection}
       >
-        <span className={`job-tabs-chevron${sourcesOpen ? " job-tabs-chevron--open" : ""}`}>▸</span>
-        {sourcesOpen ? "Források elrejtése" : "Források kiválasztása"}
+        Források
       </button>
-      {sourcesOpen && (
+      <button
+        className={`job-filter-group-btn${categoriesSectionOpen ? " active" : ""}`}
+        onClick={toggleCategoriesSection}
+      >
+        Kategóriák
+      </button>
+      {techList.length > 0 && (
+        <button
+          className={`job-filter-group-btn${techSectionOpen ? " active" : ""}`}
+          onClick={toggleTechSection}
+        >
+          Technológiák
+        </button>
+      )}
+    </div>
+
+    {/* ===== FORRÁSOK TARTALOM ===== */}
+    {sourcesSectionOpen && (
+      <div className="job-filters-panel">
         <div className="job-bulk-actions">
           <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllSources("selected")}>Mind ✓</button>
           <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllSources("excluded")}>Mind ✕</button>
           <button className="job-bulk-btn" onClick={() => setAllSources("neutral")}>Törlés</button>
         </div>
-      )}
-    </div>
+        <div className="job-tabs">
+          {loadingSources ? (
+            <div className="job-status">Források betöltése…</div>
+          ) : (
+            sources.map((s) => {
+              const state = sourceStates[s.source] || "neutral";
+              let cls = "job-tab";
+              if (state === "selected") cls += " active";
+              if (state === "excluded") cls += " highlighted";
 
-    {/* ===== FORRÁS TABOK ===== */}
-    <div className={`job-tabs-wrapper ${sourcesOpen ? "open" : ""}`}>
-      <div className="job-tabs">
-        {loadingSources ? (
-          <div className="job-status">Források betöltése…</div>
-        ) : (
-          sources.map((s) => {
-            const state = sourceStates[s.source] || "neutral";
-            let cls = "job-tab";
-            if (state === "selected") cls += " active";
-            if (state === "excluded") cls += " highlighted";
-
-            return (
-              <button
-                key={s.source}
-                className={cls}
-                onClick={() => handleSourceClick(s.source)}
-              >
-                {s.label}
-                {typeof s.count === "number" && (
-                  <span className="job-tab-count">{s.count}</span>
-                )}
-              </button>
-            );
-          })
-        )}
+              return (
+                <button
+                  key={s.source}
+                  className={cls}
+                  onClick={() => handleSourceClick(s.source)}
+                >
+                  {s.label}
+                  {typeof s.count === "number" && (
+                    <span className="job-tab-count">{s.count}</span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
-      </div>
+    )}
 
-    {/* ===== KATEGÓRIÁK ===== */}
-    <div className="job-tabs-header">
-      <button
-        className="job-tabs-toggle"
-        onClick={() =>
-          setCategoriesOpen((prev) => {
-            localStorage.setItem("jobWatcherCategoriesOpen", !prev);
-            return !prev;
-          })
-        }
-      >
-        <span className={`job-tabs-chevron${categoriesOpen ? " job-tabs-chevron--open" : ""}`}>▸</span>
-        {categoriesOpen ? "Kategóriák elrejtése" : "Kategóriák kiválasztása"}
-      </button>
-      {categoriesOpen && (
+    {/* ===== KATEGÓRIÁK TARTALOM ===== */}
+    {categoriesSectionOpen && (
+      <div className="job-filters-panel">
         <div className="job-bulk-actions">
           <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllCategories("selected")}>Mind ✓</button>
           <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllCategories("excluded")}>Mind ✕</button>
           <button className="job-bulk-btn" onClick={() => setAllCategories("neutral")}>Törlés</button>
         </div>
-      )}
-    </div>
-
-    <div className={`job-tabs-wrapper ${categoriesOpen ? "open" : ""}`}>
-      <div className="job-tabs">
-        {jobCategories
-          .map(([cat]) => cat)
-          .sort((a, b) => a.localeCompare(b, "hu"))
-          .concat("Egyéb")
-          .map((cat) => {
-          const state = categoryStates[cat] || "neutral";
-          let cls = "job-tab";
-          if (state === "selected") cls += " active";
-          if (state === "excluded") cls += " highlighted";
-          return (
-            <button key={cat} className={cls} onClick={() => handleCategoryClick(cat)}>
-              {cat}
-              <span className="job-tab-count">{categoryCounts[cat]}</span>
-            </button>
-          );
-        })}
+        <div className="job-tabs">
+          {jobCategories
+            .map(([cat]) => cat)
+            .sort((a, b) => a.localeCompare(b, "hu"))
+            .concat("Egyéb")
+            .map((cat) => {
+            const state = categoryStates[cat] || "neutral";
+            let cls = "job-tab";
+            if (state === "selected") cls += " active";
+            if (state === "excluded") cls += " highlighted";
+            return (
+              <button key={cat} className={cls} onClick={() => handleCategoryClick(cat)}>
+                {cat}
+                <span className="job-tab-count">{categoryCounts[cat]}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    )}
 
-    {/* ===== TECHNOLÓGIÁK ===== */}
-    {techList.length > 0 && (
-      <>
-        <div className="job-tabs-header">
-          <button
-            className="job-tabs-toggle"
-            onClick={() =>
-              setTechOpen((prev) => {
-                localStorage.setItem("jobWatcherTechOpen", String(!prev));
-                return !prev;
-              })
-            }
-          >
-            <span className={`job-tabs-chevron${techOpen ? " job-tabs-chevron--open" : ""}`}>▸</span>
-            {techOpen ? "Technológiák elrejtése" : "Technológiák kiválasztása"}
-          </button>
-          {techOpen && (
-            <div className="job-bulk-actions">
-              <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllTechs("selected")}>Mind ✓</button>
-              <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllTechs("excluded")}>Mind ✕</button>
-              <button className="job-bulk-btn" onClick={() => setAllTechs("neutral")}>Törlés</button>
-            </div>
-          )}
+    {/* ===== TECHNOLÓGIÁK TARTALOM ===== */}
+    {techSectionOpen && techList.length > 0 && (
+      <div className="job-filters-panel">
+        <div className="job-bulk-actions">
+          <button className="job-bulk-btn job-bulk-btn--green" onClick={() => setAllTechs("selected")}>Mind ✓</button>
+          <button className="job-bulk-btn job-bulk-btn--red" onClick={() => setAllTechs("excluded")}>Mind ✕</button>
+          <button className="job-bulk-btn" onClick={() => setAllTechs("neutral")}>Törlés</button>
         </div>
 
-        {techOpen && (
-          <div className="job-search-wrap job-tech-search-wrap">
-            <span className="job-search-icon" aria-hidden="true">🔍</span>
-            <input
-              className="job-search job-tech-search"
-              value={techSearch}
-              onChange={(e) => setTechSearch(e.target.value)}
-              placeholder="Technológia keresése…"
-            />
-          </div>
+        <div className="job-search-wrap job-tech-search-wrap">
+          <span className="job-search-icon" aria-hidden="true">🔍</span>
+          <input
+            className="job-search job-tech-search"
+            value={techSearch}
+            onChange={(e) => setTechSearch(e.target.value)}
+            placeholder="Technológia keresése…"
+          />
+        </div>
+
+        {visibleTechList.length === 0 && (
+          <div className="job-status">Nincs egyező technológia.</div>
         )}
-
-        <div className={`job-tabs-wrapper job-tabs-wrapper--tech ${techOpen ? "open" : ""}`}>
-          {techOpen && visibleTechList.length === 0 && (
-            <div className="job-status">Nincs egyező technológia.</div>
-          )}
-          <div className="job-tabs">
-            {visibleTechList.map((tech) => {
-              const state = techStates[tech] || "neutral";
-              const count = techCounts[tech] || 0;
-              // 0 találatos chip is kattintható (előre kijelölhető egy még
-              // egyetlen betöltött állásban sem szereplő technológia is) —
-              // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
-              // amint lesz rá találat, a szűrő magától életbe lép.
-              let cls = "job-tab";
-              if (state === "selected") cls += " active";
-              if (state === "excluded") cls += " highlighted";
-              if (count === 0) cls += " job-tab--sleeping";
-              return (
-                <button
-                  key={tech}
-                  className={cls}
-                  onClick={() => handleTechClick(tech)}
-                >
-                  {tech}
-                  <span className="job-tab-count">{count}</span>
-                </button>
-              );
-            })}
-          </div>
+        <div className="job-tabs">
+          {visibleTechList.map((tech) => {
+            const state = techStates[tech] || "neutral";
+            const count = techCounts[tech] || 0;
+            // 0 találatos chip is kattintható (előre kijelölhető egy még
+            // egyetlen betöltött állásban sem szereplő technológia is) —
+            // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
+            // amint lesz rá találat, a szűrő magától életbe lép.
+            let cls = "job-tab";
+            if (state === "selected") cls += " active";
+            if (state === "excluded") cls += " highlighted";
+            if (count === 0) cls += " job-tab--sleeping";
+            return (
+              <button
+                key={tech}
+                className={cls}
+                onClick={() => handleTechClick(tech)}
+              >
+                {tech}
+                <span className="job-tab-count">{count}</span>
+              </button>
+            );
+          })}
         </div>
-      </>
+      </div>
     )}
 
     <div className="job-toolbar-footer">

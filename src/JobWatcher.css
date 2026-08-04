@@ -137,13 +137,6 @@
     padding: 10px 8px;
     width: 100%;
   }
-
-  .job-tabs-toggle {
-    width: 100%;
-    justify-content: center;
-    padding: 10px 12px;
-    font-size: 14px;
-  }
 }
 
 .job-watcher h1 {
@@ -1063,22 +1056,7 @@ html, body {
   border-color: #6c5ce7;
 }
 
-/* Források / Kategóriák / Technológiák fejlécsorok: kártyaszerű keret,
-   a tömeges kijelölés gombok jobbra rendezve a nyitó/csukó gombtól. */
-.job-tabs-header {
-  margin: 5px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-}
-
-/* Aktív szűrők összegzője a toggle gomb FÖLÖTT — mindig látszik, nyitott/zárt
+/* Aktív szűrők összegzője a szűrő gombsor FÖLÖTT — mindig látszik, nyitott/zárt
    panel állapottól függetlenül, hogy ne kelljen kinyitni a listát annak
    ellenőrzéséhez, mi van épp beállítva. Kattintásra törli az adott elemet. */
 .job-active-summary {
@@ -1198,68 +1176,63 @@ html, body {
   border-color: transparent;
 }
 
-/* ===== TOGGLE GOMB =====
-   A gomb a kártyaszerű .job-tabs-header-be simuló "ghost" fejléc — nem
-   önálló, rikító színfoltként ül a halvány kártyán belül, hanem a teljes
-   sáv a kattintható felület, a nyitott/csukott állapotot pedig a forgó
-   chevron + finom hover-háttér jelzi. */
-.job-tabs-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 auto;
-  background: transparent;
-  color: #e5e5e5;
+/* ===== SZŰRŐK VÁLASZTÓ + TARTALOM =====
+   A Források/Kategóriák/Technológiák választó UGYANAZ a .job-filter-group
+   kártya, mint a fölötte lévő Szint/Frissesség soroké (sötét kártya + zöld
+   nagybetűs címke + lapos pill-gombok) — nem egy erre kitalált, önálló
+   gomb/panel-nyelv, mert az idegenül ütött el a közvetlenül fölötte lévő,
+   már bevált mintától. A pill maga a nyitó/csukó vezérlő (zöld = nyitva). */
+.job-filter-group-btn {
   border: none;
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-size: 14px;
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 10px;
+  color: #ccc;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  text-align: left;
-  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.job-tabs-chevron {
-  display: inline-block;
-  font-size: 11px;
-  color: #4f8cff;
-  transition: transform 0.2s ease;
+.job-filter-group-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
 }
 
-.job-tabs-chevron--open {
-  transform: rotate(90deg);
-}
-
-/* hover */
-.job-tabs-toggle:hover {
-  background: rgba(255, 255, 255, 0.06);
+.job-filter-group-btn.active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
+  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
 }
 
-/* kattintás */
-.job-tabs-toggle:active {
-  background: rgba(255, 255, 255, 0.1);
+.job-filter-group-btn.active:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
 }
 
-/* ===== TAB LENYITÁS ===== */
-.job-tabs-wrapper {
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* A kiválasztott csoport tartalma (bulk-actions + .job-tab chipek) — ugyanaz
+   a kártya-nyelv (háttér/border/radius), mint a .job-filter-group-é fölötte. */
+.job-filters-panel {
+  margin: 16px 0 24px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
 }
 
-.job-tabs-wrapper.open {
-  /* Mobilon a chipek kevesebb oszlopba férnek soronként, így ugyanannyi
-     forrás jóval több sort igényel, mint desktopon — 600px ott levágta
-     a lista végét. */
-  max-height: 2000px;
+.job-filters-panel .job-bulk-actions {
+  margin-bottom: 12px;
 }
 
-/* A tech-lista jóval több chipet adhat, mint a források/kategóriák —
-   magasabb plafon, hogy nyitva ne vágja le a sorokat. */
-.job-tabs-wrapper--tech.open {
-  max-height: 2000px;
+.job-filters-panel .job-tabs {
+  margin-bottom: 0;
+}
+
+/* 0 találatos tech chip: halványabb, de továbbra is kattintható — előre
+   kijelölhető egy szűrő, ami majd magától életbe lép, ha lesz rá találat. */
+.job-tab--sleeping {
+  opacity: 0.45;
 }
 
 /* 0 találatos tech chip: halványabb, de továbbra is kattintható — előre
