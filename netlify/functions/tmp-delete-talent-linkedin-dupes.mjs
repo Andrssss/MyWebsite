@@ -33,8 +33,20 @@ export default async (request) => {
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (token !== ONE_OFF_TOKEN) return json(401, { error: "Unauthorized" });
 
+  const url = new URL(request.url);
   const client = await pool.connect();
   try {
+    if (url.searchParams.get("mode") === "diag") {
+      const like = COMPANIES.map((c) => `%${c.toLowerCase()}%`);
+      const res = await client.query(
+        `SELECT company, title, url, encode(company::bytea, 'hex') AS hex, length(company) AS len
+         FROM job_posts
+         WHERE source = 'talent' AND lower(company) LIKE ANY($1::text[])`,
+        [like]
+      );
+      return json(200, { count: res.rows.length, rows: res.rows });
+    }
+
     const res = await client.query(
       `DELETE FROM job_posts
        WHERE source = 'talent' AND trim(company) = ANY($1::text[])
