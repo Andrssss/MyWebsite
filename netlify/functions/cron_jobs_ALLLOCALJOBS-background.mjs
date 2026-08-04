@@ -397,6 +397,7 @@ async function scrapeAlllocaljobs(client) {
   let skippedCompany = 0;
   let skippedNonIt = 0;
   let skippedDetailBudget = 0;
+  let skippedDeadOnArrival = 0;
   const detailDeadline = runStart + DETAIL_DEADLINE_MS;
 
   // url → tárolt experience; detail-fetch csak oda megy, ahol a DB-ben még
@@ -451,7 +452,12 @@ async function scrapeAlllocaljobs(client) {
         await sleep(500);
         const { body, finalUrl } = await fetchWithSession(item.url, jar);
         if (finalUrl.includes("requested_vacancy_not_found")) {
-          throw new Error("detail redirected to requested_vacancy_not_found");
+          // A kereső-index elmarad a hirdetés-záródástól (lásd fejléc, 2026-07-30):
+          // egy kártya felbukkanhat egy már lezárt állásra is. Ha ez az ELSŐ
+          // detail-fetchen derül ki (új url, insert előtt), a sort ki kell hagyni —
+          // különben egy sosem-élt állás kerül be aktív sorként ('-'/null mezőkkel).
+          skippedDeadOnArrival++;
+          continue;
         }
         const detailBody = stripSimilarJobs(body); // a "Hasonló munkák" blokk nélkül
         item.experience = extractBodyExperience(detailBody) || "-";
@@ -479,6 +485,7 @@ async function scrapeAlllocaljobs(client) {
     `[alllocaljobs] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
     `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
     `skipped_nonit=${skippedNonIt}, skipped_detail_budget=${skippedDetailBudget}, ` +
+    `skipped_dead_on_arrival=${skippedDeadOnArrival}, ` +
     `unique=${foundUrls.length} (raw=${allItems.length}, complete=${allComplete})`
   );
 
