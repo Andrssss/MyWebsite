@@ -1605,18 +1605,30 @@ const JobWatcher = () => {
     const el = chipsRowRef.current;
     if (!el) return;
     const measure = () => {
-      const children = Array.from(el.children);
+      // .job-saved-searches / .job-active-summary vannak display:contents-ként
+      // a chip-sorban, tehát el.children a KÉT wrapper divet adná vissza (0
+      // offsetHeight-tel, mert display:contents nem generál dobozt) — a
+      // TÉNYLEGES flex-item chipeket kell lekérdezni közvetlenül.
+      const children = Array.from(el.querySelectorAll(".job-saved-chip, .job-active-chip"));
       if (children.length === 0) {
         setChipsOverflowing(false);
         setChipsCollapsedHeight(null);
         return;
       }
-      const firstTop = children[0].offsetTop;
+      // FONTOS: offsetTop az elem offsetParent-jéhez képest relatív, ami NEM
+      // feltétlen maga `el` (mert `.job-chips-row`-nak nincs position-je) —
+      // ezért offsetTop-tal számolva a "sor magassága" könnyen egy, az `el`
+      // tetejétől távoli abszolút oldal-Y koordináta lett (pl. 554px egy
+      // ténylegesen 364px magas tartalomnál), ami sosem vágta le semmit.
+      // getBoundingClientRect()-tel MINDIG `el`-hez relatív értéket kapunk.
+      const elTop = el.getBoundingClientRect().top;
+      const firstTop = children[0].getBoundingClientRect().top;
       let overflow = false;
       let firstRowBottom = 0;
       children.forEach((c) => {
-        if (c.offsetTop > firstTop) overflow = true;
-        else firstRowBottom = Math.max(firstRowBottom, c.offsetTop + c.offsetHeight);
+        const rect = c.getBoundingClientRect();
+        if (rect.top > firstTop + 1) overflow = true;
+        else firstRowBottom = Math.max(firstRowBottom, rect.bottom - elTop);
       });
       setChipsOverflowing(overflow);
       setChipsCollapsedHeight(firstRowBottom);
@@ -1852,15 +1864,14 @@ const JobWatcher = () => {
           <div className="job-linkedin-notice">
             <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
             <p>
-              A LinkedIn-t nem tudjuk teljesen scrapelni, mert a publikus API-k
-              erősen korlátozottak. Jelenleg nagyjából az itt látható állások{" "}
-              <strong>~50%-át</strong> tudjuk csak megjeleníteni.
+              A LinkedIn állások <strong>~50%-át</strong> tudjuk csak
+              megjeleníteni, mert a publikus API-k erősen korlátozottak.
             </p>
           </div>
           <div className="job-last-deploy">
             {lastUpdates.length > 0 ? (
               <span>
-                {`Utoljára frissítve: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
+                {`Last git commit: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
               </span>
             ) : (
               <span>Nincs elérhető frissítési dátum.</span>
@@ -1896,8 +1907,51 @@ const JobWatcher = () => {
             }}
           />
         </div>
+        <div className="job-action-btns">
+          {q.trim() && !savedSearches.includes(q.trim()) && (
+            <button
+              className="job-btn job-btn--save-search"
+              onClick={() => {
+                const term = q.trim();
+                const nextSaved = [...savedSearches, term];
+                setSavedSearches(nextSaved);
+                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
+                const nextActive = new Set(activeSavedSearches);
+                nextActive.add(term);
+                setActiveSavedSearches(nextActive);
+                localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+                setQ("");
+              }}
+              title="Keresési szó mentése"
+            >
+              + Mentés
+            </button>
+          )}
+          <button
+            className={`job-btn job-btn--toggle${showAppliedOnly ? " active" : ""}`}
+            onClick={() => setShowAppliedOnly((v) => !v)}
+          >
+            {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
+          </button>
+          <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
+           📊 Statisztikák
+          </button>
+          <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
+            Frissítés
+          </button>
+          <button
+            className="job-btn job-btn--openall"
+            onClick={openAllFiltered}
+            disabled={openableJobs.length === 0}
+            title="Az összes leszűrt állást megnyitja új lapokon, és megtekintettnek jelöli (mintha egyenként rákattintottál volna)"
+          >
+            🚀 Mind megnyitása ({openableJobs.length})
+          </button>
+        </div>
+
         {(savedSearches.length > 0 || activeFilterChips.length > 0) && (
           <div className="job-saved-and-active">
+            <span className="job-filter-group-label">Aktív szűrők</span>
             <div
               className="job-chips-row"
               ref={chipsRowRef}
@@ -1959,48 +2013,6 @@ const JobWatcher = () => {
             )}
           </div>
         )}
-
-        <div className="job-action-btns">
-          {q.trim() && !savedSearches.includes(q.trim()) && (
-            <button
-              className="job-btn job-btn--save-search"
-              onClick={() => {
-                const term = q.trim();
-                const nextSaved = [...savedSearches, term];
-                setSavedSearches(nextSaved);
-                localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
-                const nextActive = new Set(activeSavedSearches);
-                nextActive.add(term);
-                setActiveSavedSearches(nextActive);
-                localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
-                setQ("");
-              }}
-              title="Keresési szó mentése"
-            >
-              + Mentés
-            </button>
-          )}
-          <button
-            className={`job-btn job-btn--toggle${showAppliedOnly ? " active" : ""}`}
-            onClick={() => setShowAppliedOnly((v) => !v)}
-          >
-            {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
-          </button>
-          <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
-           📊 Statisztikák 
-          </button>
-          <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
-            Frissítés
-          </button>
-          <button
-            className="job-btn job-btn--openall"
-            onClick={openAllFiltered}
-            disabled={openableJobs.length === 0}
-            title="Az összes leszűrt állást megnyitja új lapokon, és megtekintettnek jelöli (mintha egyenként rákattintottál volna)"
-          >
-            🚀 Mind megnyitása ({openableJobs.length})
-          </button>
-        </div>
 
         <div className="job-filters">
           <div className="job-filter-group job-filter-group--level">
@@ -2162,16 +2174,15 @@ const JobWatcher = () => {
           {loadingSources ? (
             <div className="job-status">Források betöltése…</div>
           ) : (
-            sources.map((s) => {
-              const state = sourceStates[s.source] || "neutral";
-              let cls = "job-tab";
-              if (state === "selected") cls += " active";
-              if (state === "excluded") cls += " highlighted";
-
-              return (
+            // A már kijelölt (selected/excluded) források a fenti "Aktív
+            // szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
+            // (neutral) források látszanak, hogy ne legyen duplikált a lista.
+            sources
+              .filter((s) => (sourceStates[s.source] || "neutral") === "neutral")
+              .map((s) => (
                 <button
                   key={s.source}
-                  className={cls}
+                  className="job-tab"
                   onClick={() => handleSourceClick(s.source)}
                 >
                   {s.label}
@@ -2179,8 +2190,7 @@ const JobWatcher = () => {
                     <span className="job-tab-count">{s.count}</span>
                   )}
                 </button>
-              );
-            })
+              ))
           )}
         </div>
       </div>
@@ -2195,22 +2205,20 @@ const JobWatcher = () => {
           <button className="job-bulk-btn" onClick={() => setAllCategories("neutral")}>Törlés</button>
         </div>
         <div className="job-tabs">
+          {/* A már kijelölt (selected/excluded) kategóriák a fenti "Aktív
+              szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
+              (neutral) kategóriák látszanak, hogy ne legyen duplikált a lista. */}
           {jobCategories
             .map(([cat]) => cat)
             .sort((a, b) => a.localeCompare(b, "hu"))
             .concat("Egyéb")
-            .map((cat) => {
-            const state = categoryStates[cat] || "neutral";
-            let cls = "job-tab";
-            if (state === "selected") cls += " active";
-            if (state === "excluded") cls += " highlighted";
-            return (
-              <button key={cat} className={cls} onClick={() => handleCategoryClick(cat)}>
+            .filter((cat) => (categoryStates[cat] || "neutral") === "neutral")
+            .map((cat) => (
+              <button key={cat} className="job-tab" onClick={() => handleCategoryClick(cat)}>
                 {cat}
                 <span className="job-tab-count">{categoryCounts[cat]}</span>
               </button>
-            );
-          })}
+            ))}
         </div>
       </div>
     )}
@@ -2234,32 +2242,33 @@ const JobWatcher = () => {
           />
         </div>
 
-        {visibleTechList.length === 0 && (
+        {/* A már kijelölt (selected/excluded) technológiák a fenti "Aktív
+            szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
+            (neutral) technológiák látszanak, hogy ne legyen duplikált a lista. */}
+        {visibleTechList.filter((tech) => (techStates[tech] || "neutral") === "neutral").length === 0 && (
           <div className="job-status">Nincs egyező technológia.</div>
         )}
         <div className="job-tabs">
-          {visibleTechList.map((tech) => {
-            const state = techStates[tech] || "neutral";
-            const count = techCounts[tech] || 0;
-            // 0 találatos chip is kattintható (előre kijelölhető egy még
-            // egyetlen betöltött állásban sem szereplő technológia is) —
-            // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
-            // amint lesz rá találat, a szűrő magától életbe lép.
-            let cls = "job-tab";
-            if (state === "selected") cls += " active";
-            if (state === "excluded") cls += " highlighted";
-            if (count === 0) cls += " job-tab--sleeping";
-            return (
-              <button
-                key={tech}
-                className={cls}
-                onClick={() => handleTechClick(tech)}
-              >
-                {tech}
-                <span className="job-tab-count">{count}</span>
-              </button>
-            );
-          })}
+          {visibleTechList
+            .filter((tech) => (techStates[tech] || "neutral") === "neutral")
+            .map((tech) => {
+              const count = techCounts[tech] || 0;
+              // 0 találatos chip is kattintható (előre kijelölhető egy még
+              // egyetlen betöltött állásban sem szereplő technológia is) —
+              // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
+              // amint lesz rá találat, a szűrő magától életbe lép.
+              const cls = count === 0 ? "job-tab job-tab--sleeping" : "job-tab";
+              return (
+                <button
+                  key={tech}
+                  className={cls}
+                  onClick={() => handleTechClick(tech)}
+                >
+                  {tech}
+                  <span className="job-tab-count">{count}</span>
+                </button>
+              );
+            })}
         </div>
       </div>
     )}

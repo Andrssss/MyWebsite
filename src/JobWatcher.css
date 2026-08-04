@@ -294,13 +294,22 @@
   color: #666;
 }
 
-/* ====== MENTETT KERESÉSEK + AKTÍV SZŰRŐK egy sorban ====== */
+/* ====== MENTETT KERESÉSEK + AKTÍV SZŰRŐK egy sorban ======
+   Ugyanaz a kártya-nyelv, mint a Szint/Frissesség/Szűrők dobozoké
+   (.job-filter-group): sötét háttér, halvány border, lekerekítés, zöld
+   nagybetűs címke. A különbség, hogy AZOK egy soros, nowrap+overflow-x:auto
+   dobozok (kevés, fix elem), EZ viszont tetszőleges számú chipet tartalmazhat,
+   ezért tördelődik (flex-wrap) és összecsukható (ld. .job-chips-row). */
 .job-saved-and-active {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 4px;
-  padding-top: 4px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  width: 100%;
 }
 
 /* A tényleges chip-sor: mentett keresés-chipek és aktív szűrő-chipek EGYÜTT

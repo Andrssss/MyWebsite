@@ -11,7 +11,7 @@ exports.handler = async () => {
   const data = await new Promise((resolve, reject) => {
     const options = {
       hostname: "api.netlify.com",
-      path: `/api/v1/sites/${siteId}/deploys?per_page=5`,
+      path: `/api/v1/sites/${siteId}/deploys?per_page=100`,
       method: "GET",
       headers: {
         "User-Agent": "netlify-function",
