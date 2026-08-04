@@ -1587,6 +1587,31 @@ const JobWatcher = () => {
     return [...srcChips, ...catChips, ...techChips];
   }, [sources, sourceStates, jobCategories, categoryStates, techList, techStates]);
 
+  // A Források/Kategóriák/Technológiák panelekben csak az eldöntetlen
+  // (neutral) elemek látszanak — a kijelöltek (selected/excluded) fent, az
+  // Aktív szűrők csíkban jelennek meg. Ha egy panelen belül MINDEN elem már
+  // ki van jelölve, ez a lista üresen maradna magyarázat nélkül — ezt a
+  // "Minden ... ki van jelölve" szöveg jelzi a panelben (ld. render).
+  const neutralSources = useMemo(
+    () => sources.filter((s) => (sourceStates[s.source] || "neutral") === "neutral"),
+    [sources, sourceStates]
+  );
+
+  const neutralCategories = useMemo(
+    () =>
+      jobCategories
+        .map(([cat]) => cat)
+        .sort((a, b) => a.localeCompare(b, "hu"))
+        .concat("Egyéb")
+        .filter((cat) => (categoryStates[cat] || "neutral") === "neutral"),
+    [jobCategories, categoryStates]
+  );
+
+  const neutralTechs = useMemo(
+    () => visibleTechList.filter((tech) => (techStates[tech] || "neutral") === "neutral"),
+    [visibleTechList, techStates]
+  );
+
   /* Mentett keresés-chipek + aktív szűrő-chipek közös sora összecsukható,
      ha 1 sornál többre tördelődik (PC-n és mobilon is) — enélkül a sok
      forrás/kategória/tech chip könnyen lenyomja az oldal többi részét.
@@ -2173,24 +2198,24 @@ const JobWatcher = () => {
         <div className="job-tabs">
           {loadingSources ? (
             <div className="job-status">Források betöltése…</div>
+          ) : sources.length > 0 && neutralSources.length === 0 ? (
+            <div className="job-status">Minden forrás ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
           ) : (
             // A már kijelölt (selected/excluded) források a fenti "Aktív
             // szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
             // (neutral) források látszanak, hogy ne legyen duplikált a lista.
-            sources
-              .filter((s) => (sourceStates[s.source] || "neutral") === "neutral")
-              .map((s) => (
-                <button
-                  key={s.source}
-                  className="job-tab"
-                  onClick={() => handleSourceClick(s.source)}
-                >
-                  {s.label}
-                  {typeof s.count === "number" && (
-                    <span className="job-tab-count">{s.count}</span>
-                  )}
-                </button>
-              ))
+            neutralSources.map((s) => (
+              <button
+                key={s.source}
+                className="job-tab"
+                onClick={() => handleSourceClick(s.source)}
+              >
+                {s.label}
+                {typeof s.count === "number" && (
+                  <span className="job-tab-count">{s.count}</span>
+                )}
+              </button>
+            ))
           )}
         </div>
       </div>
@@ -2208,17 +2233,16 @@ const JobWatcher = () => {
           {/* A már kijelölt (selected/excluded) kategóriák a fenti "Aktív
               szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
               (neutral) kategóriák látszanak, hogy ne legyen duplikált a lista. */}
-          {jobCategories
-            .map(([cat]) => cat)
-            .sort((a, b) => a.localeCompare(b, "hu"))
-            .concat("Egyéb")
-            .filter((cat) => (categoryStates[cat] || "neutral") === "neutral")
-            .map((cat) => (
+          {jobCategories.length > 0 && neutralCategories.length === 0 ? (
+            <div className="job-status">Minden kategória ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
+          ) : (
+            neutralCategories.map((cat) => (
               <button key={cat} className="job-tab" onClick={() => handleCategoryClick(cat)}>
                 {cat}
                 <span className="job-tab-count">{categoryCounts[cat]}</span>
               </button>
-            ))}
+            ))
+          )}
         </div>
       </div>
     )}
@@ -2244,31 +2268,35 @@ const JobWatcher = () => {
 
         {/* A már kijelölt (selected/excluded) technológiák a fenti "Aktív
             szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
-            (neutral) technológiák látszanak, hogy ne legyen duplikált a lista. */}
-        {visibleTechList.filter((tech) => (techStates[tech] || "neutral") === "neutral").length === 0 && (
+            (neutral) technológiák látszanak, hogy ne legyen duplikált a lista.
+            Két külön "üres" ok van: a keresés nem talál semmit, VAGY minden
+            találat már ki van jelölve fent — ezeket külön szöveg jelzi. */}
+        {visibleTechList.length === 0 ? (
           <div className="job-status">Nincs egyező technológia.</div>
+        ) : (
+          neutralTechs.length === 0 && (
+            <div className="job-status">Minden technológia ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
+          )
         )}
         <div className="job-tabs">
-          {visibleTechList
-            .filter((tech) => (techStates[tech] || "neutral") === "neutral")
-            .map((tech) => {
-              const count = techCounts[tech] || 0;
-              // 0 találatos chip is kattintható (előre kijelölhető egy még
-              // egyetlen betöltött állásban sem szereplő technológia is) —
-              // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
-              // amint lesz rá találat, a szűrő magától életbe lép.
-              const cls = count === 0 ? "job-tab job-tab--sleeping" : "job-tab";
-              return (
-                <button
-                  key={tech}
-                  className={cls}
-                  onClick={() => handleTechClick(tech)}
-                >
-                  {tech}
-                  <span className="job-tab-count">{count}</span>
-                </button>
-              );
-            })}
+          {neutralTechs.map((tech) => {
+            const count = techCounts[tech] || 0;
+            // 0 találatos chip is kattintható (előre kijelölhető egy még
+            // egyetlen betöltött állásban sem szereplő technológia is) —
+            // csak vizuálisan halványabb, jelezve, hogy épp "alszik":
+            // amint lesz rá találat, a szűrő magától életbe lép.
+            const cls = count === 0 ? "job-tab job-tab--sleeping" : "job-tab";
+            return (
+              <button
+                key={tech}
+                className={cls}
+                onClick={() => handleTechClick(tech)}
+              >
+                {tech}
+                <span className="job-tab-count">{count}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     )}

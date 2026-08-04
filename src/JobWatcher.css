@@ -128,11 +128,19 @@
 }
 
 /* ====== ACTIONS ====== */
+/* width:100% ide szándékos: a .job-watcher-header flex sorában ELÉRI, hogy
+   a .job-actions MINDIG saját, teljes szélességű sort kapjon a cím/leírás
+   blokk alatt (flex-wrap:wrap a szülőn), ahelyett hogy csak a saját
+   tartalma szélességét foglalná el és a cím-blokk mellett szorongna —
+   enélkül a benne lévő Szint/Frissesség dobozok (width:100%, de a SAJÁT,
+   összenyomott .job-actions-hoz képest) keskenyebbek a teljes .job-watcher
+   szélességét kitöltő Szűrők doboznál. */
 .job-actions {
   display: flex;
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .job-filters {
