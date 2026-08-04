@@ -88,11 +88,20 @@ export default async (request) => {
     const untilParam = url2.searchParams.get("until");
     const liveWindow = sinceParam && untilParam ? await windowTotals(sinceParam, untilParam) : null;
 
+    const { rows: activity } = await client.query(
+      `SELECT pid, usename, application_name, client_addr, state, query_start, state_change,
+              left(query, 200) AS query_snippet
+         FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid()
+        ORDER BY query_start DESC NULLS LAST`
+    );
+
     return json(200, {
       now: new Date().toISOString(),
       baselineFrom: "2026-08-04T19:41:28Z",
       deltas,
       liveWindow,
+      activity,
     });
   } finally {
     client.release();
