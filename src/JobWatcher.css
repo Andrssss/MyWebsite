@@ -254,7 +254,7 @@
     max-width: 380px;
   }
 
-  .job-saved-searches {
+  .job-saved-and-active {
     grid-area: saved;
   }
 
@@ -318,12 +318,19 @@
   color: #666;
 }
 
-/* ====== MENTETT KERESÉSEK ====== */
+/* ====== MENTETT KERESÉSEK + AKTÍV SZŰRŐK egy sorban ====== */
+.job-saved-and-active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+
 .job-saved-searches {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding-top: 4px;
 }
 
 .job-saved-chip {
@@ -1063,7 +1070,7 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 14px 2px 6px;
+  margin: 0;
 }
 
 .job-active-chip {

@@ -1888,42 +1888,48 @@ const JobWatcher = () => {
             }}
           />
         </div>
-        {savedSearches.length > 0 && (
-          <div className="job-saved-searches">
-            {savedSearches.map((s) => {
-              const isActive = activeSavedSearches.has(s);
-              return (
-                <span key={s} className={`job-saved-chip${isActive ? " active" : ""}`}>
-                  <button
-                    className="job-saved-chip-label"
-                    onClick={() => {
-                      const next = new Set(activeSavedSearches);
-                      if (isActive) next.delete(s); else next.add(s);
-                      setActiveSavedSearches(next);
-                      localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...next]));
-                    }}
-                    title={isActive ? "Szűrő kikapcsolása" : "Szűrő bekapcsolása"}
-                  >
-                    {s}
-                  </button>
-                  <button
-                    className="job-saved-chip-remove"
-                    onClick={() => {
-                      const nextSaved = savedSearches.filter((x) => x !== s);
-                      setSavedSearches(nextSaved);
-                      localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
-                      const nextActive = new Set(activeSavedSearches);
-                      nextActive.delete(s);
-                      setActiveSavedSearches(nextActive);
-                      localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
-                    }}
-                    title="Törlés"
-                  >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
+        {(savedSearches.length > 0 || activeFilterChips.length > 0) && (
+          <div className="job-saved-and-active">
+            {savedSearches.length > 0 && (
+              <div className="job-saved-searches">
+                {savedSearches.map((s) => {
+                  const isActive = activeSavedSearches.has(s);
+                  return (
+                    <span key={s} className={`job-saved-chip${isActive ? " active" : ""}`}>
+                      <button
+                        className="job-saved-chip-label"
+                        onClick={() => {
+                          const next = new Set(activeSavedSearches);
+                          if (isActive) next.delete(s); else next.add(s);
+                          setActiveSavedSearches(next);
+                          localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...next]));
+                        }}
+                        title={isActive ? "Szűrő kikapcsolása" : "Szűrő bekapcsolása"}
+                      >
+                        {s}
+                      </button>
+                      <button
+                        className="job-saved-chip-remove"
+                        onClick={() => {
+                          const nextSaved = savedSearches.filter((x) => x !== s);
+                          setSavedSearches(nextSaved);
+                          localStorage.setItem("jobWatcherSavedSearches", JSON.stringify(nextSaved));
+                          const nextActive = new Set(activeSavedSearches);
+                          nextActive.delete(s);
+                          setActiveSavedSearches(nextActive);
+                          localStorage.setItem("jobWatcherActiveSavedSearches", JSON.stringify([...nextActive]));
+                        }}
+                        title="Törlés"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {/* ===== AKTÍV SZŰRŐK (forrás + kategória + tech összesítve) ===== */}
+            <ActiveFilterSummary items={activeFilterChips} />
           </div>
         )}
 
@@ -2086,9 +2092,6 @@ const JobWatcher = () => {
         </div>
       </div>
     </div>
-
-    {/* ===== AKTÍV SZŰRŐK (forrás + kategória + tech összesítve) ===== */}
-    <ActiveFilterSummary items={activeFilterChips} />
 
     {/* ===== SZŰRŐK VÁLASZTÓ =====
         Ugyanaz a minta, mint a Szint/Frissesség soroké fentebb: sötét kártya,
@@ -2257,9 +2260,6 @@ const JobWatcher = () => {
             Ezt az aktív szűrőid okozhatják: {activeFilterReasons.join(", ")}.
           </p>
         )}
-        <button className="job-btn" onClick={resetAllFilters}>
-          Szűrők törlése
-        </button>
       </div>
     ) : (
       <ul className="job-list">
