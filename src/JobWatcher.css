@@ -1181,7 +1181,10 @@ html, body {
 }
 
 .job-tabs-wrapper.open {
-  max-height: 600px;
+  /* Mobilon a chipek kevesebb oszlopba férnek soronként, így ugyanannyi
+     forrás jóval több sort igényel, mint desktopon — 600px ott levágta
+     a lista végét. */
+  max-height: 2000px;
 }
 
 /* A tech-lista jóval több chipet adhat, mint a források/kategóriák —

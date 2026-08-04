@@ -425,6 +425,15 @@ function extractKukaJobs(html) {
     );
     if (!title) return;
 
+    // 2026-08-04: the API's own `locationsearch=HU` param isn't reliably honored
+    // upstream (live-verified: 3 Augsburg/Germany "Ausbildung" tiles came back
+    // through it) — each tile also carries its own Country/Region field, so use
+    // that as an independent backstop. Missing field (parse hiccup) fails open.
+    const country = normalizeWhitespace(
+      $el.find('.section-field.country div[id$="-value"]').first().text()
+    );
+    if (country && country.toUpperCase() !== "HU") return;
+
     jobs.push({
       title,
       url,
