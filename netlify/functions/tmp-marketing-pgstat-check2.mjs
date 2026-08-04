@@ -3,10 +3,37 @@
 // Disposable — delete after use.
 import pkg from "pg";
 const { Pool } = pkg;
+import { getStore } from "@netlify/blobs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 const pool = connectionString ? new Pool({ connectionString, ssl: { rejectUnauthorized: false } }) : null;
 const TOKEN = "a19f4d7c62b8e0913fd6a52c8b7e10493dfa62c1b8e5";
+
+async function windowTotals(sinceIso, untilIso) {
+  const store = getStore("db-write-audit");
+  const keys = [];
+  let cursor;
+  do {
+    const page = await store.list({ cursor });
+    for (const { key } of page.blobs) keys.push(key);
+    cursor = page.cursor;
+  } while (cursor);
+  const sinceKey = sinceIso.replace(/[:.]/g, "-");
+  const untilKey = untilIso.replace(/[:.]/g, "-");
+  const matched = keys.filter((k) => {
+    const ts = k.split("/")[1] || "";
+    return ts >= sinceKey && ts < untilKey;
+  });
+  const entries = await Promise.all(matched.map((k) => store.get(k, { type: "json" }).catch(() => null)));
+  const rawRuns = [];
+  let totalRows = 0;
+  for (const entry of entries) {
+    if (!entry) continue;
+    rawRuns.push({ jobName: entry.jobName, date: entry.date, writes: entry.writes });
+    for (const w of entry.writes) totalRows += w.rowCount;
+  }
+  return { window: { since: sinceIso, until: untilIso }, matchedKeys: matched.length, totalRowsWritten: totalRows, rawRuns };
+}
 
 function json(status, body) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -56,7 +83,16 @@ export default async (request) => {
         deltaDel: Number(r.del) - base.del,
       };
     });
-    return json(200, { now: new Date().toISOString(), baselineFrom: "2026-08-04T19:41:28Z", deltas });
+    const windowCEST = await windowTotals("2026-08-04T21:30:00.000Z", "2026-08-04T21:45:00.000Z");
+    const windowAsShown = await windowTotals("2026-08-04T23:30:00.000Z", "2026-08-04T23:45:00.000Z");
+
+    return json(200, {
+      now: new Date().toISOString(),
+      baselineFrom: "2026-08-04T19:41:28Z",
+      deltas,
+      auditWindow_cestReading_2130_2145: windowCEST,
+      auditWindow_asShown_2330_2345: windowAsShown,
+    });
   } finally {
     client.release();
   }
