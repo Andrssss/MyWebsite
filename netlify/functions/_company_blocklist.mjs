@@ -35,8 +35,24 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
   "deutsche telekom",
 ];
 
+// talent-only (user-döntés 2026-08-04): ezek a cégek a talent.hu-n cím szerint
+// 100%-ban duplikálják a saját LinkedIn-hirdetéseiket (minden talent-sorukhoz
+// volt egy pontosan egyező című LinkedIn-sor) — csak a talent forrásból
+// tiltjuk, a többiből nem, mert ott nincs bizonyított duplikáció.
+export const TALENT_ONLY_COMPANY_BLOCKLIST = [
+  "Ecolab",
+  "Hiflylabs",
+  "Kpler",
+  "Nexperia",
+  "OnTheGoSystems",
+  "Pixel Systems",
+  "Schneider Electric",
+  "Siemens",
+  "Unisys",
+];
+
 const LISTS_BY_SOURCE = {
-  talent: COMPANY_BLOCKLIST,
+  talent: [...COMPANY_BLOCKLIST, ...TALENT_ONLY_COMPANY_BLOCKLIST],
   alllocaljobs: COMPANY_BLOCKLIST,
   allasportal: COMPANY_BLOCKLIST,
   LinkedIn: LINKEDIN_COMPANY_BLOCKLIST,
