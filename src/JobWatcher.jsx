@@ -1067,17 +1067,14 @@ const JobWatcher = () => {
   }, []);
 
   useEffect(() => {
-    fetch("/.netlify/functions/last-commit")
+    fetch("/.netlify/functions/last-deploy")
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data?.updates)) return;
         setLastUpdates(
           data.updates
-            .filter((u) => u?.message && u?.date)
-            .map((u) => ({
-              message: u.message,
-              date: new Date(u.date),
-            }))
+            .filter((u) => u?.date)
+            .map((u) => ({ date: new Date(u.date) }))
         );
       })
       .catch(() => {});
@@ -1860,13 +1857,13 @@ const JobWatcher = () => {
               <strong>~50%-át</strong> tudjuk csak megjeleníteni.
             </p>
           </div>
-          <div className="job-last-commit">
+          <div className="job-last-deploy">
             {lastUpdates.length > 0 ? (
               <span>
                 {`Utoljára frissítve: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
               </span>
             ) : (
-              <span>Nincs frissítés az elmúlt 7 napban.</span>
+              <span>Nincs elérhető frissítési dátum.</span>
             )}
           </div>
       </div>

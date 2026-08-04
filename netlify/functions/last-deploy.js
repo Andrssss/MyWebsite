@@ -1,22 +1,21 @@
 const https = require("https");
 
-// Commit-üzenetek, amiket nem mutatunk a fronton (admin-only feature-ök).
-// Egyetlen általános "hidden" minta — bármi, ami a hidden-sor/admin
-// funkciót érinti, előbb-utóbb kiírja azt a szót a commit üzenetébe.
-const HIDDEN_MESSAGE_PATTERNS = [/hidden/i];
-
 exports.handler = async () => {
-  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-  const since = Date.now() - ONE_WEEK_MS;
+  const token = process.env.CRON_SECRET;
+  const siteId = process.env.SITE_ID;
+
+  if (!token || !siteId) {
+    return { statusCode: 500, body: JSON.stringify({ error: "Missing CRON_SECRET or SITE_ID" }) };
+  }
 
   const data = await new Promise((resolve, reject) => {
     const options = {
-      hostname: "api.github.com",
-      path: "/repos/Andrssss/MyWebsite/commits?per_page=100",
+      hostname: "api.netlify.com",
+      path: `/api/v1/sites/${siteId}/deploys?per_page=5`,
       method: "GET",
       headers: {
         "User-Agent": "netlify-function",
-        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
       },
     };
 
@@ -34,23 +33,18 @@ exports.handler = async () => {
     req.end();
   });
 
-  const commits = Array.isArray(data) ? data : [];
-  if (commits.length === 0) {
-    return { statusCode: 404, body: JSON.stringify({ error: "No commits found" }) };
-  }
+  const deploys = Array.isArray(data) ? data : [];
+  const latest = deploys
+    .filter((d) => d?.context === "production" && d?.published_at)
+    .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())[0];
 
-  const updates = commits
-    .map((commit) => ({
-      message: String(commit?.commit?.message || "").split("\n")[0].trim(),
-      date: commit?.commit?.author?.date || null,
-    }))
-    .filter((u) => u.message && u.date && new Date(u.date).getTime() >= since && u.message.startsWith("[jobs]"))
-    .filter((u) => !HIDDEN_MESSAGE_PATTERNS.some((re) => re.test(u.message)))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  if (!latest) {
+    return { statusCode: 404, body: JSON.stringify({ error: "No production deploys found" }) };
+  }
 
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ updates }),
+    body: JSON.stringify({ updates: [{ date: latest.published_at }] }),
   };
 };
