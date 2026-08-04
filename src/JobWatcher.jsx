@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLinkedin } from "react-icons/fa";
 import { adminFetch, purgeJobListCache, ensureAdminSecret } from "./adminAuth";
@@ -1039,7 +1039,6 @@ const JobWatcher = () => {
   };
 
   const [lastUpdates, setLastUpdates] = useState([]);
-  const [commitsOpen, setCommitsOpen] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [monthlyActiveUsers, setMonthlyActiveUsers] = useState(null);
 
@@ -1591,6 +1590,46 @@ const JobWatcher = () => {
     return [...srcChips, ...catChips, ...techChips];
   }, [sources, sourceStates, jobCategories, categoryStates, techList, techStates]);
 
+  /* Mentett keresés-chipek + aktív szűrő-chipek közös sora összecsukható,
+     ha 1 sornál többre tördelődik (PC-n és mobilon is) — enélkül a sok
+     forrás/kategória/tech chip könnyen lenyomja az oldal többi részét.
+     A "hány sor" kérdést NEM lehet CSS-ből eldönteni (a chipek száma és a
+     konténer szélessége is változó), ezért JS méri: a chip-sor gyerekeinek
+     offsetTop-ját hasonlítjuk az első gyerekéhez — ha eltér, tördelt.
+     ResizeObserver a konténeren figyeli az ablak-átméretezést IS (a szélesség
+     változása a gyerekek reflow-ját okozza, még ha a konténer magassága
+     összecsukott állapotban rögzített is). */
+  const [chipsExpanded, setChipsExpanded] = useState(false);
+  const [chipsOverflowing, setChipsOverflowing] = useState(false);
+  const [chipsCollapsedHeight, setChipsCollapsedHeight] = useState(null);
+  const chipsRowRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = chipsRowRef.current;
+    if (!el) return;
+    const measure = () => {
+      const children = Array.from(el.children);
+      if (children.length === 0) {
+        setChipsOverflowing(false);
+        setChipsCollapsedHeight(null);
+        return;
+      }
+      const firstTop = children[0].offsetTop;
+      let overflow = false;
+      let firstRowBottom = 0;
+      children.forEach((c) => {
+        if (c.offsetTop > firstTop) overflow = true;
+        else firstRowBottom = Math.max(firstRowBottom, c.offsetTop + c.offsetHeight);
+      });
+      setChipsOverflowing(overflow);
+      setChipsCollapsedHeight(firstRowBottom);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [savedSearches, activeSavedSearches, activeFilterChips]);
+
   /* Tech toggle (3-state). 0 találatos chip csak akkor kattintható, ha van
      rajta mentett állapot (hogy vissza lehessen venni) — újat nem lehet
      0-ra állítani. */
@@ -1822,40 +1861,12 @@ const JobWatcher = () => {
             </p>
           </div>
           <div className="job-last-commit">
-            <span>Elmúlt 1 hét git commitok:</span>
             {lastUpdates.length > 0 ? (
-              <>
-                <ul>
-                  {lastUpdates.slice(0, 2).map((u, i) => (
-                    <li key={`${u.date.toISOString()}-${i}`}>
-                      {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
-                    </li>
-                  ))}
-                </ul>
-                {lastUpdates.length > 2 && (
-                  <>
-                    <button
-                      className="job-commits-toggle"
-                      onClick={() => setCommitsOpen((prev) => !prev)}
-                    >
-                      {commitsOpen
-                        ? "▲ Régebbiek elrejtése"
-                        : `▼ Még ${lastUpdates.length - 3} commit megjelenítése`}
-                    </button>
-                    {commitsOpen && (
-                      <ul>
-                        {lastUpdates.slice(3).map((u, i) => (
-                          <li key={`${u.date.toISOString()}-${i + 3}`}>
-                            {`${u.message} - ${u.date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                )}
-              </>
+              <span>
+                {`Utoljára frissítve: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
+              </span>
             ) : (
-              <div>Nincs frissítés az elmúlt 7 napban.</div>
+              <span>Nincs frissítés az elmúlt 7 napban.</span>
             )}
           </div>
       </div>
@@ -1890,6 +1901,15 @@ const JobWatcher = () => {
         </div>
         {(savedSearches.length > 0 || activeFilterChips.length > 0) && (
           <div className="job-saved-and-active">
+            <div
+              className="job-chips-row"
+              ref={chipsRowRef}
+              style={
+                !chipsExpanded && chipsOverflowing && chipsCollapsedHeight
+                  ? { maxHeight: chipsCollapsedHeight, overflow: "hidden" }
+                  : undefined
+              }
+            >
             {savedSearches.length > 0 && (
               <div className="job-saved-searches">
                 {savedSearches.map((s) => {
@@ -1930,6 +1950,16 @@ const JobWatcher = () => {
             )}
             {/* ===== AKTÍV SZŰRŐK (forrás + kategória + tech összesítve) ===== */}
             <ActiveFilterSummary items={activeFilterChips} />
+            </div>
+            {chipsOverflowing && (
+              <button
+                type="button"
+                className="job-chips-toggle"
+                onClick={() => setChipsExpanded((v) => !v)}
+              >
+                {chipsExpanded ? "▲ Kevesebb" : "▼ Több"}
+              </button>
+            )}
           </div>
         )}
 
