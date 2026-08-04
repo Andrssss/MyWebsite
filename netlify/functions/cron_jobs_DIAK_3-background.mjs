@@ -28,7 +28,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, pruneStaleIdDuplicates } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -122,14 +122,6 @@ const VOLATILE_URL_PATTERNS = {
     const m = url.match(/^https:\/\/karrier\.otpbank\.hu(?:\/otp|\/leanyvallalatok)?\/job\/[^/]+\/(\d+)\/?$/);
     return m ? `^https://karrier\\.otpbank\\.hu(/otp|/leanyvallalatok)?/job/[^/]+/${m[1]}/?$` : null;
   },
-};
-
-// Same reqId extraction as VOLATILE_URL_PATTERNS.otp, for pruneStaleIdDuplicates
-// (cleans up the orphan migrateVolatileUrl's NOT-EXISTS guard leaves behind when
-// a job gets re-slugged TWICE before the first stale row's migration runs — see
-// that function's doc comment in _active_core.mjs).
-const STABLE_ID_EXTRACTORS = {
-  otp: (url) => (url.match(/^https:\/\/karrier\.otpbank\.hu(?:\/otp|\/leanyvallalatok)?\/job\/[^/]+\/(\d+)\/?$/) || [])[1] ?? null,
 };
 
 function mergeCandidates(...lists) {
@@ -911,12 +903,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       for (const [src, { urls, allSucceeded }] of foundBySource) {
         const rc = await reconcileActive(client, src, urls, { complete: allSucceeded });
         console.log(`[cron_jobs_DIAK_3] active reconcile [${src}] complete=${allSucceeded} — ${JSON.stringify(rc)}`);
-
-        const extractStableId = STABLE_ID_EXTRACTORS[src];
-        if (extractStableId) {
-          const pruned = await pruneStaleIdDuplicates(client, src, extractStableId);
-          if (pruned.deleted > 0) console.log(`[cron_jobs_DIAK_3] pruned ${pruned.deleted} stale duplicate row(s) [${src}]`);
-        }
       }
     }
   } finally {

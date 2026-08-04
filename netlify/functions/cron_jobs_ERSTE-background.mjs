@@ -18,7 +18,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex, pruneStaleIdDuplicates } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -297,11 +297,6 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
     const rc = await reconcileActive(client, "erste", foundUrls, { complete });
     console.log(`[erste] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
 
-    // Cleanup for the id-stable-slug-rename gap idOnlyPattern above can't fully
-    // close (a second re-slug before the first migration runs orphans the
-    // oldest row) — see pruneStaleIdDuplicates' doc comment.
-    const pruned = await pruneStaleIdDuplicates(client, "erste", (url) => (url.match(/-(\d+)$/) || [])[1] ?? null);
-    if (pruned.deleted > 0) console.log(`[erste] pruned ${pruned.deleted} stale duplicate row(s)`);
   } finally {
     client.release();
   }

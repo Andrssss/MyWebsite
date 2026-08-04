@@ -18,7 +18,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex, pruneStaleIdDuplicates } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 
 let _filters = [];
@@ -345,11 +345,6 @@ export default withTimeout("cron_jobs_KH-background", async () => {
     const rc = await reconcileActive(client, "kh", foundUrls, { complete });
     console.log(`[kh] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
 
-    // Same jsbq-platform id-stable-slug-rename gap as erste — a second re-slug
-    // before the first migration runs orphans the oldest row. See
-    // pruneStaleIdDuplicates' doc comment.
-    const pruned = await pruneStaleIdDuplicates(client, "kh", (url) => (url.match(/-(\d+)$/) || [])[1] ?? null);
-    if (pruned.deleted > 0) console.log(`[kh] pruned ${pruned.deleted} stale duplicate row(s)`);
   } finally {
     client.release();
   }

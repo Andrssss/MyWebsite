@@ -735,61 +735,9 @@ export async function expireAgedPushSource(client, source, days) {
   return res.rowCount ?? 0;
 }
 
-/**
- * Cleans up orphaned duplicate rows left behind by `migrateVolatileUrl`'s own
- * safety guard: when a stable-id source (erste/kh/otp — same jsbq-family ATS,
- * `VOLATILE_URL_PATTERNS`) gets re-slugged TWICE before the first stale row's
- * migration runs, `migrateVolatileUrl` refuses to rename into a url that
- * already has a row (its `NOT EXISTS` guard), so the older-slug row is left
- * behind — inactive (reconcile ages it out normally), but permanently orphaned
- * instead of merged. The job itself is NOT missing: a fresh row for the new
- * slug already exists and is active. Found live 2026-07-22 auditing "wrongly
- * deactivated" jobs — three flagged rows (erste `frontend-fejleszto-8899`, kh
- * `sre-support-engineer-15192`, otp reqId 1392573833 ×2) were exactly this:
- * harmless historical clutter that LOOKS like a false deactivation from
- * outside, not an actual bug — the frontend was already showing the job
- * correctly via the sibling row the whole time.
- *
- * Deletes an inactive row ONLY when another row of the same `source` shares
- * its stable id AND that other row is active — i.e. only when the job is
- * PROVABLY still correctly represented elsewhere. Never touches a group where
- * every row is inactive (that's just a genuinely closed job's slug history,
- * not a duplicate to clean up).
- *
- * @param {import("pg").PoolClient} client
- * @param {string} source
- * @param {(url: string) => string|null} extractStableId  pulls the platform's
- *   stable numeric id out of a url; returning null excludes that row from
- *   grouping entirely (never deleted).
- * @returns {Promise<{deleted: number}>}
- */
-export async function pruneStaleIdDuplicates(client, source, extractStableId) {
-  const { rows } = await client.query(
-    `SELECT id, url, active FROM job_posts WHERE source = $1`,
-    [source]
-  );
-
-  const byStableId = new Map();
-  for (const row of rows) {
-    let stableId;
-    try {
-      stableId = extractStableId(row.url);
-    } catch {
-      stableId = null;
-    }
-    if (!stableId) continue;
-    if (!byStableId.has(stableId)) byStableId.set(stableId, []);
-    byStableId.get(stableId).push(row);
-  }
-
-  const toDelete = [];
-  for (const group of byStableId.values()) {
-    if (group.length < 2) continue;
-    if (!group.some((r) => r.active)) continue; // no active sibling — not our call
-    for (const r of group) if (!r.active) toDelete.push(r.id);
-  }
-
-  if (toDelete.length === 0) return { deleted: 0 };
-  const res = await client.query(`DELETE FROM job_posts WHERE id = ANY($1::int[])`, [toDelete]);
-  return { deleted: res.rowCount ?? 0 };
-}
+// pruneStaleIdDuplicates (erste/kh/otp/raiffeisen orphan-duplicate cleanup) was
+// removed 2026-08-04 (user decision: scrapers may never DELETE from job_posts,
+// only the admin-gated purge may). The orphaned inactive rows it used to
+// remove are harmless clutter, not a functional bug — reconcileActive already
+// marks them inactive via UPDATE, and the job stays correctly represented by
+// its active sibling row either way.

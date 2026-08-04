@@ -676,7 +676,6 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   if (source.startsWith("profession")) {
     const kept = [];
     let dropped = 0;
-    let purged = 0;
     for (const c of matchedList) {
       if (isBudapestLocation(c.location)) {
         kept.push(c);
@@ -699,23 +698,12 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         continue;
       }
       dropped++;
-      // A szűrő eddig CSAK az insertet gátolta — egy már bent lévő vidéki sort sosem
-      // takarított el, így egyetlen fail-open (detail-fetch hiba a fenti catch-ben, vagy
-      // üres kártya-helyszín) ÖRÖKRE bent hagyta a sort. Így gyűlt össze 2026-07-14-ig
-      // 46 aktív nem-budapesti sor. Itt viszont a detail-oldal TELJES város-listája épp
-      // most bizonyította, hogy nem budapesti → a sora törölhető, és a DB minden futáson
-      // magától tisztul (nem kell újabb kézi DELETE-kör).
-      if (client) {
-        const { rowCount } = await client.query(
-          `DELETE FROM job_posts WHERE source = $1 AND url = $2`,
-          [source, c.url]
-        );
-        if (rowCount > 0) purged += rowCount;
-      }
+      // Csak megelőzés: a sor kimarad a kept/matchedList-ből, tehát sosem kerül
+      // (újra)beszúrásra. Egy már korábban bekerült vidéki sort NEM töröl — a
+      // scraper nem jogosult DELETE-re a job_posts táblán.
     }
     matchedList = kept;
     if (dropped) console.log(`[${source}] ${dropped} nem-budapesti hirdetés kiszűrve`);
-    if (purged) console.log(`[${source}] ${purged} nem-budapesti SOR TÖRÖLVE a db-ből`);
   }
 
   if (BLACKLIST_SOURCES.some(src => source.startsWith(src))) {
