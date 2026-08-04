@@ -2235,7 +2235,7 @@ const JobWatcher = () => {
     )}
 
     <div className="job-toolbar-footer">
-      <button className="job-btn job-btn--ghost" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
+      <button className="job-btn" onClick={resetAllFilters} title="Az összes szűrőt alaphelyzetbe állítja">
         Szűrők törlése
       </button>
 
