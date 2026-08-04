@@ -56,70 +56,9 @@ const ensureTable =
          interview boolean NOT NULL DEFAULT false,
          applied_by text,
          applied_at timestamptz NOT NULL DEFAULT now(),
-         PRIMARY KEY (job_key)
+         PRIMARY KEY (job_key, applied_by)
        )`
     );
-
-    // One-time migration: is the PK still job_key alone? If so, every existing
-    // row predates per-owner buckets (little-admin never had access to this
-    // endpoint before 2026-07-24), so it's all real-admin data — collapse
-    // applied_by into 'admin' before widening the key, so the four admins
-    // don't lose their existing list once rows are partitioned by applied_by.
-    const { rows } = await pool.query(
-      `SELECT array_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS cols
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-          AND tc.table_schema = kcu.table_schema
-        WHERE tc.table_schema = 'public'
-          AND tc.table_name = 'admin_applied_jobs'
-          AND tc.constraint_type = 'PRIMARY KEY'
-        GROUP BY tc.constraint_name`
-    );
-    const cols = rows[0]?.cols || [];
-    const alreadyPartitioned = cols.length === 2 && cols.includes("job_key") && cols.includes("applied_by");
-
-    if (!alreadyPartitioned) {
-      // Unconditional, not just NULL/empty: pre-migration rows hold whichever
-      // raw admin UUID last touched them (the pre-2026-07-24 behavior), not
-      // 'admin' — every one of those needs collapsing, or most existing
-      // "Jelentkeztem" marks would silently vanish from the admins' shared view.
-      await pool.query(`UPDATE admin_applied_jobs SET applied_by = 'admin'`);
-      try {
-        await pool.query(`ALTER TABLE admin_applied_jobs DROP CONSTRAINT admin_applied_jobs_pkey`);
-      } catch (err) {
-        if (err.code !== "42704") throw err; // 42704 undefined_object: already dropped (concurrent cold start)
-      }
-      try {
-        await pool.query(
-          `ALTER TABLE admin_applied_jobs ADD CONSTRAINT admin_applied_jobs_pkey PRIMARY KEY (job_key, applied_by)`
-        );
-      } catch (err) {
-        if (err.code !== "42710" && err.code !== "42P16") throw err; // already exists / already a pk
-      }
-    }
-
-    // Collapse legacy little:<uuid> owner keys (one bucket per little-admin,
-    // the original design) into a single shared 'little' bucket (2026-07-24
-    // change: little-admins pool their applied list together, same as the real
-    // admins' 'admin' bucket). Naturally idempotent — once no `little:%` rows
-    // remain, both statements below match zero rows on every later cold start.
-    // Dedup first: two different little-admins may have marked the SAME
-    // job_key, which would collide once both collapse to the literal 'little'
-    // (job_key, applied_by) is the primary key. Keep exactly one row per
-    // job_key (the most recently touched), same tradeoff as any last-write-wins
-    // merge — no way to keep "both" once they share one identity.
-    await pool.query(
-      `DELETE FROM admin_applied_jobs
-        WHERE applied_by LIKE 'little:%'
-          AND ctid NOT IN (
-            SELECT DISTINCT ON (job_key) ctid
-              FROM admin_applied_jobs
-             WHERE applied_by LIKE 'little:%'
-             ORDER BY job_key, applied_at DESC, ctid DESC
-          )`
-    );
-    await pool.query(`UPDATE admin_applied_jobs SET applied_by = 'little' WHERE applied_by LIKE 'little:%'`);
   })();
 globalThis.__ensureAdminAppliedTable = ensureTable;
 
