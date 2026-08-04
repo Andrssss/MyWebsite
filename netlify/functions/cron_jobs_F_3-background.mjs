@@ -4,7 +4,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, flushErrors, flushRecoveries } from "./_error-logger.mjs";
+import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 
@@ -172,7 +172,7 @@ function extractJobEntries(html) {
 
 /* ── handler ─────────────────────────────────────────────────── */
 
-export default async (request) => {
+export default withTimeout(JOB_NAME, async (request) => {
   const auth = (request.headers.get("authorization") || "").trim();
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   const expected = process.env.CRON_SECRET;
@@ -289,9 +289,7 @@ export default async (request) => {
     console.log(`[workly] active reconcile — complete=${complete}, ${JSON.stringify(rc)}`);
   } finally {
     client.release();
-    await flushErrors(JOB_NAME).catch(() => {});
-    await flushRecoveries(JOB_NAME).catch(() => {});
   }
 
   return new Response("OK");
-};
+});

@@ -10,6 +10,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadCategories } from "./load_categories.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isSeniorExperience } from "./_experience_core.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -106,7 +107,7 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
     .sort((a, b) => b.count - a.count);
 }
 
-export default async function handler() {
+export default withTimeout("cron_daily_stats", async function handler() {
   const client = await pool.connect();
   try {
     // Kategóriák betöltése adatbázisból
@@ -185,4 +186,4 @@ export default async function handler() {
   } finally {
     client.release();
   }
-}
+});

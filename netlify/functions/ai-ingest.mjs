@@ -23,6 +23,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
+import { withDbAuditFlush } from "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -36,7 +37,7 @@ function json(status, body) {
   });
 }
 
-export default async (request) => {
+export default withDbAuditFlush("ai-ingest", async (request) => {
   // Auth (writes to prod DB). Same token pair as ai-registry.mjs — the scoped
   // AI_INGEST_TOKEN when set, else CRON_SECRET.
   const expected = process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET;
@@ -98,4 +99,4 @@ export default async (request) => {
   } finally {
     client.release();
   }
-};
+});

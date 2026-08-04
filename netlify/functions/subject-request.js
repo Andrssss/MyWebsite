@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const { withDbAuditFlush } = require("./_db_audit.js");
 
 const pool = new Pool({
   connectionString: process.env.NETLIFY_DATABASE_URL,
@@ -60,7 +61,7 @@ function checkRateLimit(key) {
   return 0;
 }
 
-exports.handler = async (event) => {
+exports.handler = withDbAuditFlush("subject-request", async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
   }
@@ -101,4 +102,4 @@ exports.handler = async (event) => {
     console.error("[subject-request] POST error:", err);
     return json(500, { error: "Szerver hiba, próbáld újra." });
   }
-};
+});
