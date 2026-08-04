@@ -209,28 +209,15 @@ function isExpiredDetail(body) {
 
 /* ── db ──────────────────────────────────────────────────────── */
 
-// Nofluffjobs/alllocaljobs-minta: az experience csak a '-'/üres/NULL sorokat
-// tölti ki most fetchelt valós értékkel (korábbi sikertelen detail-fetch a
-// következő scrape-nél gyógyul), a technologies akkor töltődik, ha eddig NULL
-// volt, a company a hiányzót pótolja.
+// Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+// utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus esetén
+// a meglévő sor változatlan marad.
 async function upsertJob(client, item) {
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url) DO UPDATE SET
-        experience = CASE
-          WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
-           AND EXCLUDED.experience NOT IN ('-', '')
-          THEN EXCLUDED.experience ELSE job_posts.experience END,
-        technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
-        company = CASE
-          WHEN job_posts.company IS NULL THEN EXCLUDED.company
-          ELSE job_posts.company END
-        WHERE ((job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
-               AND EXCLUDED.experience NOT IN ('-', ''))
-           OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
-           OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL);`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     ["allasportal", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
@@ -311,17 +298,13 @@ async function scrapeAllasportal(client) {
   let skippedSenior = 0;
   let skippedCompany = 0;
 
-  // url → tárolt experience; detail-fetch csak oda megy, ahol a DB-ben még
-  // nincs valós érték — nincs külön backfill, a scrape gyógyít.
+  // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
+  // insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos UPDATE)
+  // úgysem gyógyulna, a fetch csak elpazarolt kérés lenne.
   const { rows: knownRows } = await client.query(
-    `SELECT url, experience FROM job_posts WHERE source = 'allasportal'`
+    `SELECT url FROM job_posts WHERE source = 'allasportal'`
   );
-  const known = new Map(knownRows.map((r) => [r.url, r.experience]));
-  const needsDetail = (url) => {
-    if (!known.has(url)) return true;
-    const exp = known.get(url);
-    return exp == null || exp === "-" || exp === "";
-  };
+  const known = new Set(knownRows.map((r) => r.url));
 
   for (const item of allItems) {
     if (seen.has(item.url)) continue;
@@ -346,7 +329,7 @@ async function scrapeAllasportal(client) {
       : isMidLevelTitle(item.title) ? "medior"
       : "-";
 
-    if (needsDetail(item.url) && item.experience === "-") {
+    if (!known.has(item.url)) {
       try {
         await sleep(400);
         const { body } = await fetchFinal(item.url);
@@ -355,7 +338,10 @@ async function scrapeAllasportal(client) {
           // nem extraktálunk, a reconcile/következő futás rendezi
           console.log(`[allasportal] expired-on-detail (listing lag): ${item.url}`);
         } else {
-          item.experience = extractBodyExperience(body) || "-";
+          // technologies KIZÁRÓLAG innen jön — mindig lefut, még akkor is, ha
+          // a cím-rövidzár már megadta az experience-t (azt csak akkor írjuk
+          // felül, ha még "-").
+          if (item.experience === "-") item.experience = extractBodyExperience(body) || "-";
           item.technologies = extractTechnologies(body);
         }
       } catch (err) {

@@ -163,16 +163,14 @@ function getDedupeKey(rawUrl) {
    DB upsert
 --------------------- */
 async function upsertJob(client, source, item) {
-  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
-  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
+  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
+  // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url)
-        DO UPDATE SET company = EXCLUDED.company
-        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;
-        `,
+     ON CONFLICT (source, url) DO NOTHING;`,
     [source, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
   );
 }
@@ -231,8 +229,8 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
   const client = await pool.connect();
   try {
     // Only a genuinely NEW url needs its own detail-page fetch for experience —
-    // an already-known row is already complete and ON CONFLICT DO UPDATE only
-    // ever touches `company`, so the fetch would otherwise be wasted.
+    // an already-known row is already complete and ON CONFLICT DO NOTHING would
+    // discard the fetch anyway.
     const { rows: knownRows } = await client.query(
       `SELECT url FROM job_posts WHERE source = 'bluebird'`
     );
@@ -276,18 +274,19 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
       }
       for (const it of items) {
         // Build the row COMPLETE before it's ever inserted — no separate pass
-        // comes back later to patch experience/technologies in. A feltehetőleg
-        // évszám-alapú szint (a feedben nincs szint-mező) csak új állásnál kell
-        // a detail-oldalról.
+        // comes back later to patch experience/technologies in. A cím-alapú szint
+        // gyakran feloldja az experience-t, de a technologies KIZÁRÓLAG a
+        // detail-oldalról jön, ezért a fetch új állásnál mindig lefut — az
+        // experience-t csak akkor írjuk felül, ha a cím még nem oldotta fel.
         it.experience = isInternshipTitle(it.title) ? "diákmunka"
           : isJuniorTitle(it.title) ? "junior"
           : isMidLevelTitle(it.title) ? "medior"
           : "-";
-        if (!known.has(it.url) && it.experience === "-") {
+        if (!known.has(it.url)) {
           try {
             await sleep(500);
             const detailHtml = await fetchText(it.url);
-            it.experience = extractBluebirdExperience(detailHtml) || "-";
+            if (it.experience === "-") it.experience = extractBluebirdExperience(detailHtml) || "-";
             it.technologies = extractTechnologies(detailHtml);
           } catch (err) {
             await logFetchError("cron_jobs_BLUE", { url: it.url, message: err.message });

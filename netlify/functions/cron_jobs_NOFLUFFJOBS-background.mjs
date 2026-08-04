@@ -306,27 +306,14 @@ function volatileUrlPattern(url) {
 }
 
 async function upsertJob(client, item) {
-  // Az experience és a technologies egymástól függetlenül healel: az experience
-  // csak a '-'/üres/NULL sorokat tölti ki egy most lefetchelt valós értékkel
-  // (pl. korábbi 429-es futás sora gyógyul a következő scrape-nél), a
-  // technologies pedig bármikor kitöltődik, ha korábban még NULL volt.
-  // A company ugyanígy backfillel: régi (company nélküli) sor kap cégnevet,
-  // meglévő értéket sosem írunk felül.
+  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
+  // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url) DO UPDATE SET
-        experience = CASE
-          WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
-           AND EXCLUDED.experience NOT IN ('-', '')
-          THEN EXCLUDED.experience ELSE job_posts.experience END,
-        technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
-        company = COALESCE(job_posts.company, EXCLUDED.company)
-        WHERE ((job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
-               AND EXCLUDED.experience NOT IN ('-', ''))
-           OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
-           OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL);`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
@@ -397,20 +384,18 @@ async function scrapeNofluffjobs(client) {
   // FULL current listing (a url still listed must never be renamed away).
   const currentUrls = allItems.map((c) => c.url);
 
-  // Experience-t CSAK ott fetchelünk, ahol a DB-ben még nincs valós érték (új
-  // url, vagy korábbi sikertelen fetch '-'-a) — nincs külön backfill, a scrape
-  // gyógyít. Mellékhatás: óránként csak pár detail-hívás megy ki, ami a
-  // nofluffjobs 429-es burst-limitje alatt marad.
-  const { rows: expRows } = await client.query(
-    `SELECT url, experience FROM job_posts
+  // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
+  // insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos UPDATE)
+  // úgysem gyógyulna, a fetch csak elpazarolt kérés lenne.
+  const { rows: knownRows } = await client.query(
+    `SELECT url FROM job_posts
       WHERE source = 'nofluffjobs' AND url = ANY($1::text[])`,
     [currentUrls]
   );
-  const storedExp = new Map(expRows.map((r) => [r.url, r.experience]));
+  const known = new Set(knownRows.map((r) => r.url));
 
   for (const item of allItems) {
-    const known = storedExp.get(item.url);
-    if (known == null || known === "-" || known === "") {
+    if (!known.has(item.url)) {
       const { experience: exp, technologies } = await fetchNofluffExperience(item.url);
       if (exp) item.experience = exp;
       item.technologies = technologies;

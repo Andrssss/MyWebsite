@@ -741,18 +741,21 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         }
       }
 
-      // Title alone didn't reveal seniority — fetch the detail page ONCE, only
-      // for a genuinely new posting (that survived the dedupe check above), and
-      // fully populate the row before it's ever inserted. No separate pass
-      // comes back later to patch it in.
-      if (!item.experience && known && !known.has(item.url)) {
+      // Fetch the detail page ONCE for a genuinely new posting (that survived
+      // the dedupe check above) and fully populate the row before it's ever
+      // inserted — no separate pass comes back later to patch it in. This runs
+      // even when the title already revealed the experience level: technologies
+      // only ever comes from the detail page, so skipping the fetch there used
+      // to leave technologies permanently null for every title-shortcut match
+      // (junior/medior/diákmunka keyword in the title).
+      if (known && !known.has(item.url)) {
         try {
           let detailHtml = item.detailHtml; // a helyszín-ellenőrzés már letölthette
           if (!detailHtml) {
             await sleep(300);
             detailHtml = await fetchText(item.url);
           }
-          item.experience = extractProfessionExperience(detailHtml) || "-";
+          if (!item.experience) item.experience = extractProfessionExperience(detailHtml) || "-";
           item.technologies = extractTechnologies(detailHtml);
         } catch (err) {
           await logFetchError(jobName, { url: item.url, message: err.message });

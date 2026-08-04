@@ -128,10 +128,12 @@ const MAX_LIST_PAGES = 15;
 // 07-11 tanulság: a cap-kimerülés guard nélkül ölt 15 élő sort).
 const BROWSE_MAX_PAGES = 250;
 
-// A detail-fetch (szint + technológiák) opcionális és ÖNGYÓGYÍTÓ: ami most
-// kimarad, az '-'-szal megy be és a következő futás needsDetail-je pótolja
-// (nofluffjobs-minta). Ezért időkeret-túllépéskor a detail-fetch-et elhagyjuk,
-// NEM a futást szakítjuk meg — a completeness (és így a reconcile) érintetlen.
+// A detail-fetch (szint + technológiák) csak új url-eknél fut, és ha az
+// időkeret közben lejár, az adott sor véglegesen '-'/technologies nélkül megy
+// be — insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos
+// UPDATE) nincs későbbi gyógyulás. Ezért időkeret-túllépéskor a detail-fetch-et
+// elhagyjuk, NEM a futást szakítjuk meg — a completeness (és így a reconcile)
+// érintetlen.
 // A withTimeout kerete háttérfüggvényre 14 perc; 10 percnél elzárjuk a csapot,
 // hogy az upsertek + reconcile biztosan beférjenek.
 const DETAIL_DEADLINE_MS = 10 * 60 * 1000;
@@ -261,28 +263,15 @@ function parseTotalCount(html) {
 
 /* ── db ──────────────────────────────────────────────────────── */
 
-// Nofluffjobs-minta: az experience csak a '-'/üres/NULL sorokat tölti ki egy
-// most fetchelt valós értékkel (egy korábbi sikertelen detail-fetch sora a
-// következő scrape-nél gyógyul), a technologies akkor töltődik, ha eddig NULL
-// volt, a company pedig csak a hiányzót pótolja.
+// Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+// utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus esetén
+// a meglévő sor változatlan marad.
 async function upsertJob(client, item) {
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url) DO UPDATE SET
-        experience = CASE
-          WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
-           AND EXCLUDED.experience NOT IN ('-', '')
-          THEN EXCLUDED.experience ELSE job_posts.experience END,
-        technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
-        company = CASE
-          WHEN job_posts.company IS NULL THEN EXCLUDED.company
-          ELSE job_posts.company END
-        WHERE ((job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
-               AND EXCLUDED.experience NOT IN ('-', ''))
-           OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
-           OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL);`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     ["alllocaljobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
@@ -400,18 +389,13 @@ async function scrapeAlllocaljobs(client) {
   let skippedDeadOnArrival = 0;
   const detailDeadline = runStart + DETAIL_DEADLINE_MS;
 
-  // url → tárolt experience; detail-fetch csak oda megy, ahol a DB-ben még
-  // nincs valós érték (új url, vagy korábbi sikertelen fetch '-'-a) — nincs
-  // külön backfill, a scrape gyógyít (nofluffjobs-minta).
+  // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
+  // insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos UPDATE)
+  // úgysem gyógyulna, a fetch csak elpazarolt kérés lenne.
   const { rows: knownRows } = await client.query(
-    `SELECT url, experience FROM job_posts WHERE source = 'alllocaljobs'`
+    `SELECT url FROM job_posts WHERE source = 'alllocaljobs'`
   );
-  const known = new Map(knownRows.map((r) => [r.url, r.experience]));
-  const needsDetail = (url) => {
-    if (!known.has(url)) return true;
-    const exp = known.get(url);
-    return exp == null || exp === "-" || exp === "";
-  };
+  const known = new Set(knownRows.map((r) => r.url));
 
   for (const item of allItems) {
     if (seen.has(item.url)) continue;
@@ -443,11 +427,11 @@ async function scrapeAlllocaljobs(client) {
       : isMidLevelTitle(item.title) ? "medior"
       : "-";
 
-    if (needsDetail(item.url) && item.experience === "-" && Date.now() >= detailDeadline) {
-      // Időkeret elfogyott — '-'-szal megy be, a következő futás needsDetail-je
-      // pótolja. A completeness szándékosan NEM romlik ettől (lásd DETAIL_DEADLINE_MS).
+    if (!known.has(item.url) && Date.now() >= detailDeadline) {
+      // Időkeret elfogyott — '-'-szal / technologies nélkül megy be. A
+      // completeness szándékosan NEM romlik ettől (lásd DETAIL_DEADLINE_MS).
       skippedDetailBudget++;
-    } else if (needsDetail(item.url) && item.experience === "-") {
+    } else if (!known.has(item.url)) {
       try {
         await sleep(500);
         const { body, finalUrl } = await fetchWithSession(item.url, jar);
@@ -460,7 +444,10 @@ async function scrapeAlllocaljobs(client) {
           continue;
         }
         const detailBody = stripSimilarJobs(body); // a "Hasonló munkák" blokk nélkül
-        item.experience = extractBodyExperience(detailBody) || "-";
+        // technologies KIZÁRÓLAG innen jön — mindig lefut, még akkor is, ha a
+        // cím-rövidzár már megadta az experience-t (azt csak akkor írjuk felül,
+        // ha még "-").
+        if (item.experience === "-") item.experience = extractBodyExperience(detailBody) || "-";
         item.technologies = extractTechnologies(detailBody);
       } catch (err) {
         await logFetchError("cron_jobs_ALLLOCALJOBS-background", { url: item.url, message: `detail: ${err.message}` });

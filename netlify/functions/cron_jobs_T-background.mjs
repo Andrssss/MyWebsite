@@ -132,15 +132,14 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 async function upsertJob(client, sourceKey, item) {
-  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
-  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
+  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
+  // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url)
-        DO UPDATE SET company = EXCLUDED.company
-        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     [sourceKey, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
   );
 }
@@ -309,10 +308,12 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
 
     // Only a genuinely NEW posting needs its detail page — an already-known url's
     // row is already complete, the upsert at most backfills its company (never
-    // experience/technologies). Title inference (inferTalentExperience) already resolved most jobs;
-    // only the "-" ones (title didn't reveal seniority) need the fetch. Either
-    // way the row is built COMPLETE before it's ever inserted — no separate pass
-    // comes back later to patch it in.
+    // experience/technologies). Title inference (inferTalentExperience) may
+    // already resolve experience, but technologies ONLY ever comes from this
+    // fetch, so it must still run for every new posting regardless — only the
+    // experience assignment below is skipped once the title already resolved it.
+    // Either way the row is built COMPLETE before it's ever inserted — no
+    // separate pass comes back later to patch it in.
     const { rows: knownRows } = await client.query(
       `SELECT url FROM job_posts WHERE source = 'talent' AND url = ANY($1::text[])`,
       [talentJobs.map((j) => j.url)]
@@ -320,12 +321,12 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     const known = new Set(knownRows.map((r) => r.url));
 
     for (const job of talentJobs) {
-      if (!known.has(job.url) && job.experience === "-") {
+      if (!known.has(job.url)) {
         try {
           await sleep(400);
           const html = await fetchText(job.url);
           const normalizedHtml = html.replace(/–/g, "-").replace(/—/g, "-");
-          job.experience = extractTalentExperience(normalizedHtml) || "-";
+          if (job.experience === "-") job.experience = extractTalentExperience(normalizedHtml) || "-";
           job.technologies = extractTechnologies(normalizedHtml);
         } catch (err) {
           await logFetchError("cron_jobs_T", { url: job.url, message: err.message, extra: { source: "talent" } });

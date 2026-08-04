@@ -290,27 +290,31 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         let source = "raiffeisen";
         let experience;
         let technologies = null;
-        if (levelLower.includes("gyakornok") || isInternshipTitle(title)) {
-          experience = "diákmunka";
-        } else {
-          await sleep(800);
-          try {
-            const detailHtml = await fetchText(url);
+        // A "gyakornok" cím-rövidzár csak az experience-t oldja fel — a
+        // technologies KIZÁRÓLAG a detail-oldalról jön, ezért a fetch mindig
+        // lefut, függetlenül attól, hogy melyik ág adta az experience-t.
+        const isInternTitle = levelLower.includes("gyakornok") || isInternshipTitle(title);
+        if (isInternTitle) experience = "diákmunka";
+
+        await sleep(800);
+        try {
+          const detailHtml = await fetchText(url);
+          if (!isInternTitle) {
             // A leírás évszáma az elsődleges; ha nincs, az explicit szint-címke
             // (level, pl. "Szenior") a fallback — így a senior sor is jelölhető.
             experience = extractBodyExperience(detailHtml) || level || "-";
-            technologies = extractTechnologies(detailHtml);
-          } catch (err) {
-            // The detail fetch only enriches experience; the job's existence is already
-            // known from the list. Keep it (experience "-") and still push to foundUrls —
-            // dropping it would let active-reconcile wrongly deactivate a live job, and
-            // gating `complete` on detail failures (below) disabled deactivation entirely
-            // on flaky bank sites.
-            detailFetchFailed++;
-            await logFetchError("cron_jobs_RAIFFEISEN-background", { url, message: err.message });
-            console.error(`[raiffeisen] detail fetch failed ${url}: ${err.message}`);
-            experience = level || "-";
           }
+          technologies = extractTechnologies(detailHtml);
+        } catch (err) {
+          // The detail fetch only enriches experience; the job's existence is already
+          // known from the list. Keep it (experience "-") and still push to foundUrls —
+          // dropping it would let active-reconcile wrongly deactivate a live job, and
+          // gating `complete` on detail failures (below) disabled deactivation entirely
+          // on flaky bank sites.
+          detailFetchFailed++;
+          await logFetchError("cron_jobs_RAIFFEISEN-background", { url, message: err.message });
+          console.error(`[raiffeisen] detail fetch failed ${url}: ${err.message}`);
+          if (!isInternTitle) experience = level || "-";
         }
 
         // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak

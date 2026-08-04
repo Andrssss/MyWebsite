@@ -271,13 +271,15 @@ const SOURCES = [
 
       for (const it of items) {
         // Build the row COMPLETE before it's ever inserted — no separate pass
-        // comes back later to patch experience/technologies in.
+        // comes back later to patch experience/technologies in. technologies
+        // KIZÁRÓLAG a detail-oldalról jön, ezért a fetch új állásnál mindig
+        // lefut — az experience-t csak akkor írjuk felül, ha a cím még "-".
         it.experience = isInternshipTitle(it.title) ? "diákmunka" : "-";
-        if (!known.has(it.url) && it.experience === "-") {
+        if (!known.has(it.url)) {
           try {
             await sleep(500);
             const detailHtml = await fetchText(it.url);
-            it.experience = extractBodyExperience(detailHtml) || "-";
+            if (it.experience === "-") it.experience = extractBodyExperience(detailHtml) || "-";
             it.technologies = extractTechnologies(detailHtml);
           } catch (err) {
             await logFetchError("cron_jobs_A_K", { url: it.url, message: err.message });

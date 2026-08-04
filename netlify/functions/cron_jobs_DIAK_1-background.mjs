@@ -1143,18 +1143,14 @@ const VOLATILE_URL_PATTERNS = {
 // DB upsert (csak write=1 esetén)
 // =====================
 async function upsertJob(client, source, item) {
-  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
-  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
-  // (csak a zyntern ad company-t; a többi forrás itemjein a guard no-op).
-  // technologies csak INSERT-kor íródik — a conflict-ág nem érinti, tehát egy
-  // már ismert sorra kárba veszne a fetch (lásd a hívó knownUrls-guardját).
+  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
+  // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url)
-        DO UPDATE SET company = EXCLUDED.company
-        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     [source, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }

@@ -123,13 +123,14 @@ function fetchText(url, redirectLeft = 5) {
 }
 
 async function upsertJob(client, sourceKey, item) {
+  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
+  // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, first_seen)
      VALUES ($1,$2,$3,$4,NOW())
-     ON CONFLICT (source, url)
-        DO UPDATE SET title = EXCLUDED.title
-        WHERE job_posts.title IS DISTINCT FROM EXCLUDED.title;`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     [sourceKey, item.title, item.url, item.experience ?? "-"]
   );
 }

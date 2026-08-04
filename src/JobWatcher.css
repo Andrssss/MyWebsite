@@ -140,7 +140,7 @@
 
   .job-tabs-toggle {
     width: 100%;
-    text-align: center;
+    justify-content: center;
     padding: 10px 12px;
     font-size: 14px;
   }
@@ -1072,10 +1072,60 @@ html, body {
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 10px 14px;
+  padding: 6px 8px;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 10px;
+}
+
+/* Aktív szűrők összegzője a toggle gomb FÖLÖTT — mindig látszik, nyitott/zárt
+   panel állapottól függetlenül, hogy ne kelljen kinyitni a listát annak
+   ellenőrzéséhez, mi van épp beállítva. Kattintásra törli az adott elemet. */
+.job-active-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 2px 6px;
+}
+
+.job-active-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+  border-radius: 999px;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.job-active-chip:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+.job-active-chip--selected {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+}
+
+.job-active-chip--excluded {
+  background: #ef4444;
+  color: #fff;
+}
+
+.job-active-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* "Szűrők törlése" + találat-összegzés egy sorban: az összegzés balra kerül
@@ -1148,29 +1198,48 @@ html, body {
   border-color: transparent;
 }
 
-/* ===== TOGGLE GOMB ===== */
+/* ===== TOGGLE GOMB =====
+   A gomb a kártyaszerű .job-tabs-header-be simuló "ghost" fejléc — nem
+   önálló, rikító színfoltként ül a halvány kártyán belül, hanem a teljes
+   sáv a kattintható felület, a nyitott/csukott állapotot pedig a forgó
+   chevron + finom hover-háttér jelzi. */
 .job-tabs-toggle {
-  background: #4f8cff;
-  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  background: transparent;
+  color: #e5e5e5;
   border: none;
   border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.job-tabs-chevron {
+  display: inline-block;
+  font-size: 11px;
+  color: #4f8cff;
+  transition: transform 0.2s ease;
+}
+
+.job-tabs-chevron--open {
+  transform: rotate(90deg);
 }
 
 /* hover */
 .job-tabs-toggle:hover {
-  background: #3b7ae0;
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
 }
 
 /* kattintás */
 .job-tabs-toggle:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.25);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ===== TAB LENYITÁS ===== */

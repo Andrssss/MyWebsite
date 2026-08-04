@@ -158,16 +158,14 @@ function htmlToText(html) {
 }
 
 async function upsertJob(client, sourceKey, item) {
-  // company backfill: a régebben mentett (company nélküli) sorok is kapjanak
-  // cégnevet, amikor újra látjuk őket — meglévő értéket sosem írunk felül
-  // (kuka itemeknek nincs company-ja → ott a guard miatt no-op)
+  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
+  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
+  // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url)
-        DO UPDATE SET company = EXCLUDED.company
-        WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL;`,
+     ON CONFLICT (source, url) DO NOTHING;`,
     [sourceKey, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
 }
@@ -178,11 +176,13 @@ async function upsertJob(client, sourceKey, item) {
 // COMPLETE before it's ever inserted; no separate pass comes back later to
 // patch it in.
 async function enrichIfNew(job, known, extract, jobName) {
-  if (known.has(job.url) || (job.experience && job.experience !== "-")) return;
+  // technologies KIZÁRÓLAG innen jön, ezért a fetch minden új url-nél lefut —
+  // még akkor is, ha a job.experience-t már a tag/cím-alapú rövidzár feloldotta.
+  if (known.has(job.url)) return;
   try {
     await sleep(400);
     const html = await fetchText(job.url);
-    job.experience = extract(html) || "-";
+    if (!job.experience || job.experience === "-") job.experience = extract(html) || "-";
     job.technologies = extractTechnologies(html);
   } catch (err) {
     await logFetchError(jobName, { url: job.url, message: err.message });

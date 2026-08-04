@@ -528,6 +528,32 @@ const getCategoriesForJob = (job, jobCategories) => {
   return collapseByPriority(result);
 };
 
+// A teljes Források/Kategóriák/Technológiák blokk FÖLÖTT mindig látható,
+// egyetlen közös csík az összes aktív (selected/excluded) szűrőből — akkor
+// is, ha az adott panel épp be van csukva, hogy ne kelljen mindegyiket
+// külön kinyitni annak ellenőrzéséhez, mi van épp beállítva. Kattintásra az
+// adott szűrő törlődik (saját onClear-t hordoz elemenként, mert a forrás/
+// kategória/tech listák külön state-tömbökben élnek).
+function ActiveFilterSummary({ items }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="job-active-summary">
+      {items.map(({ key, label, state, onClear }) => (
+        <button
+          key={key}
+          type="button"
+          className={`job-active-chip ${state === "selected" ? "job-active-chip--selected" : "job-active-chip--excluded"}`}
+          onClick={onClear}
+          title="Kattints az eltávolításhoz"
+        >
+          {label}
+          <span className="job-active-chip-remove" aria-hidden="true">×</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const JobWatcher = () => {
   const navigate = useNavigate();
   const debugMode = new URLSearchParams(window.location.search).has("debug");
@@ -1191,6 +1217,16 @@ const JobWatcher = () => {
     });
   };
 
+  /* Egyetlen aktív kategória-szűrő eltávolítása (az "aktívak" összegző sorból) */
+  const clearCategoryState = (key) => {
+    setCategoryStates((prev) => {
+      const updated = { ...prev };
+      delete updated[key];
+      localStorage.setItem("jobWatcherCategoryStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   /* Category counts */
   const categoryCounts = useMemo(() => {
     const counts = {};
@@ -1222,6 +1258,16 @@ const JobWatcher = () => {
           : "neutral";
 
       const updated = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Egyetlen aktív forrás-szűrő eltávolítása (az "aktívak" összegző sorból) */
+  const clearSourceState = (key) => {
+    setSourceStates((prev) => {
+      const updated = { ...prev };
+      delete updated[key];
       localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
       return updated;
     });
@@ -1468,15 +1514,12 @@ const JobWatcher = () => {
   // /jobs/technologies-ből — MINDEN felismerhető tech, függetlenül attól,
   // hogy van-e rá épp betöltött állás) UNIÓJA a betöltött jobokban ténylegesen
   // előforduló technológiákkal (globalTechCounts — legacy/eltérő címkék miatt
-  // a biztonság kedvéért), az aktuális (dinamikus) darabszám szerint rendezve
-  // — a 0-sok a sor végére süllyednek.
+  // a biztonság kedvéért), abc sorrendbe rendezve.
   const techList = useMemo(() => {
     const labels = new Set(allTechLabels);
     for (const tech of Object.keys(globalTechCounts)) labels.add(tech);
-    return [...labels].sort(
-      (a, b) => (techCounts[b] || 0) - (techCounts[a] || 0) || a.localeCompare(b)
-    );
-  }, [allTechLabels, globalTechCounts, techCounts]);
+    return [...labels].sort((a, b) => a.localeCompare(b, "hu"));
+  }, [allTechLabels, globalTechCounts]);
 
   // A keresőmező csak a chip-lista MEGJELENÍTÉSÉT szűri — a state-eket
   // (kijelölés, számlálás) nem érinti, tehát egy elrejtett chip kijelölése
@@ -1486,6 +1529,42 @@ const JobWatcher = () => {
     if (!term) return techList;
     return techList.filter((tech) => tech.toLowerCase().includes(term));
   }, [techList, techSearch]);
+
+  // Az épp aktív (nem semleges) forrás/kategória/tech szűrők EGY közös
+  // csík-listája — ez jelenik meg egyszer, a teljes Források/Kategóriák/
+  // Technológiák blokk fölött (nem szekciónként külön).
+  const activeFilterChips = useMemo(() => {
+    const srcChips = sources
+      .filter((s) => (sourceStates[s.source] || "neutral") !== "neutral")
+      .map((s) => ({
+        key: `src-${s.source}`,
+        label: s.label,
+        state: sourceStates[s.source],
+        onClear: () => clearSourceState(s.source),
+      }));
+
+    const catChips = jobCategories
+      .map(([cat]) => cat)
+      .concat("Egyéb")
+      .filter((cat) => (categoryStates[cat] || "neutral") !== "neutral")
+      .map((cat) => ({
+        key: `cat-${cat}`,
+        label: cat,
+        state: categoryStates[cat],
+        onClear: () => clearCategoryState(cat),
+      }));
+
+    const techChips = techList
+      .filter((tech) => (techStates[tech] || "neutral") !== "neutral")
+      .map((tech) => ({
+        key: `tech-${tech}`,
+        label: tech,
+        state: techStates[tech],
+        onClear: () => clearTechState(tech),
+      }));
+
+    return [...srcChips, ...catChips, ...techChips];
+  }, [sources, sourceStates, jobCategories, categoryStates, techList, techStates]);
 
   /* Tech toggle (3-state). 0 találatos chip csak akkor kattintható, ha van
      rajta mentett állapot (hogy vissza lehessen venni) — újat nem lehet
@@ -1498,6 +1577,16 @@ const JobWatcher = () => {
           : current === "selected" ? "excluded"
           : "neutral";
       const updated = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Egyetlen aktív tech-szűrő eltávolítása (az "aktívak" összegző sorból) */
+  const clearTechState = (key) => {
+    setTechStates((prev) => {
+      const updated = { ...prev };
+      delete updated[key];
       localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
       return updated;
     });
@@ -1973,13 +2062,17 @@ const JobWatcher = () => {
       </div>
     </div>
 
+    {/* ===== AKTÍV SZŰRŐK (forrás + kategória + tech összesítve) ===== */}
+    <ActiveFilterSummary items={activeFilterChips} />
+
     {/* ===== FORRÁS TAB TOGGLE ===== */}
     <div className="job-tabs-header">
       <button
         className="job-tabs-toggle"
         onClick={toggleSources}
       >
-        {sourcesOpen ? "▲ Források elrejtése" : "▼ Források kiválasztása"}
+        <span className={`job-tabs-chevron${sourcesOpen ? " job-tabs-chevron--open" : ""}`}>▸</span>
+        {sourcesOpen ? "Források elrejtése" : "Források kiválasztása"}
       </button>
       {sourcesOpen && (
         <div className="job-bulk-actions">
@@ -2030,7 +2123,8 @@ const JobWatcher = () => {
           })
         }
       >
-        {categoriesOpen ? "▲ Kategóriák elrejtése" : "▼ Kategóriák kiválasztása"}
+        <span className={`job-tabs-chevron${categoriesOpen ? " job-tabs-chevron--open" : ""}`}>▸</span>
+        {categoriesOpen ? "Kategóriák elrejtése" : "Kategóriák kiválasztása"}
       </button>
       {categoriesOpen && (
         <div className="job-bulk-actions">
@@ -2043,7 +2137,11 @@ const JobWatcher = () => {
 
     <div className={`job-tabs-wrapper ${categoriesOpen ? "open" : ""}`}>
       <div className="job-tabs">
-        {jobCategories.map(([cat]) => cat).concat("Egyéb").map((cat) => {
+        {jobCategories
+          .map(([cat]) => cat)
+          .sort((a, b) => a.localeCompare(b, "hu"))
+          .concat("Egyéb")
+          .map((cat) => {
           const state = categoryStates[cat] || "neutral";
           let cls = "job-tab";
           if (state === "selected") cls += " active";
@@ -2071,7 +2169,8 @@ const JobWatcher = () => {
               })
             }
           >
-            {techOpen ? "▲ Technológiák elrejtése" : "▼ Technológiák kiválasztása"}
+            <span className={`job-tabs-chevron${techOpen ? " job-tabs-chevron--open" : ""}`}>▸</span>
+            {techOpen ? "Technológiák elrejtése" : "Technológiák kiválasztása"}
           </button>
           {techOpen && (
             <div className="job-bulk-actions">
