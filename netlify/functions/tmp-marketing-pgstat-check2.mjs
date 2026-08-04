@@ -83,15 +83,16 @@ export default async (request) => {
         deltaDel: Number(r.del) - base.del,
       };
     });
-    const windowCEST = await windowTotals("2026-08-04T21:30:00.000Z", "2026-08-04T21:45:00.000Z");
-    const windowAsShown = await windowTotals("2026-08-04T23:30:00.000Z", "2026-08-04T23:45:00.000Z");
+    const url2 = new URL(request.url);
+    const sinceParam = url2.searchParams.get("since");
+    const untilParam = url2.searchParams.get("until");
+    const liveWindow = sinceParam && untilParam ? await windowTotals(sinceParam, untilParam) : null;
 
     return json(200, {
       now: new Date().toISOString(),
       baselineFrom: "2026-08-04T19:41:28Z",
       deltas,
-      auditWindow_cestReading_2130_2145: windowCEST,
-      auditWindow_asShown_2330_2345: windowAsShown,
+      liveWindow,
     });
   } finally {
     client.release();
