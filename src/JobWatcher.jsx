@@ -610,7 +610,7 @@ const JobWatcher = () => {
 
   const [time24h, setTime24h] = useState(() => {
     const saved = localStorage.getItem("jobWatcherTime24h");
-    return saved === null ? true : saved === "true";
+    return saved === null ? false : saved === "true";
   });
   const [time7d, setTime7d] = useState(() => {
     const saved = localStorage.getItem("jobWatcherTime7d");
@@ -618,7 +618,7 @@ const JobWatcher = () => {
   });
   const [timeToday, setTimeToday] = useState(() => {
     const saved = localStorage.getItem("jobWatcherTimeToday");
-    return saved === null ? false : saved === "true";
+    return saved === null ? true : saved === "true";
   });
 
   const [categoryStates, setCategoryStates] = useState(() => {
@@ -1534,12 +1534,17 @@ const JobWatcher = () => {
   // /jobs/technologies-ből — MINDEN felismerhető tech, függetlenül attól,
   // hogy van-e rá épp betöltött állás) UNIÓJA a betöltött jobokban ténylegesen
   // előforduló technológiákkal (globalTechCounts — legacy/eltérő címkék miatt
-  // a biztonság kedvéért), abc sorrendbe rendezve.
+  // a biztonság kedvéért). Találatszám szerint csökkenő sorrendben (a chipen
+  // látható darabszám alapján, ugyanaz a techCounts, amit a chip badge mutat),
+  // holtverseny esetén abc — így a leggyakoribb technológiák elöl vannak.
   const techList = useMemo(() => {
     const labels = new Set(allTechLabels);
     for (const tech of Object.keys(globalTechCounts)) labels.add(tech);
-    return [...labels].sort((a, b) => a.localeCompare(b, "hu"));
-  }, [allTechLabels, globalTechCounts]);
+    return [...labels].sort((a, b) => {
+      const diff = (techCounts[b] || 0) - (techCounts[a] || 0);
+      return diff !== 0 ? diff : a.localeCompare(b, "hu");
+    });
+  }, [allTechLabels, globalTechCounts, techCounts]);
 
   // A keresőmező csak a chip-lista MEGJELENÍTÉSÉT szűri — a state-eket
   // (kijelölés, számlálás) nem érinti, tehát egy elrejtett chip kijelölése

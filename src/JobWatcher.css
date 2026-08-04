@@ -1116,7 +1116,7 @@ html, body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin: 4px 0 8px;
+  margin: 20px 0 8px;
 }
 
 .job-toolbar-footer .job-status {
