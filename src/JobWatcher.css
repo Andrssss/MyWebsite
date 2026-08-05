@@ -1101,16 +1101,15 @@ html, body {
   display: contents;
 }
 
+/* Két külön gomb egy chipben (mint a mentett keresés chipeknél): a címkére
+   kattintva zöld↔piros vált (selected/excluded), a ×-re kattintva törlődik. */
 .job-active-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px 4px 12px;
   border-radius: 999px;
-  border: none;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -1129,16 +1128,34 @@ html, body {
   color: #fff;
 }
 
+.job-active-chip-label {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 4px 4px 4px 12px;
+}
+
 .job-active-chip-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 16px;
   height: 16px;
+  margin: 0 6px 0 4px;
+  border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.25);
+  color: inherit;
   font-size: 12px;
   line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.job-active-chip-remove:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* "Szűrők törlése" + találat-összegzés egy sorban: az összegzés balra kerül

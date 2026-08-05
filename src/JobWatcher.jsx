@@ -531,24 +531,39 @@ const getCategoriesForJob = (job, jobCategories) => {
 // A teljes Források/Kategóriák/Technológiák blokk FÖLÖTT mindig látható,
 // egyetlen közös csík az összes aktív (selected/excluded) szűrőből — akkor
 // is, ha az adott panel épp be van csukva, hogy ne kelljen mindegyiket
-// külön kinyitni annak ellenőrzéséhez, mi van épp beállítva. Kattintásra az
-// adott szűrő törlődik (saját onClear-t hordoz elemenként, mert a forrás/
-// kategória/tech listák külön state-tömbökben élnek).
+// külön kinyitni annak ellenőrzéséhez, mi van épp beállítva. A panelekben a
+// kijelölt elem eltűnik a listából (ld. neutral-only szűrés), tehát a
+// 3-állapotú ciklus (neutral → selected → excluded → neutral) második fele
+// csak itt érhető el: a címkére kattintva zöld↔piros vált (onToggle), a ×-re
+// kattintva pedig törlődik, vissza neutrálisra (onClear) — két külön gomb,
+// mint a mentett keresés chipeknél.
 function ActiveFilterSummary({ items }) {
   if (items.length === 0) return null;
   return (
     <div className="job-active-summary">
-      {items.map(({ key, label, state, onClear }) => (
-        <button
+      {items.map(({ key, label, state, onToggle, onClear }) => (
+        <span
           key={key}
-          type="button"
           className={`job-active-chip ${state === "selected" ? "job-active-chip--selected" : "job-active-chip--excluded"}`}
-          onClick={onClear}
-          title="Kattints az eltávolításhoz"
         >
-          {label}
-          <span className="job-active-chip-remove" aria-hidden="true">×</span>
-        </button>
+          <button
+            type="button"
+            className="job-active-chip-label"
+            onClick={onToggle}
+            title={state === "selected" ? "Váltás kizárásra (piros)" : "Váltás kijelölésre (zöld)"}
+          >
+            {label}
+          </button>
+          <button
+            type="button"
+            className="job-active-chip-remove"
+            onClick={onClear}
+            title="Eltávolítás"
+            aria-label="Eltávolítás"
+          >
+            ×
+          </button>
+        </span>
       ))}
     </div>
   );
@@ -1243,6 +1258,20 @@ const JobWatcher = () => {
     });
   };
 
+  /* Az Aktív szűrők csíkban lévő chip zöld/piros (selected/excluded) között
+     vált — a chip csak akkor létezik ott, ha már nem neutral, tehát a
+     harmadik ("vissza neutrálisra") lépést a chip × gombja (clearCategoryState)
+     adja, ez a kettő között vált oda-vissza kattintásra. */
+  const toggleCategoryState = (key) => {
+    setCategoryStates((prev) => {
+      const current = prev[key] || "neutral";
+      const next = current === "selected" ? "excluded" : "selected";
+      const updated = { ...prev, [key]: next };
+      localStorage.setItem("jobWatcherCategoryStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   /* Category counts */
   const categoryCounts = useMemo(() => {
     const counts = {};
@@ -1284,6 +1313,18 @@ const JobWatcher = () => {
     setSourceStates((prev) => {
       const updated = { ...prev };
       delete updated[key];
+      localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Az Aktív szűrők csíkban lévő chip zöld/piros (selected/excluded) között
+     vált — ld. toggleCategoryState komment ugyanerről a mintáról. */
+  const toggleSourceState = (key) => {
+    setSourceStates((prev) => {
+      const current = prev[key] || "neutral";
+      const next = current === "selected" ? "excluded" : "selected";
+      const updated = { ...prev, [key]: next };
       localStorage.setItem("jobWatcherSourceStates", JSON.stringify(updated));
       return updated;
     });
@@ -1561,6 +1602,7 @@ const JobWatcher = () => {
         key: `src-${s.source}`,
         label: s.label,
         state: sourceStates[s.source],
+        onToggle: () => toggleSourceState(s.source),
         onClear: () => clearSourceState(s.source),
       }));
 
@@ -1572,6 +1614,7 @@ const JobWatcher = () => {
         key: `cat-${cat}`,
         label: cat,
         state: categoryStates[cat],
+        onToggle: () => toggleCategoryState(cat),
         onClear: () => clearCategoryState(cat),
       }));
 
@@ -1581,6 +1624,7 @@ const JobWatcher = () => {
         key: `tech-${tech}`,
         label: tech,
         state: techStates[tech],
+        onToggle: () => toggleTechState(tech),
         onClear: () => clearTechState(tech),
       }));
 
@@ -1685,6 +1729,18 @@ const JobWatcher = () => {
     setTechStates((prev) => {
       const updated = { ...prev };
       delete updated[key];
+      localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  /* Az Aktív szűrők csíkban lévő chip zöld/piros (selected/excluded) között
+     vált — ld. toggleCategoryState komment ugyanerről a mintáról. */
+  const toggleTechState = (key) => {
+    setTechStates((prev) => {
+      const current = prev[key] || "neutral";
+      const next = current === "selected" ? "excluded" : "selected";
+      const updated = { ...prev, [key]: next };
       localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
       return updated;
     });

@@ -147,7 +147,7 @@ export function isSeniorLike(title, filters) {
 
 const LOCATION_OK_HINTS = [
   "budapest", "bp.", "bp,", "remote", "tavmunka", "home office", "homeoffice",
-  "orszagos", "magyarorszag", "barhol",
+  "orszagos", "magyarorszag", "hungary", "barhol",
 ];
 
 export function isNonBudapestLocation(location) {
