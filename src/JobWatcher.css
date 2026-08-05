@@ -563,6 +563,14 @@
   font-size: 15px;
 }
 
+/* Források/Kategóriák/Technológiák panel üres, mert MINDEN eleme már
+   kijelölve fent az Aktív szűrők közt — ez nem "nincs adat", hanem egy
+   magyarázat, ezért a sima szürke .job-status-nál hangsúlyosabb. */
+.job-status--all-selected {
+  color: #4ade80;
+  font-weight: 700;
+}
+
 .job-status--empty {
   display: flex;
   flex-direction: column;
@@ -1239,7 +1247,22 @@ html, body {
 }
 
 /* A kiválasztott csoport tartalma (bulk-actions + .job-tab chipek) — ugyanaz
-   a kártya-nyelv (háttér/border/radius), mint a .job-filter-group-é fölötte. */
+   a kártya-nyelv (háttér/border/radius), mint a .job-filter-group-é fölötte.
+   A :has() szelektor CSAK a Szűrők-választó dobozt találja el (Szint/
+   Frissesség sosem áll közvetlenül .job-filters-panel előtt), ezért nem kell
+   külön "nyitva" módosító osztály — a doboz és a panel eggyé olvad, amikor
+   a panel meg van nyitva (közös háttér, összeérő border, nincs dupla vonal). */
+.job-filter-group:has(+ .job-filters-panel) {
+  border-radius: 12px 12px 0 0;
+  border-bottom-color: transparent;
+}
+
+.job-filter-group + .job-filters-panel {
+  margin-top: 0;
+  border-radius: 0 0 12px 12px;
+  border-top: none;
+}
+
 .job-filters-panel {
   margin: 16px 0 24px;
   padding: 14px;

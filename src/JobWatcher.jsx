@@ -2199,7 +2199,7 @@ const JobWatcher = () => {
           {loadingSources ? (
             <div className="job-status">Források betöltése…</div>
           ) : sources.length > 0 && neutralSources.length === 0 ? (
-            <div className="job-status">Minden forrás ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
+            <div className="job-status job-status--all-selected">Minden forrás ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
           ) : (
             // A már kijelölt (selected/excluded) források a fenti "Aktív
             // szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
@@ -2233,8 +2233,8 @@ const JobWatcher = () => {
           {/* A már kijelölt (selected/excluded) kategóriák a fenti "Aktív
               szűrők" csíkban jelennek meg — itt csak a még eldöntetlen
               (neutral) kategóriák látszanak, hogy ne legyen duplikált a lista. */}
-          {jobCategories.length > 0 && neutralCategories.length === 0 ? (
-            <div className="job-status">Minden kategória ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
+          {neutralCategories.length === 0 ? (
+            <div className="job-status job-status--all-selected">        Minden kategória ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
           ) : (
             neutralCategories.map((cat) => (
               <button key={cat} className="job-tab" onClick={() => handleCategoryClick(cat)}>
@@ -2275,7 +2275,7 @@ const JobWatcher = () => {
           <div className="job-status">Nincs egyező technológia.</div>
         ) : (
           neutralTechs.length === 0 && (
-            <div className="job-status">Minden technológia ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
+            <div className="job-status job-status--all-selected">Minden technológia ki van jelölve — mind ott van fent az Aktív szűrők között.</div>
           )
         )}
         <div className="job-tabs">
