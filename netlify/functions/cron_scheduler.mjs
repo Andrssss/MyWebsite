@@ -1,8 +1,8 @@
 export const config = {
-  // Fires ONLY at the minutes present in GRID below (hours 4–22 UTC).
+  // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "3,8,11,12,13,14,22,27,33,34,38,43,45,52 4-22 * * *",
+  schedule: "3,8,11,12,13,14,22,27,33,34,38,43,45,52 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
