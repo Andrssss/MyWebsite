@@ -29,7 +29,7 @@ const STORE_NAME = "ai-scraped-registry";
 const KEY = "ratelimit.json";
 
 // Rows accepted per hour across all ai-scraped write endpoints combined.
-export const HOURLY_LIMIT = Number(process.env.AI_INGEST_HOURLY_LIMIT || 10);
+export const HOURLY_LIMIT = Number(process.env.AI_INGEST_HOURLY_LIMIT || 50);
 
 // A single request bigger than this is rejected outright, before any DB work —
 // stops a huge payload from burning CPU/DB time just to be filtered away.
