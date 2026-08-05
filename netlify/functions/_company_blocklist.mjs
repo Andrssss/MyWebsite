@@ -33,6 +33,7 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
   "deutsche telekom it solutions hu",
   "telekom hu",
   "deutsche telekom",
+  "poetry cove",
 ];
 
 // talent-only (user-döntés 2026-08-04): ezek a cégek a talent.hu-n cím szerint
