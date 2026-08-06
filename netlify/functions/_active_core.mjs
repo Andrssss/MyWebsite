@@ -374,6 +374,14 @@ export const BANNER_DEAD_SOURCES = {
     const m = body.slice(i, i + 3000).match(/system_status\\?"\s*:\s*(\d+)/);
     return !!m && m[1] === "2";
   },
+  // talent (2026-08-06): confirmed live that GET can answer a perfectly alive
+  // posting with HTTP 404 while still SSR-rendering the full page — same job
+  // title/company/apply-CTA as a real 200, and the flight payload's own id
+  // carries system_status:1 (their "live" flag). HEAD on the identical URL
+  // returned 200. Control case: id 630535740167293230 ("Network Engineer",
+  // H-Tech Supports, first_seen 2026-08-05) — the plain 404 rule below killed
+  // it within hours despite it being genuinely live. _isDeadResult consults
+  // this before trusting a bare 404 for sources listed here.
   // nofluffjobs: dead postings stay HTTP 200 forever (SEO), so only the body
   // can tell. Two independent signals, either proves death (validated
   // 2026-07-07 on 3 live PUBLISHED + 1 expired DISABLED page; extended
@@ -466,6 +474,27 @@ export const BANNER_DEAD_SOURCES = {
   },
 };
 
+// Sources whose 404 status can't be trusted at face value: the origin
+// occasionally answers a genuinely-live posting's exact GET with HTTP 404
+// while still SSR-rendering the real page — same id, own body proves it's
+// alive. When body is available (BANNER_DEAD_SOURCES already requests it)
+// this predicate is checked BEFORE the blanket 404-is-dead rule; if it can't
+// find the id in the body at all, that's a real purge and the plain 404 rule
+// still applies untouched.
+// talent (2026-08-06): see the dated comment on its BANNER_DEAD_SOURCES entry
+// above for the control case that proved this.
+export const SOFT_404_ALIVE_SOURCES = {
+  talent: (row, body) => {
+    const id = (row.url.match(/[?&]id=(\d+)/) || [])[1];
+    if (!id) return false;
+    let i = body.indexOf(`\\"id\\":\\"${id}\\"`);
+    if (i < 0) i = body.indexOf(`"id":"${id}"`);
+    if (i < 0) return false;
+    const m = body.slice(i, i + 3000).match(/system_status\\?"\s*:\s*(\d+)/);
+    return !!m && m[1] === "1";
+  },
+};
+
 function _pathOf(u) {
   try {
     const p = new URL(u).pathname.replace(/\/+$/, "");
@@ -477,7 +506,13 @@ function _pathOf(u) {
 
 function _isDeadResult(row, res) {
   if (!res) return false;
-  if (res.status === 404) return true;
+  if (res.status === 404) {
+    const aliveRule = SOFT_404_ALIVE_SOURCES[row.source];
+    if (aliveRule && typeof res.body === "string" && aliveRule(row, res.body)) {
+      return false;
+    }
+    return true;
+  }
   if (
     REDIRECT_DEAD_SOURCES.has(row.source) &&
     res.status >= 200 && res.status < 400 &&
