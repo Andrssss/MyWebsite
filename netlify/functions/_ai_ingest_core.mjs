@@ -16,7 +16,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
-  extractYearsFromText, isSeniorExperience,
+  extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
 } from "./_experience_core.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
@@ -80,7 +80,12 @@ export function sanitizeJobs(rawJobs) {
       company: trimField(j.company, 200),
       location: trimField(j.location, 200),
       experience: trimField(j.experience, 100),
-      technologies: trimField(j.technologies, 500),
+      // The LLM writes free text here with no other filtering (unlike every
+      // hand scraper, which only ever stores extractTechnologies() output) —
+      // normalize down to recognized TECH_KEYWORDS labels only, or this
+      // pipeline keeps reintroducing the exact noise the 2026-08-06 cleanup
+      // removed (see the "AI-scraped technologies cleanup" memory).
+      technologies: normalizeTechnologyList(j.technologies),
     });
   }
   return out;

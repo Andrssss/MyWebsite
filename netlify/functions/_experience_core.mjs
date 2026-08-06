@@ -367,6 +367,35 @@ function techBoundaryRegex(keyword) {
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$|\\d)`, "i");
 }
 
+// Scans arbitrary text for TECH_KEYWORDS occurrences and returns the
+// matched canonical labels as a comma-joined string (or null). Shared by
+// extractTechnologies (HTML body text) and normalizeTechnologyList (a
+// pre-extracted comma list from an external source, e.g. the ai-scraped
+// pipeline's LLM-supplied `technologies` field — commas/spaces are just as
+// valid a boundary as any other non-alnum char, so this works unchanged on
+// a "Java, Spring Boot, AWS" style string too).
+export function matchTechKeywords(text) {
+  const found = new Set();
+  if (!text) return found;
+  for (const [key, label] of TECH_KEYWORDS) {
+    if (techBoundaryRegex(key).test(text)) found.add(label);
+  }
+  return found;
+}
+
+// Normalizes a free-text, LLM-written technologies list down to ONLY
+// recognized TECH_KEYWORDS labels — the ai-scraped pipeline's technologies
+// field is raw LLM output with no other filtering (unlike every hand
+// scraper, which only ever writes extractTechnologies() output), so without
+// this an LLM writing "software testing, backend development, C, ..." would
+// insert that noise verbatim forever. See the "AI-scraped technologies
+// cleanup" memory (2026-08-06) for the one-off historical backfill this
+// mirrors going forward.
+export function normalizeTechnologyList(rawText) {
+  const found = matchTechKeywords(rawText);
+  return found.size ? [...found].join(", ") : null;
+}
+
 // Extracts a comma-joined list of recognized technology keywords from an
 // already-fetched job detail page — piggybacks on whatever html a source
 // fetched for extractBodyExperience/etc, no extra network call.
@@ -463,15 +492,7 @@ export function extractTechnologies(html) {
     }
   }
 
-  const matchKeywords = (t) => {
-    const found = new Set();
-    for (const [key, label] of TECH_KEYWORDS) {
-      if (techBoundaryRegex(key).test(t)) found.add(label);
-    }
-    return found;
-  };
-
-  let found = text ? matchKeywords(text) : new Set();
+  let found = matchTechKeywords(text);
 
   // Scoped selectors are a substring/generic-id match (e.g. #job-details),
   // so they can lock onto an unrelated element (profession.hu's hidden
@@ -494,7 +515,7 @@ export function extractTechnologies(html) {
   const MIN_TRUSTED_LENGTH = 200;
   if (!found.size && text.length < MIN_TRUSTED_LENGTH) {
     const bodyText = normalizeWhitespace($("body").text());
-    if (bodyText !== text) found = matchKeywords(bodyText);
+    if (bodyText !== text) found = matchTechKeywords(bodyText);
   }
 
   return found.size ? [...found].join(", ") : null;
