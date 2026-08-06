@@ -1355,6 +1355,15 @@ const JobWatcher = () => {
     });
   };
 
+  const clearTimeFilter = () => {
+    setTimeToday(false);
+    localStorage.setItem("jobWatcherTimeToday", "false");
+    setTime24h(false);
+    localStorage.setItem("jobWatcherTime24h", "false");
+    setTime7d(false);
+    localStorage.setItem("jobWatcherTime7d", "false");
+  };
+
   const handleInternToggle = (checked) => {
     setInternMode(checked);
     localStorage.setItem("jobWatcherInternMode", checked);
@@ -1596,6 +1605,26 @@ const JobWatcher = () => {
   // csík-listája — ez jelenik meg egyszer, a teljes Források/Kategóriák/
   // Technológiák blokk fölött (nem szekciónként külön).
   const activeFilterChips = useMemo(() => {
+    const levelChips = [];
+    if (internMode) {
+      levelChips.push({ key: "level-intern", label: "Gyakornok", state: "selected", onToggle: () => handleInternToggle(false), onClear: () => handleInternToggle(false) });
+    } else if (juniorMode) {
+      levelChips.push({ key: "level-junior", label: "Junior", state: "selected", onToggle: () => handleJuniorToggle(false), onClear: () => handleJuniorToggle(false) });
+    } else if (mediorMode) {
+      levelChips.push({ key: "level-medior", label: "Medior", state: "selected", onToggle: () => handleMediorToggle(false), onClear: () => handleMediorToggle(false) });
+    } else if (seniorMode) {
+      levelChips.push({ key: "level-senior", label: "Senior", state: "selected", onToggle: () => handleSeniorToggle(false), onClear: () => handleSeniorToggle(false) });
+    }
+
+    const timeChips = [];
+    if (timeToday) {
+      timeChips.push({ key: "time-today", label: "Mai", state: "selected", onToggle: clearTimeFilter, onClear: clearTimeFilter });
+    } else if (time24h) {
+      timeChips.push({ key: "time-24h", label: "Új (24h)", state: "selected", onToggle: clearTimeFilter, onClear: clearTimeFilter });
+    } else if (time7d) {
+      timeChips.push({ key: "time-7d", label: "Új (1 hét)", state: "selected", onToggle: clearTimeFilter, onClear: clearTimeFilter });
+    }
+
     const srcChips = sources
       .filter((s) => (sourceStates[s.source] || "neutral") !== "neutral")
       .map((s) => ({
@@ -1628,8 +1657,12 @@ const JobWatcher = () => {
         onClear: () => clearTechState(tech),
       }));
 
-    return [...srcChips, ...catChips, ...techChips];
-  }, [sources, sourceStates, jobCategories, categoryStates, techList, techStates]);
+    return [...levelChips, ...timeChips, ...srcChips, ...catChips, ...techChips];
+  }, [
+    internMode, juniorMode, mediorMode, seniorMode,
+    timeToday, time24h, time7d,
+    sources, sourceStates, jobCategories, categoryStates, techList, techStates,
+  ]);
 
   // A Források/Kategóriák/Technológiák panelekben csak az eldöntetlen
   // (neutral) elemek látszanak — a kijelöltek (selected/excluded) fent, az
@@ -2196,14 +2229,7 @@ const JobWatcher = () => {
               type="checkbox"
               checked={!timeToday && !time24h && !time7d}
               onChange={(e) => {
-                if (e.target.checked) {
-                  setTimeToday(false);
-                  localStorage.setItem("jobWatcherTimeToday", "false");
-                  setTime24h(false);
-                  localStorage.setItem("jobWatcherTime24h", "false");
-                  setTime7d(false);
-                  localStorage.setItem("jobWatcherTime7d", "false");
-                }
+                if (e.target.checked) clearTimeFilter();
               }}
             />
             Összes
