@@ -135,6 +135,26 @@ const TECH_KEYWORDS = [
   ["android", "Android"], ["ios", "iOS"], ["flutter", "Flutter"], ["ionic", "Ionic"],
   ["cocoapods", "CocoaPods"], ["rxswift", "RxSwift"], ["uikit", "UIKit"], ["xctest", "XCTest"],
   ["mvvm", "MVVM"],
+
+  // added from an audit of the AI-scraped bucket's free-text technologies
+  // field against this list (2026-08-06) — recurring, unambiguous terms only;
+  // see the "AI-scraped technologies cleanup" memory for the full rationale.
+  ["microservices", "Microservices"], ["agile", "Agile"],
+  ["devops", "DevOps"], ["data warehouse", "Data Warehouse"], ["dwh", "Data Warehouse"],
+  ["istqb", "ISTQB"], ["oop", "OOP"], ["debian", "Debian"], ["rxjs", "RxJS"],
+  ["centos", "CentOS"], ["gitops", "GitOps"], ["iis", "IIS"],
+  ["pyspark", "Apache Spark"], ["sap", "SAP"], ["splunk", "Splunk"],
+  ["ccna", "CCNA"], ["ccnp", "CCNP"], ["cissp", "CISSP"], ["oscp", "OSCP"], ["ceh", "CEH"],
+  ["business intelligence", "Business Intelligence"], ["computer vision", "Computer Vision"],
+  ["cuda", "CUDA"], ["cybersecurity", "Cybersecurity"], ["dagster", "Dagster"],
+  ["data lake", "Data Lake"], ["data science", "Data Science"],
+  ["generative ai", "Generative AI"], ["penetration testing", "Penetration Testing"],
+  ["ejb", "EJB"], ["jboss", "JBoss"], ["jsf", "JSF"], ["juniper", "Juniper"],
+  ["manageengine", "ManageEngine"], ["polarion", "Polarion"],
+  ["rds", "Amazon RDS"], ["redhat", "RedHat"], ["rhel", "RedHat"],
+  ["smarty", "Smarty"], ["spi", "SPI"], ["stl", "STL"], ["svn", "SVN"],
+  ["teamcity", "TeamCity"], ["ubuntu", "Ubuntu"], ["veeam", "Veeam"],
+  ["wan", "WAN"], ["xsd", "XSD"], ["asyncio", "asyncio"], ["intune", "Microsoft Intune"],
 ];
 
 module.exports = { TECH_KEYWORDS };
