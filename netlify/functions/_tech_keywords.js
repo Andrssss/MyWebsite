@@ -104,6 +104,11 @@ const TECH_KEYWORDS = [
   ["visio", "Visio"], ["visual studio", "Visual Studio"], ["intellij", "IntelliJ"],
   ["android studio", "Android Studio"],
 
+  // design (2026-08-06: UX/UI Design category carve-out — keeping this list
+  // short and unambiguous; deliberately omits "sketch"/"miro" which collide
+  // with ordinary English words/names in raw job-description text)
+  ["figma", "Figma"], ["adobe xd", "Adobe XD"],
+
   // systems / infra / security
   ["powershell", "PowerShell"], ["vbscript", "VBScript"],
   ["windows server", "Windows Server"], ["windows", "Windows"],

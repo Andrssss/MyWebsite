@@ -35,7 +35,7 @@ function kwRegex(kw) {
 // getCategoriesForJob-bal SZINKRONBAN tartandó (src/JobWatcher.jsx).
 const CATEGORY_PRIORITY = [
   "DevOps", "Security", "Data / AI", "Elemző / Analyst",
-  "QA / Tesztelő", "Mobil", "Menedzser / PM", "Webfejlesztés",
+  "QA / Tesztelő", "Mobil", "Menedzser / PM", "UX/UI Design", "Webfejlesztés",
   "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
 ];
 const categoryRank = (c) => {
