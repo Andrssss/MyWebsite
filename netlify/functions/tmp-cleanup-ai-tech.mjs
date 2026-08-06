@@ -4,14 +4,13 @@
 // matches what was analyzed (no clobbering concurrent AI-registry writes).
 // Deploy -> invoke -> delete this file.
 import { Pool } from "pg";
-import { withDbAuditFlush } from "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 const TOKEN = "ai-tech-cleanup-4e8b1a7f2d9c6053";
 
-export default withDbAuditFlush("tmp-cleanup-ai-tech", async (req) => {
+export default async (req) => {
   const hdr = req.headers.get("authorization") || "";
   const token = hdr.replace(/^Bearer\s+/i, "").trim();
   if (token !== TOKEN) {
@@ -43,4 +42,4 @@ export default withDbAuditFlush("tmp-cleanup-ai-tech", async (req) => {
   } finally {
     client.release();
   }
-});
+};
