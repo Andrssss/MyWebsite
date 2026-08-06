@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const { withDbAuditFlush } = require("./_db_audit.js");
+const { TECH_KEYWORDS } = require("./_tech_keywords.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -8,6 +9,23 @@ const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
 });
+
+// Category → associated technologies (2026-08-06): lets the frontend
+// auto-select a category's typical tech filters when the category itself
+// gets picked (e.g. "Frontend fejlesztő" pulling in React/Vue/TypeScript/...)
+// instead of technologies being a flat, unrelated filter dimension. Only
+// ever holds canonical TECH_KEYWORDS labels — validated on write below —
+// so the admin UI can offer a closed picker rather than free text.
+const VALID_TECH_LABELS = new Set(TECH_KEYWORDS.map(([, label]) => label));
+
+let _schemaReady = false;
+async function ensureSchema(client) {
+  if (_schemaReady) return;
+  await client.query(
+    `ALTER TABLE job_categories ADD COLUMN IF NOT EXISTS technologies text[] NOT NULL DEFAULT '{}'`
+  );
+  _schemaReady = true;
+}
 
 const ALLOWED_ORIGIN =
   process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
@@ -58,18 +76,19 @@ exports.handler = withDbAuditFlush("categories", async (event) => {
   let client;
   try {
     client = await pool.connect();
+    await ensureSchema(client);
 
-    // GET – list all categories with keywords
+    // GET – list all categories with keywords + associated technologies
     if (method === "GET") {
       const { rows } = await client.query(
-        `SELECT id, name, keywords FROM job_categories ORDER BY id`
+        `SELECT id, name, keywords, technologies FROM job_categories ORDER BY id`
       );
       return json(200, rows);
     }
 
     // POST – add a new category
     if (method === "POST") {
-      const { name, keywords } = JSON.parse(event.body || "{}");
+      const { name, keywords, technologies } = JSON.parse(event.body || "{}");
       if (!name || typeof name !== "string") {
         return json(400, { error: "name kötelező." });
       }
@@ -80,13 +99,16 @@ exports.handler = withDbAuditFlush("categories", async (event) => {
       const kws = Array.isArray(keywords)
         ? keywords.map((k) => String(k).trim()).filter(Boolean)
         : [];
+      const techs = Array.isArray(technologies)
+        ? [...new Set(technologies.filter((t) => VALID_TECH_LABELS.has(t)))]
+        : [];
 
       const { rows } = await client.query(
-        `INSERT INTO job_categories (name, keywords)
-         VALUES ($1, $2)
+        `INSERT INTO job_categories (name, keywords, technologies)
+         VALUES ($1, $2, $3)
          ON CONFLICT (name) DO NOTHING
-         RETURNING id, name, keywords`,
-        [trimmedName, kws]
+         RETURNING id, name, keywords, technologies`,
+        [trimmedName, kws, techs]
       );
       if (rows.length === 0) {
         return json(409, { error: "Ez a kategória már létezik." });
@@ -94,9 +116,9 @@ exports.handler = withDbAuditFlush("categories", async (event) => {
       return json(201, rows[0]);
     }
 
-    // PATCH – update keywords for a category
+    // PATCH – update keywords and/or associated technologies for a category
     if (method === "PATCH") {
-      const { id, keywords } = JSON.parse(event.body || "{}");
+      const { id, keywords, technologies } = JSON.parse(event.body || "{}");
       if (!id) {
         return json(400, { error: "id kötelező." });
       }
@@ -104,14 +126,25 @@ exports.handler = withDbAuditFlush("categories", async (event) => {
       if (!Number.isFinite(parsedId) || parsedId <= 0) {
         return json(400, { error: "Érvénytelen id." });
       }
-      if (!Array.isArray(keywords)) {
-        return json(400, { error: "keywords tömb kötelező." });
+      if (!Array.isArray(keywords) && !Array.isArray(technologies)) {
+        return json(400, { error: "keywords vagy technologies tömb kötelező." });
       }
-      const kws = keywords.map((k) => String(k).trim()).filter(Boolean);
+
+      const sets = [];
+      const params = [parsedId];
+      if (Array.isArray(keywords)) {
+        params.push(keywords.map((k) => String(k).trim()).filter(Boolean));
+        sets.push(`keywords = $${params.length}`);
+      }
+      if (Array.isArray(technologies)) {
+        params.push([...new Set(technologies.filter((t) => VALID_TECH_LABELS.has(t)))]);
+        sets.push(`technologies = $${params.length}`);
+      }
+
       const { rows } = await client.query(
-        `UPDATE job_categories SET keywords = $2 WHERE id = $1
-         RETURNING id, name, keywords`,
-        [parsedId, kws]
+        `UPDATE job_categories SET ${sets.join(", ")} WHERE id = $1
+         RETURNING id, name, keywords, technologies`,
+        params
       );
       if (rows.length === 0) {
         return json(404, { error: "Kategória nem található." });

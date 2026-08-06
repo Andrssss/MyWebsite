@@ -472,7 +472,7 @@ function kwRegex(kw) {
 // egy állás pontosan egy kategóriába kerüljön. Új kategóriát ide is érdemes
 // felvenni; a listán kívüli a leggyengébb prioritást kapja.
 const CATEGORY_PRIORITY = [
-  "C++", "DevOps", "Security", "Data / AI", "Elemző / Analyst",
+  "DevOps", "Security", "Data / AI", "Elemző / Analyst",
   "QA / Tesztelő", "Mobil", "Menedzser / PM", "Webfejlesztés",
   "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
 ];
@@ -506,10 +506,6 @@ const getCategoriesForJob = (job, jobCategories) => {
   // Ha több kategória matchelt és az egyik DevOps → csak DevOps
   if (matches.length > 1 && matches.includes("DevOps")) {
     return ["DevOps"];
-  }
-  // Ha több kategória matchelt és az egyik C++ → csak C++
-  if (matches.length > 1 && matches.includes("C++")) {
-    return ["C++"];
   }
   // Fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen (így Hálózat/Infra és Mérnöki/Gyártás is erősebb nála)
   const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
@@ -1117,7 +1113,7 @@ const JobWatcher = () => {
       const res = await fetch(`${API_BASE_URL}/categories`);
       const data = await res.json();
       if (Array.isArray(data)) {
-        setJobCategories(data.map((c) => [c.name, c.keywords]));
+        setJobCategories(data.map((c) => [c.name, c.keywords, c.technologies || []]));
       }
     } catch {
       setJobCategories([]);
@@ -1236,6 +1232,8 @@ const JobWatcher = () => {
 
   /* Category toggle (3-state) */
   const handleCategoryClick = (key) => {
+    const wasNeutral = (categoryStates[key] || "neutral") === "neutral";
+
     setCategoryStates((prev) => {
       const current = prev[key] || "neutral";
       const next =
@@ -1246,6 +1244,27 @@ const JobWatcher = () => {
       localStorage.setItem("jobWatcherCategoryStates", JSON.stringify(updated));
       return updated;
     });
+
+    // Kategória első kijelölésekor a hozzá tartozó technológiák is
+    // automatikusan bekerülnek szűrőnek (pl. "Frontend fejlesztő" magával
+    // rántja a React/Vue/TypeScript-et), amennyiben az adott tech-hez még
+    // nincs beállítva semmi — egy már kézzel kizárt/kijelölt tech-et ez
+    // nem ír felül. Csak a neutral→selected átmenetkor fut, kizárásra
+    // váltáskor vagy törléskor nem.
+    if (wasNeutral) {
+      const entry = jobCategories.find(([cat]) => cat === key);
+      const relatedTechs = entry?.[2] || [];
+      if (relatedTechs.length) {
+        setTechStates((prev) => {
+          const updated = { ...prev };
+          for (const t of relatedTechs) {
+            if (!updated[t]) updated[t] = "selected";
+          }
+          localStorage.setItem("jobWatcherTechStates", JSON.stringify(updated));
+          return updated;
+        });
+      }
+    }
   };
 
   /* Egyetlen aktív kategória-szűrő eltávolítása (az "aktívak" összegző sorból) */

@@ -34,7 +34,7 @@ function kwRegex(kw) {
 // szabályok után, ha még mindig több kategória maradt. A frontend
 // getCategoriesForJob-bal SZINKRONBAN tartandó (src/JobWatcher.jsx).
 const CATEGORY_PRIORITY = [
-  "C++", "DevOps", "Security", "Data / AI", "Elemző / Analyst",
+  "DevOps", "Security", "Data / AI", "Elemző / Analyst",
   "QA / Tesztelő", "Mobil", "Menedzser / PM", "Webfejlesztés",
   "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
 ];
@@ -71,11 +71,6 @@ function categorizeJobs(rows, JOB_CATEGORIES) {
     // Ha több kategória matchelt és az egyik DevOps → csak DevOps
     if (matches.length > 1 && matches.includes("DevOps")) {
       counts["DevOps"]++;
-      continue;
-    }
-    // Ha több kategória matchelt és az egyik C++ → csak C++
-    if (matches.length > 1 && matches.includes("C++")) {
-      counts["C++"]++;
       continue;
     }
     // Fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen

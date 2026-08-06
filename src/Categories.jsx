@@ -18,6 +18,12 @@ const Categories = () => {
   // Keyword hozzáadás meglévő kategóriához
   const [addingKeyword, setAddingKeyword] = useState({}); // { [id]: inputValue }
 
+  // Kapcsolódó technológia hozzáadás meglévő kategóriához — csak a
+  // canonical TECH_KEYWORDS címkék közül választható (datalist), mert a
+  // backend úgyis eldobja, ami nincs a listán (ld. categories.js VALID_TECH_LABELS).
+  const [addingTech, setAddingTech] = useState({}); // { [id]: inputValue }
+  const [allTechLabels, setAllTechLabels] = useState([]);
+
   // Kiválasztott kategória
   const [selectedId, setSelectedId] = useState(null);
 
@@ -42,6 +48,13 @@ const Categories = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    fetch("/.netlify/functions/jobs/technologies")
+      .then((res) => res.json())
+      .then((data) => { if (Array.isArray(data)) setAllTechLabels(data); })
+      .catch(() => setAllTechLabels([]));
+  }, []);
 
   // Új kategória hozzáadása
   const addCategory = async () => {
@@ -101,7 +114,7 @@ const Categories = () => {
       const res = await adminFetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: item.name, keywords: item.keywords }),
+        body: JSON.stringify({ name: item.name, keywords: item.keywords, technologies: item.technologies }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -181,10 +194,65 @@ const Categories = () => {
     }
   };
 
+  // Kapcsolódó technológia törlése egy kategóriából
+  const removeTechnology = async (cat, tech) => {
+    setError(null);
+    const updated = (cat.technologies || []).filter((t) => t !== tech);
+    try {
+      const res = await adminFetch(API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: cat.id, technologies: updated }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+      setCategories((prev) => prev.map((c) => (c.id === cat.id ? data : c)));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  // Kapcsolódó technológia hozzáadása egy kategóriához — csak a canonical
+  // listán szereplő címkéket fogadja el (a datalist ezt kínálja fel, de a
+  // felhasználó szabadon is beírhat bármit, ezért itt is kiszűrjük).
+  const addTechnology = async (cat) => {
+    const input = (addingTech[cat.id] || "").trim();
+    if (!input) return;
+    setError(null);
+    const validLower = new Map(allTechLabels.map((t) => [t.toLowerCase(), t]));
+    const newTechs = input
+      .split(",")
+      .map((t) => validLower.get(t.trim().toLowerCase()))
+      .filter(Boolean);
+    if (newTechs.length === 0) {
+      setError(`Nincs ilyen technológia: "${input}"`);
+      return;
+    }
+    const existing = cat.technologies || [];
+    const merged = [...existing, ...newTechs.filter((t) => !existing.includes(t))];
+    try {
+      const res = await adminFetch(API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: cat.id, technologies: merged }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+      setCategories((prev) => prev.map((c) => (c.id === cat.id ? data : c)));
+      setAddingTech((prev) => ({ ...prev, [cat.id]: "" }));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
   const selectedCat = categories.find((c) => c.id === selectedId);
 
   return (
     <div className="filters-page">
+      <datalist id="category-tech-options">
+        {allTechLabels.map((t) => <option key={t} value={t} />)}
+      </datalist>
+
       <div className="filters-header">
         <h1>Kategóriák</h1>
         <button className="filters-btn" onClick={() => navigate("/allasfigyelo")}>← Vissza</button>
@@ -269,6 +337,39 @@ const Categories = () => {
                   onKeyDown={(e) => e.key === "Enter" && addKeyword(selectedCat)}
                 />
                 <button className="filters-btn" onClick={() => addKeyword(selectedCat)}>+</button>
+              </div>
+
+              <h3 className="filter-group-title" style={{ marginTop: 20, fontSize: 15 }}>
+                Kapcsolódó technológiák ({(selectedCat.technologies || []).length})
+              </h3>
+              <p className="filters-status" style={{ margin: "0 0 8px", fontSize: 13 }}>
+                Ha a látogató ezt a kategóriát választja, ezek a technológia-szűrők
+                is automatikusan bekerülnek.
+              </p>
+              <div className="filter-chips">
+                {(selectedCat.technologies || []).map((t) => (
+                  <span key={t} className="filter-chip">
+                    {t}
+                    <button
+                      className="filter-chip-x"
+                      onClick={() => removeTechnology(selectedCat, t)}
+                      title="Technológia törlése"
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="filter-add-row" style={{ marginTop: 8 }}>
+                <input
+                  className="filter-input"
+                  list="category-tech-options"
+                  placeholder="Technológia hozzáadása (vessző = több)..."
+                  value={addingTech[selectedCat.id] || ""}
+                  onChange={(e) =>
+                    setAddingTech((prev) => ({ ...prev, [selectedCat.id]: e.target.value }))
+                  }
+                  onKeyDown={(e) => e.key === "Enter" && addTechnology(selectedCat)}
+                />
+                <button className="filters-btn" onClick={() => addTechnology(selectedCat)}>+</button>
               </div>
             </div>
           )}
