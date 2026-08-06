@@ -33,6 +33,15 @@ export default withTimeout("cron_experience-background", async () => {
       label: "LinkedIn",
       jobName: "cron_experience-background",
       experienceCondition: "(experience IS NULL OR experience = '-')",
+      // This job runs hourly (:23, see CRON_SCHEDULE.md) but enrichExperience's
+      // default 30-minute first_seen lookback is narrower than that cadence —
+      // rows inserted between :23 and :53 fall in a gap no run's window ever
+      // covers, and a row whose fetch fails (LinkedIn rate-limiting/blocking is
+      // common) never gets a retry once it ages out of a 30-minute window on an
+      // hourly job. 180 minutes gives every row ~3 hourly attempts before it
+      // permanently misses technologies/experience enrichment (2026-08-06 user
+      // report: 188/723 active LinkedIn rows had technologies stuck null).
+      intervalMinutes: 180,
     });
   } catch (err) {
     console.error("[cron_experience-background] LinkedIn enrichment failed:", err.message);
