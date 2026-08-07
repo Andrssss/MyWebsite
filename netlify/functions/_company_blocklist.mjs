@@ -34,6 +34,7 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
   "telekom hu",
   "deutsche telekom",
   "poetry cove",
+  "egis pharmaceuticals plc",
 ];
 
 // talent-only (user-döntés 2026-08-04): ezek a cégek a talent.hu-n cím szerint
