@@ -6,8 +6,8 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isSeniorExperience } from "./_experience_core.mjs";
+import { extractBodyExperience } from "./_experience_core.mjs";
+import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 
 let _filters = [];
 
@@ -282,148 +282,81 @@ async function fetchNofluffExperience(url) {
   try {
     const html = await fetchText(url);
     const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
-    return {
-      experience: extractBodyExperience(normalizedHtml) || null,
-      technologies: extractTechnologies(normalizedHtml),
-    };
+    return extractBodyExperience(normalizedHtml) || null;
   } catch (err) {
     await logFetchError("cron_jobs_NOFLUFFJOBS", { url, message: `nofluff experience: ${err.message}` });
-    return { experience: null, technologies: null };
+    return null;
   }
 }
 
 /* ── DB ──────────────────────────────────────────────────────── */
 
-// /hu/job/{slug} — reposts of the same ad get a SMALL trailing counter
-// (…siemens-mobility-kft--budapest → …--budapest-1; DB shows -1…-13), so the
-// counterless and countered slugs are the same posting over time. Only tails of
-// 1-3 digits count as counters — a 4-digit tail like "-2026" is part of the
-// title (graduate programs) and must NOT be merged across years.
-function volatileUrlPattern(url) {
-  const m = url.match(/^(.*)-\d{1,3}$/);
-  const base = m ? m[1] : url;
-  return `^${escapeRegex(base)}(-\\d{1,3})?$`;
-}
-
 async function upsertJob(client, item) {
-  // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
-  // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
-  // esetén a meglévő sor változatlan marad.
+  const canonicalUrl = normalizeUrl(item.url);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, technologies, first_seen)
+      (source, title, url, canonical_url, experience, company, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url) DO NOTHING;`,
-    ["nofluffjobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
+     ON CONFLICT (source, url)
+        DO NOTHING;`,
+    ["nofluffjobs", item.title, item.url, canonicalUrl, item.experience ?? "-", item.company || null]
   );
 }
 
 /* ── main scrape ─────────────────────────────────────────────── */
 
-// SSR renders at most ~20 list items per page; totalPages comes from the
-// embedded transfer state. Cap the walk so a parser glitch can't loop forever.
-const MAX_LIST_PAGES = 5;
-
 async function scrapeNofluffjobs(client) {
   const seen = new Set();
   let totalUpserted = 0;
-  const foundUrls = [];
-  const allItems = [];
 
   for (const sourceUrl of NOFLUFF_SOURCES) {
-    let totalPages = 1;
-    for (let page = 1; page <= Math.min(totalPages, MAX_LIST_PAGES); page++) {
-      const pageUrl = page === 1 ? sourceUrl : `${sourceUrl}&page=${page}`;
-      console.log(`[nofluffjobs] Fetching: ${pageUrl}`);
-      let html;
-      try {
-        html = await fetchText(pageUrl);
-      } catch (err) {
-        await logFetchError("cron_jobs_NOFLUFFJOBS", { url: pageUrl, message: err.message });
-        console.error(`[nofluffjobs] Fetch failed: ${err.message}`);
-        break;
-      }
+    console.log(`[nofluffjobs] Fetching: ${sourceUrl}`);
+    let html;
+    try {
+      html = await fetchText(sourceUrl);
+    } catch (err) {
+      await logFetchError("cron_jobs_NOFLUFFJOBS", { url: sourceUrl, message: err.message });
+      console.error(`[nofluffjobs] Fetch failed: ${err.message}`);
+      continue;
+    }
 
-      if (page === 1) {
-        const tp = html.match(/"totalPages"\s*:\s*(\d+)/);
-        if (tp) totalPages = parseInt(tp[1], 10) || 1;
-      }
+    const generic = extractCandidates(html, sourceUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
+    const ssr = extractSSR(html, sourceUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
+    let merged = mergeCandidates(generic, ssr);
+    console.log(`[nofluffjobs]   generic=${generic.length} ssr=${ssr.length} merged=${merged.length}`);
 
-      const generic = extractCandidates(html, pageUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
-      const ssr = extractSSR(html, pageUrl).filter((c) => looksLikeNofluffJobUrl(c.url));
-      let merged = mergeCandidates(generic, ssr);
-      console.log(`[nofluffjobs]   page ${page}/${totalPages}: generic=${generic.length} ssr=${ssr.length} merged=${merged.length}`);
+    // dedupe across source URLs
+    merged = merged.filter((c) => {
+      const u = normalizeUrl(c.url);
+      if (seen.has(u)) return false;
+      seen.add(u);
+      return true;
+    });
 
-      // dedupe across source URLs and pages
-      merged = merged.filter((c) => {
-        const u = normalizeUrl(c.url);
-        if (seen.has(u)) return false;
-        seen.add(u);
+    // clean & senior filter
+    merged = merged
+      .map((c) => ({ ...c, title: cleanJobTitle(c.title) ?? c.title }))
+      .filter((c) => {
+        if (isSeniorLike(c.title)) {
+          console.log(`[nofluffjobs]   [seniorFilter] KISZŰRVE: "${c.title}"`);
+          return false;
+        }
         return true;
       });
 
-      // clean & senior filter
-      merged = merged
-        .map((c) => ({ ...c, title: cleanJobTitle(c.title) ?? c.title }))
-        .filter((c) => {
-          if (isSeniorLike(c.title)) {
-            console.log(`[nofluffjobs]   [seniorFilter] KISZŰRVE: "${c.title}"`);
-            return false;
-          }
-          return true;
-        });
+    console.log(`[nofluffjobs]   after filters: ${merged.length}`);
 
-      console.log(`[nofluffjobs]   after filters: ${merged.length}`);
-      allItems.push(...merged);
-
-      await sleep(1000);
-    }
-  }
-
-  // Upsert AFTER all list pages are collected, so migrateVolatileUrl knows the
-  // FULL current listing (a url still listed must never be renamed away).
-  const currentUrls = allItems.map((c) => c.url);
-
-  // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
-  // insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos UPDATE)
-  // úgysem gyógyulna, a fetch csak elpazarolt kérés lenne.
-  const { rows: knownRows } = await client.query(
-    `SELECT url FROM job_posts
-      WHERE source = 'nofluffjobs' AND url = ANY($1::text[])`,
-    [currentUrls]
-  );
-  const known = new Set(knownRows.map((r) => r.url));
-
-  for (const item of allItems) {
-    if (!known.has(item.url)) {
-      const { experience: exp, technologies } = await fetchNofluffExperience(item.url);
+    for (const item of merged) {
+      const exp = await fetchNofluffExperience(item.url);
       if (exp) item.experience = exp;
-      item.technologies = technologies;
       await sleep(400);
+      console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] "${item.title}"`);
+      await upsertJob(client, item);
+      totalUpserted++;
     }
-    if (isSeniorExperience(item.experience)) {
-      console.log(`[nofluffjobs]   SKIP senior exp="${item.experience}" "${item.title}"`);
-      continue;
-    }
-    const migrated = await migrateVolatileUrl(
-      client, "nofluffjobs", item.url, volatileUrlPattern(item.url), currentUrls
-    );
-    if (migrated) console.log(`[nofluffjobs]   MIGRATED url → ${item.url}`);
-    console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] "${item.title}"`);
-    await upsertJob(client, item);
-    foundUrls.push(item.url);
-    totalUpserted++;
-  }
 
-  // complete:false → reactivate-only. The list is criteria-filtered
-  // (trainee/junior) and mixes rotating "recommended" postings into the
-  // results, so absence from it can NOT mean the posting died: live ads get
-  // reclassified to mid/senior and drop off the filtered view (3 ilyen hibás
-  // deaktiválás user-jelzésre, 2026-07-07). Deactivation for this source is
-  // owned by the daily 404-sweep's BANNER_DEAD_SOURCES.nofluffjobs rule,
-  // which reads the posting's own detail-page status.
-  const rc = await reconcileActive(client, "nofluffjobs", foundUrls, { complete: false });
-  console.log(`[nofluffjobs] active reconcile (reactivate-only) — ${JSON.stringify(rc)}`);
+    await sleep(1000);
+  }
 
   return totalUpserted;
 }
@@ -435,9 +368,9 @@ const _runJob = withTimeout("cron_jobs_NOFLUFFJOBS-background", async (request) 
   const client = await pool.connect();
 
   try {
-    await ensureTechnologiesColumn(client);
     const total = await scrapeNofluffjobs(client);
     console.log(`[nofluffjobs] done — ${total} jobs upserted`);
+    await flagCrossDuplicates(client, { days: 2, label: "nofluffjobs" });
   } finally {
     client.release();
   }

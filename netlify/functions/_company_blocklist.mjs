@@ -48,6 +48,7 @@ export const TALENT_ONLY_COMPANY_BLOCKLIST = [
   "Nexperia",
   "OnTheGoSystems",
   "Pixel Systems",
+  "Powerprozesse",
   "Schneider Electric",
   "Siemens",
   "Unisys",

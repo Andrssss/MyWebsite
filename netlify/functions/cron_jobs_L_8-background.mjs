@@ -1,5 +1,5 @@
 export const config = {
-  schedule: "40 4-22 * * *",
+  schedule: "28 4-22 * * *",
 };
 
 import { processLinkedInSources } from "./_linkedin_core.mjs";
