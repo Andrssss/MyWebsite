@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "3,7,11,19,23,27,31,35,39,43,47,51,55,59 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,13,15,17,18,19,21,22 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -32,20 +32,20 @@ import { withTimeout } from "./_error-logger.mjs";
  *   - Other non-LinkedIn jobs also follow 4 min gaps by design.
  */
 const GRID = {
-  3:  [{ name: "cron_jobs_T-background" }],            // talent (~165)
-  7:  [{ name: "cron_jobs_NOFLUFFJOBS-background" }],  // nofluffjobs (~44)
-  11: [{ name: "cron_jobs_RAIFFEISEN-background" }],   // raiffeisen (~10)
-  19: [{ name: "cron_jobs_ALLLOCALJOBS-background" }], // alllocaljobs (~221) — 4 min after profession
-  23: [{ name: "cron_jobs_KH-background" }],           // kh (~9)
-  27: [{ name: "cron_jobs_ERSTE-background" }],        // erste (~7)
-  31: [{ name: "cron_jobs_VALOREBASIS-background" }],  // valorebasis (~2)
-  35: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
-  39: [{ name: "cron_jobs_MIX-background" }],          // kuka/zyntern/dreamjobs (~35)
-  43: [{ name: "cron_jobs_MBH-background" }],          // mbh (~29)
-  47: [{ name: "cron_jobs_PRODIAK-background" }],      // prodiak (~13, IT+Budapest)
-  51: [{ name: "cron_jobs_BLUE-background" }],         // bluebird (~19)
-  55: [{ name: "cron_jobs_DIAK_1-background" }],       // schonherz/minddiak/muisz (~20)
-  59: [{ name: "cron_jobs_F_3-background", body: { startPage: 1 } }], // workly (~17)
+  2:  [{ name: "cron_jobs_T-background" }],            // talent (~165)
+  5:  [{ name: "cron_jobs_NOFLUFFJOBS-background" }],  // nofluffjobs (~44)
+  6: [{ name: "cron_jobs_RAIFFEISEN-background" }],   // raiffeisen (~10)
+  7: [{ name: "cron_jobs_KH-background" }],           // kh (~9)
+  9: [{ name: "cron_jobs_ALLLOCALJOBS-background" }], // alllocaljobs (~221) — 4 min after profession
+  10: [{ name: "cron_jobs_ERSTE-background" }],        // erste (~7)
+  11: [{ name: "cron_jobs_VALOREBASIS-background" }],  // valorebasis (~2)
+  13: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
+  15: [{ name: "cron_jobs_MIX-background" }],          // kuka/zyntern/dreamjobs (~35)
+  17: [{ name: "cron_jobs_MBH-background" }],          // mbh (~29)
+  18: [{ name: "cron_jobs_PRODIAK-background" }],      // prodiak (~13, IT+Budapest)
+  19: [{ name: "cron_jobs_BLUE-background" }],         // bluebird (~19)
+  21: [{ name: "cron_jobs_DIAK_1-background" }],       // schonherz/minddiak/muisz (~20)
+  22: [{ name: "cron_jobs_F_3-background", body: { startPage: 1 } }], // workly (~17)
 };
 
 export default withTimeout("cron_scheduler", async () => {
