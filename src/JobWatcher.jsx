@@ -2000,24 +2000,28 @@ const JobWatcher = () => {
   <div className="job-watcher">
     <div className="job-watcher-header">
       <div>
-          <h1>Automata scraper</h1>
-          <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve az AI agentek, azok reggel futnak, ha van még tokenem.</p>
-          <div className="job-linkedin-notice">
-            <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
-            <p>
-              A LinkedIn állások <strong>~50%-át</strong> tudjuk csak
-              megjeleníteni, mert a publikus API-k erősen korlátozottak.
-            </p>
-          </div>
-          <div className="job-last-deploy">
-            {lastUpdates.length > 0 ? (
-              <span>
-                {`Last git commit: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
-              </span>
-            ) : (
-              <span>Nincs elérhető frissítési dátum.</span>
-            )}
-          </div>
+          {!isRestricted && (
+            <>
+              <h1>Automata scraper</h1>
+              <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve az AI agentek, azok reggel futnak, ha van még tokenem.</p>
+              <div className="job-linkedin-notice">
+                <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
+                <p>
+                  A LinkedIn állások <strong>~50%-át</strong> tudjuk csak
+                  megjeleníteni, mert a publikus API-k erősen korlátozottak.
+                </p>
+              </div>
+              <div className="job-last-deploy">
+                {lastUpdates.length > 0 ? (
+                  <span>
+                    {`Last git commit: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
+                  </span>
+                ) : (
+                  <span>Nincs elérhető frissítési dátum.</span>
+                )}
+              </div>
+            </>
+          )}
 
           {isRestricted && (
             <div className="job-reroute-notice">
