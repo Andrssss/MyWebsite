@@ -7,7 +7,6 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience } from "./_experience_core.mjs";
-import { flagCrossDuplicates } from "./_cross_duplicate.mjs";
 
 let _filters = [];
 
@@ -370,7 +369,6 @@ const _runJob = withTimeout("cron_jobs_NOFLUFFJOBS-background", async (request) 
   try {
     const total = await scrapeNofluffjobs(client);
     console.log(`[nofluffjobs] done — ${total} jobs upserted`);
-    await flagCrossDuplicates(client, { days: 2, label: "nofluffjobs" });
   } finally {
     client.release();
   }
