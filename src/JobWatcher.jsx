@@ -2025,18 +2025,19 @@ const JobWatcher = () => {
 
           {isRestricted && (
             <a
-              className="job-reroute-mega"
+              className="job-reroute-card"
               href="https://pestidev.netlify.app/?fresh=today"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <span className="job-reroute-mega__eyebrow">Az állásfigyelő új otthona</span>
-              <span className="job-reroute-mega__title">
-                MENJ IDE <span className="job-reroute-mega__arrow">👉</span> pestidev.netlify.app
-              </span>
-              <span className="job-reroute-mega__sub">
-                Itt csak a saját jelentkezéseidet nézheted lent — minden friss állás mostantól ott van.
-              </span>
+              <div className="job-reroute-card__text">
+                <span className="job-reroute-card__eyebrow">Job Watcher</span>
+                <h2 className="job-reroute-card__title">Az új állások itt találhatók</h2>
+                <p className="job-reroute-card__sub">
+                  Ez az oldal mostantól csak a saját jelentkezéseidet mutatja lent — a friss állásokat a pestidev.netlify.app-on böngészheted.
+                </p>
+              </div>
+              <span className="job-reroute-card__button">Megnyitás <span aria-hidden="true">→</span></span>
             </a>
           )}
       </div>
@@ -2448,6 +2449,35 @@ const JobWatcher = () => {
       )}
     </div>
     </>
+    )}
+
+    {showAppliedOnly && !loading && visibleJobs.length > 0 && (
+      <button
+        className="job-btn job-btn--export"
+        onClick={() => {
+          const data = visibleJobs.map((job) => ({
+            title: job.title,
+            company: job.company || null,
+            source: job.source,
+            url: job.url,
+            firstSeen: job.firstSeen || null,
+            experience: job.experience || null,
+            technologies: job.technologies || null,
+          }));
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const href = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = href;
+          a.download = `jelentkezeseim-${getTodayLocalDateString()}.json`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(href);
+        }}
+        title="A lenti jelentkezések letöltése JSON fájlként"
+      >
+        ⬇ JSON exportálása
+      </button>
     )}
 
     {loading ? (
