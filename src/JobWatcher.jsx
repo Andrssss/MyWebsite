@@ -1953,6 +1953,20 @@ const JobWatcher = () => {
     );
   }, [preTechJobs, techStates, globalTechCounts, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
 
+  // Az exporthoz mindig a TELJES jelentkezés-lista kell, függetlenül attól,
+  // be van-e kapcsolva a "Jelentkezések" szűrő vagy van-e aktív kereső szó —
+  // ezért ez külön van a visibleJobs-tól, ami mindkettőtől függ.
+  const appliedExportJobs = useMemo(() => {
+    const apiKeys = new Set(preTechJobs.map(jobKeyFor));
+    const onlyCached = Object.entries(appliedCache)
+      .filter(([key]) => appliedKeys.has(key) && !apiKeys.has(key))
+      .map(([, j]) => j);
+    return [
+      ...preTechJobs.filter((j) => appliedKeys.has(jobKeyFor(j))),
+      ...onlyCached,
+    ];
+  }, [preTechJobs, appliedKeys, appliedCache]);
+
   const activeTimeLabel = timeToday
     ? "ma"
     : time7d
@@ -2451,11 +2465,11 @@ const JobWatcher = () => {
     </>
     )}
 
-    {showAppliedOnly && !loading && visibleJobs.length > 0 && (
+    {!loading && appliedExportJobs.length > 0 && (
       <button
         className="job-btn job-btn--export"
         onClick={() => {
-          const data = visibleJobs.map((job) => ({
+          const data = appliedExportJobs.map((job) => ({
             title: job.title,
             company: job.company || null,
             source: job.source,
