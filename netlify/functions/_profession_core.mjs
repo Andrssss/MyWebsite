@@ -8,6 +8,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
+import { isBlockedCompany } from "./_company_blocklist.mjs";
 
 let _filters = [];
 
@@ -668,6 +669,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
   }
 
   let matchedList = merged.filter((c) => !isSeniorLike(c.title, c.description));
+  matchedList = matchedList.filter((c) => !isBlockedCompany(c.company, source));
 
   // Csak budapesti állások kellenek. A kiszűrt sorok a foundUrls-ból is kimaradnak,
   // így a reconcile sem élesztheti újra egy korábban bekerült vidéki hirdetés sorát.

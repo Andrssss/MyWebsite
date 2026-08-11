@@ -35,7 +35,17 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
   "deutsche telekom",
   "poetry cove",
   "egis pharmaceuticals plc",
+  "bosch hungary",
 ];
+
+// profession-intern-only (user-döntés 2026-08-11): a "Mind-Diák Szövetkezet"
+// egy diákmunka-közvetítő, a hirdetéseit generikus " - diákmunka" cím alatt
+// teszi közzé — ugyanaz az állás a valódi munkáltató nevén már bekerül a
+// minddiak forrásból (pl. KUKA, MET, BlackRock). A meglévő cím-alapú dedupe
+// (lásd _profession_core.mjs stripped-title check) csak akkor talál, ha a
+// minddiak-sor MÁR a DB-ben van a profession-intern scrape idején — sorrendtől
+// függő, nem megbízható — ezért itt is blokkoljuk céggel.
+export const PROFESSION_INTERN_COMPANY_BLOCKLIST = ["Mind-Diák Szövetkezet"];
 
 // talent-only (user-döntés 2026-08-04): ezek a cégek a talent.hu-n cím szerint
 // 100%-ban duplikálják a saját LinkedIn-hirdetéseiket (minden talent-sorukhoz
@@ -59,6 +69,7 @@ const LISTS_BY_SOURCE = {
   alllocaljobs: COMPANY_BLOCKLIST,
   allasportal: COMPANY_BLOCKLIST,
   LinkedIn: LINKEDIN_COMPANY_BLOCKLIST,
+  "profession-intern": PROFESSION_INTERN_COMPANY_BLOCKLIST,
 };
 
 function normalizeText(s) {
