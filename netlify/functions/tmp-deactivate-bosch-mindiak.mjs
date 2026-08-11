@@ -5,14 +5,13 @@
 // under the real employer name). Deploy -> invoke -> delete this file.
 
 import { Pool } from "pg";
-import { withDbAuditFlush } from "./_db_audit.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 const TOKEN = "bosch-mindiak-cleanup-3f9e71ac2b0d";
 
-export default withDbAuditFlush("tmp-deactivate-bosch-mindiak", async (request) => {
+export default async (request) => {
   const auth = (request.headers.get("authorization") || "").trim();
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   if (token !== TOKEN) return new Response("Unauthorized", { status: 401 });
@@ -36,4 +35,4 @@ export default withDbAuditFlush("tmp-deactivate-bosch-mindiak", async (request) 
   } finally {
     client.release();
   }
-});
+};
