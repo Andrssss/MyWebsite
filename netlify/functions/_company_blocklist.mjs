@@ -36,6 +36,8 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
   "poetry cove",
   "egis pharmaceuticals plc",
   "bosch hungary",
+  "kuka",
+  "kuka systems gmbh branch office paris",
 ];
 
 // profession-intern-only (user-döntés 2026-08-11): a "Mind-Diák Szövetkezet"
