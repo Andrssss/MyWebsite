@@ -2024,23 +2024,20 @@ const JobWatcher = () => {
           )}
 
           {isRestricted && (
-            <div className="job-reroute-hero">
-              <div className="job-reroute-hero__icon">📦</div>
-              <div className="job-reroute-hero__body">
-                <h2 className="job-reroute-hero__title">Az új állások böngészése átköltözött</h2>
-                <p className="job-reroute-hero__text">
-                  Friss pozíciókat mostantól a pestidev-en találsz. Ez az oldal továbbra is mutatja a saját jelentkezéseidet lent.
-                </p>
-                <a
-                  className="job-reroute-hero__cta"
-                  href="https://pestidev.netlify.app/?fresh=today"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Ugrás a pestidev.netlify.app-ra <span aria-hidden="true">→</span>
-                </a>
-              </div>
-            </div>
+            <a
+              className="job-reroute-mega"
+              href="https://pestidev.netlify.app/?fresh=today"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span className="job-reroute-mega__eyebrow">Az állásfigyelő új otthona</span>
+              <span className="job-reroute-mega__title">
+                MENJ IDE <span className="job-reroute-mega__arrow">👉</span> pestidev.netlify.app
+              </span>
+              <span className="job-reroute-mega__sub">
+                Itt csak a saját jelentkezéseidet nézheted lent — minden friss állás mostantól ott van.
+              </span>
+            </a>
           )}
       </div>
 
