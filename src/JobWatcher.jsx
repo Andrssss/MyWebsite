@@ -677,6 +677,14 @@ const JobWatcher = () => {
   const manualCardRef = useRef(null);
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
   const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
+  // New-postings browsing moved to https://pestidev.netlify.app — ordinary
+  // visitors here only keep their existing "jelentkeztem" list. Admins (both
+  // tiers) are untouched, since they still manage the data from this site.
+  const isRestricted = !isAdmin && !isLittleAdmin;
+
+  useEffect(() => {
+    if (isRestricted) setShowAppliedOnly(true);
+  }, [isRestricted]);
 
   // One-time local migration of legacy title-keyed marks to url keys
   // (matters for non-admins, whose marks live only in localStorage).
@@ -2010,8 +2018,22 @@ const JobWatcher = () => {
               <span>Nincs elérhető frissítési dátum.</span>
             )}
           </div>
+
+          {isRestricted && (
+            <div className="job-reroute-notice">
+              <span className="job-reroute-notice__title">📦 Új állások máshol</span>
+              <p>
+                Az új állások böngészése átköltözött ide:{" "}
+                <a href="https://pestidev.netlify.app/?fresh=today" target="_blank" rel="noopener noreferrer">
+                  pestidev.netlify.app
+                </a>
+                . Itt továbbra is megnézheted a saját jelentkezéseidet lent.
+              </p>
+            </div>
+          )}
       </div>
 
+      {!isRestricted && (
       <div className="job-actions">
         <div className="job-search-wrap">
           <span className="job-search-icon" aria-hidden="true">🔍</span>
@@ -2256,8 +2278,11 @@ const JobWatcher = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
 
+    {!isRestricted && (
+    <>
     {/* ===== SZŰRŐK VÁLASZTÓ =====
         Ugyanaz a minta, mint a Szint/Frissesség soroké fentebb: sötét kártya,
         zöld nagybetűs címke, utána lapos pill-gombok. A Források/Kategóriák/
@@ -2414,6 +2439,8 @@ const JobWatcher = () => {
         </div>
       )}
     </div>
+    </>
+    )}
 
     {loading ? (
       <div className="job-status">Betöltés…</div>
