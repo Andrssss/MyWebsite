@@ -2482,32 +2482,37 @@ const JobWatcher = () => {
     )}
 
     {!loading && appliedExportJobs.length > 0 && (
-      <button
-        className="job-btn job-btn--export"
-        onClick={() => {
-          const data = appliedExportJobs.map((job) => ({
-            title: job.title,
-            company: job.company || null,
-            source: job.source,
-            url: job.url,
-            firstSeen: job.firstSeen || null,
-            experience: job.experience || null,
-            technologies: job.technologies || null,
-          }));
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-          const href = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = href;
-          a.download = `jelentkezeseim-${getTodayLocalDateString()}.json`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(href);
-        }}
-        title="A lenti jelentkezések letöltése JSON fájlként"
-      >
-        ⬇ JSON exportálása
-      </button>
+      <div className="job-export-wrap">
+        <button
+          className="job-btn job-btn--export"
+          onClick={() => {
+            const data = appliedExportJobs.map((job) => ({
+              title: job.title,
+              company: job.company || null,
+              source: job.source,
+              url: job.url,
+              firstSeen: job.firstSeen || null,
+              experience: job.experience || null,
+              technologies: job.technologies || null,
+            }));
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const href = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = href;
+            a.download = `jelentkezeseim-${getTodayLocalDateString()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(href);
+          }}
+          title="A jelentkezéseid letöltése JSON fájlként, hogy átimportálhasd a pestidev.netlify.app oldalra"
+        >
+          ⬇ JSON exportálása
+        </button>
+        <span className="job-export-hint">
+          Ezzel importálhatod a jelentkezéseidet a pestidev.netlify.app oldalra.
+        </span>
+      </div>
     )}
 
     {loading ? (

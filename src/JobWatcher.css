@@ -545,9 +545,21 @@
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
+.job-export-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
 .job-btn--export {
   display: inline-block;
-  margin: 0 0 14px;
+}
+
+.job-export-hint {
+  font-size: 0.85rem;
+  color: #9aa4b8;
 }
 
 .job-btn:hover:not(:disabled) {
