@@ -660,6 +660,7 @@ const JobWatcher = () => {
   const [highlightedKeys, setHighlightedKeys] = useState(() => loadHighlightedKeys());
   const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
   const [showAppliedOnly, setShowAppliedOnly] = useState(false);
+  const [showHiddenOnly, setShowHiddenOnly] = useState(false);
 
   const [manualAppliedTitle, setManualAppliedTitle] = useState("");
   const [manualAppliedSource, setManualAppliedSource] = useState("");
@@ -1914,6 +1915,10 @@ const JobWatcher = () => {
       );
     }
 
+    if (showHiddenOnly) {
+      list = list.filter((j) => j.hidden === true);
+    }
+
     if (showAppliedOnly) {
       const apiKeys = new Set(list.map(jobKeyFor));
 
@@ -1951,7 +1956,7 @@ const JobWatcher = () => {
       (a, b) =>
         new Date(b.firstSeen || 0) - new Date(a.firstSeen || 0)
     );
-  }, [preTechJobs, techStates, globalTechCounts, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
+  }, [preTechJobs, techStates, globalTechCounts, showHiddenOnly, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
 
   // Az exporthoz mindig a TELJES jelentkezés-lista kell, függetlenül attól,
   // be van-e kapcsolva a "Jelentkezések" szűrő vagy van-e aktív kereső szó —
@@ -2111,6 +2116,17 @@ const JobWatcher = () => {
           >
             {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
           </button>
+          {(isAdmin || isLittleAdmin) && (
+            <button
+              className={`job-btn job-btn--toggle${showHiddenOnly ? " active" : ""}`}
+              onClick={() => setShowHiddenOnly((v) => !v)}
+              title="Csak a manuálisan elrejtett állások mutatása"
+            >
+              {showHiddenOnly
+                ? `✓ Rejtettek (${jobs.filter((j) => j.hidden === true).length})`
+                : `🚫 Rejtettek (${jobs.filter((j) => j.hidden === true).length})`}
+            </button>
+          )}
           <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
            📊 Statisztikák
           </button>
