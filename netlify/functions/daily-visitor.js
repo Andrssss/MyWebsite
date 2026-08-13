@@ -143,6 +143,19 @@ exports.handler = withDbAuditFlush("daily-visitor", async (event) => {
 
   try {
     const visitorType = getVisitorType(visitorId);
+
+    // Admin ne kerüljön a daily_visitors táblába egyáltalán — a saját
+    // látogatásai ne torzítsák a naplózott sorokat (a MAU lekérdezés amúgy is
+    // csak 'user'-t számol, de a nyers napi log is maradjon admin-mentes).
+    if (visitorType === "admin") {
+      return jsonResponse(200, {
+        ok: true,
+        inserted: false,
+        visitorType,
+        visitDate: new Date().toISOString().slice(0, 10),
+      });
+    }
+
     const rawOrigin = (event.headers?.origin || event.headers?.referer || "").trim();
     let site = null;
     try {

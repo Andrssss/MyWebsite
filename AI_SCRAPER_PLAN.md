@@ -64,6 +64,17 @@ career-page list — it does **not** grant control of the ~30 background scraper
 would. Both `ai-registry.mjs` and `ai-ingest.mjs` accept `AI_INGEST_TOKEN` and fall back to
 `CRON_SECRET`. Rotate by changing the Netlify env var and the routine's prompt together.
 
+**Deactivating a live finding (2026-08-13):** the routine sometimes verifies during a run that a row it
+(or an earlier run) already inserted is dead — a cross-platform duplicate, a since-filled posting, a
+senior-level miss a live re-check caught. It still has no DB credential, so instead of asking for one,
+`ai-deactivate.mjs` (same `AI_INGEST_TOKEN`/`CRON_SECRET` auth as the other two) accepts
+`POST {"urls": [...], "reason": "..."}` and sets `active=false, sweep_dead=true` on matching rows —
+**scoped to `source = 'AI-scraped'` only**, so even a leaked token or a bad LLM call can never touch any
+other scraper's rows. It does not attempt to add new BANNER_DEAD_SOURCES-style dead-page detection for
+eightfold.ai/Workday-style ATS shells (no reliable closed-status signal was found live for either); this
+endpoint is the routine's own escape hatch for one-off cases it already verified by hand, not a general
+sweep mechanism.
+
 No auto-deploy side effect anymore — the routine no longer pushes to `main`, so the "production deploy
 every 5 hours" consequence noted in §0.1 is gone.
 
