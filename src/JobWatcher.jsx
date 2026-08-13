@@ -570,13 +570,17 @@ const JobWatcher = () => {
   const debugMode = new URLSearchParams(window.location.search).has("debug");
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
+  // Set by the cheap identity probe below (limit=1 request) as soon as it
+  // resolves, so little-admin visitors don't need the full jobs payload just
+  // to unlock the rest of their fetches.
+  const [littleAdminProbed, setLittleAdminProbed] = useState(false);
   // Admin-only controls are gated on a SERVER-CONFIRMED signal, not on the local
   // cookie: jobs.js sends the `hidden` column to little-admin and to nobody else,
   // so its mere presence proves the server validated the key. Faking the cookie
   // client-side yields a response without `hidden` → the controls stay hidden.
   const isLittleAdmin = useMemo(
-    () => jobs.some((j) => typeof j.hidden === "boolean"),
-    [jobs]
+    () => littleAdminProbed || jobs.some((j) => typeof j.hidden === "boolean"),
+    [littleAdminProbed, jobs]
   );
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
@@ -686,6 +690,32 @@ const JobWatcher = () => {
   useEffect(() => {
     if (isRestricted) setShowAppliedOnly(true);
   }, [isRestricted]);
+
+  // Ordinary visitors no longer need the admin-only data (sources/categories/
+  // technologies/last-deploy/full jobs list) — this page just points them to
+  // pestidev.netlify.app now, they only need their own "jelentkeztem" list.
+  // But little-admin status can ONLY be confirmed by the server (via the
+  // `hidden` column on a jobs response), so a single minimal probe still runs
+  // for everyone not already known to be admin — cheap enough (limit=1) to be
+  // worth keeping so little-admin devices keep unlocking automatically.
+  useEffect(() => {
+    if (isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/jobs?limit=1`);
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data) && data.some((j) => typeof j.hidden === "boolean")) {
+          setLittleAdminProbed(true);
+        }
+      } catch {
+        // ordinary visitor, or probe failed — stays restricted
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
 
   // One-time local migration of legacy title-keyed marks to url keys
   // (matters for non-admins, whose marks live only in localStorage).
@@ -1087,6 +1117,7 @@ const JobWatcher = () => {
   }, []);
 
   useEffect(() => {
+    if (!isAdmin && !isLittleAdmin) return;
     fetch("/.netlify/functions/last-deploy")
       .then((r) => r.json())
       .then((data) => {
@@ -1098,7 +1129,7 @@ const JobWatcher = () => {
         );
       })
       .catch(() => {});
-  }, []);
+  }, [isAdmin, isLittleAdmin]);
 
   /* =======================
      FETCH
@@ -1195,14 +1226,19 @@ const JobWatcher = () => {
   };
 
   useEffect(() => {
+    if (!isAdmin && !isLittleAdmin) return;
     fetchSources();
     fetchCategories();
     fetchTechnologies();
-  }, []);
+  }, [isAdmin, isLittleAdmin]);
 
   useEffect(() => {
+    if (!isAdmin && !isLittleAdmin) {
+      setLoading(false);
+      return;
+    }
     fetchJobs(time24h, time7d, false, timeToday);
-  }, [time24h, time7d, timeToday]);
+  }, [isAdmin, isLittleAdmin, time24h, time7d, timeToday]);
 
   /* Források/Kategóriák/Technológiák közül csak egy lehet nyitva egyszerre —
      az egyik megnyitása a másik kettőt automatikusan csukja. */
