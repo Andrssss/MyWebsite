@@ -670,7 +670,7 @@ const JobWatcher = () => {
   const manualCardRef = useRef(null);
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
   const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
-  // New-postings browsing moved to https://pestidev.netlify.app — ordinary
+  // New-postings browsing moved to https://pestidev.hu — ordinary
   // visitors here only keep their existing "jelentkeztem" list. Admins (both
   // tiers) are untouched, since they still manage the data from this site.
   const isRestricted = !isAdmin && !isLittleAdmin;
@@ -681,7 +681,7 @@ const JobWatcher = () => {
 
   // Ordinary visitors no longer need the admin-only data (sources/categories/
   // technologies/last-deploy/full jobs list) — this page just points them to
-  // pestidev.netlify.app now, they only need their own "jelentkeztem" list.
+  // pestidev.hu now, they only need their own "jelentkeztem" list.
   // But little-admin status can ONLY be confirmed by the server (via the
   // `hidden` column on a jobs response), so a single minimal probe still runs
   // for everyone not already known to be admin — cheap enough (limit=1) to be
@@ -2046,16 +2046,16 @@ const JobWatcher = () => {
               <span className="job-reroute-hero__arrow" aria-hidden="true">➡️</span>
               <h1 className="job-reroute-hero__title">Új állásokat keresel?</h1>
               <p className="job-reroute-hero__text">
-                A böngészés átköltözött a <strong>pestidev.netlify.app</strong> oldalra. Ez az
+                A böngészés átköltözött a <strong>pestidev.hu</strong> oldalra. Ez az
                 oldal mostantól csak a saját jelentkezéseidet mutatja lent.
               </p>
               <a
                 className="job-reroute-hero__cta"
-                href="https://pestidev.netlify.app/?fresh=today"
+                href="https://pestidev.hu/?fresh=today"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Ugrás: pestidev.netlify.app →
+                Ugrás: pestidev.hu →
               </a>
             </header>
           )}
@@ -2505,12 +2505,12 @@ const JobWatcher = () => {
             a.remove();
             URL.revokeObjectURL(href);
           }}
-          title="A jelentkezéseid letöltése JSON fájlként, hogy átimportálhasd a pestidev.netlify.app oldalra"
+          title="A jelentkezéseid letöltése JSON fájlként, hogy átimportálhasd a pestidev.hu oldalra"
         >
           ⬇ JSON exportálása
         </button>
         <span className="job-export-hint">
-          Ezzel importálhatod a jelentkezéseidet a pestidev.netlify.app oldalra.
+          Ezzel importálhatod a jelentkezéseidet a pestidev.hu oldalra.
         </span>
       </div>
     )}
