@@ -2017,7 +2017,7 @@ const JobWatcher = () => {
   return (
   <div className="job-watcher">
     <div className="job-watcher-header">
-      <div>
+      <div className="job-watcher-header__main">
           {!isRestricted && (
             <>
               <h1>Automata scraper</h1>
