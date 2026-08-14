@@ -204,14 +204,15 @@ function resolveExperience(job) {
 /* ── upsert (row fully built BEFORE insert — experience-write-policy) ── */
 
 async function upsertJob(client, source, job, resolvedExperience) {
-  // AI-scraped postings start hidden — this pipeline discovers new sites
-  // automatically with less vetting than a hand-written scraper, so a human
-  // reviews (job-hidden.js un-hide) before it reaches the public board.
+  // AI-scraped postings used to start hidden pending human review
+  // (job-hidden.js un-hide) before reaching the public board — removed
+  // 2026-08-15 (user decision): the routine's own 6-filter vetting is now
+  // trusted to gate quality directly, so new AI findings go live immediately.
   // `hidden` is deliberately absent from the ON CONFLICT SET below: once a row
   // exists, a re-ingest (the same posting found again on a later run) must
   // never re-hide it or re-clobber an admin's un-hide decision — same
   // anti-clobber policy already used here for `experience`.
-  const startsHidden = source === AI_SOURCE;
+  const startsHidden = false;
   await client.query(
     `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen, hidden)
      VALUES ($1,$2,$3,$4,$5,$6,NOW(),$7)
