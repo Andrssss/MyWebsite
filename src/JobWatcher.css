@@ -59,82 +59,62 @@
   font-weight: 800;
 }
 
-.job-reroute-card {
+.job-reroute-hero {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  text-align: center;
+  gap: 14px;
   width: 100%;
   margin-top: 4px;
-  padding: 28px 32px;
-  border-radius: 12px;
-  text-decoration: none;
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.12);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  padding: 48px 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: radial-gradient(circle at top, rgba(99, 102, 241, 0.22), rgba(15, 17, 23, 0.4) 70%);
 }
 
-.job-reroute-card:hover {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 12px 28px rgba(0, 0, 0, 0.16);
-  transform: translateY(-1px);
+.job-reroute-hero__arrow {
+  font-size: 40px;
+  line-height: 1;
 }
 
-.job-reroute-card__text {
-  min-width: 0;
-}
-
-.job-reroute-card__eyebrow {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: #6b7280;
-  margin-bottom: 6px;
-}
-
-.job-reroute-card__title {
-  margin: 0 0 6px;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: -0.2px;
-}
-
-.job-reroute-card__sub {
+.job-reroute-hero__title {
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 800;
   margin: 0;
-  font-size: 0.95rem;
+  background: linear-gradient(135deg, #a5b4fc, #f0abfc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.job-reroute-hero__text {
+  max-width: 560px;
+  font-size: clamp(15px, 2.2vw, 18px);
   line-height: 1.5;
-  color: #4b5563;
-  max-width: 60ch;
+  color: #cbd5e1;
 }
 
-.job-reroute-card__button {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 22px;
-  border-radius: 8px;
-  background: #2f6fed;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 0.95rem;
-  white-space: nowrap;
+.job-reroute-hero__text strong {
+  color: #f8fafc;
 }
 
-@media (max-width: 640px) {
-  .job-reroute-card {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: left;
-    padding: 24px 22px;
-  }
+.job-reroute-hero__cta {
+  margin-top: 8px;
+  padding: 16px 32px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
 
-  .job-reroute-card__button {
-    justify-content: center;
-  }
+.job-reroute-hero__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgba(99, 102, 241, 0.55);
 }
 
 .job-last-deploy {
@@ -1505,23 +1485,6 @@ html, body {
 .social-icons .email-block.open .email-reveal {
   max-width: 250px;
   opacity: 1;
-}
-
-.wau-badge {
-  margin-left: 8px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #9ca3af;
-  font-size: 13px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.wau-badge strong {
-  color: #e5e7eb;
-  font-weight: 600;
 }
 
 .bug-icon-btn {

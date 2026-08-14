@@ -8,10 +8,7 @@ const API_BASE_URL = "/.netlify/functions";
 const TIME_RANGE_24H = "24h";
 const TIME_RANGE_7D = "7d";
 
-const VISITOR_TRACK_API = "/.netlify/functions/daily-visitor";
 const VISITOR_COOKIE_NAME = "jobWatcherVisitorId";
-const DAILY_VISITOR_SENT_KEY = "jobWatcherVisitorSentDate";
-const ONE_MINUTE_MS = 60 * 1000;
 
 const getTodayLocalDateString = () => {
   const now = new Date();
@@ -304,15 +301,6 @@ const saveAppliedCache = (cache) => {
   } catch {
     // silent
   }
-};
-
-const sendDailyVisitor = async (visitorId) => {
-  const res = await fetch(VISITOR_TRACK_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ visitorId }),
-  });
-  if (!res.ok) throw new Error("Visitor tracking request failed");
 };
 
 const hoursSince = (iso) => {
@@ -1090,31 +1078,6 @@ const JobWatcher = () => {
 
   const [lastUpdates, setLastUpdates] = useState([]);
   const [showEmail, setShowEmail] = useState(false);
-  const [monthlyActiveUsers, setMonthlyActiveUsers] = useState(null);
-
-  useEffect(() => {
-    fetch(VISITOR_TRACK_API)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && typeof data.mau === "number") setMonthlyActiveUsers(data.mau);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(async () => {
-      const today = getTodayLocalDateString();
-      if (localStorage.getItem(DAILY_VISITOR_SENT_KEY) === today) return;
-      try {
-        const visitorId = getOrCreateVisitorId();
-        await sendDailyVisitor(visitorId);
-        localStorage.setItem(DAILY_VISITOR_SENT_KEY, today);
-      } catch {
-        // silent fail
-      }
-    }, ONE_MINUTE_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (!isAdmin && !isLittleAdmin) return;
@@ -2079,21 +2042,22 @@ const JobWatcher = () => {
           )}
 
           {isRestricted && (
-            <a
-              className="job-reroute-card"
-              href="https://pestidev.netlify.app/?fresh=today"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <div className="job-reroute-card__text">
-                <span className="job-reroute-card__eyebrow">Job Watcher</span>
-                <h2 className="job-reroute-card__title">Az új állások itt találhatók</h2>
-                <p className="job-reroute-card__sub">
-                  Ez az oldal mostantól csak a saját jelentkezéseidet mutatja lent — a friss állásokat a pestidev.netlify.app-on böngészheted.
-                </p>
-              </div>
-              <span className="job-reroute-card__button">Megnyitás <span aria-hidden="true">→</span></span>
-            </a>
+            <header className="job-reroute-hero">
+              <span className="job-reroute-hero__arrow" aria-hidden="true">➡️</span>
+              <h1 className="job-reroute-hero__title">Új állásokat keresel?</h1>
+              <p className="job-reroute-hero__text">
+                A böngészés átköltözött a <strong>pestidev.netlify.app</strong> oldalra. Ez az
+                oldal mostantól csak a saját jelentkezéseidet mutatja lent.
+              </p>
+              <a
+                className="job-reroute-hero__cta"
+                href="https://pestidev.netlify.app/?fresh=today"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ugrás: pestidev.netlify.app →
+              </a>
+            </header>
           )}
       </div>
 
@@ -2866,15 +2830,6 @@ const JobWatcher = () => {
       >
         <FaLinkedin />
       </a>
-
-      {monthlyActiveUsers !== null && (
-        <span
-          className="wau-badge"
-          title="Visszatérő (legalább 2x látott) egyedi látogatók az elmúlt 30 napban (admin nélkül)"
-        >
-          👥 <strong>{monthlyActiveUsers}</strong>
-        </span>
-      )}
     </div>
 
     {bugOpen && (
