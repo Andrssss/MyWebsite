@@ -21,12 +21,14 @@ import { withTimeout } from "./_error-logger.mjs";
  * otherwise), and Netlify's own scheduled invocation does NOT send that header
  * — so a worker cannot schedule itself. This scheduler holds the secret and
  * POSTs it, exactly like the old dispatcher did. The LinkedIn shards
- * (L_1..L_11) DON'T check the secret, so they stay self-scheduled in their own
+ * (L_1..L_9) DON'T check the secret, so they stay self-scheduled in their own
  * files (re-spaced ~5 min apart) rather than being routed through here.
  *
  * Spacing rules baked into the grid:
- *   - LinkedIn shards are 4 min apart (L_1..L_11), with the experience
- *     backfill at :44 (4 min after the last shard).
+ *   - LinkedIn shards are 4 min apart (L_1..L_9, :00-:32 — was L_1..L_11
+ *     :00-:40 until a 2026-08-18 dedup+merge dropped 2 shards), with the
+ *     experience backfill at :36 (4 min after the last shard, moved back
+ *     from :44 the same day to keep the original gap).
  *   - The profession dispatcher stays at :15 and alllocaljobs is at :19, so
  *     the two have the required 4 min buffer.
  *   - Other non-LinkedIn jobs also follow 4 min gaps by design.

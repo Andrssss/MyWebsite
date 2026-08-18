@@ -165,34 +165,57 @@ function extractJobs(html, categoryUrl) {
   const jobs = [];
   const seen = new Set();
 
-  // Struktúra: h5 = job cím VAGY státusz ("Jelentkezési határidő: ...")
-  const h5els = $("h5").toArray();
+  // Struktúra: cím + státusz ("Jelentkezési határidő: ...") egymást követő
+  // heading elemek. MELYIK tag-et használja (h4 vagy h5) kategória-oldalanként
+  // ÉS akár címen/státuszon belül külön-külön is változik — élőben ellenőrizve
+  // 2026-08-18: csak php-fejlesztoi-allasok és net-fejlesztoi-allasok használ
+  // h5-öt mindkettőhöz, a másik 9 kategória h4-et használ a címhez (státusz
+  // lehet h4 VAGY h5). A régi "csak h5" szelekció ezért 9/11 kategórián NULLA
+  // állást adott vissza — ez okozta, hogy egy ténylegesen nyitott C# állás
+  // (2026-11-15 határidővel, c-fejlesztoi-allasok) sosem került újra beolvasásra
+  // és kiöregedve inaktívvá vált (activation audit finding). Mindkét tag-et
+  // szelektáljuk, dokumentum-sorrendben, tag helyett TARTALOM alapján párosítva.
+  const headEls = $("h4, h5").toArray();
 
-  for (const h5el of h5els) {
-    const titleText = normalizeWhitespace($(h5el).text());
+  for (let i = 0; i < headEls.length; i++) {
+    const el = headEls[i];
+    const titleText = normalizeWhitespace($(el).text());
     if (!titleText) continue;
 
-    // Státusz h5-öket kihagyjuk — csak a cím h5-öket dolgozzuk fel
+    // Státusz elemeket kihagyjuk — csak a cím elemeket dolgozzuk fel
     if (titleText.toLowerCase().includes("jelentkezési határidő")) continue;
 
     // Duplikált cím kiszűrése (az oldal flip-kártya miatt többszöröz)
     if (seen.has(titleText)) continue;
 
-    // Következő h5 — tartalmazza a státuszt
-    const statusEl = $(h5el).nextAll("h5").first();
-    if (!statusEl.length) continue;
-    const statusText = normalizeWhitespace(statusEl.text());
+    // A rákövetkező elem — tartalmaznia kell a státuszt
+    const statusEl = headEls[i + 1];
+    if (!statusEl) continue;
+    const statusText = normalizeWhitespace($(statusEl).text());
     if (!statusText.toLowerCase().includes("jelentkezési határidő")) continue;
 
-    // Szövegtörzs: a cím h5-től a következő cím h5-ig (nem státusz h5)
-    const nextTitleH5 = $(h5el).nextAll("h5").filter((_, el) => {
-      const t = normalizeWhitespace($(el).text()).toLowerCase();
-      return !t.includes("jelentkezési határidő");
-    }).first();
+    // "Jelentkezési határidő: A keresés szünetel" (search paused) replaces the
+    // deadline date when a listing is closed but the card stays on the page —
+    // confirmed live 2026-08-18 (php-fejlesztoi-allasok category, "PHP
+    // FEJLESZTŐ" card). The header comment above always documented this as
+    // step 4 but the check itself was never implemented, so a paused card kept
+    // getting upserted/reconciled as active forever (activation audit finding,
+    // same date).
+    if (normalizeText(statusText).includes("szunetel")) {
+      console.log(`[valorebasis] SKIP szünetel "${titleText}"`);
+      continue;
+    }
 
-    const nextSection = nextTitleH5.length
-      ? $(h5el).nextUntil(nextTitleH5).text()
-      : $(h5el).nextAll().text();
+    // Szövegtörzs: a cím elemtől a következő cím elemig (nem státusz elem)
+    let nextTitleEl = null;
+    for (let j = i + 1; j < headEls.length; j++) {
+      const t = normalizeWhitespace($(headEls[j]).text()).toLowerCase();
+      if (!t.includes("jelentkezési határidő")) { nextTitleEl = headEls[j]; break; }
+    }
+
+    const nextSection = nextTitleEl
+      ? $(el).nextUntil($(nextTitleEl)).text()
+      : $(el).nextAll().text();
 
     // Budapest validáció
     const locMatch = nextSection.match(/Munkavégzés helye[:\s]*([^\n•◦]+)/i);

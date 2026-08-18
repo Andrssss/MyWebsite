@@ -61,7 +61,7 @@ React Router SPA; all routes live in `src/App.jsx` with Hungarian paths: `/targy
 ### Scraper/cron system
 ~30 `cron_jobs_<SOURCE>-background.mjs` Netlify **background** functions ingest into `job_posts`. Scheduling is two-tier (reference doc: `netlify/functions/CRON_SCHEDULE.md`):
 
-- **Directly scheduled** via `export const config = { schedule: "..." }` in-file: LinkedIn shards `cron_jobs_L_1..L_11` (staggered minutes, hours `4-22` UTC), `cron_experience-background.mjs`, `cron_daily_stats.mjs` (23:59), `cron_stats_cleanup.mjs`, `weekly-backup.js`.
+- **Directly scheduled** via `export const config = { schedule: "..." }` in-file: LinkedIn shards `cron_jobs_L_1..L_9` (staggered minutes, hours `4-22` UTC), `cron_experience-background.mjs`, `cron_daily_stats.mjs` (23:59), `cron_stats_cleanup.mjs`, `weekly-backup.js`.
 - **Dispatcher-triggered**: `cron_dispatcher.mjs` (hourly, high-volume sources), `cron_dispatcher_daily.mjs` (14:00 UTC, sources with <10 postings), `cron_dispatcher_test.mjs`, and `cron_jobs_P.mjs` POST to the background workers with `Authorization: Bearer $CRON_SECRET`. Workers reject requests without the secret.
 
 **Scraper invariants — keep these when touching any scraper:**

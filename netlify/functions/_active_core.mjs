@@ -291,7 +291,16 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
 // wherewework (2026-07-22): a dead job 302-redirects to the generic /en/jobs
 // board root (a different path) instead of banner-ing or 404-ing; a live job
 // stays a plain 200 at its own path. Confirmed 6/6 dead + 3/3 live samples.
-export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok", "profession-intern", "wherewework"]);
+// pannondiak (2026-08-18): a dead/unknown job id 302-redirects to /error/nopage,
+// which itself 302-redirects to / (home) — final path "/" always differs from
+// the job's own path. A currently-listed job stays a plain 200 at its own path
+// with zero redirects. Confirmed live: a fresh id pulled from the site's own
+// search API right now (job 3556) loads 200 with no redirect, while the only
+// pre-existing DB row (job 3517, still flagged active) redirects all the way to
+// home — i.e. this activation audit finding IS a real stale-active row, not a
+// false positive from a session/cookie gate (checked with and without cookies +
+// Referer, same result both ways).
+export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok", "profession-intern", "wherewework", "pannondiak"]);
 
 // Sources whose LISTING keeps showing already-closed jobs, so being in
 // foundUrls does not prove a posting is live. For these, reconcileActive's
