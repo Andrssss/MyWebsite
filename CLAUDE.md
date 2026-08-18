@@ -44,6 +44,7 @@ Deploy = push to `main`; Netlify builds per `netlify.toml` (publish `dist`, func
 - `weekly-backups` — `subject_reviews` JSON dumps (despite the name, runs monthly on the 1st, ~10-day retention — `weekly-backup.js`)
 - `ai-scraped-registry` — the AI discovery routine's cross-run memory (checked sites + `lastChecked`, permanently-rejected list, already-found URLs), read/written by `ai-registry.mjs`
 - `zip-jobs` — async Drive-folder ZIP job results (`download-folder-background.mjs` → `download-result.mjs`)
+- `job-posts-archive` — cold storage for `job_posts` rows that have been `active=false` for 60+ days (past both the frontend's 30-day inactive-visibility window and `reviveSweepDead`'s 45-day self-healing window, so nothing live reads them back); one JSON blob per month, written and then deleted from Postgres by `cron_jobposts_cleanup.mjs` — added 2026-08-18 as the table's inactive-row backlog started growing unbounded
 
 **Google Drive** — the actual file storage for subject materials. Reads use rotating API keys (`drive-files`, `list-files-recursive`, `proxy-file`, `download-folder*`); uploads use a service account (`upload-to-drive.js`, setup in `DRIVE_UPLOAD_SETUP.md`).
 
