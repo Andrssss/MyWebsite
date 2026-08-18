@@ -47,13 +47,19 @@ export const config = {
   schedule: "0 3 1 * *", // havonta 1-jén 03:00 UTC (a stats/backup cleanup-ok után)
 };
 
-function budapestDateStamp() {
-  return new Intl.DateTimeFormat("en-CA", {
+// Óra is a névben, hogy egy ugyanaznapi kézi újrafuttatás (pl. tesztelés)
+// ne írja felül az előző futás blobját ugyanazon a napon.
+function budapestDateHourStamp() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Budapest",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date());
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return `${get("year")}-${get("month")}-${get("day")}-${get("hour")}`;
 }
 
 export default withDbAuditFlush("cron_jobposts_cleanup", async function handler() {
@@ -74,8 +80,7 @@ export default withDbAuditFlush("cron_jobposts_cleanup", async function handler(
       return;
     }
 
-    const today = budapestDateStamp();
-    const key = `job-posts-archive-${today}.json`;
+    const key = `job-posts-archive-${budapestDateHourStamp()}.json`;
     const store = getStore(STORE_NAME);
 
     await store.set(
