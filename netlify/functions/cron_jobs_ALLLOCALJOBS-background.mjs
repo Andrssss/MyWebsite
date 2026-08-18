@@ -68,6 +68,15 @@
   random részhalmazt óránként. A session-fetch gépezet (makeJar/fetchWithSession/
   fixLocationEncoding) `_alllocaljobs_core.mjs`-be lett kiemelve, hogy a két
   fájl (ez + a deepsweep) ne két külön, idővel szétdriftelő másolatot tartson.
+
+  ⚠️ 2026-08-18 (user-döntés, élő cég+title átfedés-vizsgálat után: 215 aktív
+  sorból csak 23%-nak volt pontos cég+title egyezése talent/profession/
+  LinkedIn-nel — NEM teljes duplikáció, de a valódi átfedést innentől kiszűrjük
+  insertnél): ÚJ url-eknél, insert előtt, ha egy MÁS forrás AKTÍV sora ugyanarra
+  a normalizált cég+title párra szól, a kártyát kihagyjuk (skippedDuplicateElsewhere).
+  Csak aktív külső sorral hasonlítunk — egy régen lezárt, véletlen egyező cég+title
+  ne nyeljen el egy ma is élő hirdetést. Meglévő (insert előtti) alllocaljobs
+  duplikátumokat ez a run nem törli — arra lásd a retroaktív SQL takarítást.
 */
 
 import { Pool } from "pg";
@@ -185,6 +194,19 @@ function _blacklistRegex(k) {
 function isSeniorLike(title) {
   const n = normalizeText(title);
   return _filters.some((k) => _blacklistRegex(k).test(n));
+}
+
+// Cross-source duplicate check (2026-08-18, user-döntés): ha egy másik forrás
+// AKTÍV sora ugyanarra a cég+title párra szól, az AllLocalJobs-kártyát nem
+// mentjük el — az aggregátor sokszor ugyanazt a hirdetést hordozza, amit
+// talent/profession/LinkedIn/stb. már úgyis felszed. Csak AKTÍV külső sorokkal
+// hasonlítunk (ha ott már lezárt, egy régi, más állásra illő cég+title
+// véletlen egyezés ne nyeljen el egy ma is élő AllLocalJobs hirdetést).
+function normalizeForDedupe(s) {
+  return normalizeText(s).replace(/[^a-z0-9]+/g, " ").trim();
+}
+function dedupeKey(company, title) {
+  return `${normalizeForDedupe(company)}|${normalizeForDedupe(title)}`;
 }
 /* ── extraction ─────────────────────────────────────────────── */
 
@@ -387,6 +409,7 @@ async function scrapeAlllocaljobs(client) {
   let skippedNonIt = 0;
   let skippedDetailBudget = 0;
   let skippedDeadOnArrival = 0;
+  let skippedDuplicateElsewhere = 0;
   const detailDeadline = runStart + DETAIL_DEADLINE_MS;
 
   // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
@@ -396,6 +419,14 @@ async function scrapeAlllocaljobs(client) {
     `SELECT url FROM job_posts WHERE source = 'alllocaljobs'`
   );
   const known = new Set(knownRows.map((r) => r.url));
+
+  const { rows: otherActiveRows } = await client.query(
+    `SELECT company, title FROM job_posts
+     WHERE source <> 'alllocaljobs' AND active = true AND company IS NOT NULL`
+  );
+  const otherActiveKeys = new Set(
+    otherActiveRows.map((r) => dedupeKey(r.company, r.title))
+  );
 
   for (const item of allItems) {
     if (seen.has(item.url)) continue;
@@ -417,6 +448,15 @@ async function scrapeAlllocaljobs(client) {
 
     if (isBlockedCompany(item.company, "alllocaljobs")) {
       skippedCompany++;
+      continue;
+    }
+
+    // Ismert url-eket nem dobjuk ki utólag (insert-only, lásd fejléc) — a
+    // dedupe csak ÚJ soroknál dönt a mentésről, meglévő alllocaljobs sorokat
+    // ez a run nem érinti (azokra lásd a visszamenőleges SQL takarítást).
+    if (!known.has(item.url) && item.company &&
+        otherActiveKeys.has(dedupeKey(item.company, item.title))) {
+      skippedDuplicateElsewhere++;
       continue;
     }
 
@@ -473,6 +513,7 @@ async function scrapeAlllocaljobs(client) {
     `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
     `skipped_nonit=${skippedNonIt}, skipped_detail_budget=${skippedDetailBudget}, ` +
     `skipped_dead_on_arrival=${skippedDeadOnArrival}, ` +
+    `skipped_duplicate_elsewhere=${skippedDuplicateElsewhere}, ` +
     `unique=${foundUrls.length} (raw=${allItems.length}, complete=${allComplete})`
   );
 
