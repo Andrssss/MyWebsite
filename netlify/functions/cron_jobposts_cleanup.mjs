@@ -13,6 +13,15 @@
 // 60 nap biztos tartalékot ad mindkét fölött, úgyhogy ami ide kerül, azt élő
 // kód többé nem olvassa vissza — bátran törölhető a select után.
 //
+// LinkedIn KIVÉTEL (user-döntés 2026-08-18): a LinkedIn sosem használja az
+// active modellt (reconcileActive nem fut rá, ld. jobs.js TIME_BASED_SOURCES
+// / _active_core.mjs) — a sorai gyakorlatilag örökké active=true maradnak,
+// úgyhogy az "active = false" feltétel ŐKET SOHA nem engedné archiválni. A
+// frontend rájuk is ugyanazt a 30 napos first_seen-alapú ablakot alkalmazza
+// (jobs.js), tehát 60 nap után ők is ugyanúgy láthatatlanok — ezért a
+// LinkedIn forrásnál az active flag-től FÜGGETLENÜL archiválunk, kizárólag
+// first_seen alapján. Minden más forrásnál változatlanul active=false kell.
+//
 // A job_posts identitása (source, url) — ez alapján töröljük ugyanazokat a
 // sorokat, amiket archiváltunk (nem egy külön WHERE-újrafuttatással, hogy egy
 // közben (nagyon valószínűtlenül) újraaktivált sort ne törölhessünk).
@@ -32,6 +41,7 @@ const pool = new Pool({
 
 const STORE_NAME = "job-posts-archive";
 const ARCHIVE_AFTER_DAYS = 60;
+const TIME_BASED_ONLY_SOURCES = ["LinkedIn"];
 
 export const config = {
   schedule: "0 3 1 * *", // havonta 1-jén 03:00 UTC (a stats/backup cleanup-ok után)
@@ -51,10 +61,10 @@ export default withDbAuditFlush("cron_jobposts_cleanup", async function handler(
   try {
     const { rows: oldPosts } = await client.query(
       `SELECT * FROM job_posts
-        WHERE active = false
-          AND first_seen < NOW() - make_interval(days => $1::int)
+        WHERE first_seen < NOW() - make_interval(days => $1::int)
+          AND (source = ANY($2::text[]) OR active = false)
         ORDER BY first_seen`,
-      [ARCHIVE_AFTER_DAYS]
+      [ARCHIVE_AFTER_DAYS, TIME_BASED_ONLY_SOURCES]
     );
 
     if (oldPosts.length === 0) {
@@ -88,11 +98,11 @@ export default withDbAuditFlush("cron_jobposts_cleanup", async function handler(
 
     const { rowCount: deleted } = await client.query(
       `DELETE FROM job_posts
-        WHERE active = false
-          AND (source, url) IN (
-            SELECT s, u FROM unnest($1::text[], $2::text[]) AS t(s, u)
-          )`,
-      [sources, urls]
+        WHERE (source, url) IN (
+          SELECT s, u FROM unnest($1::text[], $2::text[]) AS t(s, u)
+        )
+          AND (source = ANY($3::text[]) OR active = false)`,
+      [sources, urls, TIME_BASED_ONLY_SOURCES]
     );
 
     console.log(
