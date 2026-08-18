@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "2,5,6,7,9,10,11,13,15,17,18,19,21,22 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,13,17,18,19,21,22,23 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -21,14 +21,16 @@ import { withTimeout } from "./_error-logger.mjs";
  * otherwise), and Netlify's own scheduled invocation does NOT send that header
  * — so a worker cannot schedule itself. This scheduler holds the secret and
  * POSTs it, exactly like the old dispatcher did. The LinkedIn shards
- * (L_1..L_9) DON'T check the secret, so they stay self-scheduled in their own
+ * (L_1..L_8) DON'T check the secret, so they stay self-scheduled in their own
  * files (re-spaced ~5 min apart) rather than being routed through here.
  *
  * Spacing rules baked into the grid:
- *   - LinkedIn shards are 4 min apart (L_1..L_9, :00-:32 — was L_1..L_11
- *     :00-:40 until a 2026-08-18 dedup+merge dropped 2 shards), with the
- *     experience backfill at :36 (4 min after the last shard, moved back
- *     from :44 the same day to keep the original gap).
+ *   - LinkedIn shards are 4 min apart (L_1..L_8, :00-:28 — was L_1..L_11
+ *     :00-:40 before two 2026-08-18 passes: a dup/merge pass dropped 2
+ *     shards, then dropping the non-tech "intern"/bare-"Junior" keywords
+ *     shrank 2 more shards enough to merge again), with the profession
+ *     dispatcher at :30 and the experience backfill at :32 (both moved
+ *     earlier the same days to track the shortened LinkedIn chain).
  *   - The profession dispatcher stays at :15 and alllocaljobs is at :19, so
  *     the two have the required 4 min buffer.
  *   - Other non-LinkedIn jobs also follow 4 min gaps by design.
@@ -41,12 +43,12 @@ const GRID = {
   9: [{ name: "cron_jobs_ALLLOCALJOBS-background" }], // alllocaljobs (~221) — 4 min after profession
   10: [{ name: "cron_jobs_ERSTE-background" }],        // erste (~7)
   11: [{ name: "cron_jobs_VALOREBASIS-background" }],  // valorebasis (~2)
-  13: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
-  15: [{ name: "cron_jobs_MIX-background" }],          // kuka/zyntern/dreamjobs (~35)
+  13: [{ name: "cron_jobs_MIX-background" }],          // kuka/zyntern/dreamjobs (~35)
   17: [{ name: "cron_jobs_MBH-background" }],          // mbh (~29)
   18: [{ name: "cron_jobs_PRODIAK-background" }],      // prodiak (~13, IT+Budapest)
   19: [{ name: "cron_jobs_BLUE-background" }],         // bluebird (~19)
   21: [{ name: "cron_jobs_DIAK_1-background" }],       // schonherz/minddiak/muisz (~20)
+  23: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
   22: [{ name: "cron_jobs_F_3-background", body: { startPage: 1 } }], // workly (~17)
 };
 

@@ -1,9 +1,9 @@
 export const config = {
   // Moved off :15 2026-08-18 — it collided with the scheduler GRID's MIX
-  // slot (both firing at :15, 0 min apart). :34 sits in the otherwise-empty
-  // LinkedIn-only corridor (L_8 :28, L_9 :32, CRON_EX :36), so this doesn't
-  // widen the DB-active window at all.
-  schedule: "34 4-19 * * *",
+  // slot (both firing at :15, 0 min apart). Sits in the otherwise-empty
+  // LinkedIn-only corridor after L_8 (:28) and before CRON_EX (:32); passed
+  // through :34 and :30 the same day before settling on :29.
+  schedule: "29 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
