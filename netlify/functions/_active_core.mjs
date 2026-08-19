@@ -451,6 +451,12 @@ export const BANNER_DEAD_SOURCES = {
   // when expired — SEO pattern, same idea as nofluffjobs — but adds an
   // explicit expiry line the live-page check confirmed is absent otherwise.
   dreamjobs: "már lejárt",
+  // startupjobs (2026-08-19): dead posting answers plain HTTP 200 with
+  // `<h4>This job is no longer available</h4>` — never a 404, so the sweep's
+  // default rule never caught it (see SWEEP_SOLE_DEACTIVATOR_SOURCES comment
+  // above for the "UNVERIFIED" history this closes). Confirmed absent on a
+  // live sample from the same session.
+  startupjobs: "this job is no longer available",
   // kuka/cg-jobstream/wise's ATS renders in the visitor's locale, so both an
   // English and a German "closed" string were seen live; checking either
   // covers kuka specifically (cg-jobstream/wise only showed the English one).
@@ -647,11 +653,12 @@ export const REVIVE_MAX_AGE_DAYS = 45;
 // PUBLISHED in the last 14 days — a time window, not a full current listing —
 // so absence from it never proves a job closed (same reasoning as talent's
 // rotating search results). Its scraper reconciles reactivate-only
-// (complete:false); the 404 sweep's default plain-404 rule is its only
-// deactivator. That default is UNVERIFIED here (no confirmed-dead posting
-// checked yet) — if rows stay stuck active well past closing, check a known-
-// dead startup.jobs page and add a BANNER_DEAD_SOURCES / REDIRECT_DEAD_SOURCES
-// entry instead.
+// (complete:false); the 404 sweep's default plain-404 rule USED TO be its only
+// deactivator. 2026-08-19: confirmed that was insufficient — a dead posting
+// answers HTTP 200 with `<h4>This job is no longer available</h4>`, never a
+// plain 404, so the default rule never fired and rows sat stuck active past
+// closing. Now covered by a BANNER_DEAD_SOURCES entry instead (verified
+// absent on a live sample from the same run).
 export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
   "profession-intern",
   "talent",
