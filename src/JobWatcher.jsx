@@ -719,11 +719,14 @@ const JobWatcher = () => {
   }, []);
 
   // Admins share a single applied/interview list stored in the DB.
-  // Load it on mount and make the DB the source of truth for them.
+  // Load it on mount, and re-sync whenever this tab regains focus — another
+  // device can write to the same shared bucket at any time, and without this
+  // a long-open tab would keep showing a pre-change snapshot indefinitely.
   useEffect(() => {
     if (!isAdmin && !isLittleAdmin) return;
     let cancelled = false;
-    (async () => {
+
+    const loadApplied = async () => {
       try {
         // Ask for the password up front and verify it server-side, so admin
         // status is settled before anything unlocks — not discovered later.
@@ -783,9 +786,20 @@ const JobWatcher = () => {
       } catch {
         // keep whatever is in localStorage
       }
-    })();
+    };
+
+    loadApplied();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadApplied();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, [isAdmin, isLittleAdmin, myVisitorId]);
 
@@ -853,52 +867,65 @@ const JobWatcher = () => {
     }
   };
 
-  const toggleApplied = (key, job) => {
+  // Applies the given applied/interview/cache state to local state + localStorage.
+  const applyAppliedLocal = (key, appliedVal, interviewVal, cacheVal) => {
     setAppliedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-        setAppliedCache((c) => {
-          const { [key]: _, ...rest } = c;
-          saveAppliedCache(rest);
-          return rest;
-        });
-        // Unapplying also clears the interview flag (interview ⊆ applied).
-        setInterviewKeys((iv) => {
-          if (!iv.has(key)) return iv;
-          const n = new Set(iv);
-          n.delete(key);
-          saveInterviewKeys(n);
-          return n;
-        });
-        persistAdminApplied(key, false, false, job);
-      } else {
-        next.add(key);
-        if (job) {
-          setAppliedCache((c) => {
-            const updated = { ...c, [key]: job };
-            saveAppliedCache(updated);
-            return updated;
-          });
-        }
-        persistAdminApplied(key, true, false, job);
-      }
+      if (appliedVal) next.add(key);
+      else next.delete(key);
       saveAppliedKeys(next);
       return next;
     });
-  };
-
-  const toggleInterview = (key, job) => {
     setInterviewKeys((prev) => {
       const next = new Set(prev);
-      const nowInterview = !next.has(key);
-      if (nowInterview) next.add(key);
+      if (interviewVal) next.add(key);
       else next.delete(key);
       saveInterviewKeys(next);
-      // Interview is only tickable on applied jobs, so applied stays true.
-      persistAdminApplied(key, true, nowInterview, job);
       return next;
     });
+    setAppliedCache((c) => {
+      const updated = { ...c };
+      if (cacheVal !== undefined) updated[key] = cacheVal;
+      else delete updated[key];
+      saveAppliedCache(updated);
+      return updated;
+    });
+  };
+
+  // Optimistic like toggleHidden: flips locally first, then rolls back with an
+  // alert if the shared DB write fails — otherwise a failed write silently
+  // leaves the DB row in place while this device shows it as un-saved, and any
+  // other device (or a reload of this one) keeps showing the stale state.
+  const toggleApplied = async (key, job) => {
+    const wasApplied = appliedKeys.has(key);
+    const wasInterview = interviewKeys.has(key);
+    const prevCacheEntry = appliedCache[key];
+    const nextApplied = !wasApplied;
+
+    // Unapplying also clears the interview flag (interview ⊆ applied).
+    applyAppliedLocal(key, nextApplied, false, nextApplied ? job : undefined);
+
+    const ok = await persistAdminApplied(key, nextApplied, false, job);
+    if (!ok) {
+      applyAppliedLocal(key, wasApplied, wasInterview, prevCacheEntry);
+      window.alert("Nem sikerült menteni a jelentkezés állapotát — visszaálltam. Próbáld újra.");
+    }
+  };
+
+  const toggleInterview = async (key, job) => {
+    const wasApplied = appliedKeys.has(key);
+    const wasInterview = interviewKeys.has(key);
+    const prevCacheEntry = appliedCache[key];
+    const nextInterview = !wasInterview;
+
+    // Interview is only tickable on applied jobs, so applied stays true.
+    applyAppliedLocal(key, true, nextInterview, job || prevCacheEntry);
+
+    const ok = await persistAdminApplied(key, true, nextInterview, job);
+    if (!ok) {
+      applyAppliedLocal(key, wasApplied, wasInterview, prevCacheEntry);
+      window.alert("Nem sikerült menteni az interjú állapotát — visszaálltam. Próbáld újra.");
+    }
   };
 
   // Purely local bookmark, no API call — just so a visitor can pick a posting

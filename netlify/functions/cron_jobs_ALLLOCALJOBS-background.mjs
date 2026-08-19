@@ -77,6 +77,32 @@
   Csak aktív külső sorral hasonlítunk — egy régen lezárt, véletlen egyező cég+title
   ne nyeljen el egy ma is élő hirdetést. Meglévő (insert előtti) alllocaljobs
   duplikátumokat ez a run nem törli — arra lásd a retroaktív SQL takarítást.
+
+  ⚠️ 2026-08-19 (user-jelzés: ugyanaz a SnapSoft állás 2 forrásban 7x mentve
+  el): a fenti 08-18-as egyezés a TELJES normalizált cégnevet hasonlította,
+  ami elvéti a "SnapSoft Kft." vs "SnapSoft Informatikai és Szolgáltató Kft."
+  típusú eltérő jogi-alak-formázást — ugyanaz a cég, más string. A cégegyezés
+  mostantól az ELSŐ SZÓRA megy (companyKey), "The"/"the" kivétellel (akkor a
+  MÁSODIK szó számít) — ez a dedupeKey egyetlen közös függvénye, tehát a
+  08-18-as külső-forrás szűrést IS élesebbé teszi, nem csak az itt hozzáadott
+  új szabályt. ÚJ: az alllocaljobs saját magával szembeni ismétlés-szűrése —
+  a site maga is ad ki új url-t (új token) ugyanarra az újra-feladott
+  hirdetésre néhány naponta (megfigyelve: SnapSoft 5x, KFS GROUP 4x,
+  BlackBelt 4x stb., ~26%-a a forrás összes sorának). Ha egy ÚJ url cég+title
+  párja megegyezik egy már AKTÍV alllocaljobs sorral, kihagyjuk
+  (skippedDuplicateRepost) — a régi sor a meglévő grace+confirmDead
+  gépezeten át magától deaktiválódik, ha az újrafeladás tényleg lecserélte.
+
+  ⚠️ 2026-08-19 (később, user-jelzés élő adatokkal: BlackBelt/KFS GROUP/LITIT
+  láncok, MINDEGYIK sor inaktív): a fenti skippedDuplicateRepost csak AKTÍV
+  saját sorral egyező új url-t kap el — a reposztok viszont tipikusan azUTÁN
+  jönnek, hogy a régi sor már a grace lejártával inaktívvá vált, tehát a
+  legtöbb ilyen esetben simán új sorként ment be. Fix: `migrateRepost` — ha az
+  új url cég+title párja egy INAKTÍV saját sorral egyezik, azt a sort
+  mozgatjuk az új url-re (url+active csak, tartalom változatlan — insert-only
+  elv, mint migrateVolatileUrl-nél), NEM új sort szúrunk be. Csak alllocaljobs
+  önmagával szemben fut — cross-source törlést/migrációt a user kifejezetten
+  NEM kért (lásd a retroaktív takarító SQL-t is: csak same-source DELETE).
 */
 
 import { Pool } from "pg";
@@ -205,8 +231,17 @@ function isSeniorLike(title) {
 function normalizeForDedupe(s) {
   return normalizeText(s).replace(/[^a-z0-9]+/g, " ").trim();
 }
+// Első szó szerinti cégegyezés — "SnapSoft Kft." és "SnapSoft Informatikai és
+// Szolgáltató Kft." ugyanaz a cég, csak eltérő jogi-alak-formázással szerepel
+// a két forrásban. "The"/"the" kivétel: akkor a MÁSODIK szó számít.
+function companyKey(company) {
+  const words = normalizeForDedupe(company).split(" ").filter(Boolean);
+  if (!words.length) return "";
+  const idx = words[0] === "the" && words.length > 1 ? 1 : 0;
+  return words[idx];
+}
 function dedupeKey(company, title) {
-  return `${normalizeForDedupe(company)}|${normalizeForDedupe(title)}`;
+  return `${companyKey(company)}|${normalizeForDedupe(title)}`;
 }
 /* ── extraction ─────────────────────────────────────────────── */
 
@@ -296,6 +331,24 @@ async function upsertJob(client, item) {
      ON CONFLICT (source, url) DO NOTHING;`,
     ["alllocaljobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
   );
+}
+
+// Repost-migráció (2026-08-19, user-jelzés): ha egy ÚJ url cég+title párja egy
+// már INAKTÍV alllocaljobs sorral egyezik, azt a régi sort mozgatjuk az új
+// url-re (mint migrateVolatileUrl máshol), NEM új sort szúrunk be — a tartalmi
+// mezőket (title/company/experience/technologies) szándékosan nem írjuk felül,
+// ugyanaz az insert-only elv, mint a migrateVolatileUrl-nél. Csak akkor fut,
+// ha a victim sor a hívás pillanatában még mindig inaktív (verseny-védelem).
+async function migrateRepost(client, newUrl, oldUrl) {
+  const res = await client.query(
+    `UPDATE job_posts
+        SET url = $1, active = true, sweep_dead = false
+      WHERE source = 'alllocaljobs' AND url = $2 AND active = false
+        AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = 'alllocaljobs' AND url = $1)
+      RETURNING id`,
+    [newUrl, oldUrl]
+  );
+  return (res.rowCount ?? 0) > 0;
 }
 
 /* ── main scrape ─────────────────────────────────────────────── */
@@ -410,6 +463,8 @@ async function scrapeAlllocaljobs(client) {
   let skippedDetailBudget = 0;
   let skippedDeadOnArrival = 0;
   let skippedDuplicateElsewhere = 0;
+  let skippedDuplicateRepost = 0;
+  let migratedRepost = 0;
   const detailDeadline = runStart + DETAIL_DEADLINE_MS;
 
   // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
@@ -427,6 +482,38 @@ async function scrapeAlllocaljobs(client) {
   const otherActiveKeys = new Set(
     otherActiveRows.map((r) => dedupeKey(r.company, r.title))
   );
+
+  // Saját-forrásos ismétlés-szűrés (2026-08-19): az alllocaljobs maga is új
+  // url-t ad ki, ha egy cég újra feladja ugyanazt a hirdetést — enélkül minden
+  // újrafeladás új sorként menne be. A halmazt a run alatt is bővítjük, hogy
+  // egyazon futáson belüli, két új url-re eső ismétlés is elkapva legyen.
+  const { rows: ownActiveRows } = await client.query(
+    `SELECT company, title FROM job_posts
+     WHERE source = 'alllocaljobs' AND active = true AND company IS NOT NULL`
+  );
+  const ownActiveKeys = new Set(
+    ownActiveRows.map((r) => dedupeKey(r.company, r.title))
+  );
+
+  // Repost-migráció alapja (2026-08-19): a reposztok tipikusan AZUTÁN jönnek,
+  // hogy a régi sor már inaktívvá vált (a grace lejárt, mire a cég újra
+  // feladja) — az ownActiveKeys ezt sosem kapja el, mert a régi sor addigra
+  // már nem aktív. cég+title kulcsonként a LEGFRISSEBB inaktív sort tartjuk
+  // meg migrálás-jelöltnek; a párosítás felhasználásakor a kulcs törlődik a
+  // térképből, hogy egy futáson belüli 2. új url ne akarja ugyanazt a régi
+  // sort másodszor is elvinni.
+  const { rows: ownInactiveRows } = await client.query(
+    `SELECT url, company, title, first_seen FROM job_posts
+     WHERE source = 'alllocaljobs' AND active = false AND company IS NOT NULL`
+  );
+  const ownInactiveByKey = new Map();
+  for (const r of ownInactiveRows) {
+    const k = dedupeKey(r.company, r.title);
+    const existing = ownInactiveByKey.get(k);
+    if (!existing || new Date(r.first_seen) > new Date(existing.first_seen)) {
+      ownInactiveByKey.set(k, r);
+    }
+  }
 
   for (const item of allItems) {
     if (seen.has(item.url)) continue;
@@ -457,6 +544,12 @@ async function scrapeAlllocaljobs(client) {
     if (!known.has(item.url) && item.company &&
         otherActiveKeys.has(dedupeKey(item.company, item.title))) {
       skippedDuplicateElsewhere++;
+      continue;
+    }
+
+    if (!known.has(item.url) && item.company &&
+        ownActiveKeys.has(dedupeKey(item.company, item.title))) {
+      skippedDuplicateRepost++;
       continue;
     }
 
@@ -501,19 +594,40 @@ async function scrapeAlllocaljobs(client) {
 
     if (known.has(item.url)) {
       alreadyExisted++;
-    } else {
-      newlyInserted++;
-      console.log(`[alllocaljobs] NEW [${item.experience}] "${item.title}" (${item.company ?? "?"})`);
+      await upsertJob(client, item);
+      continue;
     }
+
+    // Repost-migráció: a most élőnek igazolt (fentebb dead-on-arrival ellenőrzött)
+    // új url ugyanarra a cég+title párra szól, mint egy már inaktív saját sor —
+    // azt a sort mozgatjuk erre az url-re, nem szúrunk be újat (lásd migrateRepost).
+    const repostKey = item.company ? dedupeKey(item.company, item.title) : null;
+    const victim = repostKey ? ownInactiveByKey.get(repostKey) : null;
+    if (victim) {
+      const migrated = await migrateRepost(client, item.url, victim.url);
+      if (migrated) {
+        migratedRepost++;
+        ownInactiveByKey.delete(repostKey);
+        ownActiveKeys.add(repostKey);
+        console.log(`[alllocaljobs] MIGRATED (repost) "${item.title}" (${item.company}) ${victim.url} -> ${item.url}`);
+        continue;
+      }
+    }
+
+    newlyInserted++;
+    console.log(`[alllocaljobs] NEW [${item.experience}] "${item.title}" (${item.company ?? "?"})`);
+    if (item.company) ownActiveKeys.add(dedupeKey(item.company, item.title));
     await upsertJob(client, item);
   }
 
   console.log(
     `[alllocaljobs] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
+    `migrated_repost=${migratedRepost}, ` +
     `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
     `skipped_nonit=${skippedNonIt}, skipped_detail_budget=${skippedDetailBudget}, ` +
     `skipped_dead_on_arrival=${skippedDeadOnArrival}, ` +
     `skipped_duplicate_elsewhere=${skippedDuplicateElsewhere}, ` +
+    `skipped_duplicate_repost=${skippedDuplicateRepost}, ` +
     `unique=${foundUrls.length} (raw=${allItems.length}, complete=${allComplete})`
   );
 

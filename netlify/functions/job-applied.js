@@ -75,7 +75,10 @@ function corsHeaders(extra = {}) {
 function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
     statusCode,
-    headers: corsHeaders(extraHeaders),
+    // Shared applied/interview list changes on every write and is read by
+    // multiple devices under the same ownerKey bucket — nothing between the
+    // browser and this function may cache a pre-change snapshot.
+    headers: corsHeaders({ "Cache-Control": "private, no-store", ...extraHeaders }),
     body: JSON.stringify(body),
   };
 }
