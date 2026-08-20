@@ -1,5 +1,5 @@
 /* =========================
-  "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
+  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&per_page=100",
   "https://melonjobs.hu/wp-json/wp/v2/job-listings?per_page=100&page=1";
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
 */
@@ -41,13 +41,50 @@ const MAX_PAGES = 20;
 // 2026-07-21: dropped the `tags[office-location]` filter (was 2925=Budapest,
 // 15990=Távmunka only). A full unfiltered live scan showed 2/20 correctly-categorized
 // IT postings sitting outside those two tags (Pécs, Veszprém) — invisible to the
-// scraper purely because of the location tag, not a category problem. Also merged the
-// two category-URLs into one covering the union of both (57,44,49,55,58,22381); they
-// overlapped and `fetchAllDreamJobs`'s `seen` dedupe made the split pointless once
-// location stopped being the differentiator. See CRON_JOBS_AUDIT.md #2 for the numbers.
+// scraper purely because of the location tag, not a category problem.
+//
+// 2026-08-20: MEGSZŰNT a szerver-oldali `tags[job-category][]` szűrő is, a melonjobs
+// mintájára (lásd ott a részletes indoklást). A site összesen 59 élő állást tart
+// (`pagination.total`, egyetlen oldal), és MINDEN állás magával hozza a saját
+// `tags.job_category` objektumát {id, slug, name} — nem kell külön taxonómia-lehívás,
+// a kategória-szűrés így ingyen elvégezhető itthon. Amit ez megold:
+//  1. a reconcile bucket a TELJES élő lista lehet (kategória/senior szűrés előtt);
+//  2. egy ÚJ kategória nem tűnik el némán — a lenti "el nem bírált kategória" warn szól;
+//  3. a `scope[]=isNotBlue` is kliens-oldalra került (`job.is_blue`) — élőben amúgy
+//     jelenleg no-op: 59 találat vele is, nélküle is.
 const DREAMJOBS_API_URLS = [
-  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Bjob-category%5D%5B%5D=22381&scope%5B%5D=isNotBlue&per_page=50",
+  "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&per_page=100",
 ];
+
+// IT-kategóriák. A 44/58/22381 a site MAI taxonómiájában már NEM létezik (2026-08-20:
+// a dreamjobs.hu saját searchbar-szűrője 16 kategóriát kínál, és mind a 16 megjelenik
+// az 59 élő állás között — ez a három nincs köztük). Szándékosan BENNMARADNAK: nulla
+// költségű kliens-oldali id-check, a törlésük viszont pont az a hiba lenne, amit a
+// melonjobs kat.63-nál javítottunk.
+// 55 engineer-1 ("Mérnök") általános mérnöki kategória — jelenleg nem IT tartalommal
+// (PLC-automatizálás, MEO-referens), de RÉGÓTA a listában van, így nem nyúlok hozzá:
+// az "üresnek/rossznak látszik → kivágom" reflex a bug forrása, nem a megoldása.
+const DREAMJOBS_IT_CATEGORY_IDS = new Set([57, 49, 55, 44, 58, 22381]);
+const DREAMJOBS_IT_CATEGORY_SLUGS = new Set(["it-development", "it-operations-pm", "engineer-1"]);
+
+// Már ELBÍRÁLT, tudatosan kihagyott kategóriák (2026-08-20-i élő taxonómia).
+// Ami se itt, se a fenti IT-listákban nincs benne, az ÚJ → warn megy a logba, hogy
+// eldöntsük. Ez pontosabb jelzés, mint egy kulcsszó-heurisztika a slugon.
+const DREAMJOBS_NON_IT_CATEGORY_IDS = new Set([
+  45,    // finance-4 — Pénzügy
+  50,    // law-1 — Jog/Compliance
+  51,    // executive-management — Cégvezetés, Menedzsment
+  52,    // marketing-pr-design — Marketing, PR, Design
+  53,    // administration-6 — Irodai munka
+  56,    // sales-customer-support — Sales
+  59,    // others — Egyéb
+  3971,  // hr-recruitment-employer-branding — HR
+  20985, // logistics-purchasing — Logisztika, Beszerzés
+  21025, // education-research — Oktatás
+  76376, // hospitality-tourism — Vendéglátás és Turizmus
+  80399, // skilled-manual-labor — Szakmunka & Fizikai munka
+  80400, // engineering-manufacturing — Mérnök & Gyártás (élőben: operátor/termelés, nem IT)
+]);
 
 // 2026-08-20: MEGSZŰNT az API-oldali `job-categories=` szűrő.
 // Előzmény: 2026-07-14-én a 63-as kategóriát azért vettük ki a listából, mert
@@ -303,8 +340,18 @@ function extractDreamJobs(payload) {
       url: buildDreamJobsUrl(job),
       experience: normalizeWhitespace(job?.tags?.job_level?.slug) || null,
       company: (normalizeWhitespace(job?.company?.name) || null)?.slice(0, 200) ?? null,
+      categoryId: Number(job?.tags?.job_category?.id),
+      categorySlug: normalizeText(job?.tags?.job_category?.slug),
+      isBlue: job?.is_blue === true,
     }))
     .filter((item) => item.title && item.url);
+}
+
+function isDreamJobsItCategory(job) {
+  return (
+    DREAMJOBS_IT_CATEGORY_IDS.has(job.categoryId) ||
+    DREAMJOBS_IT_CATEGORY_SLUGS.has(job.categorySlug)
+  );
 }
 
 // Returns { jobs, complete }. `complete` is false when a paging loop ran all the
@@ -312,14 +359,26 @@ function extractDreamJobs(payload) {
 // reconcileActive must not deactivate the rows that fell off the tail. (Same bug
 // class that killed 15 live wherewework rows on 2026-07-11: an exhausted page cap
 // with no guard reads as "these jobs are gone".)
+// Visszaad: { jobs, allUrls, complete }.
+// `jobs` = az IT-kategóriás, nem-blue állások (ezeket ingesztáljuk), `allUrls` = MINDEN
+// élő hirdetés url-je kategóriától/senior-szűrőtől függetlenül → ez a reconcile bucket
+// és a migrateVolatileUrl "él még" halmaza.
+//
+// A lapozás vége mostantól a szerver `pagination` mezőjéből jön, NEM a
+// `pageJobs.length < perPage` heurisztikából: az `extractDreamJobs` kidobja a
+// felépíthetetlen url-ű sorokat, így egy teljes oldal is rövidebbnek látszhatott a
+// vártnál, és a ciklus "természetes végként" hagyta ott a listát — közben a maradék
+// oldalak kimaradtak, `complete:true` mellett. Ma nem harap (59 állás = 1 oldal), de
+// pont ez az a néma csonkolás, ami a wherewework-nél 15 élő sort ölt meg.
 async function fetchAllDreamJobs() {
   const jobs = [];
+  const allUrls = [];
   const seen = new Set();
+  const unknownCategories = new Map();
   let complete = true;
 
   for (const apiUrl of DREAMJOBS_API_URLS) {
     const baseUrl = new URL(apiUrl);
-    const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "50", 10) || 50;
     let naturalEnd = false;
 
     for (let page = 1; page <= MAX_PAGES; page += 1) {
@@ -327,17 +386,28 @@ async function fetchAllDreamJobs() {
       const payload = await fetchJson(baseUrl.toString());
       const pageJobs = extractDreamJobs(payload);
 
-      if (pageJobs.length === 0) { naturalEnd = true; break; }
-
       for (const job of pageJobs) {
         const key = normalizeUrl(job.url);
-        if (!seen.has(key)) {
-          seen.add(key);
-          jobs.push(job);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        allUrls.push(key);
+
+        if (!isDreamJobsItCategory(job) && !DREAMJOBS_NON_IT_CATEGORY_IDS.has(job.categoryId)) {
+          unknownCategories.set(job.categoryId, job.categorySlug);
         }
+        // `scope[]=isNotBlue` kliens-oldali megfelelője.
+        if (job.isBlue || !isDreamJobsItCategory(job)) continue;
+        jobs.push(job);
       }
 
-      if (pageJobs.length < perPage) { naturalEnd = true; break; }
+      const lastPage = Number(payload?.pagination?.last_page);
+      if (Number.isFinite(lastPage) && lastPage > 0) {
+        if (page >= lastPage) { naturalEnd = true; break; }
+      } else if (pageJobs.length === 0) {
+        // Nincs használható pagination → csak az üres oldal a megbízható végjel.
+        naturalEnd = true;
+        break;
+      }
     }
 
     if (!naturalEnd) {
@@ -346,7 +416,12 @@ async function fetchAllDreamJobs() {
     }
   }
 
-  return { jobs, complete };
+  if (unknownCategories.size) {
+    const listed = [...unknownCategories].map(([id, slug]) => `${id}=${slug}`).join(", ");
+    console.warn(`[dreamjobs] ÚJ, még el nem bírált kategóriában van élő hirdetés: ${listed}`);
+  }
+
+  return { jobs, allUrls, complete };
 }
 
 /* ── MelonJobs ──────────────────────────────────────────────── */
@@ -577,17 +652,17 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
     /* DreamJobs */
     try {
-      const { jobs: allDreamJobs, complete: dreamComplete } = await fetchAllDreamJobs();
-      // Full current listing (pre-filter) — a url in this set is live on the
-      // source, so migrateVolatileUrl must never rename its row away.
-      const currentUrls = allDreamJobs.map((j) => j.url);
+      const { jobs: allDreamJobs, allUrls: currentUrls, complete: dreamComplete } = await fetchAllDreamJobs();
+      // `currentUrls` = a teljes élő lista (kategória-szűrés ELŐTT) — egy ebben
+      // szereplő url él a forráson, így a migrateVolatileUrl soha nem nevezheti át
+      // alóla a sort.
       const dreamJobs = allDreamJobs.filter((job) => {
         if (isSeniorLike(job.title, "")) return false;
         const exp = String(job.experience || "").toLowerCase();
         if (/\bsenior\b/.test(exp)) return false;
         return true;
       });
-      console.log(`dreamjobs: ${dreamJobs.length} jobs found`);
+      console.log(`dreamjobs: ${dreamJobs.length} IT jobs found (of ${currentUrls.length} listed)`);
 
       for (const job of dreamJobs) {
         const pattern = dreamjobsVolatileUrlPattern(job.url);
@@ -602,7 +677,10 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
-      const rc = await reconcileActive(client, "dreamjobs", dreamJobs.map((j) => j.url), { complete: dreamComplete });
+      // Reconcile a TELJES élő listával (kategória/senior szűrés előtt): ami még kint
+      // van a forráson, az él — ne kapcsoljuk le csak azért, mert a saját szűrőnk
+      // kiejtette. (kuka/melonjobs-minta.)
+      const rc = await reconcileActive(client, "dreamjobs", currentUrls, { complete: dreamComplete });
       console.log(`[dreamjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "dreamjobs", message: err.message });
