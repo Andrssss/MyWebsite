@@ -1,6 +1,6 @@
 /* =========================
   "https://api.dreamjobs.hu/api/v1/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Boffice-location%5D%5B%5D=2925&scope%5B%5D=isNotBlue&per_page=50",
-  "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=63&per_page=100&page=1";
+  "https://melonjobs.hu/wp-json/wp/v2/job-listings?per_page=100&page=1";
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU&optionsFacetsDD_department=IT";
 */
 
@@ -49,12 +49,52 @@ const DREAMJOBS_API_URLS = [
   "https://api.dreamjobs.hu/api/v1/hu/jobs?region=hu&page=1&tags%5Bjob-category%5D%5B%5D=57&tags%5Bjob-category%5D%5B%5D=44&tags%5Bjob-category%5D%5B%5D=49&tags%5Bjob-category%5D%5B%5D=55&tags%5Bjob-category%5D%5B%5D=58&tags%5Bjob-category%5D%5B%5D=22381&scope%5B%5D=isNotBlue&per_page=50",
 ];
 
-// job-categories: 62=Rendszergazda, 110=Tesztelő, 112=IT tanácsadó.
-// A korábbi `63` ÜRES kategória volt (élőben ellenőrizve 2026-07-14: 0 találat),
-// a 62 és a 112 viszont valódi IT-állásokat tartalmaz, amiket sosem kértünk le
-// (Gazdasági informatikus, ERP System Analyst) — lásd SCRAPER_BUG_INVESTIGATION.md.
-const MELONJOBS_API_URL =
-  "https://melonjobs.hu/wp-json/wp/v2/job-listings?job-categories=62,110,112&per_page=100&page=1";
+// 2026-08-20: MEGSZŰNT az API-oldali `job-categories=` szűrő.
+// Előzmény: 2026-07-14-én a 63-as kategóriát azért vettük ki a listából, mert
+// "ÜRES kategóriának" látszott (aznap 0 találat) — közben a 63 = "Programozó,
+// Fejlesztő", a site LEGFONTOSABB IT-kategóriája, csak épp nem volt benne
+// aktív hirdetés. Emiatt 2026-08-20-ig nem került be pl. a "Backend fejlesztő
+// (JAVA, Springboot)" (Trans-Uni Kft., Budapest). Tanulság: egy kategória
+// PILLANATNYI darabszáma nem bizonyíték arra, hogy nem kell figyelni.
+//
+// A site összesen ~65 élő hirdetést tart (egyetlen 100-as oldal), így a teljes
+// listát lekérni ingyen van, és a kategóriát itthon szűrjük. Ez két dolgot old meg:
+//  1. a reconcile bucket a TELJES élő lista lehet (lásd fetchAllMelonJobs) —
+//     egy még kint lévő hirdetés soha nem deaktiválódik csak azért, mert a
+//     kategória/helyszín/senior szűrőnk kiejtette;
+//  2. új IT-kategória automatikusan bejön a slug-alapú illesztésen keresztül.
+const MELONJOBS_LISTINGS_URL =
+  "https://melonjobs.hu/wp-json/wp/v2/job-listings?per_page=100&page=1&_fields=id,link,title,content,meta,job-categories";
+const MELONJOBS_TAXONOMY_URL =
+  "https://melonjobs.hu/wp-json/wp/v2/job-categories?per_page=100&page=1&_fields=id,name,slug";
+
+// A term-ID WordPressben állandó, a slug viszont szerkeszthető — ezért a kettő
+// UNIÓJA dönt: az id-lista a már ismert kategóriákat rögzíti (átnevezés ellen),
+// a slug-lista pedig az újonnan felvett/átszámozott termeket kapja el.
+// Szándékosan KIMARADT: 125 informatikai-ertekesito (értékesítés, nem IT-szerep),
+// 74 it-fejlesztesi-vezeto (vezetői pozíció, nem pályakezdő-profil),
+// 54 adatrogzito (adatrögzítés — a job_filters is tiltja).
+const MELONJOBS_IT_CATEGORY_IDS = new Set([31, 55, 60, 62, 63, 110, 112, 148, 163, 178, 199, 237]);
+const MELONJOBS_IT_SLUGS = new Set([
+  "it-informatika",
+  "adatbazisszakerto",
+  "it-support-helpdesk",
+  "rendszergazda",
+  "programozo-fejleszto",
+  "tesztelo-tesztmernok",
+  "it-tanacsado-elemzo-auditor",
+  "vallalatiranyitasi-rendszer-sap",
+  "rendszertervezo",
+  "informaciobiztonsag",
+  "rendszeruzemelteto-karbantarto",
+  "rendszerintegrator",
+]);
+
+// Csak naplózásra: ha egy ÉLŐ hirdetés olyan kategóriában ül, aminek IT-szagú a
+// slugja, de egyik listánkban sincs benne, azt kiírjuk — így a következő bővítés
+// nem attól függ, hogy valaki véletlenül észreveszi. Nem szűr, nem ingesztál.
+const MELONJOBS_IT_HINT =
+  /(^|-)(it|informatik|szoftver|software|fejleszto|programozo|rendszer|tesztel|devops|adatbazis|halozat|cyber|web)/;
 
 const KUKA_API_URL =
   "https://jobs.kuka.com/tile-search-results/?q=&locationsearch=HU";
@@ -367,26 +407,78 @@ function extractMelonJobs(payload) {
     .filter((job) => !isSeniorLike(job.title, job.description));
 }
 
+// id → slug. Üres Map = a taxonómia nem érhető el; ilyenkor a hívó csak az
+// id-listára támaszkodik (szűkebb találat jobb, mint nulla).
+async function fetchMelonCategoryMap() {
+  const map = new Map();
+  const url = new URL(MELONJOBS_TAXONOMY_URL);
+  const perPage = Number.parseInt(url.searchParams.get("per_page") || "100", 10) || 100;
+
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    url.searchParams.set("page", String(page));
+    const terms = await fetchJson(url.toString());
+    if (!Array.isArray(terms) || terms.length === 0) break;
+    for (const term of terms) map.set(Number(term.id), normalizeText(term.slug || term.name));
+    if (terms.length < perPage) break;
+  }
+
+  return map;
+}
+
+function melonCategoryIds(listing) {
+  const raw = listing?.["job-categories"];
+  return Array.isArray(raw) ? raw.map(Number).filter(Number.isFinite) : [];
+}
+
+function isMelonItCategory(id, catMap) {
+  return MELONJOBS_IT_CATEGORY_IDS.has(id) || MELONJOBS_IT_SLUGS.has(catMap.get(id) ?? "");
+}
+
+// Visszaad: { jobs, allUrls, complete }.
+// `allUrls` = MINDEN élő hirdetés url-je kategóriától/helyszíntől/senior-szűrőtől
+// függetlenül — ez a reconcile bucket. `jobs` = a ténylegesen ingesztálandó, már
+// szűrt halmaz.
 async function fetchAllMelonJobs() {
-  const jobs = [];
-  const baseUrl = new URL(MELONJOBS_API_URL);
+  let catMap = new Map();
+  try {
+    catMap = await fetchMelonCategoryMap();
+  } catch (err) {
+    console.warn(`[melonjobs] taxonomy fetch failed (${err.message}) — csak az id-listával szűrünk`);
+  }
+
+  const listings = [];
+  const baseUrl = new URL(MELONJOBS_LISTINGS_URL);
   const perPage = Number.parseInt(baseUrl.searchParams.get("per_page") || "100", 10) || 100;
   let naturalEnd = false;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     baseUrl.searchParams.set("page", String(page));
     const payload = await fetchJson(baseUrl.toString());
-    const pageJobs = extractMelonJobs(payload);
+    if (!Array.isArray(payload) || payload.length === 0) { naturalEnd = true; break; }
 
-    if (pageJobs.length === 0 && (!Array.isArray(payload) || payload.length === 0)) { naturalEnd = true; break; }
+    listings.push(...payload);
 
-    jobs.push(...pageJobs);
-
-    if (!Array.isArray(payload) || payload.length < perPage) { naturalEnd = true; break; }
+    if (payload.length < perPage) { naturalEnd = true; break; }
   }
 
   if (!naturalEnd) console.warn(`[melonjobs] page cap (${MAX_PAGES}) exhausted — listing truncated, skipping deactivation`);
-  return { jobs, complete: naturalEnd };
+
+  const missedItLike = [...new Set(listings.flatMap(melonCategoryIds))]
+    .filter((id) => !isMelonItCategory(id, catMap) && MELONJOBS_IT_HINT.test(catMap.get(id) ?? ""))
+    .map((id) => `${id}=${catMap.get(id)}`);
+  if (missedItLike.length) {
+    console.warn(`[melonjobs] IT-szagú, de NEM figyelt kategóriában van élő hirdetés: ${missedItLike.join(", ")}`);
+  }
+
+  const itListings = listings.filter((listing) =>
+    melonCategoryIds(listing).some((id) => isMelonItCategory(id, catMap))
+  );
+
+  return {
+    jobs: extractMelonJobs(itListings),
+    allUrls: listings.map((listing) => normalizeUrl(listing?.link || "")).filter(Boolean),
+    complete: naturalEnd,
+  };
 }
 
 /* ── KUKA ───────────────────────────────────────────────────── */
@@ -519,8 +611,8 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
     /* MelonJobs */
     try {
-      const { jobs: melonJobs, complete: melonComplete } = await fetchAllMelonJobs();
-      console.log(`melonjobs: ${melonJobs.length} jobs found`);
+      const { jobs: melonJobs, allUrls: melonAllUrls, complete: melonComplete } = await fetchAllMelonJobs();
+      console.log(`melonjobs: ${melonJobs.length} IT jobs found (of ${melonAllUrls.length} listed)`);
 
       for (const job of melonJobs) {
         await enrichIfNew(job, known.get("melonjobs"), extractBodyExperience, "cron_jobs_MIX");
@@ -528,7 +620,10 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await upsertJob(client, "melonjobs", job);
       }
       console.log(`melonjobs: ${melonJobs.length} jobs processed`);
-      const rc = await reconcileActive(client, "melonjobs", melonJobs.map((j) => j.url), { complete: melonComplete });
+      // Reconcile a TELJES élő listával (kategória/helyszín/senior szűrés előtt):
+      // ami még kint van a site-on, az él — soha ne kapcsoljuk le csak azért,
+      // mert a saját szűrőnk kiejtette. (Ugyanaz az elv, mint a kuka ágon.)
+      const rc = await reconcileActive(client, "melonjobs", melonAllUrls, { complete: melonComplete });
       console.log(`[melonjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
       await logFetchError("cron_jobs_MIX", { url: "melonjobs", message: err.message });
