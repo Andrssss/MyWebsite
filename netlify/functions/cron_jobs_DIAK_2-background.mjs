@@ -35,8 +35,21 @@ const YDIAK_IT_DETAIL_RE = /^https:\/\/ydiak\.hu\/it-munka\/[^/?#]+$/;
 // kategória 12 = IT; 21 (nincs publikus UI-címke, tartalom alapján software-dev)
 // hozzáadva 2026-07-29 (coverage audit: 2 valódi junior dev poszt — JS Back-End
 // fejlesztő, React/React Native fejlesztő — ezen a kategórián ült, sosem lett lekérve).
+//
+// 1 = "Adattudós" hozzáadva 2026-08-21 (coverage audit). A teljes taxonómia a
+// https://cloud.qdiak.hu/-/items/munka_kategoria végponton olvasható (28 kategória)
+// — érdemes onnan ellenőrizni, ha megint gyanú merül fel, nem találgatásból.
+// Élő tartalma a felvételkor 2 budapesti hirdetés: "Data Engineer Gyakornok"
+// (egyértelmű IT, EZ hiányzott) és "Business Insights & Demand Planning gyakornok"
+// (üzleti analitika, határeset). Vagyis szűk, célzott bővítés — nem a 2026-07-29-i
+// muisz kat.4 esete, ami tömeg nem-IT mérnöki gyakornokot öntött be és vissza
+// kellett vonni.
+//
+// FIGYELEM: a qdiak-ág a kategóriát MAGÁT használja IT-szűrőnek (csak Budapestre
+// szűr utána), tehát minden itt felvett kategória tartalma bekerül — új kategória
+// előtt mindig nézd meg élőben, mi van benne.
 const QDIAK_API_URL =
-  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=12,21&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
+  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=1,12,21&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
 
 /* ── shared helpers ─────────────────────────────────────────── */
 

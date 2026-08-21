@@ -186,8 +186,17 @@ function postForm(url, body) {
   });
 }
 
+// Ugyanaz a jsbq platform, mint a K&H-nál — és ugyanaz a lapozási csapda:
+// a `page` KÜLÖN form-mezőként némán hatástalan, csak a `q` stringen BELÜL
+// működik, 1-alapú indexeléssel. (Élő mérés 2026-08-21: page=2 külön mezőként
+// ugyanazt a 14 sort adta vissza, a q-n belül 0-t — mert összesen 14 állás van.)
+//
+// Itt jelenleg LAPPANGÓ a hiba: a szűrt lista 14 sor, vagyis belefér az első
+// oldalba. Amint 20 fölé nő, a 20. sortól minden némán elveszne — ezért javítva,
+// nem megvárva, hogy éles veszteséget okozzon. A FILTER_Q `&`-re végződik.
 async function fetchPage(page) {
-  const body = `sRoute=public_job_esearch&q=${encodeURIComponent(FILTER_Q)}&page=${page}`;
+  const q = `${FILTER_Q}page=${page}`;
+  const body = `sRoute=public_job_esearch&q=${encodeURIComponent(q)}`;
   const text = await postForm(API, body);
   return JSON.parse(text);
 }
@@ -215,8 +224,9 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
     let crawlError = false;
     const foundUrls = [];
     const allRows = [];
-    let page = 0;
+    let page = 1; // 1-alapú, lásd fetchPage
     let total = 0;
+    let maxPagesLeft = 25; // safety: ha a `total` hazudik, ne pörögjön végtelenül
 
     do {
       let res;
@@ -234,6 +244,12 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
       allRows.push(...rows);
       if (rows.length === 0) break;
       page++;
+      if (--maxPagesLeft <= 0) {
+        // Csonka lista nem mehet teljesként a reconcile-ba.
+        console.warn(`[raiffeisen] oldal-cap kimerült (allRows=${allRows.length}, total=${total}) → complete=false`);
+        crawlError = true;
+        break;
+      }
     } while (allRows.length < total);
 
     const seen = new Set();
@@ -320,6 +336,24 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak
         // cím-denylist dob" szabály mellett most az experience-alapú senior-flag
         // is kizár insert előtt — nem csak a frontend/statisztika szűri utólag.
+        //
+        // 2026-08-21 (coverage audit) — MEGVIZSGÁLVA, SZÁNDÉKOSAN NEM VÁLTOZTATVA:
+        // az audit szerint a "BUSINESS ANALYST (BANKKÁRTYA TERÜLET)" (level=
+        // "Szenior szakértő") tévesen esik ki, mert a `level` a bank fizetési
+        // sávja, nem elvárt tapasztalat. A hirdetés szövege viszont élőben
+        // ellenőrizve kimondja: "Több éves üzleti elemzői tapasztalattal
+        // rendelkezel" + csapatok mentorálása — vagyis VALÓBAN szenior, a
+        // kizárás helyes. Az `extractBodyExperience` csak azért nem fogja meg,
+        // mert a "több éves" fordulatban nincs számjegy, így itt a `level`
+        // fallback ténylegesen hasznos védőháló.
+        //
+        // A `level`-alapú kizárás elvi kockázata (egy VALÓBAN junior, de
+        // "Szenior szakértő" sávba sorolt hirdetés kiesne) megmarad; élő
+        // ellenjavallat viszont nincs rá: az "AI ENGINEER" ugyanezzel a
+        // level-lel bent van a DB-ben. Ha ez valaha előjön, a helyes javítás a
+        // szám nélküli magyar fordulatok ("több éves", "többéves") felvétele az
+        // extractBodyExperience-be — NEM a level fallback kilövése, mert azzal
+        // pont ez a szenior sor kerülne be.
         if (isSeniorExperience(experience)) {
           skippedSenior++;
           console.log(`[raiffeisen] SKIP senior-experience [${experience}] "${title}" → ${url}`);

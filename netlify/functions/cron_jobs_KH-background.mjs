@@ -1,11 +1,18 @@
 /*
   K&H Bank karrier oldal scraper
   API: POST https://karrier.kh.hu/jsbq
-       sRoute=public_job_esearch&q=<urlencoded filter>&page=N
+       sRoute=public_job_esearch&q=<urlencoded "filter&page=N">
   Filter: specialities[]=IT és innováció & cities[]=Budapest
 
+  FIGYELEM a lapozásra (2026-08-21-i mérés): a `page` KÜLÖN form-mezőként küldve
+  némán hatástalan — az API mindig az 1. oldalt adja vissza. Csak akkor lapoz, ha
+  a `page` a `q` értékén BELÜL van, és 1-ALAPÚ (page=1 = első oldal).
+
+      page=0 / 1 / 2 külön mezőként  → total=25, rows=20, mindig ugyanaz
+      page=2 a q-n belül             → total=25, rows=5  (a maradék)
+
   Flow:
-    1. POST API with pagination (rowNum=20 per page)
+    1. POST API with pagination (rowNum=20 per page, page a q-ban, 1-alapú)
     2. Parse each row.row HTML with cheerio
     3. Intern detection (level "szakmai gyakorlat" OR title keywords)
     4. Direct experience field upsert (no detail fetch, no senior filter)
@@ -172,8 +179,11 @@ function postForm(url, body) {
   });
 }
 
+// `page` a q stringen BELÜL megy és 1-alapú — külön form-mezőként az API eldobja
+// (lásd a fájl fejlécét). A FILTER_Q már `&`-re végződik.
 async function fetchPage(page) {
-  const body = `sRoute=public_job_esearch&q=${encodeURIComponent(FILTER_Q)}&page=${page}`;
+  const q = `${FILTER_Q}page=${page}`;
+  const body = `sRoute=public_job_esearch&q=${encodeURIComponent(q)}`;
   const text = await postForm(API, body);
   return JSON.parse(text);
 }
@@ -201,8 +211,9 @@ export default withTimeout("cron_jobs_KH-background", async () => {
     let crawlError = false;
     const foundUrls = [];
     const allRows = [];
-    let page = 0;
+    let page = 1; // 1-alapú: page=1 az első oldal (0 ugyanazt adja, de maradjunk a szerződésnél)
     let total = 0;
+    let maxPagesLeft = 25; // safety: ha a `total` hazudik, ne pörögjön végtelenül
 
     do {
       let res;
@@ -220,6 +231,13 @@ export default withTimeout("cron_jobs_KH-background", async () => {
       allRows.push(...rows);
       if (rows.length === 0) break;
       page++;
+      if (--maxPagesLeft <= 0) {
+        // Csonka listát nem szabad teljesnek hazudni: a reconcile különben
+        // deaktiválná a le nem kért oldalak élő sorait.
+        console.warn(`[kh] oldal-cap kimerült (allRows=${allRows.length}, total=${total}) → complete=false`);
+        crawlError = true;
+        break;
+      }
     } while (allRows.length < total);
 
     // Dedup by URL

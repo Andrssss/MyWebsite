@@ -138,8 +138,14 @@ function postForm(url, body) {
   });
 }
 
+// Ugyanaz a jsbq lapozási csapda, mint a K&H-nál és a Raiffeisennél: a `page`
+// KÜLÖN form-mezőként némán hatástalan, csak a `q` stringen BELÜL működik,
+// 1-alapú indexeléssel. (Élő mérés 2026-08-21: page=2 külön mezőként ugyanazt a
+// 8 sort adta, a q-n belül 0-t — mert összesen 8 állás van.)
+// Itt most LAPPANGÓ a hiba (8 sor < 20-as oldalméret), de a platform ugyanaz.
 async function fetchPage(page) {
-  const body = `sRoute=public_job_esearch&q=${encodeURIComponent(FILTER_Q)}&page=${page}`;
+  const q = `${FILTER_Q}page=${page}`;
+  const body = `sRoute=public_job_esearch&q=${encodeURIComponent(q)}`;
   const text = await postForm(API, body);
   return JSON.parse(text);
 }
@@ -166,8 +172,9 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
     let crawlError = false;
     const foundUrls = [];
     const allRows = [];
-    let page = 0;
+    let page = 1; // 1-alapú, lásd fetchPage
     let total = 0;
+    let maxPagesLeft = 25; // safety: ha a `total` hazudik, ne pörögjön végtelenül
 
     do {
       let res;
@@ -185,6 +192,12 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
       allRows.push(...rows);
       if (rows.length === 0) break;
       page++;
+      if (--maxPagesLeft <= 0) {
+        // Csonka lista nem mehet teljesként a reconcile-ba.
+        console.warn(`[erste] oldal-cap kimerült (allRows=${allRows.length}, total=${total}) → complete=false`);
+        crawlError = true;
+        break;
+      }
     } while (allRows.length < total);
 
     const seen = new Set();

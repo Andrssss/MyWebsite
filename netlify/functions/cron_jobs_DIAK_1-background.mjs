@@ -5,7 +5,7 @@ console.log("CRON_JOBS_DIAK_1 LOADED");
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
   { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
-  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
+  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
 ];
@@ -150,6 +150,12 @@ function extractMinddiakCompany(rawDescription) {
 }
 
 
+// A korábban szerver-oldalon szűrt mező-ID-k. NEM töröljük őket, csak leszedtük
+// róluk a lekérés-szűrőt: ami ezekben a mezőkben van, az továbbra is automatikusan
+// bejön (lásd `inItField`). Egy mező attól, hogy MA üres, holnap még újratöltődhet
+// — ilyenkor nem szabad, hogy a cím-egyezésen múljon, bekerül-e.
+const ZYNTERN_IT_FIELD_IDS = new Set([80, 15, 16]);
+
 function extractZynternFromApiPayload(payload) {
   const arr = Array.isArray(payload?.data) ? payload.data : [];
 
@@ -159,6 +165,20 @@ function extractZynternFromApiPayload(payload) {
       url: j?.url ? normalizeUrl(String(j.url)) : null,
       description: j?.description ? String(j.description).slice(0, 800) : null,
       company: j?.company?.name ? normalizeWhitespace(String(j.company.name)).slice(0, 200) : null,
+      // A hirdetés saját "IT-terület" skill-címkéje. Szűk szándékosan: az élő
+      // 57 hirdetésen az "IT-terület" 2/2 pontos (AI Requirements Analyst +
+      // IT folyamatfejlesztési), míg a puszta "IT" címke a Fizikai biztonsági
+      // gyakornokra is rákerült. Csak a cím-alapú találat KIEGÉSZÍTÉSE, mert
+      // az "AI Requirements Analyst gyakornok" címben nincs kategória-keyword.
+      itSkill: Array.isArray(j?.skills)
+        ? j.skills.some((s) => String(s?.name ?? s).trim().toLowerCase() === "it-terület")
+        : false,
+      // Benne van-e a hirdetés a KORÁBBAN szűrt mezők (80/15/16) valamelyikében?
+      // Ez tartja meg a régi viselkedést: ami eddig bejött volna, az ezután is
+      // bejön, akkor is, ha a címe nem ad kategória-keywordöt.
+      inItField: Array.isArray(j?.fields)
+        ? j.fields.some((f) => ZYNTERN_IT_FIELD_IDS.has(Number(f?.id)))
+        : false,
     }))
     .filter((x) => x.title && x.url);
 }
@@ -169,11 +189,20 @@ async function fetchJson(url, redirectLeft = 5) {
 }
 
 
-async function fetchAllZynternJobs({ fields = "80,15,16", maxPages = 10 }) {
+// `fields` üresen hagyva = NINCS szerver-oldali mezőszűrő, mindent lekérünk és
+// kliens-oldalon osztályozunk. 2026-08-21: a korábbi fields=80,15,16 lista
+// elavult — a 15 és 16 ID visszavonva (mindkettő 0 találat), a maradó 80
+// ("Business & Data Analyst") pedig egyetlen IT hirdetést sem tartalmazott, így
+// a forrás 0 sort adott. Az élő taxonómiában NINCS is IT mező: a valódi IT
+// gyakornoki hirdetések a 68 (Adminisztratív) és 6 (Pénzügy) alá vannak téve.
+// Ugyanaz a hibaosztály és ugyanaz a javítási minta, mint a 2026-08-20-i
+// dreamjobs/melonjobs konverzióban.
+async function fetchAllZynternJobs({ fields = "", maxPages = 10 } = {}) {
   const all = [];
 
   for (let page = 1; page <= maxPages; page++) {
-    const url = `https://zyntern.com/api/jobs?fields=${fields}&page=${page}`;
+    const fieldsParam = fields ? `fields=${fields}&` : "";
+    const url = `https://zyntern.com/api/jobs?${fieldsParam}page=${page}`;
 
     let payload;
     try {
@@ -249,7 +278,7 @@ function dedupeByUrl(items) {
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
   { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
-  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs?fields=80,15,16" },
+  { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://app.tudatosdiak.hu/hu/jobs?searchIndustry%5B0%5D=7&searchMinHourlyWage=1000" },
 ];
@@ -874,9 +903,12 @@ function looksLikeJobUrl(sourceKey, url) {
     const nu = normalizeUrl(url);
     // informatikai---support added 2026-07-29 (coverage audit: real IT/support
     // postings in that category were never scraped at all).
+    // muszaki added 2026-08-21 — MUST stay in sync with SCHONHERZ_CATEGORIES,
+    // különben a lekért kategória állásait ez az allowlist némán eldobja.
     if (
       !nu.startsWith("https://schonherz.hu/diakmunka/budapest/fejleszto---tesztelo/") &&
-      !nu.startsWith("https://schonherz.hu/diakmunka/budapest/informatikai---support/")
+      !nu.startsWith("https://schonherz.hu/diakmunka/budapest/informatikai---support/") &&
+      !nu.startsWith("https://schonherz.hu/diakmunka/budapest/muszaki/")
     ) return false;
   }
 
@@ -1199,9 +1231,25 @@ function extractSchonherz(html, baseUrl) {
 // informatikai---support added 2026-07-29 (coverage audit: real IT/support
 // postings there — IT tanácsadó gyakornok, IT Technician, Programozó oktató —
 // were never scraped at all, the site has 9 categories total and only 1 was
-// covered). Other categories (adminisztratív, gazdasági, műszaki, etc.) were
-// sampled and found mostly non-IT, so left uncovered on purpose.
-const SCHONHERZ_CATEGORIES = ["fejleszto---tesztelo", "informatikai---support"];
+// covered).
+//
+// muszaki added 2026-08-21 (coverage audit): a "Platform engineer gyakornok"
+// (on-prem → cloud migráció) ott él, és sehol máshol. A kategória NEM önt be
+// nem-IT tömeget: az 5 élő műszaki hirdetésből a cím-alapú kategória-keyword
+// szűrő pontosan 1-et enged át (a Platform engineert), a Villamosmérnök /
+// Műszaki előkészítő / Műszaki árajánlat / Projektvezető mind kiesik —
+// vagyis nem ismétlődik a 2026-07-29-i muisz kat.4 eset.
+//
+// A vegzos-hallgatoknak kategória SZÁNDÉKOSAN kimarad: az ottani IT-hirdetés
+// (41421) ugyanannak az állásnak a második listázása, mint a
+// fejleszto---tesztelo/41365 — csak duplikátumot hozna.
+//
+// A többi kategória (adminisztratív, gazdasági, alkalmi, foreign-students)
+// átnézve: érdemi IT-tartalom nincs.
+//
+// FIGYELEM: a looksLikeJobUrl() schonherz-allowlistjét EGYÜTT kell módosítani
+// ezzel a listával, különben a lekért kategória találatai némán elvesznek.
+const SCHONHERZ_CATEGORIES = ["fejleszto---tesztelo", "informatikai---support", "muszaki"];
 
 // Returns { jobs, complete } — complete=false when any category's pagination
 // broke mid-way (page error) or its initial fetch failed. The caller MUST
@@ -1501,7 +1549,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
       if (source === "zyntern") {
         try {
-          merged = await fetchAllZynternJobs({ fields: "80,15,16", maxPages: 10 });
+          merged = await fetchAllZynternJobs({ maxPages: 10 });
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Zyntern API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
@@ -1557,7 +1605,34 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       // FILTER & KEYWORD MATCH
       // =========================
       let matchedList;
-      if (source === "minddiak" || source === "muisz" || source === "zyntern") {
+      if (source === "zyntern") {
+        // zyntern MÁR NEM elő-szűrt: 2026-08-21 óta mezőszűrő nélkül kérjük le a
+        // teljes listát (a fields=80,15,16 taxonómia elavult, lásd
+        // fetchAllZynternJobs), tehát itt kell IT-re osztályozni.
+        //
+        // A szűrő BŐVÍTÉS, nem csere — három egymást kiegészítő jel bármelyike elég:
+        //   1. `inItField`  — a hirdetés a korábban szűrt 80/15/16 mezők valamelyikében
+        //                     van. Ez a RÉGI viselkedés megőrzése: ami eddig bejött,
+        //                     ezután is bejön, akkor is, ha a címe nem árulkodó, és
+        //                     akkor is, ha ezek a mezők most épp üresek, de újratöltődnek.
+        //   2. cím-egyezés  — így jönnek be a máshova (68/6) sorolt IT hirdetések is.
+        //   3. `itSkill`    — az "AI Requirements Analyst gyakornok" címében nincs
+        //                     kategória-keyword, a skill-címkéjében viszont ott az IT.
+        //
+        // A description-t szándékosan NEM etetjük a matchesKeywords-be: a 800 karakteres
+        // leírásokban a banki/marketinges szövegek is emlegetnek Excelt/SQL-t, ez pontosan
+        // a 2026-07-29-i description-pollution csapda.
+        matchedList = merged
+          .filter((c) => c.inItField || matchesKeywords(c.title, "") || c.itSkill)
+          .filter((c) => !isSeniorLike(c.title, ""))
+          .filter((c) => {
+            const hit = findBlacklistHit(c.title, "");
+            if (hit) console.log(`[zyntern] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
+            return !hit;
+          });
+        console.log(`[zyntern] matched=${matchedList.length}  total_before_filter=${merged.length}`);
+        matchedList.forEach((c, i) => console.log(`[zyntern]   MATCH[${i+1}] "${c.title}" → ${c.url}`));
+      } else if (source === "minddiak" || source === "muisz") {
         // API sources: already pre-filtered to IT jobs – only apply blacklist on title, no false positives from description
         matchedList = [];
         for (const c of merged) {

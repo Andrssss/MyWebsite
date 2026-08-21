@@ -157,6 +157,59 @@ function extractJobLinks(html, baseUrl) {
 
 /* ── detail page parser ──────────────────────────────────────── */
 
+// Budapest-e a helyszín? A puszta `includes("budapest")` 2026-08-21-ig 3 élő MBH
+// gyakornoki hirdetést dobott el némán, mert a "MUNKAVÉGZÉS HELYE" mező nem
+// mindig írja ki a város nevét:
+//
+//   "XI. kerület, Infopark - Magyar Tudósok krt. 9."  → csak kerület
+//   "1116 Bp., Kalotaszeg u. 31."                     → rövidítve
+//   "1138 Budapest, Váci út 193."                     → ez volt az egyetlen, ami átment
+//
+// Egyértelmű jelek: a "budapest" szó, a "bp" rövidítés, és a budapesti
+// irányítószám (1011-1239 → minden 1-essel kezdődő négyjegyű).
+//
+// A puszta "N. kerület" SZÁNDÉKOSAN nem szerepel itt: Debrecennek, Miskolcnak,
+// Győrnek és Pécsnek is vannak kerületei, úgyhogy önmagában félrevezető. Azokat
+// az eseteket a JSON-LD addressRegion fedi le (lásd extractJsonLdLocation),
+// ami kimondottan "Budapest"-et ír — nem kell hozzá találgatnunk.
+function isBudapestLocation(text) {
+  const t = String(text || "").toLowerCase();
+  if (!t) return false;
+  if (/\bbudapest/.test(t)) return true;
+  if (/\bbp\b|\bbp\./.test(t)) return true;
+  if (/\b1[0-2]\d{2}\b/.test(t)) return true; // budapesti irányítószám
+  return false;
+}
+
+// A hirdetések többsége visz egy schema.org JobPosting JSON-LD blokkot, amiben a
+// helyszín STRUKTURÁLTAN szerepel (addressLocality / addressRegion). Ez sokkal
+// megbízhatóbb, mint a látható címke szövegét visszafejteni — a fenti két
+// kerület-only hirdetésnél is tisztán "Budapest" az addressRegion.
+// Nem minden oldalon van (8-ból 2-n hiányzik), ezért csak ELSŐDLEGES forrás,
+// nem kizárólagos.
+function extractJsonLdLocation(html) {
+  const parts = [];
+  const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    let data;
+    try {
+      data = JSON.parse(m[1]);
+    } catch {
+      continue; // törött JSON-LD nem ok a futás megszakítására
+    }
+    for (const node of Array.isArray(data) ? data : [data]) {
+      const jl = node?.jobLocation;
+      if (!jl) continue;
+      for (const place of Array.isArray(jl) ? jl : [jl]) {
+        const a = place?.address || {};
+        parts.push(a.addressLocality, a.addressRegion, a.postalCode, place?.name);
+      }
+    }
+  }
+  return parts.filter(Boolean).join(" | ");
+}
+
 // Returns { title, experience } or null if not Budapest
 function parseDetailPage(html) {
   const $ = cheerioLoad(html);
@@ -186,7 +239,12 @@ function parseDetailPage(html) {
     if (m) location = m[1].trim();
   }
 
-  if (!location.toLowerCase().includes("budapest")) return null;
+  // A látható címke és a strukturált JSON-LD EGYÜTT dönt: elég, ha bármelyik
+  // Budapestre mutat. (A JSON-LD-t akkor is megnézzük, ha a címke-parse adott
+  // értéket — pont a "XI. kerület, Infopark…" eset az, ahol a címke szövege
+  // önmagában nem árulja el a várost.)
+  const jsonLdLocation = extractJsonLdLocation(html);
+  if (!isBudapestLocation(location) && !isBudapestLocation(jsonLdLocation)) return null;
 
   const title = normalizeWhitespace($("h1").first().text());
   const experience = isInternshipTitle(title)

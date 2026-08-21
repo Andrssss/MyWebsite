@@ -3,7 +3,8 @@
 
   API: GET https://web-api.melodiak.hu/v1/job-advertisement?page=N
   Returns 50 jobs/page, no server-side category filter — client-side filter needed.
-  Filter: category.slug === "informatikai-mernoki-muszaki" && city_name === "Budapest"
+  Filter: city_name === "Budapest" ÉS (category.slug === "informatikai-mernoki-muszaki"
+          VAGY a cím egyértelmű IT-jelet ad — lásd STRONG_IT_TITLE, 2026-08-21)
   Job URL: https://www.melodiak.hu/diakmunkak/{slug}
 
   Flow:
@@ -32,6 +33,23 @@ const pool = new Pool({
 const BASE = "https://www.melodiak.hu";
 const API_BASE = "https://web-api.melodiak.hu/v1/job-advertisement";
 const IT_SLUG = "informatikai-mernoki-muszaki";
+
+// 2026-08-21 (coverage audit): a forrás maga sorolja be rosszul a hirdetéseit —
+// az "Adatelemző_adattudós gyakornok a Szerencsejáték Zrt-nél!" a
+// `gazdasagi-penzugyi-marketing` slugon ült, így a slug-szűrő sosem látta.
+//
+// A slug-szűrőt NEM tágítjuk (a `job_categories` teljes keyword-listáját ráengedve
+// 300 élő hirdetésből 6 jött volna be: 1 valódi + 5 fals pozitív — "Office manager
+// assistant", "Irodai, admin munka", "Kontroller gyakornok", "Elemzési gyakornok",
+// "Robotporszívó-tesztelő" —, vagyis pont a 2026-07-29-i muisz kat.4 hibája).
+//
+// Helyette: a NEM-IT slugokról csak EGYÉRTELMŰ IT-jelre engedünk be. Szándékosan
+// nincs benne a puszta "tesztelő" (robotporszívó-tesztelő!), "elemző", "admin",
+// "manager", "kontroller" — ezek a fenti fals pozitívok forrásai.
+// Élő mérés a felvételkor: a teljes 300-as listán pontosan 1 sort hoz be, a
+// valódi hiányzót, 0 fals pozitívval.
+const STRONG_IT_TITLE =
+  /(adattudós|adatelemző|adatmérnök|data\s+(scientist|analyst|engineer)|szoftver|software|programozó|fejlesztőmérnök|webfejlesztő|developer|devops|rendszergazda|informatikus|\bIT\b)/i;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -157,11 +175,13 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
 
       for (const job of jobs) {
         const catSlug = job.category?.slug ?? "";
-        if (catSlug !== IT_SLUG) continue;
         if (normalizeText(job.city_name ?? "") !== "budapest") continue;
 
         const title = normalizeWhitespace(job.title);
         if (!title) continue;
+
+        // Az IT-slug önmagában elég; azon kívülről csak egyértelmű IT-cím jöhet be.
+        if (catSlug !== IT_SLUG && !STRONG_IT_TITLE.test(title)) continue;
 
         if (isSeniorLike(title)) {
           skippedSenior++;

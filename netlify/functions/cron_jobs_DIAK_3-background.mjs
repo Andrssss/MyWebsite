@@ -707,15 +707,24 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       }
 
-      // Paginate otp (SAP SuccessFactors): a kereső 25 soronként lapoz
+      // Paginate otp (SAP SuccessFactors): a kereső oldalanként lapoz
       // (?startrow=N), az első válasz CSAK az 1. oldal. E nélkül a 2+. oldal
       // állásai sosem kerülnek a foundUrls-be → a grace után tévesen
       // deaktiválódnak (élőben bizonyítva 2026-07-06: IT-lista 26 állás,
       // "Alkalmazás üzemeltető" a 2. oldalon). Ugyanaz a platform-hiba, mint a
       // kuka 2026-07-01-es fixe. Lapozási hiba → allSucceeded=false, hogy a
       // reconcile ne deaktiváljon részleges lista alapján.
-      if (source === "otp") {
-        let startrow = 25;
+      // 2026-08-21: a lépésköz 25 volt beégetve, a kereső viszont 20-asával lapoz
+      // (élő mérés: startrow=0 → 20 találat, startrow=20 → 5, startrow=25 → 0).
+      // Emiatt a 25-ös ugrás nemcsak átlépte a 20-24. sorokat, hanem a 0 találatos
+      // választ a lista VÉGÉNEK olvasta (sawEnd=true) → a 20. sortól felfelé semmi
+      // nem került be, és a foundUrls is csonka maradt. Ezért a lépésköz mostantól
+      // az 1. oldalon ténylegesen visszakapott találatszám: a valósnál KISEBB
+      // lépésköz csak átfedést okoz (a mergeCandidates dedupel), a NAGYOBB viszont
+      // sorokat ugrik át — így ha a forrás megint oldalméretet vált, magától követi.
+      if (source === "otp" && merged.length > 0) {
+        const stepRows = Math.max(10, merged.length);
+        let startrow = stepRows;
         let safetyPagesLeft = 12;
         let sawEnd = false;
         while (safetyPagesLeft-- > 0) {
@@ -736,7 +745,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           merged = mergeCandidates(merged, pgGeneric, pgSsr);
           console.log(`${tag}   otp startrow=${startrow}: +${merged.length - prevCount} új (összesen: ${merged.length})`);
           if (merged.length === prevCount) { sawEnd = true; break; } // nincs új találat → utolsó oldal után járunk
-          startrow += 25;
+          startrow += stepRows;
           await sleep(300);
         }
         // Cap úgy merült ki, hogy az utolsó oldal még adott újat → a listing
