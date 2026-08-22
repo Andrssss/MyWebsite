@@ -1,11 +1,10 @@
 // netlify/functions/ai-registry.mjs
 //
-// The single API the AI-scraped discovery ROUTINE talks to. Replaces the old
-// "routine writes ai_scraped_registry.json and git-pushes it" design, which
-// never actually worked — the push silently failed on every run since
-// 2026-07-17, so not one finding ever reached the DB (see AI_SCRAPER_PLAN.md §0).
-//
-// Two halves, because the routine needs BOTH:
+// The REST transport for the AI-scraped discovery ROUTINE's memory/write API.
+// The actual GET/POST logic lives in _ai_registry_core.mjs (getRegistrySnapshot
+// / submitFindings) so it has one implementation shared with ai-mcp.mjs, the
+// MCP transport for the same two operations — this file now only does
+// Authorization-header auth and REST status-code/JSON shaping.
 //
 //   GET  → the routine's MEMORY. Routines start cold every run
 //          (persist_session:false), so without this it would re-research the
@@ -18,13 +17,10 @@
 //          (_ai_ingest_core.mjs ingestJobs) — so the routine's own LLM judgment
 //          is never the only gate; isItJob / isSeniorLike (title denylist) and
 //          the company blocklist all re-apply here, deterministically, in code.
-//          (Body-year senior dropping was removed 2026-07-20 — see ingestJobs.)
 //
 // The POST is INCREMENTAL, not a whole-state replace: the routine reports only
 // what it did this run ({findings, sitesChecked, rejected}) and the server
-// merges into stored state. That keeps payloads small no matter how big the
-// registry grows, and means a run that dies halfway can't truncate the state it
-// never got around to echoing back.
+// merges into stored state.
 //
 // State lives in Netlify Blobs (same store pattern as fetch-error-logs /
 // weekly-backups) rather than Postgres — it's one small JSON doc of bookkeeping,
@@ -39,45 +35,14 @@
 //          "company":"ACME","experience":"junior","technologies":"Java"}],
 //          "sitesChecked":{"example":{"url":"https://example.hu/karrier","status":"has_junior_opening"}},
 //          "rejected":["SomeCorp"]}'
+//
+// See ai-mcp.mjs for the MCP transport of the same two operations — added so
+// the routine's orchestrator can fetch/submit without ever composing a raw
+// `curl -H "Authorization: Bearer $TOKEN"` command itself.
 
-import { Pool } from "pg";
 import { withDbAuditFlush } from "./_db_audit.js";
-import { getStore } from "@netlify/blobs";
-import { loadFilters } from "./load_filters.mjs";
-import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
-import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
-
-const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
-
-const STORE_NAME = "ai-scraped-registry";
-const KEY = "registry.json";
-
-const EMPTY = { sites: {}, permanentlyRejected: [], findings: [], updatedAt: null };
-
-// Strong consistency: this is a read-modify-write of a single doc, and the
-// routine's next run must see what this run just committed.
-function store() {
-  return getStore({ name: STORE_NAME, consistency: "strong" });
-}
-
-async function readRegistry() {
-  const raw = await store().get(KEY, { type: "json" });
-  if (!raw || typeof raw !== "object") return { ...EMPTY };
-  return {
-    sites: raw.sites && typeof raw.sites === "object" ? raw.sites : {},
-    permanentlyRejected: Array.isArray(raw.permanentlyRejected) ? raw.permanentlyRejected : [],
-    findings: Array.isArray(raw.findings) ? raw.findings : [],
-    updatedAt: raw.updatedAt || null,
-  };
-}
-
-async function writeRegistry(reg) {
-  await store().setJSON(KEY, { ...reg, updatedAt: new Date().toISOString() });
-}
+import { getRegistrySnapshot, submitFindings, RegistryRequestError } from "./_ai_registry_core.mjs";
+import { tooManyRequests } from "./_ai_rate_limit.mjs";
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -113,46 +78,8 @@ function authDiagnostic(request) {
   };
 }
 
-/* ── GET: hand the routine its memory ───────────────────────────────── */
-
 async function handleGet() {
-  const reg = await readRegistry();
-  // Hand the caller its remaining upload budget so it can stop hunting for more
-  // postings once it has enough to fill it — verifying finds it can't upload
-  // this hour is wasted effort (they'd throttle and get re-found next run).
-  const budget = await checkBudget();
-  return json(200, {
-    sites: reg.sites,
-    permanentlyRejected: reg.permanentlyRejected,
-    // urls only — the routine needs these to skip already-found postings, and
-    // sending full finding objects would grow this response without bound.
-    knownUrls: reg.findings.map((f) => f.url).filter(Boolean),
-    uploadBudget: {
-      remaining: budget.remaining,
-      limit: budget.limit,
-      resetInSeconds: budget.resetInSeconds,
-    },
-    counts: {
-      sites: Object.keys(reg.sites).length,
-      permanentlyRejected: reg.permanentlyRejected.length,
-      findings: reg.findings.length,
-    },
-    updatedAt: reg.updatedAt,
-  });
-}
-
-/* ── POST: ingest findings + merge this run's bookkeeping ───────────── */
-
-function groupBySlug(findings) {
-  const groups = new Map();
-  for (const f of findings || []) {
-    if (!f || !f.title || !f.url) continue;
-    const slug = toSlug(f.slug);
-    if (!slug) continue;
-    if (!groups.has(slug)) groups.set(slug, []);
-    groups.get(slug).push(f);
-  }
-  return groups;
+  return json(200, await getRegistrySnapshot());
 }
 
 async function handlePost(request) {
@@ -163,118 +90,15 @@ async function handlePost(request) {
     return json(400, { error: "Invalid JSON body" });
   }
 
-  const submitted = Array.isArray(payload.findings) ? payload.findings : [];
-
-  // Oversized payload: reject before any DB work rather than filtering 10k rows.
-  if (submitted.length > MAX_ROWS_PER_REQUEST) {
-    return json(413, {
-      error: "Too many findings in one request",
-      max: MAX_ROWS_PER_REQUEST,
-      received: submitted.length,
-    });
-  }
-
-  // Hourly write budget — caps what a leaked token can inject. The content
-  // filters stop accidental bad rows but can be gamed by crafted titles; this
-  // bounds the damage regardless of what the titles say.
-  const budget = await checkBudget();
-  if (submitted.length > 0 && budget.remaining === 0) return tooManyRequests(budget);
-
-  // Truncate to the remaining budget so this request can't exceed it. Dropped
-  // rows are NOT recorded as findings, so the routine re-finds them next run
-  // rather than losing them silently.
-  const throttled = Math.max(0, submitted.length - budget.remaining);
-  const accepted = submitted.slice(0, budget.remaining);
-
-  const reg = await readRegistry();
-  const now = new Date().toISOString();
-  const results = {};
-  let totalWritten = 0;
-
-  // Flatten every finding to ONE source (AI_SOURCE), keeping each job's slug only
-  // for the registry bookkeeping below. Dedupe across slugs by url (url is the
-  // row identity), so the same posting reported under two slugs writes once.
-  const slugByUrl = new Map();
-  const allJobs = [];
-  for (const [slug, rawJobs] of groupBySlug(accepted)) {
-    for (const j of sanitizeJobs(rawJobs)) {
-      if (slugByUrl.has(j.url)) continue;
-      slugByUrl.set(j.url, slug);
-      allJobs.push(j);
+  try {
+    return json(200, await submitFindings(payload));
+  } catch (err) {
+    if (err instanceof RegistryRequestError) {
+      if (err.code === "too_many_rows") return json(413, { error: err.message, ...err.details });
+      if (err.code === "rate_limited") return tooManyRequests({ limit: err.details.limit, resetInSeconds: err.details.retryAfterSeconds });
     }
+    throw err;
   }
-
-  if (allJobs.length > 0) {
-    const client = await pool.connect();
-    try {
-      const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
-      // fullListing:false — the routine reports individual postings it found,
-      // never a site's complete current listing, so reconcile stays
-      // reactivate-only and the 404 sweep owns deaths.
-      const stats = await ingestJobs(client, { source: AI_SOURCE, jobs: allJobs, fullListing: false, filters, categories });
-      results[AI_SOURCE] = stats;
-      totalWritten = stats.insertedUrls.length;
-      console.log(
-        `[ai-registry] ${AI_SOURCE}: rows=${stats.rows} inserted=${stats.inserted} ` +
-        `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
-        `skip_non_it=${stats.skippedNonIt} skip_location=${stats.skippedLocation}`
-      );
-
-      // Record only what actually survived the gates, so the routine's knownUrls
-      // reflects the DB rather than what it hoped to write. Keep the slug so the
-      // registry still tracks which company each finding came from.
-      const insertedSet = new Set(stats.insertedUrls);
-      const known = new Set(reg.findings.map((f) => f.url));
-      for (const j of allJobs) {
-        if (!insertedSet.has(j.url) || known.has(j.url)) continue;
-        reg.findings.push({ slug: slugByUrl.get(j.url), ...j, foundDate: now });
-      }
-    } finally {
-      client.release();
-    }
-  }
-
-  // 2. Merge this run's bookkeeping.
-  for (const [rawSlug, info] of Object.entries(payload.sitesChecked || {})) {
-    const slug = toSlug(rawSlug);
-    if (!slug) continue;
-    reg.sites[slug] = {
-      ...(reg.sites[slug] || {}),
-      ...(info && typeof info === "object" ? info : {}),
-      lastChecked: now,
-    };
-  }
-
-  const rejectedSet = new Set(reg.permanentlyRejected);
-  for (const name of payload.rejected || []) {
-    const n = String(name || "").trim();
-    if (n) rejectedSet.add(n);
-  }
-  reg.permanentlyRejected = [...rejectedSet];
-
-  await writeRegistry(reg);
-
-  // Charge only rows that actually reached the DB — rows the content filters
-  // dropped never got written, so billing them would let a legitimate run with
-  // a few rejects starve its own budget.
-  await consume(totalWritten);
-
-  return json(200, {
-    ok: true,
-    ingested: results,
-    rateLimit: {
-      limit: budget.limit,
-      writtenThisRequest: totalWritten,
-      remainingBefore: budget.remaining,
-      throttled, // submitted but not processed — re-submit next run
-      resetInSeconds: budget.resetInSeconds,
-    },
-    counts: {
-      sites: Object.keys(reg.sites).length,
-      permanentlyRejected: reg.permanentlyRejected.length,
-      findings: reg.findings.length,
-    },
-  });
 }
 
 export default withDbAuditFlush("ai-registry", async (request) => {
