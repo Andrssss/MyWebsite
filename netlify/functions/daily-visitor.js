@@ -82,17 +82,17 @@ exports.handler = withDbAuditFlush("daily-visitor", async (event) => {
   }
 
   if (event.httpMethod === "GET") {
+    // daily_visitors is now one row per visitor_cookie, ever (visit_date/
+    // visitor_type were dropped, shared with pisiseknek_weblap): created_at
+    // is the first visit, last_visited_at updates on every repeat one. A
+    // returning visitor is one where those two have diverged (visited more
+    // than once) and the latest visit falls inside the window.
     try {
       const { rows } = await pool.query(
         `SELECT COUNT(*)::int AS mau
-         FROM (
-           SELECT visitor_cookie
-           FROM daily_visitors
-           WHERE visitor_type = 'user'
-           GROUP BY visitor_cookie
-           HAVING COUNT(DISTINCT visit_date) > 1
-              AND MAX(visit_date) >= CURRENT_DATE - 29
-         ) AS returning_visitors`
+         FROM daily_visitors
+         WHERE last_visited_at > created_at
+           AND last_visited_at >= CURRENT_DATE - 29`
       );
       return jsonResponse(
         200,
@@ -145,14 +145,13 @@ exports.handler = withDbAuditFlush("daily-visitor", async (event) => {
     const visitorType = getVisitorType(visitorId);
 
     // Admin ne kerüljön a daily_visitors táblába egyáltalán — a saját
-    // látogatásai ne torzítsák a naplózott sorokat (a MAU lekérdezés amúgy is
-    // csak 'user'-t számol, de a nyers napi log is maradjon admin-mentes).
+    // látogatásai ne torzítsák a naplózott sorokat (visitor_type már nincs
+    // az adattáblában, ez a kizárás az egyetlen admin-mentesítés).
     if (visitorType === "admin") {
       return jsonResponse(200, {
         ok: true,
         inserted: false,
         visitorType,
-        visitDate: new Date().toISOString().slice(0, 10),
       });
     }
 
@@ -164,16 +163,15 @@ exports.handler = withDbAuditFlush("daily-visitor", async (event) => {
       // ignore malformed
     }
     const { rowCount } = await pool.query(
-      `INSERT INTO daily_visitors (visit_date, visitor_cookie, visitor_type, site)
-       VALUES (CURRENT_DATE, $1, $2, $3)
-       ON CONFLICT (visit_date, visitor_cookie) DO NOTHING`,
-      [visitorId, visitorType, site]
+      `INSERT INTO daily_visitors (visitor_cookie, site)
+       VALUES ($1, $2)
+       ON CONFLICT (visitor_cookie) DO UPDATE SET last_visited_at = NOW()`,
+      [visitorId, site]
     );
     return jsonResponse(200, {
       ok: true,
       inserted: rowCount > 0,
       visitorType,
-      visitDate: new Date().toISOString().slice(0, 10),
     });
   } catch (err) {
     console.error("[daily-visitor] Error:", err);
