@@ -20,6 +20,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -92,8 +93,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function postForm(url, body) {
@@ -158,7 +158,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
   );
   return res.rowCount > 0;
 }
@@ -247,7 +247,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
         // (user-döntés 2026-07-20). Az explicit tapasztalat-sáv ("5 év fölött")
         // NEM dob többé: elmentjük, az experience az expCombined marad (pl.
         // "5 év fölött" → a frontend badge évszám alapján jelöli).
-        if (isSeniorLike(title)) {
+        if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[erste] SKIP senior "${title}" → ${url}`);
           continue;
@@ -270,7 +270,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
         // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak
         // cím-denylist dob" szabály mellett most az experience-alapú senior-flag
         // is kizár insert előtt.
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[erste] SKIP senior-experience [${experience}] "${title}" → ${url}`);
           continue;

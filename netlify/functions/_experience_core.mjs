@@ -86,9 +86,10 @@ export function isMidLevelTitle(title) {
 // (frontend hides/filters on this same rule; used here so cron_daily_stats.mjs
 // excludes senior postings from the statistics the same way).
 export const SENIOR_MIN_YEARS = 5;
-export function isSeniorExperience(experience) {
+export function isSeniorExperience(experience, title = "") {
   const n = normalizeText(experience);
-  if (/\b(senior|szenior|lead)\b/.test(n)) return true;
+  const titleNorm = normalizeText(title);
+  if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(`${n} ${titleNorm}`)) return true;
   const nums = n.match(/\d+/g);
   if (!nums) return false;
   return Math.min(...nums.map(x => parseInt(x, 10))) >= SENIOR_MIN_YEARS;

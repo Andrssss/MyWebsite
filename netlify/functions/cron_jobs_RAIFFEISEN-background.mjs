@@ -8,7 +8,8 @@
   Flow:
     1. POST API with pagination
     2. Parse row HTML (CSS classes, not data-cy)
-    3. Senior filter: level "Szenior" OR isSeniorLike(title)
+    3. Senior filter: csak a job_filters cím-denylist (a "Szenior" szint NEM
+       dob — 2026-07-20 óta elmentjük, a szint az experience fallbackja)
     4. Intern: level "Gyakornok" OR isInternshipTitle(title)
 */
 
@@ -21,6 +22,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -140,8 +142,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function postForm(url, body) {
@@ -209,7 +210,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -297,7 +298,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         // szint lentebb az experience fallbackja (a frontend badge a "szenior"
         // szó / évszám alapján jelöli).
         const levelLower = level.toLowerCase();
-        if (isSeniorLike(title)) {
+        if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[raiffeisen] SKIP senior "${title}" → ${url}`);
           continue;
@@ -354,7 +355,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
         // szám nélküli magyar fordulatok ("több éves", "többéves") felvétele az
         // extractBodyExperience-be — NEM a level fallback kilövése, mert azzal
         // pont ez a szenior sor kerülne be.
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[raiffeisen] SKIP senior-experience [${experience}] "${title}" → ${url}`);
           continue;

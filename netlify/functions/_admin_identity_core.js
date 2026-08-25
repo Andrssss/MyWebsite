@@ -104,6 +104,20 @@ function hasAdminSecret(event) {
   return token.length > 0 && safeEqual(token, expected);
 }
 
+// Does this request come from someone allowed to use the job-board pages AT ALL?
+// Since 2026-08-25 everything under /allasfigyelo is admin-only: ordinary
+// visitors are bounced to pestidev.hu before any fetch fires, and this is the
+// server-side half of that rule — a client-side redirect on its own would leave
+// every endpoint openly callable by anyone who knows the URL.
+//
+// Either admin tier qualifies by visitor cookie; an ADMIN_SECRET bearer also
+// does, so the repo's own maintenance scripts (scripts/audit_all_sources.mjs,
+// scripts/check_false_deactivations.mjs, ad-hoc curl checks) keep working
+// without a browser cookie.
+function hasJobBoardAccess(event) {
+  return isRecognizedAdmin(event) || hasAdminSecret(event);
+}
+
 module.exports = {
   VISITOR_COOKIE,
   adminKeys,
@@ -114,4 +128,5 @@ module.exports = {
   isRecognizedAdmin,
   resolveOwnerKey,
   hasAdminSecret,
+  hasJobBoardAccess,
 };

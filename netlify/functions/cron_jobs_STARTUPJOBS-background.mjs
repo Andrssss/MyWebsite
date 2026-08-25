@@ -51,6 +51,7 @@ import {
   extractTechnologies,
   isSeniorExperience,
 } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -102,8 +103,7 @@ function _blacklistRegex(k) {
 
 // job_filters title denylist — same uniform senior gate every scraper uses.
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function titleExperience(title) {
@@ -177,7 +177,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-", item.company ?? null, item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company ?? null, item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -240,7 +240,7 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
             continue;
           }
 
-          if (isSeniorLike(title)) {
+          if (shouldSkipTitleFilter(title, _filters)) {
             skippedSenior++;
             console.log(`[startupjobs] SKIP title-denylist "${title}" → ${url}`);
             continue;
@@ -251,7 +251,7 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
           const technologies = extractTechnologies(descriptionHtml);
           const company = normalizeWhitespace(job?.company?.name) || null;
 
-          if (isSeniorExperience(experience)) {
+          if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
             skippedSenior++;
             console.log(`[startupjobs] SKIP senior-experience [${experience}] "${title}" → ${url}`);
             continue;

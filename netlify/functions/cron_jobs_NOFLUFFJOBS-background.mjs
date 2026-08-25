@@ -7,6 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -19,9 +20,9 @@ const pool = new Pool({
 });
 
 const NOFLUFF_SOURCES = [
-  "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior",
-  "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior&sort=newest",
-  "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other%20seniority%3Dtrainee,junior",
+  "https://nofluffjobs.com/hu/budapest",
+  "https://nofluffjobs.com/hu/budapest?sort=newest",
+  "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other",
 ];
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -90,8 +91,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title);
-  return _filters.some((k) => _blacklistRegex(k).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function looksLikeNofluffJobUrl(url) {
@@ -298,7 +298,7 @@ async function upsertJob(client, item) {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
         DO NOTHING;`,
-    ["nofluffjobs", item.title, item.url, canonicalUrl, item.experience ?? "-", item.company || null]
+    ["nofluffjobs", item.title, item.url, canonicalUrl, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null]
   );
 }
 
@@ -336,7 +336,7 @@ async function scrapeNofluffjobs(client) {
     merged = merged
       .map((c) => ({ ...c, title: cleanJobTitle(c.title) ?? c.title }))
       .filter((c) => {
-        if (isSeniorLike(c.title)) {
+        if (shouldSkipTitleFilter(c.title, _filters)) {
           console.log(`[nofluffjobs]   [seniorFilter] KISZŰRVE: "${c.title}"`);
           return false;
         }

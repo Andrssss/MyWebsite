@@ -119,6 +119,7 @@ import {
   extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
   isSeniorExperience,
 } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 let _categories = [];
@@ -218,8 +219,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title);
-  return _filters.some((k) => _blacklistRegex(k).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 // Cross-source duplicate check (2026-08-18, user-döntés): ha egy másik forrás
@@ -329,7 +329,7 @@ async function upsertJob(client, item) {
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    ["alllocaljobs", item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
+    ["alllocaljobs", item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -520,7 +520,7 @@ async function scrapeAlllocaljobs(client) {
     seen.add(item.url);
     foundUrls.push(item.url);
 
-    if (isSeniorLike(item.title)) {
+    if (shouldSkipTitleFilter(item.title, _filters)) {
       skippedSenior++;
       continue;
     }
@@ -587,7 +587,7 @@ async function scrapeAlllocaljobs(client) {
       }
     }
 
-    if (isSeniorExperience(item.experience)) {
+    if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
       skippedSenior++;
       continue;
     }

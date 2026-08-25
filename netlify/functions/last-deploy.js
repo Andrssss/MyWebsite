@@ -1,6 +1,18 @@
 const https = require("https");
+const { hasJobBoardAccess } = require("./_admin_identity_core");
 
-exports.handler = async () => {
+exports.handler = async (event = {}) => {
+  // Only shown on the (now admin-only) /allasfigyelo page. Gated because the
+  // response is derived from a Netlify API call made with CRON_SECRET — no
+  // reason to hand deploy history to anyone who curls the URL.
+  if (!hasJobBoardAccess(event)) {
+    return {
+      statusCode: 401,
+      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store" },
+      body: JSON.stringify({ error: "Unauthorized" }),
+    };
+  }
+
   const token = process.env.CRON_SECRET;
   const siteId = process.env.SITE_ID;
 

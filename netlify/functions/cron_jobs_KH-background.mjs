@@ -27,6 +27,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -87,8 +88,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function fetchText(url, redirectLeft = 5) {
@@ -196,7 +196,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -282,7 +282,7 @@ export default withTimeout("cron_jobs_KH-background", async () => {
           continue;
         }
 
-        if (isSeniorLike(title)) {
+        if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[kh] SKIP senior "${title}" → ${url}`);
           continue;
@@ -325,7 +325,7 @@ export default withTimeout("cron_jobs_KH-background", async () => {
           }
         }
 
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[kh] SKIP senior-experience [${experience}] "${title}" → ${url}`);
           continue;

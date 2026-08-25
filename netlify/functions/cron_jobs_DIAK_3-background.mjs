@@ -7,13 +7,12 @@ const SOURCES = [
   { key: "otp", label: "OTP", url: "https://karrier.otpbank.hu/search/?searchby=location&createNewAlert=false&q=&locationsearch=Budapest&geolocation=&optionsFacetsDD_city=&optionsFacetsDD_customfield1=&optionsFacetsDD_customfield2=Informatika+%C3%A9s+digitaliz%C3%A1ci%C3%B3&optionsFacetsDD_title=&_gl=1*1tielcj*_up*MQ..*_ga*MTczNTU5MDI1Ni4xNzgwMzI1MTQ2*_ga_MS48V6C7P1*czE3ODAzMjUxNDYkbzEkZzAkdDE3ODAzMjUxNDYkajYwJGwwJGgw"},
   { key: "vizmuvek",  label:  "vizmuvek", url: "https://www.vizmuvek.hu/hu/karrier/gyakornoki-dualis-kepzes" },
   { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/budaors,budapest/bpo-services,health-services,other-services,others,pharmaceutical,horeca,itc,trade,agriculture,education" },
-  { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
   { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
   { key: "miszisz", label: "MISZISZ", url: "https://miszisz.hu/?post_type%5B%5D=munkaink&s=&mmin=0&mmax=8000&mvaros%5B%5D=0&mvaros%5B%5D=2&mvaros%5B%5D=3&mvaros%5B%5D=4&mvaros%5B%5D=6&mvaros%5B%5D=7&mvaros%5B%5D=8&mvaros%5B%5D=9&mvaros%5B%5D=10&mvaros%5B%5D=11&mvaros%5B%5D=12&mvaros%5B%5D=15&mvaros%5B%5D=17&mvaros%5B%5D=21&mvaros%5B%5D=68&mvaros%5B%5D=69&mvaros%5B%5D=368&mkat%5B%5D=231&mkat%5B%5D=40&mkat%5B%5D=257&mkat%5B%5D=41" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?utm_source=facebook&utm_medium=social_cpc&utm_campaign=hbp&utm_content=Instagram_Reels&utm_id=120239436336450697&utm_term=120239436336520697&fbclid=PAdGRleAP9v2xleHRuA2FlbQEwAGFkaWQBqy0hd5G9WXNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp-R_SE_c9O6KU5EqFghpD-ajuuKDtviyfnC4ISpI22VXvxQFO3UL-hd8sdBG_aem_9-6Oig3Ju0SERNEIrcg6kw&criteria=seniority%3Dtrainee,junior" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior&sort=newest" },
-  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other%20seniority%3Dtrainee,junior" },
+  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?utm_source=facebook&utm_medium=social_cpc&utm_campaign=hbp&utm_content=Instagram_Reels&utm_id=120239436336450697&utm_term=120239436336520697&fbclid=PAdGRleAP9v2xleHRuA2FlbQEwAGFkaWQBqy0hd5G9WXNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp-R_SE_c9O6KU5EqFghpD-ajuuKDtviyfnC4ISpI22VXvxQFO3UL-hd8sdBG_aem_9-6Oig3Ju0SERNEIrcg6kw" },
+  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest" },
+  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest?sort=newest" },
+  { key: "nofluffjobs", label: "nofluffjobs", url: "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other" },
 ];
 */
 
@@ -30,6 +29,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -177,8 +177,15 @@ const SOURCES = [
   // listából. (A kategória-path — pl. /itc — újra él, de a Bosch a mérnök-IT
   // posztjait "Industrial Production" alá sorolja, így az itc-lista a meglévő
   // sorainkat NEM fedné — élőben ellenőrizve: 0/21 találat.)
-  { key: "wherewework", label: "wherewework bucket (széles)", bucketOnly: true, url: "https://www.wherewework.hu/en/jobs/budaors,budapest" },
-  { key: "wherewework", label: "wherewework", url: "https://www.wherewework.hu/en/jobs/student-internship,entry-level-2-years/budapest?page=1" },
+  //
+  // 2026-08-25 (user-döntés, "mindenhol kell az összes level of experience"):
+  // a széles lista már NEM csak bucket — INGESTEL is, és az intern/entry-level
+  // szűkített lista megszűnt (részhalmaza a szélesnek, felesleges kör volt).
+  // A senior szintű találatokat nem dobjuk el: a _seniority_policy.mjs
+  // seniorAwareExperience()-e experience="senior"-ra írja őket, a frontend
+  // pedig alapból elrejti. A nem-IT zajt továbbra is a job_filters + a
+  // kategória-illesztés szűri, ugyanúgy, mint minden más forrásnál.
+  { key: "wherewework", label: "wherewework (minden szint)", url: "https://www.wherewework.hu/en/jobs/budaors,budapest" },
   { key: "onejob", label: "onejob", url: "https://onejob.hu/munkaink/?job__category_spec=informatika&job__location_spec=budapest" },
   { key: "miszisz", label: "MISZISZ", url: "https://miszisz.hu/?post_type%5B%5D=munkaink&s=&mmin=0&mmax=8000&mvaros%5B%5D=0&mvaros%5B%5D=2&mvaros%5B%5D=3&mvaros%5B%5D=4&mvaros%5B%5D=6&mvaros%5B%5D=7&mvaros%5B%5D=8&mvaros%5B%5D=9&mvaros%5B%5D=10&mvaros%5B%5D=11&mvaros%5B%5D=12&mvaros%5B%5D=15&mvaros%5B%5D=17&mvaros%5B%5D=21&mvaros%5B%5D=68&mvaros%5B%5D=69&mvaros%5B%5D=368&mkat%5B%5D=231&mkat%5B%5D=40&mkat%5B%5D=257&mkat%5B%5D=41" },
   // nofluffjobs → áttéve: cron_jobs_NOFLUFFJOBS-background.mjs
@@ -209,8 +216,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title = "", desc = "") {
-  const n = normalizeText(title);
-  return _filters.some(k => _blacklistRegex(k).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 
@@ -521,7 +527,7 @@ async function upsertJob(client, source, item) {
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [source, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -794,7 +800,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           return c;
         })
         .filter((c) => {
-          const filtered = isSeniorLike(c.title, c.description);
+          const filtered = shouldSkipTitleFilter(c.title, _filters);
           if (filtered) console.log(`${tag}   [seniorFilter] KISZŰRVE: "${c.title}"`);
           return !filtered;
         });
@@ -889,7 +895,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             item.technologies = technologies;
             await sleep(400);
           }
-          if (isSeniorExperience(item.experience)) {
+          if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
             console.log(`${tag}     SKIP senior [${item.experience}] "${item.title}"`);
             continue;
           }

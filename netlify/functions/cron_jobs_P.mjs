@@ -15,13 +15,23 @@ import { withTimeout } from "./_error-logger.mjs";
  * invocation. Background functions have a 15 min limit, which is enough for
  * full pagination of any single listing.
  */
+// 2026-08-25 (user-döntés: "profession-nél minden szintet akarok"): a P_2-ről
+// lekerült a `,gyakornok`, a P_6-ról a `,intern` szint-slug. A P_6 ezzel
+// karakterre azonos lett a P_1-gyel, ezért törölve — a P_2 viszont mostantól a
+// TELJES IT-üzemeltetés kategória (eddig CSAK a gyakornoki szeletét láttuk).
+// A senior találatokat nem dobjuk el: a seniorAwareExperience() experience=
+// "senior"-ra írja őket, a frontend alapból rejti.
+//
+// FIGYELEM: mind a task ugyanazt a source kulcsot használja ("profession-intern",
+// ld. cron_jobs_P-background.mjs) — a név mostantól félrevezető, DE nem nevezhető
+// át: a `source` a sor identitásának része (ON CONFLICT (source, url)), átnevezés
+// esetén minden meglévő sor árván maradna.
 const TASKS = [
   { jobName: "P_1", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23" },
-  { jobName: "P_2", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23,gyakornok" },
+  { jobName: "P_2", url: "https://www.profession.hu/allasok/it-uzemeltetes-telekommunikacio/budapest/1,25,23" },
   { jobName: "P_3", url: "https://www.profession.hu/allasok/adatbazisszakerto/budapest/1,10,23,0,200" },
   { jobName: "P_4", url: "https://www.profession.hu/allasok/programozo-fejleszto/budapest/1,10,23,0,75" },
   { jobName: "P_5", url: "https://www.profession.hu/allasok/tesztelo-tesztmernok/budapest/1,10,23,0,80" },
-  { jobName: "P_6", url: "https://www.profession.hu/allasok/it-programozas-fejlesztes/budapest/1,10,23,intern" },
 ];
 
 export default withTimeout("cron_jobs_P", async () => {

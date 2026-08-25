@@ -22,6 +22,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -697,9 +698,7 @@ function _blacklistRegex(k) {
 }
 
 function matchesKeywords(title, desc) {
-  const n = normalizeText(title ?? "");
-  const hasBlacklistedWord = _filters.some((k) => _blacklistRegex(k).test(n));
-  return !hasBlacklistedWord;
+  return !shouldSkipTitleFilter(title, _filters);
 }
 
 function findBlacklistHit(title, desc) {
@@ -708,8 +707,7 @@ function findBlacklistHit(title, desc) {
 }
 
 function isSeniorLike(title = "", desc = "") {
-  const n = normalizeText(title);
-  return _filters.some(k => _blacklistRegex(k).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 
@@ -1183,7 +1181,7 @@ async function upsertJob(client, source, item) {
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [source, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -1624,9 +1622,8 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // a 2026-07-29-i description-pollution csapda.
         matchedList = merged
           .filter((c) => c.inItField || matchesKeywords(c.title, "") || c.itSkill)
-          .filter((c) => !isSeniorLike(c.title, ""))
           .filter((c) => {
-            const hit = findBlacklistHit(c.title, "");
+            const hit = getBlockingFilterWord(c.title, _filters);
             if (hit) console.log(`[zyntern] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
             return !hit;
           });
@@ -1636,7 +1633,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // API sources: already pre-filtered to IT jobs – only apply blacklist on title, no false positives from description
         matchedList = [];
         for (const c of merged) {
-          const hit = findBlacklistHit(c.title, "");
+          const hit = getBlockingFilterWord(c.title, _filters);
           if (hit) {
             console.log(`[${source}] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);
           } else {
@@ -1648,7 +1645,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       } else {
         matchedList = merged
           .filter((c) => matchesKeywords(c.title, c.description))
-          .filter((c) => !isSeniorLike(c.title, c.description));
+          .filter((c) => !shouldSkipTitleFilter(c.title, _filters));
         console.log(`[${source}] matched=${matchedList.length}  total_before_filter=${merged.length}`);
         matchedList.forEach((c, i) => console.log(`[${source}]   MATCH[${i+1}] "${c.title}" → ${c.url}`));
       }
@@ -1772,6 +1769,3 @@ export default async (request) => {
   }
   return _runJob(request);
 };
-
-
-

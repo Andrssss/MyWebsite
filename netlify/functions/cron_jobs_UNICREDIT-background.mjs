@@ -37,6 +37,7 @@ import { isItJob } from "./_ai_ingest_core.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -102,9 +103,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  if (n.includes("senior") || n.includes("szenior")) return true;
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function fetchText(url, redirectLeft = 5) {
@@ -160,7 +159,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -244,7 +243,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           console.log(`[unicredit] SKIP non-IT "${job.title}" → ${job.url}`);
           continue;
         }
-        if (isSeniorLike(job.title)) {
+        if (shouldSkipTitleFilter(job.title, _filters)) {
           skippedSenior++;
           console.log(`[unicredit] SKIP senior "${job.title}" → ${job.url}`);
           continue;
@@ -288,7 +287,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           }
         }
 
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[unicredit] SKIP senior-experience [${experience}] "${job.title}" → ${job.url}`);
           continue;

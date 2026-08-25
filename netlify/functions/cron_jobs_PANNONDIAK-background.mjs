@@ -21,6 +21,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -69,8 +70,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function sleep(ms) {
@@ -156,7 +156,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, "diákmunka"]
+    [source, item.title, item.url, seniorAwareExperience(item.title, "diákmunka")]
   );
   return res.rowCount > 0;
 }
@@ -202,7 +202,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
         if (seen.has(job.url)) continue;
         seen.add(job.url);
 
-        if (isSeniorLike(job.title)) {
+        if (shouldSkipTitleFilter(job.title, _filters)) {
           skippedSenior++;
           console.log(`[pannondiak] SKIP senior "${job.title}"`);
           continue;

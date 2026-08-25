@@ -9,6 +9,7 @@ import { logFetchError } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -137,8 +138,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title = "", desc = "") {
-  const n = normalizeText(title);
-  return _filters.some(k => _blacklistRegex(k).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 // =====================
@@ -457,7 +457,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url)
       DO NOTHING    `,
-    [source, item.title, canonicalUrl, item.experience || null, item.company || null, item.technologies || null]
+    [source, item.title, canonicalUrl, seniorAwareExperience(item.title, item.experience) || null, item.company || null, item.technologies || null]
   );
 }
 
@@ -668,7 +668,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
     return { source, label: p.label, url: p.url, ok: false, error: err.message, foundUrls: [] };
   }
 
-  let matchedList = merged.filter((c) => !isSeniorLike(c.title, c.description));
+  let matchedList = merged.filter((c) => !shouldSkipTitleFilter(c.title, _filters));
   matchedList = matchedList.filter((c) => !isBlockedCompany(c.company, source));
 
   // Csak budapesti állások kellenek. A kiszűrt sorok a foundUrls-ból is kimaradnak,
@@ -765,7 +765,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
       }
       delete item.detailHtml;
 
-      if (isSeniorExperience(item.experience)) {
+      if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
         console.log(`[${source}] SKIP senior-experience [${item.experience}] "${item.title}" → ${item.url}`);
         continue;
       }

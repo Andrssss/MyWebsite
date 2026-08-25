@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const { withDbAuditFlush } = require("./_db_audit.js");
+const { hasJobBoardAccess } = require("./_admin_identity_core");
 const { TECH_KEYWORDS } = require("./_tech_keywords.js");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -68,7 +69,16 @@ exports.handler = withDbAuditFlush("categories", async (event) => {
     };
   }
 
-  // All mutations require the admin secret; only the read-only list is public.
+  // The whole /allasfigyelo area is admin-only now, so even the read-only
+  // category list needs a recognized caller (admin cookie or ADMIN_SECRET
+  // bearer). The scrapers don't go through here — load_categories.mjs reads
+  // the DB directly — so nothing legitimate calls this anonymously.
+  if (!hasJobBoardAccess(event)) {
+    return json(401, { error: "Unauthorized" });
+  }
+
+  // Mutations additionally require the admin secret itself — a little-admin
+  // cookie gets past the gate above but must not write.
   if (method !== "GET" && !authorized(event)) {
     return json(401, { error: "Unauthorized" });
   }

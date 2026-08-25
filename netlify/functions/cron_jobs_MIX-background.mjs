@@ -20,6 +20,7 @@ import {
   INTERNSHIP_KEYWORDS,
   isSeniorExperience,
 } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, isSeniorTitleFilterMatch, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -243,7 +244,7 @@ async function upsertJob(client, sourceKey, item) {
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, item.experience ?? "-", item.company || null, item.technologies ?? null]
+    [sourceKey, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -440,7 +441,7 @@ function inferExperience(title, description) {
   const fullNorm = normalizeText(`${title ?? ""} ${description ?? ""}`);
 
   if (INTERNSHIP_KEYWORDS.some(k => fullNorm.includes(k))) return "diákmunka";
-  if (_filters.some((kw) => _blacklistRegex(kw).test(titleNorm))) return "senior";
+  if (isSeniorTitleFilterMatch(title, _filters)) return "senior";
   if (/\bmedior\b/.test(titleNorm)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(titleNorm)) return "junior";
 
@@ -453,8 +454,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title, description) {
-  const normalized = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(normalized));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function extractMelonJobs(payload) {
@@ -479,7 +479,7 @@ function extractMelonJobs(payload) {
     })
     .filter((job) => job.title && job.url)
     .filter((job) => isBudapestLocation(job.location))
-    .filter((job) => !isSeniorLike(job.title, job.description));
+    .filter((job) => !shouldSkipTitleFilter(job.title, _filters));
 }
 
 // id → slug. Üres Map = a taxonómia nem érhető el; ilyenkor a hívó csak az
@@ -560,7 +560,7 @@ async function fetchAllMelonJobs() {
 
 function inferKukaExperience(title) {
   const normalized = normalizeText(title);
-  if (_filters.some((kw) => normalized.includes(normalizeText(kw))))
+  if (isSeniorTitleFilterMatch(title, _filters))
     return "senior";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
   // kuka "junior" hirdetései gyakornoki-egyenértékűek (üzleti szabály, korábban
@@ -657,9 +657,9 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       // szereplő url él a forráson, így a migrateVolatileUrl soha nem nevezheti át
       // alóla a sort.
       const dreamJobs = allDreamJobs.filter((job) => {
-        if (isSeniorLike(job.title, "")) return false;
+        if (shouldSkipTitleFilter(job.title, _filters)) return false;
         const exp = String(job.experience || "").toLowerCase();
-        if (/\bsenior\b/.test(exp)) return false;
+        if (shouldSkipSeniorExperience(/\bsenior\b/.test(exp))) return false;
         return true;
       });
       console.log(`dreamjobs: ${dreamJobs.length} IT jobs found (of ${currentUrls.length} listed)`);
@@ -673,7 +673,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         await enrichIfNew(job, known.get("dreamjobs"), extractBodyExperience, "cron_jobs_MIX");
         // Ideiglenes döntés (2026-08-01): a senior-flag pontos, de a nem-LinkedIn
         // forrásoknál insert előtt is kizárjuk — ne is kerüljön be a DB-be.
-        if (isSeniorExperience(job.experience)) continue;
+        if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
         await upsertJob(client, "dreamjobs", job);
       }
       console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
@@ -694,7 +694,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
 
       for (const job of melonJobs) {
         await enrichIfNew(job, known.get("melonjobs"), extractBodyExperience, "cron_jobs_MIX");
-        if (isSeniorExperience(job.experience)) continue;
+        if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
         await upsertJob(client, "melonjobs", job);
       }
       console.log(`melonjobs: ${melonJobs.length} jobs processed`);
@@ -713,12 +713,12 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       // Full paginated listing — the bucket for reconcile. Any fetch error throws
       // out to the catch below, so a partial crawl never reaches reconcileActive.
       const { jobs: allKukaJobs, complete: kukaComplete } = await fetchAllKukaJobs();
-      const kukaJobs = allKukaJobs.filter((job) => !isSeniorLike(job.title, ""));
+      const kukaJobs = allKukaJobs.filter((job) => !shouldSkipTitleFilter(job.title, _filters));
       console.log(`kuka: ${kukaJobs.length} jobs found (of ${allKukaJobs.length} listed)`);
 
       for (const job of kukaJobs) {
         await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX");
-        if (isSeniorExperience(job.experience)) continue;
+        if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);

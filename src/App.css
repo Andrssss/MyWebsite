@@ -839,3 +839,19 @@ body {
 
 
 
+
+/* Hozzáférés-ellenőrzés az /allasfigyelo alatt (JobAccessGate): a nem-admin
+   látogató átirányítás előtt ezt látja egy pillanatra. */
+.job-access-gate {
+  max-width: 640px;
+  margin: 4rem auto;
+  padding: 2rem;
+  text-align: center;
+  color: #e6e6e6;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.job-access-gate a {
+  color: #4ade80;
+}

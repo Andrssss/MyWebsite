@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const { withDbAuditFlush } = require("./_db_audit.js");
+const { hasJobBoardAccess } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -53,8 +54,16 @@ exports.handler = withDbAuditFlush("filters", async (event) => {
     };
   }
 
-  // Every mutating / data-reading-beyond-the-word-list action requires the
-  // admin secret. Only the plain filter-word list (GET) stays public.
+  // The whole /allasfigyelo area is admin-only now, so even the read-only
+  // filter-word list needs a recognized caller (admin cookie or ADMIN_SECRET
+  // bearer). It used to be public — nothing legitimate reads it anonymously:
+  // the scrapers go through load_filters.mjs, straight to the DB.
+  if (!hasJobBoardAccess(event)) {
+    return json(401, { error: "Unauthorized" });
+  }
+
+  // Every mutating action additionally requires the admin secret itself — a
+  // little-admin cookie gets past the gate above but must not write.
   if (method !== "GET" && !authorized(event)) {
     return json(401, { error: "Unauthorized" });
   }

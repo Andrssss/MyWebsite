@@ -14,6 +14,7 @@ import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -29,6 +30,16 @@ const pool = new Pool({
 // breadth and so the reactivate-only reconcile can heal live rows that rotate
 // back into the search. (&date=1 also returns near-empty results nowadays.)
 // We fetch the whole list and let ON CONFLICT DO NOTHING dedupe.
+// A talent.com kulcsszó NÉLKÜL (`?l=Budapest` üres `k=`-val) NULLA találatot ad —
+// élőben ellenőrizve 2026-08-25: a kártyák teljesen hiányoznak a HTML-ből, csak a
+// szűrő-vázat kapjuk vissza. Böngészhető IT-kategória sincs. Vagyis a `k=` KÖTELEZŐ,
+// és a lefedettséget kizárólag ez a lista adja — nem szint-, hanem kulcsszó-korlát.
+// 2026-08-25 (user-döntés): 12 → 39 kulcsszó. A nem-IT zajt a job_filters
+// cím-denylist szűri, ahogy minden más forrásnál.
+//
+// A bővítés OLCSÓ: a lapozó `no-new` ágon leáll, tehát az átfedő kulcsszavak
+// gyakorlatilag 1 oldal után kilépnek. A reconcile szempontjából pedig biztonságos:
+// több talált url = kevesebb deaktiválás, sosem több.
 const TALENT_SEARCH_URLS = [
   "https://hu.talent.com/jobs?k=fejleszt%C5%91&l=Budapest%2C+HU",
   "https://hu.talent.com/jobs?k=programoz%C3%B3&l=Budapest%2C+HU",
@@ -42,6 +53,33 @@ const TALENT_SEARCH_URLS = [
   "https://hu.talent.com/jobs?k=hardware&l=Budapest%2C+HU",
   "https://hu.talent.com/jobs?k=support&l=Budapest%2C+HU",
   "https://hu.talent.com/jobs?k=c%2B%2B&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=software&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=szoftver&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=szoftverm%C3%A9rn%C3%B6k&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=rendszerm%C3%A9rn%C3%B6k&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=rendszergazda&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=%C3%BCzemeltet%C5%91&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=informatikai&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=engineer&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=architect&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=java&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=python&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=javascript&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=sql&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=.net&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=c%23&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=php&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=frontend&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=backend&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=fullstack&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=cloud&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=security&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=adatb%C3%A1zis&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=network&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=android&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=ios&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=sap&l=Budapest%2C+HU",
+  "https://hu.talent.com/jobs?k=ai&l=Budapest%2C+HU",
 ];
 
 /* ── shared helpers ─────────────────────────────────────────── */
@@ -140,7 +178,7 @@ async function upsertJob(client, sourceKey, item) {
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
+    [sourceKey, item.title, item.url, seniorAwareExperience(item.title, item.experience), item.company || null, item.technologies ?? null]
   );
 }
 
@@ -152,8 +190,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const normalized = normalizeText(title);
-  return _filters.some((kw) => _blacklistRegex(kw).test(normalized));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 // INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
@@ -240,6 +277,7 @@ async function fetchAllTalentJobs() {
     let pagesVisited = 0;
     let stopReason = "max-pages";
     let totalAddedForKeyword = 0;
+    let emptyStreak = 0;
 
     for (let page = 1; page <= TALENT_MAX_PAGES; page += 1) {
       const pageUrl = buildTalentPagedUrl(searchUrl, page);
@@ -275,9 +313,14 @@ async function fetchAllTalentJobs() {
 
       console.log(`talent[${keyword}] page ${page}: ${jobs.length} jobs, ${newOnPage} new`);
 
+      // Két EGYMÁST KÖVETŐ új-találat nélküli oldal kell a leálláshoz. Egy is elég
+      // volt, amíg 12 kulcsszó futott; a bővített listánál viszont egy csupa-
+      // duplikátum első oldal levágta volna a mögötte lévő új találatokat.
       if (newOnPage === 0) {
-        stopReason = "no-new";
-        break;
+        emptyStreak += 1;
+        if (emptyStreak >= 2) { stopReason = "no-new"; break; }
+      } else {
+        emptyStreak = 0;
       }
 
       await sleep(1000);
@@ -299,7 +342,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
   try {
     /* talent.com */
     const { jobs: rawJobs, complete } = await fetchAllTalentJobs();
-    const afterSenior = rawJobs.filter((job) => !isSeniorLike(job.title));
+    const afterSenior = rawJobs.filter((job) => !shouldSkipTitleFilter(job.title, _filters));
     const talentJobs = afterSenior.filter((job) => !isBlockedCompany(job.company, "talent"));
     console.log(
       `talent: ${talentJobs.length} unique jobs found (after senior+company filter, ` +
@@ -332,7 +375,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
           await logFetchError("cron_jobs_T", { url: job.url, message: err.message, extra: { source: "talent" } });
         }
       }
-      if (isSeniorExperience(job.experience)) continue;
+      if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
       await upsertJob(client, "talent", job);
     }
     console.log(`talent: ${talentJobs.length} jobs processed`);

@@ -18,6 +18,7 @@ import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
   extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
 } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience } from "./_seniority_policy.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
    Lives here so ai-ingest.mjs and ai-registry.mjs can't drift apart on what
@@ -131,8 +132,7 @@ function blacklistRegex(k) {
 }
 
 export function isSeniorLike(title, filters) {
-  const n = normalizeText(title);
-  return (filters || []).some((k) => blacklistRegex(k).test(n));
+  return shouldSkipTitleFilter(title, filters);
 }
 
 /* ── location filter (user rule 2026-07-24: default Budapest-only) ──
@@ -195,11 +195,9 @@ function resolveExperience(job) {
   return extractYearsFromText(raw) || "-";
 }
 
-// NB: az AI-pipeline korábban a body-ból BECSÜLT évszám alapján is dobott
-// (isSeniorByYears, küszöb 3 év) — ezt 2026-07-20-án kivettük (user-döntés):
-// a magas évszámos találatot is elmentjük, a frontend csak megjelöli (senior
-// badge). A cím-denylist (isSeniorLike) maradt az egyetlen senior-kapu itt is,
-// mint minden más scrapernél.
+// Senior postings are stored and are hidden by default in the frontend.  Keep
+// the policy gate here so the source-specific title/experience classifiers
+// remain available without dropping the row before upsert.
 
 /* ── upsert (row fully built BEFORE insert — experience-write-policy) ── */
 
@@ -272,13 +270,10 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
     if (!job || !job.title || !job.url) continue;
     foundUrls.push(job.url);
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
-    if (isSeniorLike(job.title, filters)) { skippedSenior++; continue; }
+    if (shouldSkipTitleFilter(job.title, filters)) { skippedSenior++; continue; }
     if (isNonBudapestLocation(job.location)) { skippedLocation++; continue; }
-    const resolvedExperience = resolveExperience(job);
-    // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "évszám-
-    // alapú senior nem dob" szabály megfordult — most az experience-alapú
-    // senior-flag is kizár insert előtt, mint minden más (nem-LinkedIn) scrapernél.
-    if (isSeniorExperience(resolvedExperience)) { skippedSenior++; continue; }
+    const resolvedExperience = seniorAwareExperience(job.title, resolveExperience(job));
+    if (shouldSkipSeniorExperience(isSeniorExperience(resolvedExperience))) { skippedSenior++; continue; }
     if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
     await upsertJob(client, source, job, resolvedExperience);
     insertedUrls.push(job.url);

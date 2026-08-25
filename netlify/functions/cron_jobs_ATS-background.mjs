@@ -12,6 +12,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -68,8 +69,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const normalized = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(normalized));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function isHungaryLocation(loc) {
@@ -208,7 +208,7 @@ async function upsertJob(client, item) {
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [item.source, item.title, item.url, item.experience ?? "-", item.technologies ?? null]
+    [item.source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -254,7 +254,7 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
     }
 
     for (const item of deduped) {
-      if (isSeniorLike(item.title) || isSeniorExperience(item.experience)) {
+      if (shouldSkipTitleFilter(item.title, _filters) || shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
         console.log(`[ats] skip senior: "${item.title}" (${item.source})`);
         skippedSenior += 1;
         continue;

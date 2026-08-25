@@ -11,6 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { seniorAwareExperience } from "./_seniority_policy.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -144,7 +145,7 @@ async function upsertJob(client, sourceKey, item) {
       (source, title, url, experience, first_seen)
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, item.experience ?? "-"]
+    [sourceKey, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
   );
 }
 

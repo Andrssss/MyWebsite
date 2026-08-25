@@ -16,6 +16,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractBluebirdExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,8 +59,7 @@ function _blacklistRegex(k) {
 }
 
 function titleNotBlacklisted(title) {
-  const t = normalizeText(title);
-  return !_filters.some(word => _blacklistRegex(word).test(t));
+  return !shouldSkipTitleFilter(title, _filters);
 }
 
 function dedupeByUrl(items) {
@@ -171,13 +171,12 @@ async function upsertJob(client, source, item) {
       (source, title, url, experience, company, technologies, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [source, item.title, item.url, item.experience, item.company || null, item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience), item.company || null, item.technologies ?? null]
   );
 }
 
 function levelNotBlacklisted(title, desc) {
-  const t = normalizeText(title ?? "");
-  return !_filters.some((w) => _blacklistRegex(w).test(t));
+  return !shouldSkipTitleFilter(title, _filters);
 }
 
 // XMLParser-érték → trimmelt szöveg (CDATA sima stringként jön; attribútumos
@@ -292,7 +291,7 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
             await logFetchError("cron_jobs_BLUE", { url: it.url, message: err.message });
           }
         }
-        if (isSeniorExperience(it.experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(it.experience))) {
           console.log(`SKIP senior exp="${it.experience}" "${it.title}"`);
           continue;
         }

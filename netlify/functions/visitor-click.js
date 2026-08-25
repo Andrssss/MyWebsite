@@ -1,6 +1,7 @@
 // netlify/functions/visitor-click.js
 const { Pool } = require("pg");
 const { withDbAuditFlush } = require("./_db_audit.js");
+const { hasJobBoardAccess } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -85,6 +86,14 @@ function checkRateLimit(visitorId) {
 exports.handler = withDbAuditFlush("visitor-click", async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(), body: "" };
+  }
+
+  // Click tracking only ever fires from /allasfigyelo and /allasfigyelo/stats,
+  // both admin-only now — so an uncredentialed caller is by definition not the
+  // page. Gating it also closes the write path (anyone could stuff the
+  // analytics table before).
+  if (!hasJobBoardAccess(event)) {
+    return jsonResponse(401, { error: "Unauthorized" }, { "Cache-Control": "private, no-store" });
   }
 
   if (event.httpMethod === "GET") {

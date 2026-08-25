@@ -9,7 +9,8 @@
     1. POST API once
     2. Parse HTML fragment with cheerio
     3. Skip if location not Budapest
-    4. Skip if level "Szenior" OR isSeniorLike(title)
+    4. Skip only on the job_filters title-denylist (a "Szenior" career-level
+       NEM dob — 2026-07-20 óta elmentjük, a szint az experience-be kerül)
     5. Intern: level "Gyakornok" OR isInternshipTitle(title) → exp="diákmunka"
     6. Otherwise extract year-range from level (e.g. "Medior (2-5 év)" → "2-5 év")
 */
@@ -23,6 +24,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -96,8 +98,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function postJson(url, body) {
@@ -150,7 +151,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
   );
   return res.rowCount > 0;
 }
@@ -223,7 +224,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
         // elmentjük, a career-level lentebb az experience-be kerül (a frontend
         // badge a "szenior"/évszám alapján jelöli).
         const levelLower = careerLevel.toLowerCase();
-        if (isSeniorLike(title)) {
+        if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[mfb] SKIP senior "${title}" → ${url}`);
           continue;
@@ -239,7 +240,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           experience = m ? m[1].trim() : (careerLevel || "-");
         }
 
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[mfb] SKIP senior-experience [${experience}] "${title}" → ${url}`);
           continue;

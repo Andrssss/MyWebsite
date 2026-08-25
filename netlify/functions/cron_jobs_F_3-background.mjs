@@ -7,6 +7,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
 const SOURCE = "workly";
@@ -56,8 +57,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const t = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(t));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function isWorklyJobUrl(url) {
@@ -236,14 +236,14 @@ export default withTimeout(JOB_NAME, async (request) => {
       }
 
       for (const entry of entries) {
-        if (isSeniorLike(entry.title)) {
+        if (shouldSkipTitleFilter(entry.title, _filters)) {
           skippedSenior++;
           console.log(`[workly] SKIP senior "${entry.title}"`);
           continue;
         }
 
         const experience = detectExperience(entry.title, entry.cardText);
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[workly] SKIP senior-experience [${experience}] "${entry.title}"`);
           continue;
@@ -266,7 +266,7 @@ export default withTimeout(JOB_NAME, async (request) => {
            VALUES ($1,$2,$3,$4,$5,NOW())
            ON CONFLICT (source, url) DO NOTHING
            RETURNING id;`,
-          [SOURCE, entry.title, entry.url, experience, company]
+          [SOURCE, entry.title, entry.url, seniorAwareExperience(entry.title, experience), company]
         );
         if (res.rowCount > 0) {
           newlyInserted++;

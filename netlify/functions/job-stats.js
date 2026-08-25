@@ -3,6 +3,7 @@
 // Returns daily stats for the last 30 days + last 10 days.
 
 const { Pool } = require("pg");
+const { hasJobBoardAccess } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -12,18 +13,25 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-function jsonResponse(statusCode, body) {
+function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "https://bakan7.netlify.app",
+      ...extraHeaders,
     },
     body: JSON.stringify(body),
   };
 }
 
-exports.handler = async () => {
+exports.handler = async (event = {}) => {
+  // /allasfigyelo/stats is admin-only (see _admin_identity_core.hasJobBoardAccess):
+  // ordinary visitors are redirected to pestidev.hu and never reach this page.
+  if (!hasJobBoardAccess(event)) {
+    return jsonResponse(401, { error: "Unauthorized" }, { "Cache-Control": "private, no-store" });
+  }
+
   const client = await pool.connect();
   try {
     const now = new Date();

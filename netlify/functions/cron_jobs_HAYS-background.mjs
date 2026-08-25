@@ -65,6 +65,7 @@ import {
   extractTechnologies,
   isSeniorExperience,
 } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 const SOURCE = "Hays";
 const COMPANY = "Hays Hungary Kft.";
@@ -103,8 +104,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 // jobsv2 gives us a ready-to-use navigable URL in two shapes: the SEO slug
@@ -239,7 +239,7 @@ async function upsertJob(client, item) {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id`,
-    [SOURCE, item.title, item.url, COMPANY, item.experience, item.technologies ?? null]
+    [SOURCE, item.title, item.url, COMPANY, seniorAwareExperience(item.title, item.experience), item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -294,7 +294,7 @@ const _runJob = withTimeout("cron_jobs_HAYS-background", async () => {
       // able to deactivate an otherwise-live row.
       foundUrls.push(url);
 
-      if (isSeniorLike(title)) {
+      if (shouldSkipTitleFilter(title, _filters)) {
         skippedSenior++;
         continue;
       }
@@ -309,7 +309,7 @@ const _runJob = withTimeout("cron_jobs_HAYS-background", async () => {
         : extractBodyExperience(descHtml) || "-";
       const technologies = extractTechnologies(descHtml);
 
-      if (isSeniorExperience(experience)) {
+      if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
         skippedSenior++;
         continue;
       }

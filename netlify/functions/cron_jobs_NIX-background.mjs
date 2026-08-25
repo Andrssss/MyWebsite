@@ -50,6 +50,7 @@ import {
   extractTechnologies,
   isSeniorExperience,
 } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -131,8 +132,7 @@ function _blacklistRegex(k) {
 // job_filters title denylist (senior/lead/architect… words) — same signal every
 // other scraper uses.
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 // Lowest (most junior) seniority rank across a vacancy's level term ids, or null
@@ -234,7 +234,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-", "NIX", item.technologies ?? null]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", "NIX", item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -291,7 +291,7 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
         // (user-döntés 2026-07-20). Sem a taxonómia-senior, sem a leírásból becsült
         // magas évszám NEM dob többé: elmentjük, a frontend csak megjelöli (senior
         // badge). A cím marad az egyetlen megbízható, egységes senior-kapu.
-        if (isSeniorLike(title)) {
+        if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[nix] SKIP title-denylist "${title}" → ${url}`);
           continue;
@@ -310,7 +310,7 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
         // Ideiglenes felülírás (2026-08-01, user-döntés): a fenti 07-20-as "csak
         // cím-denylist dob" szabály mellett most az experience-alapú senior-flag
         // (taxonómia-senior/lead VAGY magas leírás-évszám) is kizár insert előtt.
-        if (isSeniorExperience(experience)) {
+        if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
           skippedSenior++;
           console.log(`[nix] SKIP senior-experience [${experience}] "${title}" → ${url}`);
           continue;

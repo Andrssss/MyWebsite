@@ -51,6 +51,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isInternshipTitle, extractYearsFromText } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 
@@ -112,8 +113,7 @@ function _blacklistRegex(k) {
 }
 
 function isSeniorLike(title) {
-  const n = normalizeText(title ?? "");
-  return _filters.some((kw) => _blacklistRegex(kw).test(n));
+  return shouldSkipTitleFilter(title, _filters);
 }
 
 function fetchText(url, redirectLeft = 5) {
@@ -226,7 +226,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, item.experience ?? "-"]
+    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
   );
   return res.rowCount > 0;
 }
@@ -296,7 +296,7 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
           continue;
         }
 
-        if (isSeniorLike(title)) {
+        if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[workcenter] SKIP senior "${title}"`);
           continue;

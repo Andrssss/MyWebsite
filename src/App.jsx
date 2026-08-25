@@ -19,6 +19,7 @@ import JobWatcher from "./JobWatcher.jsx";
 import Filters from "./Filters.jsx";
 import Categories from "./Categories.jsx";
 import JobStats from "./JobStats.jsx";
+import JobAccessGate from "./JobAccessGate.jsx";
 
 const AppContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -151,9 +152,11 @@ const AppContent = () => {
           <Route
             path="/allasfigyelo"
             element={
-              <div className="re-page">
-                <JobWatcher />
-              </div>
+              <JobAccessGate>
+                <div className="re-page">
+                  <JobWatcher />
+                </div>
+              </JobAccessGate>
             }
           />
 
@@ -161,9 +164,11 @@ const AppContent = () => {
           <Route
             path="/allasfigyelo/filters"
             element={
-              <div className="re-page">
-                <Filters />
-              </div>
+              <JobAccessGate>
+                <div className="re-page">
+                  <Filters />
+                </div>
+              </JobAccessGate>
             }
           />
 
@@ -171,9 +176,11 @@ const AppContent = () => {
           <Route
             path="/allasfigyelo/categories"
             element={
-              <div className="re-page">
-                <Categories />
-              </div>
+              <JobAccessGate>
+                <div className="re-page">
+                  <Categories />
+                </div>
+              </JobAccessGate>
             }
           />
 
@@ -181,9 +188,11 @@ const AppContent = () => {
           <Route
             path="/allasfigyelo/stats"
             element={
-              <div className="re-page">
-                <JobStats />
-              </div>
+              <JobAccessGate>
+                <div className="re-page">
+                  <JobStats />
+                </div>
+              </JobAccessGate>
             }
           />
 

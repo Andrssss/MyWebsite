@@ -116,7 +116,7 @@ const PRIVATE_HEADERS = {
 // duplicated copy here is exactly what caused the 2026-07-23 LITTLE_ADMIN_4..7
 // → ADMIN_1..4 rename to silently break this file while job-applied.js's
 // separate check kept working.
-const { isRecognizedAdmin } = require("./_admin_identity_core");
+const { isRecognizedAdmin, hasJobBoardAccess } = require("./_admin_identity_core");
 
 // One-line boot log so "is any key even configured?" is answerable from the
 // function log without exposing values. isRecognizedAdmin re-reads process.env
@@ -213,6 +213,14 @@ exports.handler = async (event) => {
       },
       body: "",
     };
+  }
+
+  // /allasfigyelo is admin-only since 2026-08-25: ordinary visitors are
+  // redirected to pestidev.hu before the page mounts, so nothing legitimate
+  // calls this endpoint without a credential. The redirect is UX; THIS is the
+  // access control — without it the whole job list stays a public URL away.
+  if (!hasJobBoardAccess(event)) {
+    return jsonResponse(401, { error: "Unauthorized" }, PRIVATE_HEADERS);
   }
 
   // Does this request see hidden rows? Decided ONCE per request and folded into

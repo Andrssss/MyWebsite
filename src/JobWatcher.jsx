@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLinkedin } from "react-icons/fa";
 import { adminFetch, purgeJobListCache, ensureAdminSecret } from "./adminAuth";
 import "./JobWatcher.css";
+import { useJobAccess } from "./JobAccessGate.jsx";
 
 const API_BASE_URL = "/.netlify/functions";
 const TIME_RANGE_24H = "24h";
@@ -95,13 +96,6 @@ const HIGHLIGHTED_KEYS_STORAGE = "jobWatcherHighlightedKeys";
 
 // Shared admin applied/interview list lives in the DB (see job-applied.js).
 const JOB_APPLIED_API = "/.netlify/functions/job-applied";
-const ADMIN_VISITOR_IDS = new Set([
-  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
-  "69872482-1311-4702-a5e5-a782ca9f2669",
-  "82906f93-dfbb-4684-b2b1-a948b99553e0",
-  "b878ceed-55b7-47db-87ec-c4e2825246f8",
-]);
-
 // Trim a job to just the fields the applied/interview list needs to render.
 const compactJob = (job) =>
   job
@@ -424,15 +418,17 @@ const isMediorExperience = (experience) => {
 
 // Senior JELÖLÉS + szűrés: alapból elrejtjük, "Csak senior" módban KIZÁRÓLAG
 // ezeket mutatjuk (ld. preTechJobs). Badge-elés is ebből. Két jel:
-//   1) explicit senior/lead szint-címke (pl. NIX taxonómia "senior", MFB/
+//   1) explicit senioritási címke (pl. senior/lead/head/principal/staff/chief/
+//      director/VP; NIX taxonómia "senior", MFB/
 //      Raiffeisen "Szenior" szint) — egyértelmű, nem évszám;
 //   2) évszám: a leírásból kinyert "5-10 years"/"7+ years"/"10 év" — a LEGKISEBB
 //      évszámot vesszük, csak ha az is >= SENIOR_MIN_YEARS ("3-5 év" min 3 → NEM).
 // Junior/medior/diákmunka/- szint-tokenben nincs se szám, se senior-szó → nem az.
 const SENIOR_MIN_YEARS = 5;
-const isSeniorExperience = (experience) => {
+const isSeniorExperience = (experience, title = "") => {
   const n = normalizeExperience(experience);
-  if (/\b(senior|szenior|lead)\b/.test(n)) return true;
+  const titleNorm = normalizeExperience(title);
+  if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(`${n} ${titleNorm}`)) return true;
   const nums = n.match(/\d+/g);
   if (!nums) return false;
   return Math.min(...nums.map((x) => parseInt(x, 10))) >= SENIOR_MIN_YEARS;
@@ -449,10 +445,32 @@ const getKeywordNotesForJob = (job) => {
 /* =======================
    KATEGÓRIÁK – dynamikusan betöltve az adatbázisból
 ======================= */
+// Kulcsszó → regex. Alapból MINDKÉT oldalon szóhatárt követel, hogy a "qa" ne
+// illeszkedjen a "qatar"-ra. A magyar viszont ragoz és összetesz, ezért a
+// kulcsszó `*`-gal jelölheti, hol NEM kell szóhatár:
+//   "fejlesztő"   → csak önálló szóként   (Webfejlesztő ✗, fejlesztőt ✗)
+//   "fejleszt*"   → előtagként            (fejlesztőt ✓, Webfejlesztő ✗)
+//   "*fejleszt*"  → bárhol a szóban       (Webfejlesztő ✓, Algoritmusfejlesztő ✓)
+// A `*` nélküli kulcsszavak viselkedése változatlan, tehát a meglévő ~465
+// kulcsszó közül egy sem illeszkedik másképp, mint eddig.
 function kwRegex(kw) {
-  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+  const openLeft = kw.startsWith("*");
+  const openRight = kw.endsWith("*");
+  const core = kw.replace(/^\*/, "").replace(/\*$/, "");
+  // Csupa `*` kulcsszó mindenre illeszkedne — inkább semmire se.
+  if (!core) return /(?!)/;
+  const escaped = core.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const left = openLeft ? "" : "(^|[^a-z0-9])";
+  const right = openRight ? "" : "([^a-z0-9]|$)";
+  return new RegExp(`${left}${escaped}${right}`, "i");
 }
+
+// A két gyűjtő-kategória neve. Az első a DB-ben is így hívják (a legyengébb
+// prioritású kategória: "fejlesztő, de semmi konkrétabb nem derült ki a
+// címből"), a második nem DB-kategória, hanem a "semmire sem illeszkedett"
+// halom neve a felületen.
+const FALLBACK_CATEGORY = "Egyéb fejlesztő";
+const UNCATEGORIZED = "Nem kategorizált";
 
 // Kategória-prioritás (erős → gyenge) — CSAK VÉGSŐ TIE-BREAK: a fenti egyedi
 // szabályok után, ha még mindig több kategória maradt, ez választ közülük egyet.
@@ -462,7 +480,7 @@ function kwRegex(kw) {
 const CATEGORY_PRIORITY = [
   "DevOps", "Security", "Data / AI", "Elemző / Analyst",
   "QA / Tesztelő", "Mobil", "Menedzser / PM", "UX/UI Design", "Webfejlesztés",
-  "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
+  "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", FALLBACK_CATEGORY,
 ];
 const categoryRank = (c) => {
   const i = CATEGORY_PRIORITY.indexOf(c);
@@ -479,24 +497,36 @@ const getCategoriesForJob = (job, jobCategories) => {
   const matches = jobCategories
     .filter(([, keywords]) => keywords.some((kw) => kwRegex(kw.toLowerCase()).test(title)))
     .map(([cat]) => cat);
-  // Ha a title tartalmaz "analyst" vagy "elemző" → mindig Elemző / Analyst (keywords-től függetlenül)
-  if (title.includes("analyst") || title.includes("elemző")) {
+  // Az alábbi két kemény szabály a kulcsszavak MEGKERÜLÉSÉVEL sorol be. Ez a
+  // legtöbb esetben jó, de nem szabad felülírnia egy konkrét szakma-találatot:
+  // a "SOC Analyst" security-s, a "test analyst" tesztelő, a "UX Designer – AI
+  // experiences" pedig UX-es. Ezért ha a cím ezek valamelyikét konkrétan
+  // megnevezte, a kemény szabályok kimaradnak, és a normál sorrend dönt.
+  const STRONG_CATEGORIES = ["Security", "QA / Tesztelő", "UX/UI Design"];
+  const hasStrongMatch = matches.some((c) => STRONG_CATEGORIES.includes(c));
+
+  // Ha a title tartalmaz "analyst" vagy "elemző" → Elemző / Analyst (keywords-től függetlenül)
+  if (!hasStrongMatch && (title.includes("analyst") || title.includes("elemző"))) {
     return ["Elemző / Analyst"];
   }
-  // Ha a title-ben különálló szóként szerepel "AI" → mindig Data / AI (keywords-től függetlenül)
-  if (/(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(job.title)) {
+  // Ha a title-ben különálló szóként szerepel "AI" → Data / AI (keywords-től függetlenül).
+  // DE csak ha az AI a szakterület, nem ha csak jelző: az "AI-assisted developer"
+  // fejlesztő, aki AI-t HASZNÁL, nem AI-fejlesztő.
+  const aiIsModifier =
+    /(^|[^a-z0-9])ai[-\s](assisted|enabled|native|powered|empowered|driven|first|asszisztált|asszisztalt|alapú|alapu|támogatott|tamogatott)/i.test(job.title);
+  if (!hasStrongMatch && !aiIsModifier && /(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(job.title)) {
     return ["Data / AI"];
   }
   // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
-  if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
+  if (!hasStrongMatch && matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
     return ["Elemző / Analyst"];
   }
   // Ha több kategória matchelt és az egyik DevOps → csak DevOps
   if (matches.length > 1 && matches.includes("DevOps")) {
     return ["DevOps"];
   }
-  // Fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen (így Hálózat/Infra és Mérnöki/Gyártás is erősebb nála)
-  const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
+  // Egyéb fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen (így Hálózat/Infra és Mérnöki/Gyártás is erősebb nála)
+  const withoutFallback = matches.filter((c) => c !== FALLBACK_CATEGORY);
   const effective = withoutFallback.length > 0 ? withoutFallback : matches;
   // Hálózat / Infra alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
   let result;
@@ -558,18 +588,17 @@ const JobWatcher = () => {
   const debugMode = new URLSearchParams(window.location.search).has("debug");
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
-  // Set by the cheap identity probe below (limit=1 request) as soon as it
-  // resolves, so little-admin visitors don't need the full jobs payload just
-  // to unlock the rest of their fetches.
-  const [littleAdminProbed, setLittleAdminProbed] = useState(false);
-  // Admin-only controls are gated on a SERVER-CONFIRMED signal, not on the local
-  // cookie: jobs.js sends the `hidden` column to little-admin and to nobody else,
-  // so its mere presence proves the server validated the key. Faking the cookie
-  // client-side yields a response without `hidden` → the controls stay hidden.
-  const isLittleAdmin = useMemo(
-    () => littleAdminProbed || jobs.some((j) => typeof j.hidden === "boolean"),
-    [littleAdminProbed, jobs]
-  );
+  // Both admin tiers come from JobAccessGate, which already asked the server
+  // (`job-access`) before this component was allowed to mount. That verdict is
+  // SERVER-CONFIRMED — the credential is the visitor cookie matched against the
+  // ADMIN_* / LITTLE_ADMIN* env vars, so faking the cookie client-side changes
+  // nothing: every job-board endpoint re-checks it on its own.
+  //
+  // This replaced two older client-side signals: a source-committed UUID
+  // allowlist (public in the repo, so not a credential at all) and a
+  // `jobs?limit=1` probe that sniffed for the `hidden` column.
+  const { tier } = useJobAccess();
+  const isLittleAdmin = tier === "little";
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
@@ -669,41 +698,16 @@ const JobWatcher = () => {
   const [editingAppliedKey, setEditingAppliedKey] = useState(null);
   const manualCardRef = useRef(null);
   const myVisitorId = useMemo(() => getOrCreateVisitorId(), []);
-  const isAdmin = useMemo(() => ADMIN_VISITOR_IDS.has(myVisitorId), [myVisitorId]);
-  // New-postings browsing moved to https://pestidev.hu — ordinary
-  // visitors here only keep their existing "jelentkeztem" list. Admins (both
-  // tiers) are untouched, since they still manage the data from this site.
+  const isAdmin = tier === "admin";
+  // New-postings browsing moved to https://pestidev.hu. Ordinary visitors are
+  // now redirected there by JobAccessGate before this component mounts, so this
+  // can no longer be true in practice — it stays as the in-component fallback
+  // in case JobWatcher is ever rendered outside the gate.
   const isRestricted = !isAdmin && !isLittleAdmin;
 
   useEffect(() => {
     if (isRestricted) setShowAppliedOnly(true);
   }, [isRestricted]);
-
-  // Ordinary visitors no longer need the admin-only data (sources/categories/
-  // technologies/last-deploy/full jobs list) — this page just points them to
-  // pestidev.hu now, they only need their own "jelentkeztem" list.
-  // But little-admin status can ONLY be confirmed by the server (via the
-  // `hidden` column on a jobs response), so a single minimal probe still runs
-  // for everyone not already known to be admin — cheap enough (limit=1) to be
-  // worth keeping so little-admin devices keep unlocking automatically.
-  useEffect(() => {
-    if (isAdmin) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/jobs?limit=1`);
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data) && data.some((j) => typeof j.hidden === "boolean")) {
-          setLittleAdminProbed(true);
-        }
-      } catch {
-        // ordinary visitor, or probe failed — stays restricted
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdmin]);
 
   // One-time local migration of legacy title-keyed marks to url keys
   // (matters for non-admins, whose marks live only in localStorage).
@@ -1330,11 +1334,11 @@ const JobWatcher = () => {
   const categoryCounts = useMemo(() => {
     const counts = {};
     for (const [cat] of jobCategories) counts[cat] = 0;
-    counts["Egyéb"] = 0;
+    counts[UNCATEGORIZED] = 0;
     for (const job of jobs) {
       const cats = getCategoriesForJob(job, jobCategories);
       if (cats.length === 0) {
-        counts["Egyéb"]++;
+        counts[UNCATEGORIZED]++;
       } else {
         for (const cat of cats) counts[cat]++;
       }
@@ -1401,7 +1405,7 @@ const JobWatcher = () => {
     setCategoryStates(() => {
       const updated = {};
       if (state !== "neutral") {
-        const cats = jobCategories.map(([cat]) => cat).concat("Egyéb");
+        const cats = jobCategories.map(([cat]) => cat).concat(UNCATEGORIZED);
         for (const cat of cats) updated[cat] = state;
       }
       localStorage.setItem("jobWatcherCategoryStates", JSON.stringify(updated));
@@ -1568,7 +1572,7 @@ const JobWatcher = () => {
 
     // Alapból a senior-jelölésű állásokat elrejtjük; a "Csak senior" mód
     // megfordítja ezt, és KIZÁRÓLAG a senior-jelölésűeket mutatja.
-    list = list.filter((j) => isSeniorExperience(j.experience) === seniorMode);
+    list = list.filter((j) => isSeniorExperience(j.experience, j.title) === seniorMode);
 
     const selected = Object.keys(sourceStates).filter(
       (k) => sourceStates[k] === "selected"
@@ -1589,13 +1593,13 @@ const JobWatcher = () => {
     if (selectedCats.length) {
       list = list.filter((j) => {
         const cats = getCategoriesForJob(j, jobCategories);
-        if (cats.length === 0) return selectedCats.includes("Egyéb");
+        if (cats.length === 0) return selectedCats.includes(UNCATEGORIZED);
         return cats.some((c) => selectedCats.includes(c));
       });
     } else if (excludedCats.length) {
       list = list.filter((j) => {
         const cats = getCategoriesForJob(j, jobCategories);
-        if (cats.length === 0) return !excludedCats.includes("Egyéb");
+        if (cats.length === 0) return !excludedCats.includes(UNCATEGORIZED);
         return !cats.some((c) => excludedCats.includes(c));
       });
     }
@@ -1691,7 +1695,7 @@ const JobWatcher = () => {
 
     const catChips = jobCategories
       .map(([cat]) => cat)
-      .concat("Egyéb")
+      .concat(UNCATEGORIZED)
       .filter((cat) => (categoryStates[cat] || "neutral") !== "neutral")
       .map((cat) => ({
         key: `cat-${cat}`,
@@ -1730,10 +1734,16 @@ const JobWatcher = () => {
 
   const neutralCategories = useMemo(
     () =>
-      jobCategories
-        .map(([cat]) => cat)
+      // A két gyűjtő-halom mindig a lista VÉGÉRE kerül, ábécérend ide-oda: a
+      // sorrend így azt tükrözi, ahogy a besorolás is dönt — előbb a konkrét
+      // szakterületek, aztán "fejlesztő, de nem tudjuk mi", végül "semmi".
+      [...jobCategories.map(([cat]) => cat)]
+        .filter((cat) => cat !== FALLBACK_CATEGORY)
         .sort((a, b) => a.localeCompare(b, "hu"))
-        .concat("Egyéb")
+        .concat(
+          jobCategories.some(([cat]) => cat === FALLBACK_CATEGORY) ? [FALLBACK_CATEGORY] : [],
+          UNCATEGORIZED
+        )
         .filter((cat) => (categoryStates[cat] || "neutral") === "neutral"),
     [jobCategories, categoryStates]
   );
@@ -2597,7 +2607,7 @@ const JobWatcher = () => {
                     {job.title}
                     {debugMode && (
                       <span style={{ color: "#f50b0b", marginLeft: 6, fontSize: "0.85em" }}>
-                        [{getCategoriesForJob(job, jobCategories).join(", ") || "Egyéb"}]
+                        [{getCategoriesForJob(job, jobCategories).join(", ") || UNCATEGORIZED}]
                       </span>
                     )}
                   </a>
@@ -2640,7 +2650,7 @@ const JobWatcher = () => {
 
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
-                {isSeniorExperience(job.experience) && (
+                {isSeniorExperience(job.experience, job.title) && (
                   <span
                     className="job-senior-badge"
                     title="Minimum tapasztalat ≥ 5 év — valószínűleg nem belépő/junior szint"
@@ -2652,7 +2662,7 @@ const JobWatcher = () => {
                   <span
                     className={
                       "job-experience" +
-                      (isSeniorExperience(job.experience) ? " job-experience--senior" : "")
+                      (isSeniorExperience(job.experience, job.title) ? " job-experience--senior" : "")
                     }
                   >
                     {job.experience}

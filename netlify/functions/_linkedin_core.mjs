@@ -7,6 +7,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError } from "./_error-logger.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
 const ENABLE_FETCH_ERROR_LOGGING = false;
@@ -46,8 +47,7 @@ function _blacklistRegex(k) {
 }
 
 function titleNotBlacklisted(title) {
-  const t = normalizeText(title);
-  return !_filters.some(word => _blacklistRegex(word).test(t));
+  return !shouldSkipTitleFilter(title, _filters);
 }
 
 function dedupeByUrl(items) {
@@ -239,10 +239,13 @@ async function upsertJob(client, source, item) {
     source === "LinkedIn"
       ? canonicalizeLinkedInJobUrl(item.url)
       : item.url;
-  const experience = isInternshipTitle(item.title) ? "diákmunka"
-    : isJuniorTitle(item.title) ? "junior"
-    : isMidLevelTitle(item.title) ? "medior"
-    : "-";
+  const experience = seniorAwareExperience(
+    item.title,
+    isInternshipTitle(item.title) ? "diákmunka"
+      : isJuniorTitle(item.title) ? "junior"
+      : isMidLevelTitle(item.title) ? "medior"
+      : "-",
+  );
 
   await client.query(
     `INSERT INTO job_posts
@@ -259,8 +262,7 @@ async function upsertJob(client, source, item) {
 }
 
 function levelNotBlacklisted(title, desc) {
-  const t = normalizeText(title ?? "");
-  return !_filters.some((w) => _blacklistRegex(w).test(t));
+  return !shouldSkipTitleFilter(title, _filters);
 }
 
 // =====================
