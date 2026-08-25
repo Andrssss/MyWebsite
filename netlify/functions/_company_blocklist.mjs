@@ -38,6 +38,15 @@ export const LINKEDIN_COMPANY_BLOCKLIST = [
   "bosch hungary",
   "kuka",
   "kuka systems gmbh branch office paris",
+  // user-döntés 2026-08-25: a "[ WhereWeWork Jobs ]" nem munkáltató, hanem a
+  // wherewework.hu állásaggregátor saját LinkedIn-oldala — ugyanazok a
+  // hirdetések már bekerülnek a `wherewework` forrásból, LinkedIn-en csak
+  // duplikátumot csinálnak. Több írásmód is listázva (a kártyán szögletes
+  // zárójellel jelenik meg), hogy egy név-tisztítás se szivárogtassa vissza.
+  "[ wherewework jobs ]",
+  "[wherewework jobs]",
+  "wherewework jobs",
+  "wherewework",
 ];
 
 // profession-intern-only (user-döntés 2026-08-11): a "Mind-Diák Szövetkezet"
