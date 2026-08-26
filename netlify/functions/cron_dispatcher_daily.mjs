@@ -58,14 +58,9 @@ const TARGETS = [
   // cron_jobs_ATSCRAWL-background NEM itt van: 2026-08-26-tól óránként fut a
   // cron_scheduler.mjs :40 percében (user-döntés — ugyanaz a tempó, mint a
   // LinkedIn-é). Csak a FELDERÍTŐ fele maradt napi, lentebb.
-  // ATS slug-felderítés (WEB_CRAWLER_PLAN.md F2, added 2026-08-26): a
-  // job_posts.company cégnevekből slug-jelölteket képez és leprobálja őket a
-  // három tiszta-404-es provideren; a találatok az ats_tenants-be kerülnek, és
-  // a következő ÓRÁS körben már aratja is őket az ATSCRAWL worker.
-  // Ez a fele szándékosan NAPI marad: futásonként ~45 jelölt × max 3 kérés
-  // idegen API-k felé, és a cégnév-utánpótlás napokban mérhető, nem órákban —
-  // óránként lőni ugyanezt puszta pazarlás lenne.
-  { name: "cron_ats_discover-background" },
+  // cron_ats_discover-background SINCS itt: 2026-08-26-tól szintén óránként fut
+  // (cron_scheduler.mjs :25). Napi ütemmel a kezdeti cégnév-backlog hónapokig
+  // tartott volna — lásd az ottani kommentet.
   // Cross-source safety net: deactivates any active non-LinkedIn job whose URL
   // now returns HTTP 404 (see _active_core.mjs sweepActive404). Once/day is
   // plenty — the per-source reconcile handles the common case hourly.

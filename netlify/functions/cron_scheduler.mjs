@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "2,5,6,7,9,10,11,13,14,17,18,19,21,22,23 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,13,14,17,18,19,21,22,23,25 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -49,6 +49,16 @@ const GRID = {
   19: [{ name: "cron_jobs_BLUE-background" }],         // bluebird (~19)
   21: [{ name: "cron_jobs_DIAK_1-background" }],       // schonherz/minddiak/muisz (~20)
   23: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
+  // ATS slug-felderítés (2026-08-26): eredetileg napi tierre tettem, tévesen.
+  // Napi 45 jelölt jó a STEADY STATE-re (új cégnév csak annyi jön, amennyi új
+  // hirdetés), de a KEZDETI BACKLOG-ra nem: a job_posts több ezer különböző
+  // cégnevet tartalmaz, azokból cégenként max 4 slug-jelölt lesz, és 45/nap
+  // mellett ez hónapokig tartana. Óránként ugyanez a keret ~16-szoros átfutás,
+  // változatlan burst-mérettel (futásonként max 45 jelölt × max 3 kérés, 150 ms
+  // szünettel) — a backlog napok alatt fogy el, nem hónapok alatt.
+  // Ha nincs esedékes jelölt, a futás azonnal véget ér: magától elhal, amint a
+  // backlog elfogyott, és onnantól csak az új cégneveket nézi.
+  25: [{ name: "cron_ats_discover-background" }],      // ATS slug-felderítés
   22: [{ name: "cron_jobs_F_3-background", body: { startPage: 1 } }], // workly (~17)
   // ats-crawl (2026-08-26): napi tierről ide költöztetve, user-döntés — óránként
   // fut, mint a LinkedIn. A perc :14 (user-választás), ami a MEGLÉVŐ :00-:32
