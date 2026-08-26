@@ -63,6 +63,35 @@ export default withDbAuditFlush("tmp_stats_rebuild", async (request) => {
   const client = await pool.connect();
   try {
     const jobCategories = await loadCategories();
+
+    // verify=1 → csak visszaolvassa, mi VAN a táblákban (nem számol újra),
+    // hogy az újraépítés eredménye független lekérdezésből is látszódjon.
+    if (url.searchParams.get("verify") === "1") {
+      const { rows: span } = await client.query(
+        `SELECT TO_CHAR(MIN(date), 'YYYY-MM-DD') AS min_date,
+                TO_CHAR(MAX(date), 'YYYY-MM-DD') AS max_date,
+                COUNT(*)::int AS days,
+                SUM(total_jobs)::int AS total_jobs,
+                SUM(intern_jobs)::int AS intern_jobs
+           FROM job_daily_stats`
+      );
+      const { rows: byMonth } = await client.query(
+        `SELECT TO_CHAR(DATE_TRUNC('month', date), 'YYYY-MM') AS month,
+                COUNT(*)::int AS days,
+                SUM(total_jobs)::int AS total_jobs,
+                SUM(intern_jobs)::int AS intern_jobs
+           FROM job_daily_stats GROUP BY 1 ORDER BY 1`
+      );
+      const { rows: cats } = await client.query(
+        `SELECT category, SUM(count)::int AS count,
+                TO_CHAR(MIN(date), 'YYYY-MM-DD') AS first_date,
+                TO_CHAR(MAX(date), 'YYYY-MM-DD') AS last_date
+           FROM job_daily_categories
+          WHERE category NOT LIKE 'intern:%'
+          GROUP BY 1 ORDER BY 2 DESC`
+      );
+      return json(200, { ok: true, verify: true, span: span[0], byMonth, categories: cats });
+    }
     const result = await rebuildStats(client, jobCategories, { from, to, dryRun });
     return json(200, {
       ok: true,
