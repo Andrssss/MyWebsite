@@ -1,6 +1,10 @@
 // netlify/functions/cron_daily_stats.mjs
 // Napi statisztika: hány álláshirdetés érkezett ma, abból hány diák/intern.
 // Minden nap 23:59 UTC-kor fut.
+//
+// A kategorizálás és a nap-összesítés a KÖZÖS _stats_core.mjs-ben lakik
+// (ugyanaz a szabálykészlet, amit a board használ) — itt szándékosan NINCS
+// másolat belőle, mert pont az ilyen másolatok csúsztak el a frontendtől.
 
 export const config = {
   schedule: "59 23 * * *",
@@ -9,7 +13,7 @@ export const config = {
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadCategories } from "./load_categories.mjs";
-import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isSeniorExperience } from "./_experience_core.mjs";
+import { computeDayStats } from "./_stats_core.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -20,100 +24,16 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// INTERN_SOURCES / INTERNSHIP_KEYWORDS imported from _experience_core.mjs
-const INTERN_TITLE_KEYWORDS = INTERNSHIP_KEYWORDS;
-
-const ZERO_RANGE_EXPERIENCE_REGEX = String.raw`(^|[^0-9])(0\s*[-–/]\s*[1-9][0-9]*|0\s*(?:\+)?\s*(?:év|éves|ev|eves|year|years|yr|yrs))([^0-9]|$)`;
-
-function kwRegex(kw) {
-  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
-}
-
-// Kategória-prioritás (erős → gyenge) — CSAK VÉGSŐ TIE-BREAK a fenti egyedi
-// szabályok után, ha még mindig több kategória maradt. A frontend
-// getCategoriesForJob-bal SZINKRONBAN tartandó (src/JobWatcher.jsx).
-const CATEGORY_PRIORITY = [
-  "DevOps", "Security", "Data / AI", "Elemző / Analyst",
-  "QA / Tesztelő", "Mobil", "Menedzser / PM", "UX/UI Design", "Webfejlesztés",
-  "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", "Fejlesztő",
-];
-const categoryRank = (c) => {
-  const i = CATEGORY_PRIORITY.indexOf(c);
-  return i === -1 ? CATEGORY_PRIORITY.length : i;
-};
-
-function categorizeJobs(rows, JOB_CATEGORIES) {
-  const counts = {};
-  for (const [cat] of JOB_CATEGORIES) counts[cat] = 0;
-  counts["Egyéb"] = 0;
-
-  for (const row of rows) {
-    const title = (row.title || "").toLowerCase();
-    const matches = JOB_CATEGORIES
-      .filter(([, kws]) => kws.some((kw) => kwRegex(kw.toLowerCase()).test(title)))
-      .map(([cat]) => cat);
-    // Ha a title tartalmaz "analyst" vagy "elemző" → mindig Elemző / Analyst (keywords-től függetlenül)
-    if (title.includes("analyst") || title.includes("elemző")) {
-      counts["Elemző / Analyst"] = (counts["Elemző / Analyst"] || 0) + 1;
-      continue;
-    }
-    // Ha a title-ben különálló szóként szerepel "AI" → mindig Data / AI (keywords-től függetlenül)
-    if (/(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(row.title || "")) {
-      counts["Data / AI"] = (counts["Data / AI"] || 0) + 1;
-      continue;
-    }
-    // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
-    if (matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
-      counts["Elemző / Analyst"]++;
-      continue;
-    }
-    // Ha több kategória matchelt és az egyik DevOps → csak DevOps
-    if (matches.length > 1 && matches.includes("DevOps")) {
-      counts["DevOps"]++;
-      continue;
-    }
-    // Fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen
-    const withoutFallback = matches.filter((c) => c !== "Fejlesztő");
-    const effective = withoutFallback.length > 0 ? withoutFallback : matches;
-    // Hálózat / Infra alacsony prioritású (de Fejlesztőnél erősebb)
-    let cats;
-    if (effective.length > 1 && effective.includes("Hálózat / Infra")) {
-      cats = effective.filter((c) => c !== "Hálózat / Infra");
-    } else if (effective.length > 1 && effective.includes("Mérnöki / Gyártás")) {
-      cats = effective.filter((c) => c !== "Mérnöki / Gyártás");
-    } else {
-      cats = effective;
-    }
-
-    // VÉGSŐ tie-break: ha a fenti szabályok után IS több kategória maradt, a prioritás dönt → egy kategória.
-    if (cats.length > 1) {
-      cats = [[...cats].sort((a, b) => categoryRank(a) - categoryRank(b))[0]];
-    }
-    if (cats.length > 0) {
-      for (const cat of cats) counts[cat]++;
-    } else {
-      counts["Egyéb"]++;
-    }
-  }
-  return Object.entries(counts)
-    .filter(([, c]) => c > 0)
-    .map(([category, count]) => ({ category, count }))
-    .sort((a, b) => b.count - a.count);
-}
-
 export default withTimeout("cron_daily_stats", async function handler() {
   const client = await pool.connect();
   try {
     // Kategóriák betöltése adatbázisból
     const JOB_CATEGORIES = await loadCategories();
 
-    // Előző napi dátum (UTC): a statisztikát mindig tegnapra mentjük
-    const statsDate = new Date();
-    statsDate.setUTCDate(statsDate.getUTCDate() );
-    const today = statsDate.toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
 
-    // Mai összes új munka (experience is szükséges a senior kizáráshoz)
+    // A mai nap összes új munkája (title + source + experience kell a
+    // senior-kizáráshoz és a diák/intern felismeréshez)
     const { rows: todayRows } = await client.query(
       `SELECT title, source, experience
        FROM job_posts
@@ -121,24 +41,8 @@ export default withTimeout("cron_daily_stats", async function handler() {
       [today]
     );
 
-    // Senior hirdetéseket kizárjuk a statisztikából — frontend logikával
-    // szinkronban (ld. isSeniorExperience a JobWatcher.jsx-ben és _experience_core.mjs-ben).
-    const todayJobs = todayRows.filter((row) => !isSeniorExperience(row.experience));
-    const totalJobs = todayJobs.length;
-
-    // Mai diák/intern munkák: forrás alapján VAGY cím/experience kulcsszó alapján
-    const zeroRangeRegex = new RegExp(ZERO_RANGE_EXPERIENCE_REGEX, "i");
-    const internJobRows = todayJobs.filter((row) => {
-      const title = (row.title || "").toLowerCase();
-      const experience = (row.experience || "").toLowerCase();
-      return (
-        INTERN_SOURCES.includes(row.source) ||
-        INTERN_TITLE_KEYWORDS.some((kw) => title.includes(kw)) ||
-        INTERN_TITLE_KEYWORDS.some((kw) => experience.includes(kw)) ||
-        zeroRangeRegex.test(experience)
-      );
-    });
-    const internJobs = internJobRows.length;
+    const { totalJobs, internJobs, categories, internCategories } =
+      computeDayStats(todayRows, JOB_CATEGORIES);
 
     // Upsert a napi statisztikába
     await client.query(
@@ -150,8 +54,6 @@ export default withTimeout("cron_daily_stats", async function handler() {
     );
 
     // Kategória bontás mentése (összes, senior nélkül)
-    const categories = categorizeJobs(todayJobs, JOB_CATEGORIES);
-
     for (const { category, count } of categories) {
       await client.query(
         `INSERT INTO job_daily_categories (date, category, count)
@@ -163,8 +65,6 @@ export default withTimeout("cron_daily_stats", async function handler() {
     }
 
     // Intern kategória bontás mentése (prefix: "intern:")
-    const internCategories = categorizeJobs(internJobRows, JOB_CATEGORIES);
-
     for (const { category, count } of internCategories) {
       await client.query(
         `INSERT INTO job_daily_categories (date, category, count)
