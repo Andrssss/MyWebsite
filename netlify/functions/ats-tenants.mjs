@@ -74,6 +74,66 @@ function authDiagnostic(request) {
   };
 }
 
+/* ── a routine használati utasítása — ITT él, nem egy külön dokumentumban ──
+   Azért a válasz része, mert a routine tárolt promptja nehezen frissíthető
+   (kézzel, a felületen), a repo-beli .md fájlok pedig ebben a projektben
+   gitignore-oltak (`*.md`), tehát egy működési utasításnak ott a legrosszabb
+   helye: nem verziókövetett és a routine nem is látja. Így a promptba elég egy
+   sor ("hívd meg a GET-et és kövesd az instructions mezőt"), a tartalom pedig
+   deployjal frissül — a keresés-bank bővítéséhez nem kell prompthoz nyúlni. */
+
+const QUERY_BANK = [
+  "site:jobs.ashbyhq.com Budapest",
+  "site:jobs.ashbyhq.com Hungary junior",
+  "site:job-boards.greenhouse.io Budapest",
+  "site:job-boards.greenhouse.io Hungary intern",
+  "site:boards.greenhouse.io Budapest",
+  "site:jobs.lever.co Budapest",
+  "site:jobs.lever.co Magyarország",
+  "site:jobs.smartrecruiters.com Budapest",
+  "site:jobs.ashbyhq.com gyakornok",
+  "site:job-boards.greenhouse.io \"Budapest, Hungary\" engineer",
+];
+
+// Napi rotáció: a routine nem tárol állapotot futások között, tehát ha mindig a
+// bank elejét kapná, a lista végét soha nem keresné ki senki. A nap sorszáma
+// determinisztikus és külön memória nélkül lépteti az ablakot.
+function suggestedQueries(count = 4) {
+  const dayIndex = Math.floor(Date.now() / 86400000);
+  return Array.from({ length: Math.min(count, QUERY_BANK.length) },
+    (_, i) => QUERY_BANK[(dayIndex * count + i) % QUERY_BANK.length]);
+}
+
+function routineInstructions() {
+  return {
+    purpose:
+      "ATS-boardok felderítése. Az itt felvett cégeket a napi ats-crawl worker aratja le; " +
+      "ez az endpoint NEM ír a job_posts-ba. Álláshirdetést továbbra is az ai-registry-n keresztül küldj.",
+    steps: [
+      "1. Ezt a GET-et már meghívtad — a `tenants` a már ismert boardok, a `knownMisses` a már cáfolt slugok. Egyiket se küldd be újra.",
+      "2. Futtasd le a `suggestedQueries` listában kapott kereséseket (naponta forognak, nem kell választanod).",
+      "3. A találatokból gyűjtsd ki az ATS-HIRDETÉSLINKEKET (a supportedProviders domainjeire mutató url-eket), NEM a cégek saját karrieroldalát.",
+      "4. Küldd be őket egyben: POST erre az url-re, ugyanezzel a bearer tokennel, body: {\"urls\": [...]}.",
+      "5. A válasz `added` / `alreadyKnown` / `notFound` mezőit írd bele a futás összefoglalójába.",
+    ],
+    rules: [
+      "Kérésenként legfeljebb " + MAX_ITEMS + " elem.",
+      "Cégnév-tippet (`tenants` mező) ne küldj — az `urls` alak pontosabb, mert abból a slug kiolvasható.",
+      "A szerver minden beküldött slugot élesben leprobál; a nem létező boardok nem kerülnek be.",
+      "A cégnevet ne találgasd: a szerver szándékosan nem tárolja a beküldött nevet a tenanton.",
+    ],
+    submit: {
+      method: "POST",
+      contentType: "application/json",
+      bodyExample: { urls: ["https://jobs.ashbyhq.com/<ceg>/<id>", "https://job-boards.greenhouse.io/<ceg>/jobs/<id>"] },
+    },
+    promptSnippet:
+      "Minden futásban, a szokásos munka mellett: hívd meg GET-tel a " +
+      "https://bakan7.netlify.app/.netlify/functions/ats-tenants endpointot az AI_INGEST_TOKEN bearerrel, " +
+      "és kövesd a válasz `instructions` mezőjében leírt lépéseket.",
+  };
+}
+
 async function ensureSchema(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS ats_tenants (
@@ -110,6 +170,9 @@ async function handleGet(client) {
     // A jelölt-táblát a discover worker hozza létre; ha még nem futott, üres lista.
   }
   return json(200, {
+    instructions: routineInstructions(),
+    suggestedQueries: suggestedQueries(),
+    queryBank: QUERY_BANK,
     tenants,
     counts: {
       total: tenants.length,
