@@ -62,6 +62,13 @@ const TARGETS = [
   // (F2, kereső-alapú slug-felderítés), ez átkerül az órás dispatcherre, hogy a
   // rotáció körbeérjen — a worker eleve last_checked szerint lapoz.
   { name: "cron_jobs_ATSCRAWL-background" },
+  // ATS slug-felderítés (WEB_CRAWLER_PLAN.md F2, added 2026-08-26): a
+  // job_posts.company cégnevekből slug-jelölteket képez és leprobálja őket a
+  // három tiszta-404-es provideren; a találatok az ats_tenants-be kerülnek, és
+  // a KÖVETKEZŐ napi körben aratja le őket az ATSCRAWL worker. (A dispatcher
+  // Promise.all-lal indít, tehát a sorrend nem garantált — nem is kell: az
+  // egynapos csúszás ára nulla.) Futásonként ~45 jelölt × max 3 kérés.
+  { name: "cron_ats_discover-background" },
   // Cross-source safety net: deactivates any active non-LinkedIn job whose URL
   // now returns HTTP 404 (see _active_core.mjs sweepActive404). Once/day is
   // plenty — the per-source reconcile handles the common case hourly.

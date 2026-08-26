@@ -133,6 +133,14 @@ async function seedTenants(client) {
   return added;
 }
 
+/*
+ * Esedékes tenantok. A rendezés ELSŐ kulcsa szándékosan a `live` státusz: az
+ * F2 felderítő tetszőleges számú boardot tud behozni, és azok többsége
+ * `no_hu` lesz (idegen cégek, slug-egyezésből — lásd a felderítő addTenant
+ * kommentjét). Puszta last_checked-rendezéssel egy nagy no_hu-tömeg kiszorítaná
+ * a napi keretből azt a néhány boardot, amelyiken tényleg vannak magyar
+ * hirdetések.
+ */
 async function dueTenants(client, limit) {
   const { rows } = await client.query(
     `SELECT provider, slug, company
@@ -143,7 +151,7 @@ async function dueTenants(client, limit) {
           OR (status = 'live'  AND last_checked < NOW() - make_interval(hours => $2::int))
           OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days  => $3::int))
         )
-      ORDER BY last_checked ASC NULLS FIRST
+      ORDER BY (status = 'live') DESC, last_checked ASC NULLS FIRST
       LIMIT $1`,
     [limit, RECHECK_LIVE_HOURS, RECHECK_NO_HU_DAYS]
   );
