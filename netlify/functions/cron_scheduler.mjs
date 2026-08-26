@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "2,5,6,7,9,10,11,13,17,18,19,21,22,23 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,13,17,18,19,21,22,23,26 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -50,6 +50,15 @@ const GRID = {
   21: [{ name: "cron_jobs_DIAK_1-background" }],       // schonherz/minddiak/muisz (~20)
   23: [{ name: "cron_jobs_DIAK_3-background" }],       // otp + wherewework (~32)
   22: [{ name: "cron_jobs_F_3-background", body: { startPage: 1 } }], // workly (~17)
+  // ats-crawl (2026-08-26): napi tierről ide költöztetve, user-döntés — óránként
+  // fut, mint a LinkedIn. A perc :26, azaz a MEGLÉVŐ :00-:32 sávon BELÜL (L_7 :24
+  // és L_8 :28 között, 2-2 perc réssel). Nem a sávon kívülre tettem, mert a
+  // CRON_SCHEDULE.md szerint a Neon autosuspend miatt a számla a legelső és a
+  // legutolsó DB-t érintő hívás KÖZTI SPAN-tól függ, nem a hívások számától: egy
+  // :40-es slot ~8 perccel nyújtotta volna meg az óránkénti ébren töltött időt.
+  // Futásonként max 20 tenant (ATS_CRAWL_BATCH) → 16 óra × 20 = 320
+  // board-lekérés/nap a plafon, akkor is, ha a felderítő több száz tenantot hoz be.
+  26: [{ name: "cron_jobs_ATSCRAWL-background" }],   // ats-crawl (19 tenant)
 };
 
 export default withTimeout("cron_scheduler", async () => {

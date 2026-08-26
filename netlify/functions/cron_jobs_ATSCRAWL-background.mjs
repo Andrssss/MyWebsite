@@ -47,11 +47,22 @@ export const ATS_SOURCE = "ats-crawl";
 
 // Hány tenantot dolgozunk fel egy futásban. A background function 15 percet kap;
 // egy board = 1 lista-hívás + a HU-sorok detail-hívásai, tipikusan pár másodperc.
+// Óránkénti futás mellett ez egyben a napi terhelés plafonja is: 16 futás × 20
+// tenant = max 320 board-lekérés/nap, akkor is, ha a felderítő több száz
+// tenantot hoz be. A `live` boardok mindig előre kerülnek a rendezésben, tehát
+// a keretből ők nem szorulnak ki.
 const BATCH_SIZE = Number(process.env.ATS_CRAWL_BATCH || 20);
 
-// Újranézési ütem státusz szerint. A 0 magyar állást adó boardokat NEM dobjuk el
-// (holnap nyithatnak budapesti pozíciót), csak ritkábban nézzük.
-const RECHECK_LIVE_HOURS = 12;
+// Újranézési ütem státusz szerint.
+//
+// A `live` boardokra NINCS időkorlát: 2026-08-26 óta ez a worker óránként fut
+// (cron_scheduler.mjs :40, user-döntés — ugyanaz a tempó, mint a LinkedIn-é),
+// és ezen a néhány boardon vannak a magyar hirdetések, tehát minden körben
+// esedékesek. A tényleges plafon a BATCH_SIZE, nem egy időablak.
+//
+// A 0 magyar állást adó boardokat NEM dobjuk el (holnap nyithatnak budapesti
+// pozíciót), csak ritkábban nézzük — ezek túlnyomó része a felderítőből jövő,
+// szlug-egyezésen alapuló idegen cég, amit óránként lekérni tiszta pazarlás.
 const RECHECK_NO_HU_DAYS = 3;
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -148,12 +159,12 @@ async function dueTenants(client, limit) {
       WHERE status <> 'dead'
         AND (
           last_checked IS NULL
-          OR (status = 'live'  AND last_checked < NOW() - make_interval(hours => $2::int))
-          OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days  => $3::int))
+          OR status = 'live'
+          OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days => $2::int))
         )
       ORDER BY (status = 'live') DESC, last_checked ASC NULLS FIRST
       LIMIT $1`,
-    [limit, RECHECK_LIVE_HOURS, RECHECK_NO_HU_DAYS]
+    [limit, RECHECK_NO_HU_DAYS]
   );
   return rows;
 }
