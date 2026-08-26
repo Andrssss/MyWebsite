@@ -55,6 +55,13 @@ const TARGETS = [
   // source was frozen at 9 forever-active rows. Rows deactivated manually the
   // same day. Re-add here (and reactivate what's still live) if a proxy ever
   // makes the source reachable again.
+  // ATS-crawl (WEB_CRAWLER_PLAN.md F1, added 2026-08-26): publikus ATS-board
+  // API-k aratása az ats_tenants tábla alapján, futásonként ATS_CRAWL_BATCH (20)
+  // tenant. Napi tier, mert a seed 19 tenantja egy futásban elfér, és ezek a
+  // boardok napokban mérve mozognak, nem órákban. Ha a tenant-lista száz fölé nő
+  // (F2, kereső-alapú slug-felderítés), ez átkerül az órás dispatcherre, hogy a
+  // rotáció körbeérjen — a worker eleve last_checked szerint lapoz.
+  { name: "cron_jobs_ATSCRAWL-background" },
   // Cross-source safety net: deactivates any active non-LinkedIn job whose URL
   // now returns HTTP 404 (see _active_core.mjs sweepActive404). Once/day is
   // plenty — the per-source reconcile handles the common case hourly.

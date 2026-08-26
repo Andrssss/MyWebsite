@@ -64,6 +64,15 @@ export async function ensureActiveSchema(client) {
  *   succeeded (i.e. it also passes complete:true on the same run) — otherwise a
  *   blocked crawl would wipe the whole source.
  * @param {number}  [opts.graceDays=ACTIVE_GRACE_DAYS]
+ * @param {string}  [opts.scopePrefix]  restrict EVERY write of this call to rows
+ *   whose url starts with this prefix. Needed when ONE `source` value is fed by
+ *   many independent full listings (the ATS crawl: one board per company, sharded
+ *   across runs) — without it the second shard's reconcile would deactivate the
+ *   first shard's finds, which is exactly the Cat-5 failure in DEACTIVATION_AUDIT.md
+ *   (two scrapers reconciling one source wipe each other). With a prefix, a call can
+ *   only ever touch rows under that one company's board, so shards are isolated by
+ *   construction rather than by scheduling luck. Derive it from the urls actually
+ *   returned (deriveScopePrefix in _ats_providers.mjs), never hardcode a host.
  * @param {(url: string) => Promise<boolean>} [opts.confirmDead]  optional per-row
  *   death gate. When given, a row that is aged AND absent from foundUrls is NOT
  *   deactivated on absence alone — it is only switched off if confirmDead(url)
@@ -80,6 +89,10 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
   const complete = opts.complete !== false;
   const emptyIsValid = opts.emptyIsValid === true;
   const graceDays = opts.graceDays ?? ACTIVE_GRACE_DAYS;
+  // starts_with() rather than LIKE: no %/_ escaping to get wrong, and the prefix
+  // is caller data. null → unscoped (every existing caller).
+  const scopePrefix = typeof opts.scopePrefix === "string" && opts.scopePrefix ? opts.scopePrefix : null;
+  const scoped = (paramIndex) => (scopePrefix ? `AND starts_with(url, $${paramIndex})` : "");
 
   await ensureActiveSchema(client);
 
@@ -102,8 +115,9 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
           SET active = false
         WHERE source = $1
           AND active = true
-          AND first_seen < NOW() - make_interval(days => $2::int)`,
-      [source, graceDays]
+          AND first_seen < NOW() - make_interval(days => $2::int)
+          ${scoped(3)}`,
+      scopePrefix ? [source, graceDays, scopePrefix] : [source, graceDays]
     );
     return { deactivated: gone.rowCount ?? 0, reactivated: 0, skipped: false };
   }
@@ -128,8 +142,9 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
         AND active = false
         ${noResurrect ? "AND NOT sweep_dead" : ""}
         AND url = ANY($2::text[])
+        ${scoped(3)}
       RETURNING url`,
-    [source, urls]
+    scopePrefix ? [source, urls, scopePrefix] : [source, urls]
   );
   if (reactivated.rows.length > 0) {
     logRecovery({
@@ -154,8 +169,9 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
         WHERE source = $1
           AND active = true
           AND first_seen < NOW() - make_interval(days => $3::int)
-          AND url <> ALL($2::text[])`,
-      [source, urls, graceDays]
+          AND url <> ALL($2::text[])
+          ${scoped(4)}`,
+      scopePrefix ? [source, urls, graceDays, scopePrefix] : [source, urls, graceDays]
     );
     const dead = [];
     for (const { url } of candidates) {
@@ -174,8 +190,9 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
             SET active = false
           WHERE source = $1
             AND active = true
-            AND url = ANY($2::text[])`,
-        [source, dead]
+            AND url = ANY($2::text[])
+            ${scoped(3)}`,
+        scopePrefix ? [source, dead, scopePrefix] : [source, dead]
       );
       confirmedOff = res.rowCount ?? 0;
     }
@@ -194,8 +211,9 @@ export async function reconcileActive(client, source, foundUrls, opts = {}) {
       WHERE source = $1
         AND active = true
         AND first_seen < NOW() - make_interval(days => $3::int)
-        AND url <> ALL($2::text[])`,
-    [source, urls, graceDays]
+        AND url <> ALL($2::text[])
+        ${scoped(4)}`,
+    scopePrefix ? [source, urls, graceDays, scopePrefix] : [source, urls, graceDays]
   );
 
   return {

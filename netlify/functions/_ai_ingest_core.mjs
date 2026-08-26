@@ -252,8 +252,21 @@ async function upsertJob(client, source, job, resolvedExperience) {
  * @param {string[]} [args.filters=[]]  senior-title blacklist (loadFilters()).
  * @param {Array}    [args.categories=[]]  [[name, keywords[]], ...] from loadCategories() —
  *                                    REQUIRED gate: only IT-matching titles are accepted.
+ * @param {(location: string) => boolean} [args.rejectLocation=isNonBudapestLocation]
+ *                                    location gate; true = skip the row. Overridable because
+ *                                    the ATS crawl needs the OPPOSITE default for a missing
+ *                                    location (fail-closed — an international job board is
+ *                                    foreign unless it says otherwise; see _ats_location.mjs).
+ *                                    Injected rather than branching on `source` here so this
+ *                                    module keeps knowing nothing about its callers.
+ * @param {string}   [args.scopePrefix]  passed through to reconcileActive — restricts its
+ *                                    writes to rows under one url prefix. Required when many
+ *                                    independent full listings share ONE source value.
  */
-export async function ingestJobs(client, { source, jobs, fullListing = false, filters = [], categories = [] }) {
+export async function ingestJobs(client, {
+  source, jobs, fullListing = false, filters = [], categories = [],
+  rejectLocation = isNonBudapestLocation, scopePrefix = null,
+}) {
   await ensureTechnologiesColumn(client);
   const ok = jobs.length > 0;
   const complete = ok && !!fullListing;
@@ -271,7 +284,7 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
     foundUrls.push(job.url);
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
     if (shouldSkipTitleFilter(job.title, filters)) { skippedSenior++; continue; }
-    if (isNonBudapestLocation(job.location)) { skippedLocation++; continue; }
+    if (rejectLocation(job.location)) { skippedLocation++; continue; }
     const resolvedExperience = seniorAwareExperience(job.title, resolveExperience(job));
     if (shouldSkipSeniorExperience(isSeniorExperience(resolvedExperience))) { skippedSenior++; continue; }
     if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
@@ -281,7 +294,7 @@ export async function ingestJobs(client, { source, jobs, fullListing = false, fi
 
   let reconcile = { skipped: true };
   if (ok) {
-    reconcile = await reconcileActive(client, source, foundUrls, { complete });
+    reconcile = await reconcileActive(client, source, foundUrls, { complete, scopePrefix });
   }
 
   return {

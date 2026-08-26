@@ -81,6 +81,10 @@ const LISTS_BY_SOURCE = {
   allasportal: COMPANY_BLOCKLIST,
   LinkedIn: LINKEDIN_COMPANY_BLOCKLIST,
   "profession-intern": PROFESSION_INTERN_COMPANY_BLOCKLIST,
+  // ATS-crawl (2026-08-26): a cégnevet a board API adja display-formában
+  // (Greenhouse company_name) vagy az ats_tenants sor — ugyanaz az alak, mint a
+  // talent/alllocaljobs ágon, tehát a közös lista illeszkedik rá.
+  "ats-crawl": COMPANY_BLOCKLIST,
 };
 
 function normalizeText(s) {
