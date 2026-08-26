@@ -66,11 +66,16 @@ function randomDelay(minMs = 600, maxMs = 1400) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// LinkedIn guest pagination endpoint (returns HTML fragment with the same
-// `ul.jobs-search__results-list li` structure as the public search page).
+// LinkedIn guest pagination endpoint. NOTE: it does NOT return the same
+// structure as the public search page — it sends a bare <li> fragment with no
+// <ul> wrapper, so `ul.jobs-search__results-list li` matches nothing there
+// (see extractLinkedInJobs).
 const LINKEDIN_GUEST_PAGINATION_URL =
   "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search";
-const LINKEDIN_PAGE_SIZE = 25;
+// The fragment endpoint returns 10 results per call, NOT the 25 the search
+// page's own paging suggests (verified live: start=25 -> rows 26-35,
+// start=35 -> rows 36-45). Stepping by 25 skipped 15 rows out of every 25.
+const LINKEDIN_PAGE_SIZE = 10;
 
 // =====================
 // Bot-evasion helpers
@@ -191,7 +196,12 @@ function extractLinkedInJobs(html) {
   const $ = cheerioLoad(html);
   const jobs = [];
 
-  $("ul.jobs-search__results-list li").each((_, el) => {
+  // Bare `li` on purpose: the seeMoreJobPostings fragment arrives without a
+  // <ul> wrapper, so `ul.jobs-search__results-list li` matched 0 there and
+  // every search silently stopped after page 0. The `title && url` guard below
+  // drops the non-result <li>s (nav etc.); on page 0 both selectors yield the
+  // same 60 hits.
+  $("li").each((_, el) => {
     const title = normalizeText($(el).find("h3.base-search-card__title").text());
     const company = normalizeText($(el).find("h4.base-search-card__subtitle").text());
     let location = normalizeText($(el).find("span.job-search-card__location").text());
@@ -304,13 +314,19 @@ async function fetchAllLinkedInPages(searchUrl, {
     // Delay BEFORE every page (incl. first paginated one) — humans don't
     // scroll instantly after the page renders.
     await randomDelay(minDelayMs, maxDelayMs);
-    const pageUrl = buildLinkedInPageUrl(searchUrl, page * LINKEDIN_PAGE_SIZE);
+    // Page 0 is the full search page and already returned `firstItems.length`
+    // rows (60 in a live check), so continue right after them instead of
+    // assuming page 0 held one LINKEDIN_PAGE_SIZE worth. The post-dedupe
+    // length can only undershoot the real row count, and an overlap is
+    // harmless (dedupeByUrl) while a gap would silently drop postings.
+    const start = firstItems.length + (page - 1) * LINKEDIN_PAGE_SIZE;
+    const pageUrl = buildLinkedInPageUrl(searchUrl, start);
     let html;
     try {
       html = await fetchText(pageUrl, { userAgent: ua, referer: searchUrl });
     } catch (err) {
       if (err instanceof LinkedInBlockedError) throw err; // bubble up — abort cron
-      console.error(`pagination stop at start=${page * LINKEDIN_PAGE_SIZE}: ${err.message}`);
+      console.error(`pagination stop at start=${start}: ${err.message}`);
       break;
     }
     const items = extractLinkedInJobs(html);

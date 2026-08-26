@@ -19,10 +19,29 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// FIGYELEM — ez a scraper NEM LAPOZ: forrásonként EGYETLEN fetchText fut, tehát
+// csak azt látjuk, amit az SSR-oldal kiszállít (~20 hirdetés-link / url). Emiatt a
+// lista egy FIX MÉRETŰ ABLAK, nem egy teljes találati halmaz.
+//
+// 2026-08-25 élő mérés: a szűretlen /hu/budapest ablak és a
+// ?criteria=seniority=trainee,junior ablak 20-ból mindössze 4 hirdetésen osztozik.
+// A szűretlen ablakot a senior hirdetések uralják (senior-software-engineer,
+// senior-sap-abap-developer, expert-developer…), a junior/gyakornoki hirdetések
+// pedig CSAK a szűrt ablakban vannak benne.
+//
+// Ezért MINDKETTŐ kell: a szűretlen url-ek hozzák a senior kínálatot (a frontend
+// alapból rejti), a seniority-szűrtek pedig megvédik a junior lefedettséget attól,
+// hogy a senior hirdetések kiszorítsák őket a 20-as ablakból. Ha csak a szűretlen
+// maradna, ~16 junior hely veszne el hirdetésenként.
 const NOFLUFF_SOURCES = [
+  // minden szint
   "https://nofluffjobs.com/hu/budapest",
   "https://nofluffjobs.com/hu/budapest?sort=newest",
   "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other",
+  // junior/trainee ablak — külön kell, különben a fenti ablakból kiszorulnak
+  "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior",
+  "https://nofluffjobs.com/hu/budapest?criteria=seniority%3Dtrainee,junior&sort=newest",
+  "https://nofluffjobs.com/hu/budapest/artificial-intelligence?criteria=requirement%3DJava,Python,C%23,SQL,C%2B%2B,Golang,JavaScript,React,Angular,TypeScript,HTML,Git,Vue.js,Kotlin,Android%20category%3Dsys-administrator,business-analyst,architecture,backend,data,ux,devops,erp,embedded,frontend,fullstack,game-dev,mobile,project-manager,security,support,testing,other%20seniority%3Dtrainee,junior",
 ];
 
 /* ── helpers ─────────────────────────────────────────────────── */
