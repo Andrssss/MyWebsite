@@ -31,6 +31,7 @@ Deploy = push to `main`; Netlify builds per `netlify.toml` (publish `dist`, func
 |---|---|---|
 | `job_posts` | every scraped job posting; **`url` is the row identity**; `active` flag = still listed on source | all `cron_jobs_*` scrapers → `jobs.js` API |
 | `job_daily_stats` | daily per-source aggregates | `cron_daily_stats.mjs` → `job-stats.js`; pruned by `cron_stats_cleanup.mjs` |
+| `job_daily_categories` | daily per-category counts (`intern:` prefix = student/intern split) | same writers/readers as `job_daily_stats` |
 | `job_categories` | category → keyword lists for classification | edited via `categories.js`, read by `load_categories.mjs` (5-min cache) |
 | `job_filters` | title filter words | `filters.js`, `load_filters.mjs` |
 | `subject_reviews` | university subject reviews | `reviews.js`; seedable via `seed-subjects.mjs`; backed up monthly |
@@ -57,7 +58,9 @@ React Router SPA; all routes live in `src/App.jsx` with Hungarian paths: `/targy
 
 ### Backend (`netlify/functions/`)
 - **HTTP API**: `jobs.js` (job list; per-warm-container 60s cache; CORS pinned to the prod origin), `job-stats.js`, `categories.js`, `filters.js`, `reviews.js`, `bug-report.js`, `subject-request.js`, visitor tracking, Drive functions.
-- **Shared cores** (prefix `_`, not routable): `_active_core.mjs` (active-flag reconcile + volatile-URL migration), `_linkedin_core.mjs`, `_experience_core.mjs` / `_profession_core.mjs` (backfill classification), `_error-logger.mjs` (`withTimeout` wrapper + blob logging), `_backup-core.js`.
+- **Shared cores** (prefix `_`, not routable): `_active_core.mjs` (active-flag reconcile + volatile-URL migration), `_linkedin_core.mjs`, `_experience_core.mjs` / `_profession_core.mjs` (backfill classification), `_error-logger.mjs` (`withTimeout` wrapper + blob logging), `_backup-core.js`, `_stats_core.mjs` + `_stats_rebuild_core.mjs` (see below).
+
+**Stats are derived data — rebuild them, don't patch them.** `job_daily_stats`/`job_daily_categories` are just a nightly *snapshot* of rules that keep changing, so every category rename/retune leaves the saved history stale. The rules live in exactly two places now: `src/JobWatcher.jsx` (the board, still the reference implementation) and `_stats_core.mjs` (the only server-side copy — `cron_daily_stats.mjs` and the rebuild both call it). **Change one, change the other, then rebuild** — three copies had silently drifted before 2026-08-26 (old category names, a deleted `C++` category, missing `UX/UI Design`/`STRONG_CATEGORIES`/`*`-keyword support, seniors counted in one copy and not the other). `_stats_rebuild_core.mjs` recomputes any date range from the raw postings — `job_posts` **plus the `job-posts-archive` blobs**, without which every day older than ~60 days rebuilds as zero — and writes each range in one transaction. Run it from a disposable `tmp-*` endpoint (blobs need site context, and the prod connection string isn't available locally); the local `backfill_daily_stats.mjs` CLI is gitignored and needs `NETLIFY_SITE_ID`/`NETLIFY_API_TOKEN` to see the archive.
 
 ### Scraper/cron system
 ~30 `cron_jobs_<SOURCE>-background.mjs` Netlify **background** functions ingest into `job_posts`. Scheduling is two-tier (reference doc: `netlify/functions/CRON_SCHEDULE.md`):
