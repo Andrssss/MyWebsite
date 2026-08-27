@@ -18,7 +18,7 @@ import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
   extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
 } from "./_experience_core.mjs";
-import { shouldSkipTitleFilter, shouldSkipSeniorExperience } from "./_seniority_policy.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
    Lives here so ai-ingest.mjs and ai-registry.mjs can't drift apart on what
