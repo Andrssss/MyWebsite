@@ -462,7 +462,27 @@ export const BANNER_DEAD_SOURCES = {
   // fetched fresh from web-api.melodiak.hu's own listing since no active row
   // existed in job_posts to test against at the time).
   melodiak: "<h3>lezárt hirdetés</h3>",
-  mbh: "a keresett álláshirdetés nem található",
+  // mbh has TWO dead shapes and the plain string only ever caught the first.
+  // 2026-08-26: a closed posting is served as the bare app shell — HTTP 200,
+  // ~22.6 KB, an EMPTY <title>, and no "Jelentkezem" apply CTA anywhere. It
+  // never contains the "nem található" phrase, so the string rule read it as
+  // alive and the rows sat active past closing (2 found: JobAdvertisement/21994
+  // and /22070). Measured on live vs dead vs a control:
+  //   live 21634 / 21890 / 22215 → 223 / 140 / 51 KB, real <title>, "Jelentkezem" x4
+  //   dead 21994 / 22070        → 22.6 KB, <title></title>, "Jelentkezem" x0
+  //   made-up id 99999 (control) → identical to the dead shape
+  // Both signals must be absent to call it dead, so if MBH ever renames the CTA
+  // or starts emitting a title on the shell, the rule fails SAFE (alive) rather
+  // than killing live rows. A transient blank page can't kill either: the sweep
+  // re-checks every dead verdict once, and mbh is not a sole-deactivator source,
+  // so a wrong kill still carries sweep_dead=true and reviveSweepDead undoes it
+  // on the next run.
+  mbh: (row, body) => {
+    if (body.toLowerCase().includes("a keresett álláshirdetés nem található")) return true;
+    const title = (body.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "";
+    if (title.trim()) return false;
+    return !/Jelentkezem/i.test(body);
+  },
   "cg-jobstream": "position has been filled",
   wise: "job has expired",
   // dreamjobs shows the full posting (title/description/apply button) even
