@@ -346,13 +346,27 @@ export const STICKY_SWEEP_DEAD_SOURCES = new Set(["talent", "allasportal"]);
 // kills — reconcileActive's full-listing walk already owns their active flag.
 //   • LinkedIn: bot-blocked (no clean 404s), also shown time-based on the
 //     frontend, so its `active` flag is irrelevant anyway.
-//   • tudasdiak (2026-07-12): app.tudatosdiak.hu is an Inertia SPA whose detail
-//     route 404s on a bare GET even for a LIVE posting (confirmed live on the
-//     "Security Support Engineering Intern (IAM)" job — sweep killed it, the
-//     hourly cron_jobs_DIAK_1 listing scrape resurrected it the same day, on
-//     loop once per day right after the 14:00 UTC sweep). tudasdiak's listing
-//     has <10 postings and its own reconcileActive already tracks it fully.
-export const SWEEP_EXCLUDED_SOURCES = new Set(["LinkedIn", "tudasdiak"]);
+//   • tudasdiak: REMOVED from this set 2026-08-27 — see below.
+//
+// tudasdiak was here from 2026-07-12 because app.tudatosdiak.hu's detail route
+// 404'd a bare GET even for a LIVE posting. That was never the SPA's doing: the
+// urls we were asking about were malformed. The detail url needs a `pj` prefix
+// before the puuid, and the scraper built them without it until commit c46bcd7
+// — so the sweep was 404-ing on urls that genuinely did not exist. Re-measured
+// 2026-08-27: a live posting's own url answers 200 (pj6423282947), an unknown
+// puuid answers 404 (pj6306719999), and a stale SLUG with the right puuid
+// 302s to the canonical url and 200s — i.e. the only 404 left is a real one.
+//
+// Removing it matters because its own reconcileActive CANNOT be its safety net
+// here: the source's IT facet (searchIndustry=7) legitimately drops to zero
+// postings for stretches (the site's own facet counter says 0 right now), and
+// reconcileActive deliberately no-ops on an empty result set — a blocked crawl
+// and a genuinely empty listing look identical to it. With no sweep and no
+// reconcile, a closed tudasdiak row stayed active forever; that is exactly what
+// the user hit ("Cloud Engineer Intern", closed since at least 2026-08-27,
+// still on the board). The BANNER_DEAD_SOURCES.tudasdiak rule below is what
+// actually decides death now; the sweep just carries the question to it.
+export const SWEEP_EXCLUDED_SOURCES = new Set(["LinkedIn"]);
 
 // Sources whose sites answer a DEAD job url with a plain 200 page — no 404,
 // no redirect — so neither sweep rule above can see it. For these the sweep
@@ -525,6 +539,24 @@ export const BANNER_DEAD_SOURCES = {
     const m = body.slice(i, i + 400).match(/statusz\\?"\s*:\s*\\?"([^"\\]*)/);
     return !!m && m[1] !== "aktiv";
   },
+  // tudasdiak (2026-08-27): app.tudatosdiak.hu is an Inertia SPA — the whole
+  // page state ships in the `data-page` attribute of the root div, HTML-entity
+  // escaped. A closed posting keeps HTTP 200 and still renders the full ad;
+  // the only difference is that prop bag, which carries the page's OWN job
+  // (there is exactly one `isDisabled` occurrence per page — `similarJobs`
+  // objects don't have the field, so no related-job contamination like
+  // talent/qdiak had). Measured on the user-reported "Cloud Engineer Intern"
+  // (pj6306719691, banner "Erre a pozícióra már nem fogadunk új jelentkezőket
+  // — a kiválasztás folyamatban"): isDisabled:true, isSelectionOnly:true,
+  // closedBannerMessage non-null, availability_status "on-hold". Control on a
+  // live posting (pj6423282947): isDisabled:false, closedBannerMessage:null —
+  // i.e. `isDisabled":true` is present exactly once when dead and zero times
+  // when alive, so the i18n-template trap that burned qdiak/melodiak doesn't
+  // apply. Both the escaped and raw JSON forms are accepted because the
+  // attribute is entity-escaped in the HTML but the same prop appears
+  // unescaped in the Inertia XHR response.
+  tudasdiak: (row, body) =>
+    /isDisabled&quot;\s*:\s*true/i.test(body) || /"isDisabled"\s*:\s*true/i.test(body),
 };
 
 // Sources whose 404 status can't be trusted at face value: the origin
@@ -548,6 +580,64 @@ export const SOFT_404_ALIVE_SOURCES = {
   },
 };
 
+/**
+ * Sources whose death question must be asked somewhere OTHER than the posting's
+ * own public url, because that url cannot be fetched reliably. Each entry maps a
+ * row to `{ url, headers, minIntervalMs }` (or null to fall back to `row.url`).
+ *
+ * startupjobs (2026-08-27): startup.jobs sits behind Cloudflare and answers a
+ * plain GET with a 403 "Just a moment…" interstitial most of the time — measured
+ * 3 of 8 sequential requests locally, and the sweep hits it at concurrency 12,
+ * so far worse. A 403 is correctly a NON-verdict, which is why the (correct)
+ * BANNER_DEAD_SOURCES.startupjobs rule added 2026-08-19 almost never got a body
+ * to run against and confirmed-dead postings sat active for a month. The site's
+ * own official REST API has no such gate and the scraper already holds a key:
+ * `GET api.startup.jobs/v1/jobs/{id}` answers 200 with the job for a live
+ * posting and a flat 404 for a closed one. Verified 2026-08-27 against the three
+ * user-reported closed postings (8802122 / 8744978 / 8739390 — all 404, all
+ * showing "This job is no longer available" on the site) and against live
+ * controls pulled from the site's own Hungary listing (9023227 / 9100436 /
+ * 9441132 — all 200).
+ *
+ * The 14-day publish window that makes the LIST endpoint useless for reconcile
+ * does NOT apply to the single-job endpoint: 8985268 (published 2026-08-12,
+ * 15 days old) still answers 200. Checked explicitly, because a windowed
+ * single-job endpoint would have mass-deactivated every aged row.
+ *
+ * Rate limit is the catch — the free tier is 20 req/min and a 57-row sweep
+ * pulled 37 × HTTP 429 in one burst. 429 is a non-verdict like 403, so it is
+ * merely slow rather than wrong, but the paced lane below keeps it from
+ * happening at all. No key → no override → the HTML banner rule stays in
+ * charge, exactly as before.
+ */
+export const SWEEP_PROBE_OVERRIDES = {
+  startupjobs: (row) => {
+    const key = process.env.STARTUPJOBS_API_KEY;
+    if (!key) return null;
+    const id = (row.url.match(/-(\d+)(?:[/?#]|$)/) || [])[1];
+    if (!id) return null;
+    return {
+      url: `https://api.startup.jobs/v1/jobs/${id}`,
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+      minIntervalMs: 3200, // 20 req/min free tier, with headroom
+    };
+  },
+};
+
+/**
+ * Where the sweep should actually ask about `row`. Exported so the repo's
+ * maintenance scripts ask the same question prod asks — the same reason
+ * isDeadResult/isAliveResult are exported (a hand-copied mirror drifts).
+ *
+ * @returns {{url: string, headers: object|null, minIntervalMs: number, overridden: boolean}}
+ */
+export function sweepProbeFor(row) {
+  const build = SWEEP_PROBE_OVERRIDES[row.source];
+  const o = build ? build(row) : null;
+  if (!o) return { url: row.url, headers: null, minIntervalMs: 0, overridden: false };
+  return { url: o.url, headers: o.headers ?? null, minIntervalMs: o.minIntervalMs ?? 0, overridden: true };
+}
+
 function _pathOf(u) {
   try {
     const p = new URL(u).pathname.replace(/\/+$/, "");
@@ -568,6 +658,12 @@ function _isDeadResult(row, res) {
   }
   if (
     REDIRECT_DEAD_SOURCES.has(row.source) &&
+    // The redirect rule compares the response's final path against the ROW's
+    // own path, so it is meaningless when the probe deliberately asked a
+    // different url (SWEEP_PROBE_OVERRIDES) — it would read every override
+    // response as "landed somewhere else" = dead. No source is in both sets
+    // today; this keeps that from becoming a silent mass-kill if one ever is.
+    !SWEEP_PROBE_OVERRIDES[row.source] &&
     res.status >= 200 && res.status < 400 &&
     res.finalUrl
   ) {
@@ -665,24 +761,13 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
   );
   if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0 };
 
-  // Round-robin the URLs across `concurrency` workers. Body is only fetched
-  // where a banner rule needs it.
-  const wantBody = (row) => ({ wantBody: _needsBody(row.source) });
-  const results = new Map();
-  const lanes = Array.from({ length: concurrency }, (_, i) =>
-    rows.filter((_, idx) => idx % concurrency === i)
-  );
-  await Promise.all(
-    lanes.map(async (list) => {
-      for (const row of list) results.set(row.url, await checkFinal(row.url, wantBody(row)));
-    })
-  );
+  const results = await _probeAll(rows, checkFinal, concurrency);
 
   // Re-check first-pass dead verdicts once; only a still-dead row deactivates.
   const suspects = rows.filter((r) => _isDeadResult(r, results.get(r.url)));
   const confirmed = [];
   for (const row of suspects) {
-    if (_isDeadResult(row, await checkFinal(row.url, wantBody(row)))) confirmed.push(row.url);
+    if (_isDeadResult(row, await _probeOne(row, checkFinal))) confirmed.push(row.url);
   }
 
   let deactivated = 0;
