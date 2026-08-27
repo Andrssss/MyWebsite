@@ -1169,6 +1169,35 @@ const VOLATILE_URL_PATTERNS = {
   },
 };
 
+// A FORDÍTOTT churn is létezik, és a schonherz/minddiak valójában EZT csinálja:
+// az id marad, a SLUG generálódik újra egy szerkesztett címből. Élő bizonyíték
+// 2026-08-26: schonherz .../41934-voice-agent-tesztelo-es-finomhangolo →
+// .../41934-voice-agent-tesztelo-es-finomhangolo-qa, minddiak
+// .../hil-mernok-gyakornok-budapest-xiii-53867 →
+// .../hil-validation-engineer-gyakornok-budapest-xiii-53867 — mindkettőnél
+// ugyanaz az id. A fenti minták a slugot tartják FIXEN és az id-t engedik
+// szabadon, tehát nem illeszkednek: a régi sor árván (inaktívan, HTTP 200-zal)
+// maradt, és egy duplikátum sor jött létre arra, ami a felhasználónak egyetlen
+// hirdetés. Ugyanaz a hiba és ugyanaz a fallback, amit az erste 2026-07-22-én
+// kapott — bármelyik url, ami ezt az id-t hordozza, slugtól függetlenül. Az id
+// forráson belül egyedi, és a migrateVolatileUrl sosem nevez át olyan url-t,
+// ami még kint van az élő listán, tehát ez nem tud túl-illeszkedni.
+//
+// (zyntern/muisz szándékosan nincs itt: náluk ilyen párra nincs bizonyíték —
+// ha lesz, ugyanez a minta a megoldás.)
+const ID_ONLY_URL_PATTERNS = {
+  // https://schonherz.hu/diakmunka/{város}/{kategória}/{id}-{slug}
+  schonherz: (url) => {
+    const m = url.match(/\/(\d+)-[^/]+$/);
+    return m ? escapeRegex(`/${m[1]}-`) : null;
+  },
+  // https://minddiak.hu/diakmunka/{slug}-{kerület}-{id}
+  minddiak: (url) => {
+    const m = url.match(/-(\d+)$/);
+    return m ? `${escapeRegex(`-${m[1]}`)}$` : null;
+  },
+};
+
 // =====================
 // DB upsert (csak write=1 esetén)
 // =====================
@@ -1690,10 +1719,15 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           item.experience = "diákmunka";
           try {
             const pattern = patternFor ? patternFor(item.url) : null;
-            if (pattern) {
-              const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
-              if (migrated) console.log(`[${source}] MIGRATED url → ${item.url}`);
+            let migrated = pattern
+              ? await migrateVolatileUrl(client, source, item.url, pattern, currentUrls)
+              : false;
+            if (!migrated) {
+              const idPatternFor = ID_ONLY_URL_PATTERNS[source];
+              const idPattern = idPatternFor ? idPatternFor(item.url) : null;
+              if (idPattern) migrated = await migrateVolatileUrl(client, source, item.url, idPattern, currentUrls);
             }
+            if (migrated) console.log(`[${source}] MIGRATED url → ${item.url}`);
             if (source === "minddiak" && !knownUrls.has(item.url)) {
               // Already have the full ad body from the listing API response
               // (item.techHtml) — no separate fetch (the SPA detail page has

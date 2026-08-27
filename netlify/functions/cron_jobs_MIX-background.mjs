@@ -617,6 +617,22 @@ function extractKukaJobs(html) {
 const KUKA_PAGE_SIZE = 25;
 const KUKA_MAX_PAGES = 20;
 
+// A kuka url-je /job/{slug}/{id}/ — az id STABIL, a slug viszont újragenerálódik
+// egy szerkesztett címből. Élő bizonyíték 2026-08-26: a
+// /job/Budapest-AMR-Service-Engineer/1363441355/ hirdetés
+// /job/Budapest-AMR-Project-Engineer/1363441355/ lett — ugyanaz az id. A kuka
+// ág eddig EGYÁLTALÁN nem hívott migrateVolatileUrl-t (a MIX-ben csak a
+// dreamjobs kapott ilyet), így az átnevezés árván hagyta a régi sort
+// (inaktívan, HTTP 200-zal) és beszúrt egy duplikátumot ugyanarra az állásra —
+// ez töri a dedupe-ot és a napi statisztikát. Ugyanaz a fallback, amit az erste
+// 2026-07-22-én kapott: bármelyik kuka url, ami ezt az id-t hordozza. Az id
+// forráson belül egyedi, és a migrateVolatileUrl sosem nevez át olyan url-t,
+// ami még kint van az élő listán, tehát ez nem tud túl-illeszkedni.
+function kukaIdOnlyPattern(url) {
+  const m = url.match(/\/(\d{6,})\/?$/);
+  return m ? `${escapeRegex(`/${m[1]}/`)}$` : null;
+}
+
 async function fetchAllKukaJobs() {
   const jobs = [];
   const seen = new Set();
@@ -716,9 +732,17 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       const kukaJobs = allKukaJobs.filter((job) => !shouldSkipTitleFilter(job.title, _filters));
       console.log(`kuka: ${kukaJobs.length} jobs found (of ${allKukaJobs.length} listed)`);
 
+      // A TELJES élő lista (szűrés előtt) a migrálás "él még" halmaza — egy még
+      // listázott url-t soha nem nevezhetünk át alóla.
+      const kukaCurrentUrls = allKukaJobs.map((j) => j.url);
       for (const job of kukaJobs) {
         await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX");
         if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
+        const idPattern = kukaIdOnlyPattern(job.url);
+        if (idPattern) {
+          const migrated = await migrateVolatileUrl(client, "kuka", job.url, idPattern, kukaCurrentUrls);
+          if (migrated) console.log(`[kuka] MIGRATED url → ${job.url}`);
+        }
         await upsertJob(client, "kuka", job);
       }
       console.log(`kuka: ${kukaJobs.length} jobs processed`);

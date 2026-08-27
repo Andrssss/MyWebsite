@@ -36,6 +36,23 @@ function volatileUrlPattern(url) {
   return m ? `^${escapeRegex(m[1])}\\d+${escapeRegex(m[2])}$` : null;
 }
 
+// The OPPOSITE churn also happens, and it is the one MBH actually does: the id
+// stays put while the SLUG is regenerated from an edited title. Live evidence
+// 2026-08-26: JobAdvertisement/22208/informaciobiztonsagi-gyakornok--es-
+// projekttamogatasi-gyakornok/gyakornok was re-slugged to
+// .../22208/informaciobiztonsagi--es-projekttamogatasi-gyakornok/gyakornok —
+// same id, one word dropped. volatileUrlPattern above holds the SLUG fixed and
+// wildcards the id, so it cannot match: the old row was orphaned (left
+// inactive, still HTTP 200) while a duplicate row was inserted for what is one
+// posting. Same bug and same fallback erste grew on 2026-07-22 — match ANY mbh
+// url carrying this id, whatever the slug. Ids are unique per source, and
+// migrateVolatileUrl never touches a url still present in the live listing, so
+// this cannot over-match.
+function idOnlyPattern(url) {
+  const m = url.match(/\/JobAdvertisement\/(\d+)\//);
+  return m ? escapeRegex(`/JobAdvertisement/${m[1]}/`) : null;
+}
+
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
@@ -347,9 +364,13 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
         }
 
         const pattern = volatileUrlPattern(detailUrl);
-        const migrated = pattern
+        let migrated = pattern
           ? await migrateVolatileUrl(client, "mbh", detailUrl, pattern, [...jobSet])
           : false;
+        if (!migrated) {
+          const idPattern = idOnlyPattern(detailUrl);
+          if (idPattern) migrated = await migrateVolatileUrl(client, "mbh", detailUrl, idPattern, [...jobSet]);
+        }
         if (migrated) console.log(`[mbh] MIGRATED url → ${detailUrl}`);
         const wasNew = await upsertJob(client, "mbh", {
           title: parsed.title,

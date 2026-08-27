@@ -566,6 +566,46 @@ function _isDeadResult(row, res) {
   return false;
 }
 
+// "Not dead" is NOT the same as "alive". sweepActive404 treats a negative status
+// (local failure) and 403/429/5xx as a NON-VERDICT: no dead-rule fired, so it
+// leaves the row alone — fail-safe, because the only thing it can do is kill.
+// reviveSweepDead's mistake (found 2026-08-26) was reusing that same "no rule
+// fired" as positive proof of life, so a bot-block or rate-limit RESURRECTED a
+// genuinely dead row. Measured on startup.jobs: 3 of 8 plain sequential GETs
+// answered 403 (the sweep hits it at concurrency 12, so far worse), which is
+// exactly why that source had 0 inactive rows out of 48 ever recorded while two
+// confirmed-dead postings sat active — the daily sweep killed them and the
+// revive that runs seconds later brought them straight back. Reviving may only
+// ever act on a REAL response from the posting's own page: HTTP 200–399 that
+// fails every dead-rule. Anything else (403/429/5xx/-1/-2/-3) means "we could
+// not ask", and the existing inactive flag stands until we can.
+// Melyik forrásnál kell a válasz TÖRZSE is? Mindenhol, ahol valamelyik szabály a
+// törzsre néz — a banner-szabályok ÉS a soft-404 "mégis él" szabályok is. Ma a
+// SOFT_404_ALIVE_SOURCES egyetlen forrása (talent) amúgy is banner-es, tehát ez
+// nulla plusz letöltés; a lényeg, hogy egy JÖVŐBELI soft-404-es forrás ne
+// csendben banner nélkül maradjon — akkor a törzs hiányában a puszta 404
+// azonnal halálnak olvasódna, pont amit a soft-404 szabály meg akar előzni.
+function _needsBody(source) {
+  return BANNER_DEAD_SOURCES[source] !== undefined || SOFT_404_ALIVE_SOURCES[source] !== undefined;
+}
+
+function _isAliveResult(row, res) {
+  if (!res) return false;
+  if (!(res.status >= 200 && res.status < 400)) return false;
+  return !_isDeadResult(row, res);
+}
+
+// Exported ONLY so the repo's maintenance scripts (scripts/audit_all_sources.mjs,
+// scripts/check_false_deactivations.mjs) can ask the exact question the scheduled
+// sweep asks, instead of keeping their own hand-copied "pontos tükör" of the rules
+// above. That mirror drifted and produced wrong findings: SOFT_404_ALIVE_SOURCES
+// was added here 2026-08-06 and never made it into either copy, so every talent
+// 404 read as dead in an audit even where prod would (correctly) call it alive
+// — found 2026-08-26. A copy can drift from the original; the original cannot
+// drift from itself.
+export const isDeadResult = _isDeadResult;
+export const isAliveResult = _isAliveResult;
+
 /**
  * 404 sweep — the cross-source safety net for reconcileActive.
  *
@@ -607,7 +647,7 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
 
   // Round-robin the URLs across `concurrency` workers. Body is only fetched
   // where a banner rule needs it.
-  const wantBody = (row) => ({ wantBody: BANNER_DEAD_SOURCES[row.source] !== undefined });
+  const wantBody = (row) => ({ wantBody: _needsBody(row.source) });
   const results = new Map();
   const lanes = Array.from({ length: concurrency }, (_, i) =>
     rows.filter((_, idx) => idx % concurrency === i)
@@ -709,7 +749,9 @@ export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
  * it now says alive (2026-07-12, confirmed on 2 user-reported urls).
  *
  * Revivals are double-checked (mirrors sweepActive404's own re-check) so a transient
- * blip can't resurrect a genuinely dead row.
+ * blip can't resurrect a genuinely dead row, and both checks demand a real
+ * HTTP 200–399 from the posting's own page (see _isAliveResult) — a 403/429/5xx
+ * is "we could not ask", never "it's back".
  *
  * @param {import("pg").PoolClient} client
  * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
@@ -734,7 +776,7 @@ export async function reviveSweepDead(client, checkFinal, opts = {}) {
   );
   if (rows.length === 0) return { checked: 0, revived: 0 };
 
-  const wantBody = (row) => ({ wantBody: BANNER_DEAD_SOURCES[row.source] !== undefined });
+  const wantBody = (row) => ({ wantBody: _needsBody(row.source) });
   const results = new Map();
   const lanes = Array.from({ length: concurrency }, (_, i) =>
     rows.filter((_, idx) => idx % concurrency === i)
@@ -745,17 +787,11 @@ export async function reviveSweepDead(client, checkFinal, opts = {}) {
     })
   );
 
-  // Negative statuses (local failure) never count as "alive" — only a real
-  // response that fails every dead-rule is a revival candidate.
-  const candidates = rows.filter((r) => {
-    const res = results.get(r.url);
-    return !!res && res.status >= 0 && !_isDeadResult(r, res);
-  });
+  const candidates = rows.filter((r) => _isAliveResult(r, results.get(r.url)));
 
   const confirmed = [];
   for (const row of candidates) {
-    const res = await checkFinal(row.url, wantBody(row));
-    if (res && res.status >= 0 && !_isDeadResult(row, res)) confirmed.push(row);
+    if (_isAliveResult(row, await checkFinal(row.url, wantBody(row)))) confirmed.push(row);
   }
 
   let revived = 0;
