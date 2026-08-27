@@ -18,6 +18,29 @@ export default async (req) => {
 
   let body;
   try { body = await req.json(); } catch { return new Response("bad json", { status: 400 }); }
+
+  // probe mode: authenticated GET against api.startup.jobs, to find out what a
+  // CLOSED posting looks like through the official API (the HTML page is behind
+  // Cloudflare and 403s the sweep).
+  if (body.probe) {
+    const out = [];
+    for (const u of body.probe) {
+      try {
+        const r = await fetch(u, {
+          headers: {
+            Authorization: `Bearer ${process.env.STARTUPJOBS_API_KEY}`,
+            Accept: "application/json",
+          },
+        });
+        const t = await r.text();
+        out.push({ url: u, status: r.status, body: t.slice(0, 1500) });
+      } catch (e) {
+        out.push({ url: u, error: e.message });
+      }
+    }
+    return new Response(JSON.stringify(out), { headers: { "content-type": "application/json" } });
+  }
+
   const queries = Array.isArray(body.queries) ? body.queries : [{ sql: body.sql, params: body.params || [] }];
 
   const client = await pool.connect();
