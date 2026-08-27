@@ -181,6 +181,7 @@ const FIXED = [
   { key: "Hays", label: "Hays" },
   { key: "nix", label: "NIX" },
   { key: "startupjobs", label: "Startup Jobs" },
+  { key: "ats-crawl", label: "ATS boardok" },
 ];
 
 // Sources still shown by time window (NOT governed by the active flag). For now
@@ -296,6 +297,22 @@ exports.handler = async (event) => {
           const count = dbKeys.reduce((sum, k) => sum + (map.get(k)?.count ?? 0), 0);
           return { source: s.key, label: s.label, count };
         });
+
+        // FIXED is the LABEL + ordering registry, not an allowlist. Any source
+        // present in the DB but missing from it is appended with its raw key as
+        // the label, so a newly added scraper can never be invisible in the
+        // filter chips just because nobody remembered to edit this file.
+        // (2026-08-26: "ats-crawl" shipped and its rows were in the job list,
+        // but the chip was missing entirely — the same stale-hardcoded-list bug
+        // class as the category-ID allowlists. The v2 allasfigyelo reader
+        // already derives its chips from the DB for exactly this reason.)
+        const covered = new Set(FIXED.flatMap((s) => s.keys || [s.key]));
+        for (const [source, row] of map) {
+          if (covered.has(source)) continue;
+          if (source.startsWith("AI - ")) continue; // legacy per-company AI keys fold into AI-scraped
+          out.push({ source, label: source, count: row.count });
+        }
+
         out.sort((a, b) => a.label.localeCompare(b.label, "hu"));
 
         cacheSet(cacheKey, out);
