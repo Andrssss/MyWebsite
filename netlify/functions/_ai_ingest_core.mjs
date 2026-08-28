@@ -115,6 +115,31 @@ export function isItJob(title, categories) {
   return (categories || []).some(([, kws]) => (kws || []).some((kw) => kwRegex(kw.toLowerCase()).test(t)));
 }
 
+/* ── "erős" IT-cím jel (a kategória-taxonómia MELLÉ, nem helyette) ──
+   Akkor kell, ha a forrás saját kategóriája nem megbízható: van olyan portál,
+   ahol egy IT hirdetés nem-IT kategóriában ül (muisz "IT Intern" → Irodai,
+   melodiak → gazdasagi-penzugyi-marketing slug). Ilyenkor a kategória-szűrő
+   tágítása NEM megoldás — a 2026-07-29-i muisz kat.4 eset (a teljes Mérnöki
+   kategória beöntése) és a `job_categories` teljes keyword-listája is tömeg
+   fals pozitívot hoz ("Office manager assistant", "Kontroller gyakornok",
+   "Robotporszívó-tesztelő"). Ezért a nem-IT kategóriákból CSAK egyértelmű
+   IT-jelre engedünk be.
+
+   Szándékosan NINCS benne a puszta "tesztelő" / "elemző" / "admin" / "manager" /
+   "kontroller" — pont ezek a fenti fals pozitívok forrásai. Az `isItJob`-tól
+   (job_categories teljes keyword-listája) külön él és szűkebb nála: ez a
+   kategórián KÍVÜLI beengedés kapuja, az `isItJob` a kategória nélküli
+   forrásoké.
+
+   Egy közös példány, mert két scraper használja (melodiak, muisz) — külön
+   másolatban garantáltan szétcsúsznának. */
+export const STRONG_IT_TITLE =
+  /(adattudós|adatelemző|adatmérnök|data\s+(scientist|analyst|engineer)|szoftver|software|programozó|fejlesztőmérnök|webfejlesztő|developer|devops|rendszergazda|informatikus|\bIT\b)/i;
+
+export function hasStrongItTitle(title) {
+  return STRONG_IT_TITLE.test(String(title || ""));
+}
+
 /* ── senior filter (same rule as every scraper) ──────────────────── */
 
 function normalizeText(s) {

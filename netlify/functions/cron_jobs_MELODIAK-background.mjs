@@ -20,6 +20,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { STRONG_IT_TITLE } from "./_ai_ingest_core.mjs";
 
 let _filters = [];
 
@@ -49,8 +50,8 @@ const IT_SLUG = "informatikai-mernoki-muszaki";
 // "manager", "kontroller" — ezek a fenti fals pozitívok forrásai.
 // Élő mérés a felvételkor: a teljes 300-as listán pontosan 1 sort hoz be, a
 // valódi hiányzót, 0 fals pozitívval.
-const STRONG_IT_TITLE =
-  /(adattudós|adatelemző|adatmérnök|data\s+(scientist|analyst|engineer)|szoftver|software|programozó|fejlesztőmérnök|webfejlesztő|developer|devops|rendszergazda|informatikus|\bIT\b)/i;
+// A mintát a _ai_ingest_core.mjs tartja (a muisz is ugyanezt használja) — egy
+// másolat, hogy a két scraper IT-kapuja ne csússzon szét.
 
 /* ── helpers ─────────────────────────────────────────────────── */
 

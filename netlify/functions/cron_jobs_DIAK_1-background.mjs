@@ -4,7 +4,7 @@ console.log("CRON_JOBS_DIAK_1 LOADED");
 /* =========================
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
-  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
+  { key: "muisz", label: "Muisz – teljes lista, IT-kapuval", url: "https://muisz.hu/hu/diakmunkaink" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://tudatosdiak.anyway.hu/hu/jobs?searchIndustry%5B%5D=7&searchMinHourlyWage=1000" },
@@ -23,6 +23,7 @@ import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
+import { hasStrongItTitle } from "./_ai_ingest_core.mjs";
 
 let _filters = [];
 
@@ -278,7 +279,7 @@ function dedupeByUrl(items) {
 // =====================
 const SOURCES = [
   { key: "minddiak", label: "Minddiák", url: "https://minddiak.hu/diakmunka-226/work_type/it-mernok-10" },
-  { key: "muisz", label: "Muisz – gyakornoki kategória", url: "https://muisz.hu/hu/diakmunkaink?categories=3&locations=10" },
+  { key: "muisz", label: "Muisz – teljes lista, IT-kapuval", url: "https://muisz.hu/hu/diakmunkaink" },
   { key: "zyntern", label: "Zyntern – IT/fejlesztés", url: "https://zyntern.com/jobs" },
   { key: "schonherz", label: "Schönherz – Budapest fejlesztő/tesztelő + informatikai-support", url: "https://schonherz.hu/diakmunkak/budapest/fejleszto---tesztelo" },
   { key: "tudasdiak", label: "Tudasdiak", url: "https://app.tudatosdiak.hu/hu/jobs?searchIndustry%5B0%5D=7&searchMinHourlyWage=1000" },
@@ -1442,7 +1443,33 @@ async function fetchAllTudasdiakJobs(html, listUrl, { maxPages = 20 } = {}) {
 }
 
 
-async function fetchAllMuiszJobs({ categories = [3], locations = [10], limit = 12, maxPages = 20 } = {}) {
+// A szerveroldali locations[]=10 kiváltása. Csak a `location` mezőre nézünk: egyértékű és
+// mindig kitöltött, a "Budapest 11. ker." / "Debrecen" / "Home office" formákkal — nincs
+// benne a profession-nél megismert több-városos csapda, ezért nem kell detail-oldal.
+// A "Home office" / "Távmunka" BENNMARAD (a szerveroldali szűrő kihagyta): távmunka nem
+// vidéki állás. Ez az EGYETLEN szándékos tágítás a régi viselkedéshez képest.
+function isBudapestLocation(location) {
+  const t = String(location || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (!t) return true; // fail-open: üres helyszín sosem fordult elő, de ne dobjuk el némán
+  return /budapest/.test(t) || /home\s*office|tavmunka|remote/.test(t);
+}
+
+// A muisz saját kategóriája NEM megbízható IT-szűrő: az "IT Intern" (28329) az
+// "Irodai", az "IT Üzemeltetés-támogató" (11512) a "Mérnöki" kategóriában ül, így a
+// korábbi job_main_categories[]=3 lekérés SOHA nem láthatta őket. A kategória-szűrő
+// tágítása nem megoldás (2026-07-29: kat.4 = a teljes Mérnöki kategória, tömeg nem-IT
+// gyakornok) → a teljes listát kérjük le, és a nem-IT kategóriákból csak erős cím-jelre
+// engedünk be (hasStrongItTitle, lásd a runBatch muisz-ágát).
+//
+// A locations[]=10 (Budapest) szűrő MŰKÖDIK a szerveren (kat.3 = 8 sor, ebből 4 Debrecen;
+// kat.3+loc.10 = 4 sor, mind budapesti) — csak azért nem küldjük már, mert a kategória-
+// szűrő nélküli lekéréshez a helyszín-szűrést is kliensoldalra kellett hozni. A pótlása
+// KÖTELEZŐ: lásd isBudapestLocation + a runBatch muisz-ága. A `location` mező egyértékű
+// és mindig kitöltött ("Budapest 11. ker.", "Debrecen", "Home office"); élőben mérve a
+// `location`-ben szereplő "Budapest" PONTOSAN a locations[]=10 halmazt adja vissza
+// (91/134), tehát a kliensoldali pótlás nem lazább a szerveroldali szűrőnél.
+async function fetchAllMuiszJobs({ limit = 100, maxPages = 20 } = {}) {
   const base = "https://merp.muisz.hu/api_v2_prod/jobs/filter";
   const all = [];
 
@@ -1450,8 +1477,6 @@ async function fetchAllMuiszJobs({ categories = [3], locations = [10], limit = 1
     const offset = page * limit;
 
     const params = new URLSearchParams();
-    for (const c of categories) params.append("job_main_categories[]", String(c));
-    for (const l of locations)   params.append("locations[]", String(l));
     params.set("offset", String(offset));
     params.set("limit",  String(limit));
 
@@ -1482,7 +1507,9 @@ async function fetchAllMuiszJobs({ categories = [3], locations = [10], limit = 1
         const alias = j?.url_alias ? encodeURIComponent(String(j.url_alias).trim()) : null;
         const jobIdC = j?.job_id_c ? String(j.job_id_c).trim() : null;
         const url = alias && jobIdC ? `https://muisz.hu/hu/diakmunkaink/${alias}--${jobIdC}` : null;
-        return { title, url, description: null };
+        const mainCategory = j?.job_main_category ? String(j.job_main_category).trim() : null;
+        const location = j?.location ? String(j.location).trim() : null;
+        return { title, url, description: null, mainCategory, location };
       })
       .filter((x) => x.title && x.url);
 
@@ -1593,11 +1620,26 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         }
       } else if (source === "muisz") {
         try {
-          // categories 3=Informatikai, 4=Mérnöki. 4 was added 2026-07-29 (coverage
-          // audit: whole engineering category was never queried) then reverted the
-          // same day — it's dominated by non-IT engineering internships (mechanical/
-          // civil/electrical), not the missed IT postings the audit was chasing.
-          merged = await fetchAllMuiszJobs({ categories: [3], locations: [10], limit: 12, maxPages: 20 });
+          // Teljes lista (minden kategória), majd IT-kapu: az "Informatikai" kategória
+          // teljes egészében marad, minden más kategóriából csak egyértelmű IT-cím jön be.
+          // A helyszín-szűrés IS itt történik (a szerveroldali locations[]=10 kiváltása,
+          // lásd isBudapestLocation) — a kategória-szűrő elhagyásával az is kliensoldalra
+          // került, és nélküle a muisz vidéki (debreceni) sorokat kezdene betolni.
+          // Élő mérés a felvételkor: 134 → 93 budapesti → 8 IT: 4 Informatikai + 4 cím-alapú
+          // ("IT Intern", "IT Üzemeltetés-támogató", "Project Data Analyst Intern",
+          // "OPTIKAI FEJLESZTŐMÉRNÖK" — az utolsó az egyetlen határeset). A régi
+          // kat.3+loc.10 lekérés ugyanezen a listán 4 sort adott.
+          const allMuisz = await fetchAllMuiszJobs({ limit: 100, maxPages: 20 });
+          const budapest = allMuisz.filter((c) => isBudapestLocation(c.location));
+          merged = budapest.filter((c) => {
+            if (c.mainCategory === "Informatikai") return true;
+            if (hasStrongItTitle(c.title)) {
+              console.log(`[muisz] IT-cím a(z) "${c.mainCategory}" kategóriából: "${c.title}"`);
+              return true;
+            }
+            return false;
+          });
+          console.log(`[muisz] budapest_gate: ${budapest.length} / ${allMuisz.length}  →  it_gate: ${merged.length}`);
         } catch (e) {
           await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Muisz API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Muisz API error: ${e.message}` });
@@ -1659,7 +1701,10 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         console.log(`[zyntern] matched=${matchedList.length}  total_before_filter=${merged.length}`);
         matchedList.forEach((c, i) => console.log(`[zyntern]   MATCH[${i+1}] "${c.title}" → ${c.url}`));
       } else if (source === "minddiak" || source === "muisz") {
-        // API sources: already pre-filtered to IT jobs – only apply blacklist on title, no false positives from description
+        // API sources – az IT-szűrés MÁR MEGTÖRTÉNT feljebb (minddiak: IT-mérnök
+        // work_type listaoldal; muisz: Informatikai kategória + hasStrongItTitle kapu),
+        // itt már csak a job_filters denylist fut a CÍMRE. A description-t szándékosan
+        // nem etetjük szűrőbe (2026-07-29 description-pollution csapda).
         matchedList = [];
         for (const c of merged) {
           const hit = getBlockingFilterWord(c.title, _filters);
