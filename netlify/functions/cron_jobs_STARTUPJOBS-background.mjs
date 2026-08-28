@@ -43,6 +43,7 @@ import zlib from "zlib";
 import { loadFilters } from "./load_filters.mjs";
 import { logFetchError, withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe } from "./_cross_source_dupe.mjs";
 import {
   isInternshipTitle,
   isJuniorTitle,
@@ -199,7 +200,15 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
     let skippedSenior = 0;
     let skippedWrongCountry = 0;
     let skippedNoData = 0;
+    let skippedCrossSourceDupe = 0;
     let fetchFailed = false;
+
+    // startup.jobs is an aggregator: the 2026-08-28 overlap analysis found 45
+    // of its 56 rows were already on the board from the employer-side sources,
+    // with no discovery-time advantage. Anything another source already carries
+    // under the same <company first word>|<title> key is dropped before insert.
+    const dupeIndex = await loadCrossSourceDupeIndex(client, "startupjobs");
+    console.log(`[startupjobs] cross-source dupe index: ${dupeIndex.size} keys`);
 
     let cursor = null;
     let page = 0;
@@ -251,6 +260,12 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
           const technologies = extractTechnologies(descriptionHtml);
           const company = normalizeWhitespace(job?.company?.name) || null;
 
+          if (isCrossSourceDupe(dupeIndex, company, title)) {
+            skippedCrossSourceDupe++;
+            console.log(`[startupjobs] SKIP cross-source dupe "${title}" @ ${company} → ${url}`);
+            continue;
+          }
+
           if (shouldSkipSeniorExperience(isSeniorExperience(experience))) {
             skippedSenior++;
             console.log(`[startupjobs] SKIP senior-experience [${experience}] "${title}" → ${url}`);
@@ -276,7 +291,8 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
     console.log(
       `[startupjobs] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_wrong_country=${skippedWrongCountry}, ` +
-      `skipped_no_data=${skippedNoData}, fetch_failed=${fetchFailed}`
+      `skipped_no_data=${skippedNoData}, skipped_dupe=${skippedCrossSourceDupe}, ` +
+      `fetch_failed=${fetchFailed}`
     );
 
     // Reactivate-only — see file header: the API only surfaces the last 14
