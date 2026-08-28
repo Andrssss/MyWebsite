@@ -69,6 +69,10 @@ export function fetchFinal(url, opts = {}, redirectLeft = 5) {
         Accept: "text/html,application/xhtml+xml,application/json,*/*;q=0.8",
         "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
         "Accept-Encoding": wantBody ? "identity" : "gzip,deflate,br",
+        // SWEEP_PROBE_OVERRIDES rows are asked at an authenticated API instead
+        // of the posting's public page (startupjobs → api.startup.jobs), so the
+        // checker has to carry that source's auth header through.
+        ...(opts.headers || {}),
       },
       timeout: REQUEST_TIMEOUT_MS,
     }, (res) => {

@@ -750,6 +750,59 @@ export const isAliveResult = _isAliveResult;
  * @param {number} [opts.concurrency=12]
  * @returns {Promise<{checked:number, suspects:number, deactivated:number}>}
  */
+/** One probe, routed through SWEEP_PROBE_OVERRIDES and asking for a body only
+ *  where some rule actually reads one. */
+function _probeOne(row, checkFinal) {
+  const p = sweepProbeFor(row);
+  return checkFinal(p.url, { wantBody: _needsBody(row.source), headers: p.headers });
+}
+
+/**
+ * Fan out one probe per row.
+ *
+ * Rows whose source has NO probe override keep the original round-robin across
+ * `concurrency` workers. Rows whose source HAS one are pulled out into a
+ * separate lane per source, walked sequentially with `minIntervalMs` between
+ * requests: the override endpoints are rate-limited APIs, not public pages, and
+ * spraying them at concurrency 12 just converts every verdict into an HTTP 429
+ * non-verdict (measured on startup.jobs: 37 of 57 rows in one burst). Those
+ * lanes still run in parallel with the plain ones, so pacing one small source
+ * doesn't stall the sweep.
+ */
+async function _probeAll(rows, checkFinal, concurrency) {
+  const results = new Map();
+  const plain = [];
+  const pacedBySource = new Map();
+  for (const row of rows) {
+    if (SWEEP_PROBE_OVERRIDES[row.source] && sweepProbeFor(row).overridden) {
+      if (!pacedBySource.has(row.source)) pacedBySource.set(row.source, []);
+      pacedBySource.get(row.source).push(row);
+    } else {
+      plain.push(row);
+    }
+  }
+
+  const lanes = Array.from({ length: concurrency }, (_, i) =>
+    plain.filter((_, idx) => idx % concurrency === i)
+  ).map(async (list) => {
+    for (const row of list) results.set(row.url, await _probeOne(row, checkFinal));
+  });
+
+  for (const [, list] of pacedBySource) {
+    lanes.push((async () => {
+      for (let i = 0; i < list.length; i++) {
+        const row = list[i];
+        const wait = sweepProbeFor(row).minIntervalMs;
+        if (i > 0 && wait > 0) await new Promise((r) => setTimeout(r, wait));
+        results.set(row.url, await _probeOne(row, checkFinal));
+      }
+    })());
+  }
+
+  await Promise.all(lanes);
+  return results;
+}
+
 export async function sweepActive404(client, checkFinal, opts = {}) {
   const concurrency = Math.max(1, opts.concurrency ?? 12);
 
@@ -881,22 +934,13 @@ export async function reviveSweepDead(client, checkFinal, opts = {}) {
   );
   if (rows.length === 0) return { checked: 0, revived: 0 };
 
-  const wantBody = (row) => ({ wantBody: _needsBody(row.source) });
-  const results = new Map();
-  const lanes = Array.from({ length: concurrency }, (_, i) =>
-    rows.filter((_, idx) => idx % concurrency === i)
-  );
-  await Promise.all(
-    lanes.map(async (list) => {
-      for (const row of list) results.set(row.url, await checkFinal(row.url, wantBody(row)));
-    })
-  );
+  const results = await _probeAll(rows, checkFinal, concurrency);
 
   const candidates = rows.filter((r) => _isAliveResult(r, results.get(r.url)));
 
   const confirmed = [];
   for (const row of candidates) {
-    if (_isAliveResult(row, await checkFinal(row.url, wantBody(row)))) confirmed.push(row);
+    if (_isAliveResult(row, await _probeOne(row, checkFinal))) confirmed.push(row);
   }
 
   let revived = 0;
