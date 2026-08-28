@@ -1,6 +1,16 @@
-// netlify/functions/linkedin_scraper.js
+// netlify/functions/jobPipeline.js
+//
+// HOLT KÓD — a legelső LinkedIn-scraper maradványa (a fejléce még
+// `linkedin_scraper.js`-nek hívja magát). A repóban semmi nem hivatkozik rá, a
+// job_posts-ba nem ír, a mai LinkedIn-aratást a cron_jobs_L_1..L_8 végzi.
+// 2026-08-28-ig viszont HITELESÍTÉS NÉLKÜL, élesben ki volt téve: bárki
+// meghívhatta, és a mi függvényünkkel, a mi kimenő IP-nkről fetcheltetett
+// linkedin.com-ot tetszőleges `keyword`/`geo`/`pages` paraméterrel (max 10 oldal
+// × ~2s késleltetés futásidőben). Ezért ADMIN_SECRET mögé került — de igazából
+// törölni kellene, nem védeni.
 const https = require("https");
 const cheerio = require("cheerio");
+const { hasAdminSecret } = require("./_admin_identity_core");
 
 // =====================
 // Helper: fetch HTML
@@ -55,6 +65,14 @@ function extractJobs(html) {
 // Handler
 // =====================
 exports.handler = async (event) => {
+  if (!hasAdminSecret(event)) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: "Unauthorized" }),
+      headers: { "Content-Type": "application/json" },
+    };
+  }
+
   const qs = event.queryStringParameters || {};
   const pages = Math.min(parseInt(qs.pages || "3", 10), 10); // max 10 oldal
   const delay = Math.max(parseInt(qs.delay || "1500", 10), 500); // ms

@@ -181,7 +181,10 @@ async function fetchSmartRecruiters(src) {
     const technologies = descHtml ? extractTechnologies(descHtml) : null;
 
     console.log(`[ats][${src.label}] ACCEPT: "${title}" exp=${experience} url=${url}`);
-    results.push({ source: src.key, title, url, experience, technologies });
+    // A cégnevet a SR-payload adja (`company.name`); a src.company csak az
+    // API-slug, végszükség-tartalék.
+    const company = normalizeWhitespace(it?.company?.name) || src.company || null;
+    results.push({ source: src.key, title, url, experience, technologies, company });
   }
 
   return { raw: all.length, mapped: results };
@@ -201,16 +204,27 @@ function dedupeBySourceUrl(items) {
   return out;
 }
 
+/*
+ * A `company` 2026-08-28-ig egyáltalán nem szerepelt az oszloplistában, pedig a
+ * SmartRecruiters-payload adja — emiatt mind a 11 élő `wise` sor cégnév nélkül
+ * állt. A DO UPDATE ág szándékosan CSAK NULL fölé ír (ugyanaz a guardolt
+ * cég-backfill minta, mint a többi cégnevet író scraperben), így a meglévő
+ * sorok maguktól begyógyulnak a következő futáson, és semmi mást nem írunk át.
+ * A visszatérési érték `xmax = 0` — az "újonnan beszúrt" számláló különben a
+ * backfill-frissítéseket is új sornak venné.
+ */
 async function upsertJob(client, item) {
   const res = await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
-     ON CONFLICT (source, url) DO NOTHING
-     RETURNING id;`,
-    [item.source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null]
+      (source, title, url, experience, technologies, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+     ON CONFLICT (source, url) DO UPDATE SET
+        company = EXCLUDED.company
+      WHERE job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL
+     RETURNING (xmax = 0) AS inserted;`,
+    [item.source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null, item.company ?? null]
   );
-  return res.rowCount > 0;
+  return res.rows[0]?.inserted === true;
 }
 
 export default withTimeout("cron_jobs_ATS-background", async () => {

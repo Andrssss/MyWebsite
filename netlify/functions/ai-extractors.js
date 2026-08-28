@@ -9,6 +9,7 @@
 
 const { Pool } = require("pg");
 const { withDbAuditFlush } = require("./_db_audit.js");
+const { safeEqual } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -18,6 +19,17 @@ const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
 const MODES = new Set(["llm-read", "recipe", "disabled"]);
+
+// Ugyanaz a szerződés, mint az ai-ingest/ai-registry/ai-deactivate/ats-tenants
+// végpontokon: AI_INGEST_TOKEN, és amíg az nincs beállítva, CRON_SECRET.
+function authorized(event) {
+  const expected = (process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET || "").trim();
+  if (!expected) return false;
+  const hdr =
+    (event.headers && (event.headers.authorization || event.headers.Authorization)) || "";
+  const token = hdr.replace(/^Bearer\s+/i, "").trim();
+  return token.length > 0 && safeEqual(token, expected);
+}
 
 function json(statusCode, body) {
   return {
@@ -71,6 +83,21 @@ exports.handler = withDbAuditFlush("ai-extractors", async (event) => {
       },
       body: "",
     };
+  }
+
+  /* Auth: AI_INGEST_TOKEN, MINDEN metódusra (2026-08-28).
+     Eddig NULLA hitelesítés volt rajta, pedig ez a végpont dönti el, milyen
+     oldalakat arat be a `cron_jobs_AI-background.mjs` az `AI - <site>`
+     forrásokba: egy POST-tal bárki tetszőleges list_url-t tehetett a
+     pipeline-ba (a mi infrastruktúránkkal fetchelve), DELETE-tel pedig
+     kiüríthette a regisztert. A GET sem ártalmatlan — a teljes aratási
+     konfigurációnkat listázza.
+     A kulcs SZÁNDÉKOSAN az AI-család szűk tokenje (`ai-ingest`, `ai-registry`,
+     `ai-deactivate`, `ats-tenants` ugyanezt használja), NEM az ADMIN_SECRET:
+     az AI-utak sosem tartanak destruktív kulcsot, és ez az endpoint is az AI
+     regiszterhez tartozik. Böngészőből semmi nem hívja, csak curl. */
+  if (!authorized(event)) {
+    return json(401, { error: "Unauthorized" });
   }
 
   let client;

@@ -229,6 +229,32 @@ async function crawlTenant(client, tenant, { filters, categories }) {
 
   console.log(`[atscrawl] ${label}: board=${boardJobs.length} hu=${huJobs.length}`);
 
+  /* Cégnév a boardtól, ha a hirdetés nem hozza.
+     A felderített tenantok `company`-ja SZÁNDÉKOSAN NULL (a slug nem azonosítja
+     a céget — ld. cron_ats_discover addTenant), ashby és lever pedig a
+     hirdetés-payloadban sem ad cégnevet → 2026-08-28-ig minden ilyen sor
+     cégnév NÉLKÜL került be (18 élő sor). A board saját nyitóoldalának címe
+     viszont a board tulajdonosának saját állítása magáról, nem a mi tippünk,
+     tehát tényként írható. Tenantonként egyszer kérjük le (utána a DB-ből jön),
+     és csak akkor, ha van mit felcímkézni vele. */
+  if (!tenant.company && huJobs.length > 0 && typeof provider.companyName === "function") {
+    try {
+      const name = await provider.companyName(tenant.slug);
+      if (name) {
+        tenant.company = name;
+        await client.query(
+          `UPDATE ats_tenants SET company = $3 WHERE provider = $1 AND slug = $2 AND company IS NULL`,
+          [tenant.provider, tenant.slug, name]
+        );
+        console.log(`[atscrawl] ${label} company resolved → "${name}"`);
+      } else {
+        console.log(`[atscrawl] ${label} company unresolved (board title gave nothing)`);
+      }
+    } catch (err) {
+      console.error(`[atscrawl] ${label} company lookup failed: ${err.message}`);
+    }
+  }
+
   // 2) a HU-sorok teljes felépítése (insert ELŐTT, egyetlen detail-hívással)
   const built = [];
   for (const job of huJobs) {

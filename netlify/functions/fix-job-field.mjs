@@ -11,8 +11,16 @@
 // 2026-07-21 "medior" mislabel; 2026-07-22 added `active` to deactivate
 // AI-scraped duplicates of an already-hand-scraped source, e.g. nix).
 //
+// Auth: ADMIN_SECRET (2026-08-28 — eddig CRON_SECRET volt). Ez kézi job_posts
+// ÍRÁS, ami ráadásul megkerüli az anti-clobber guardot, tehát a write/destruktív
+// tierbe tartozik, oda, ahova a filters.js/categories.js írásai és a job-hidden.js.
+// A CRON_SECRET a teljes cron-flottát vezérli (és a CLAUDE.md szerint egy Netlify
+// personal access token értéke) — nem az a helyes kulcs egy admin-korrekcióhoz.
+// Fallback CRON_SECRET-re, amíg az ADMIN_SECRET nincs beállítva, ugyanúgy, mint a
+// többi write-endpointon.
+//
 //   curl -X POST https://bakan7.netlify.app/.netlify/functions/fix-job-field \
-//     -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+//     -H "Authorization: Bearer $ADMIN_SECRET" -H "Content-Type: application/json" \
 //     -d '{"url":"https://example.hu/allas/1","experience":"junior"}'
 //     -d '{"url":"https://example.hu/allas/1","active":false}'
 
@@ -32,7 +40,7 @@ function json(status, body) {
 }
 
 function authorized(request) {
-  const expected = process.env.CRON_SECRET;
+  const expected = (process.env.ADMIN_SECRET || process.env.CRON_SECRET || "").trim();
   if (!expected) return false;
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   return token === expected;

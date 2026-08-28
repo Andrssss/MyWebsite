@@ -10,6 +10,9 @@
  *   detectsMissingTenant   true, ha a nemlétező slug megkülönböztethető (404)
  *   async list(slug)       → { notFound, jobs: [AtsJob] }
  *   async detail(job)      → descriptionHtml | null   (csak ha a lista nem hozza)
+ *   async companyName(slug)→ a board TULAJDONOSÁNAK neve | null   (csak azoknál
+ *                            a providereknél, amelyek a hirdetés-payloadban NEM
+ *                            adják meg — ld. lentebb)
  *
  * AtsJob:
  *   { title, url, location, company, descriptionHtml, detailRef }
@@ -25,6 +28,14 @@
  *    "4iG") 200-at ad `content: []`-tel, tehát a "nincs ilyen cég" és a
  *    "nincs nyitott állása" megkülönböztethetetlen. Ezért detectsMissingTenant
  *    = false, és üres boardra SOSEM deaktiválunk (a worker complete:false-t ad).
+ *  • Cégnév: greenhouse (`company_name`) és smartrecruiters (`company.name`) a
+ *    hirdetés mellé adja, ashby és lever NEM (2026-08-28: 18 ats-crawl sor
+ *    maradt cégnév nélkül emiatt — a felderített tenantok `company`-ja
+ *    szándékosan NULL, ld. cron_ats_discover addTenant). Ez utóbbi kettőnél a
+ *    board saját nyitóoldalának <title>-je adja a nevet ("<Cég> Jobs" ashby-n,
+ *    "<Cég>" leveren) — ez a board saját állítása magáról, nem a mi tippünk a
+ *    cégnévből képzett slugra, tehát tényként kezelhető. A worker tenantonként
+ *    EGYSZER kéri le és elmenti az ats_tenants sorba.
  *  • A leíráshoz NEM kell külön kör ashby/lever esetén (a lista hozza), viszont
  *    greenhouse/smartrecruiters esetén igen — ott EGY detail-fetch/sor, a
  *    HU-szűrés UTÁN, insert ELŐTT (experience-write-policy: a sor teljesen
@@ -51,6 +62,35 @@ async function fetchJson(url) {
   });
   if (!res.ok) throw new HttpError(res.status, url);
   return res.json();
+}
+
+async function fetchText(url) {
+  const res = await fetch(url, {
+    headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.8" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new HttpError(res.status, url);
+  return res.text();
+}
+
+/*
+ * A board nyitóoldalának <title>-jéből olvassa ki a cég nevét.
+ * `suffixRe` = a provider állandó toldaléka ("… Jobs"), amit le kell vágni.
+ * Nem létező boardnál ez pont üres nevet ad (ashby: "<title>Jobs</title>"),
+ * ezért a levágás UTÁNI üres string = nincs név, nem pedig névtelen cég.
+ */
+async function companyFromBoardTitle(url, suffixRe) {
+  let html;
+  try {
+    html = await fetchText(url);
+  } catch {
+    return null;
+  }
+  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!m) return null;
+  const name = clean(decodeEntities(m[1])).replace(suffixRe, "").trim();
+  if (!name || /^not found/i.test(name)) return null;
+  return name.slice(0, 200);
 }
 
 // A Greenhouse `content` mezője HTML-ENTITÁSKÉNT kódolt HTML-t ad vissza
@@ -108,6 +148,12 @@ const ashby = {
     return { notFound: false, jobs };
   },
   async detail() { return null; },
+  async companyName(slug) {
+    return companyFromBoardTitle(
+      `https://jobs.ashbyhq.com/${encodeURIComponent(slug)}`,
+      /\s*jobs$/i
+    );
+  },
 };
 
 /* ── Greenhouse ───────────────────────────────────────────────────────
@@ -179,6 +225,12 @@ const lever = {
     return { notFound: false, jobs };
   },
   async detail() { return null; },
+  async companyName(slug) {
+    return companyFromBoardTitle(
+      `https://jobs.lever.co/${encodeURIComponent(slug)}`,
+      /\s*jobs$/i
+    );
+  },
 };
 
 /* ── SmartRecruiters ──────────────────────────────────────────────────
