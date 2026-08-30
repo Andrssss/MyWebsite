@@ -112,15 +112,20 @@ export function candidateSlugs(companyName) {
 // learatni nem tudunk, csak szemetelne a táblában.
 const URL_PATTERNS = [
   { provider: "ashby", re: /^https?:\/\/jobs\.ashbyhq\.com\/([^/?#]+)/i },
-  { provider: "greenhouse", re: /^https?:\/\/(?:job-)?boards(?:-api)?\.greenhouse\.io\/(?:embed\/job_board\?for=)?([^/?#]+)/i },
-  { provider: "greenhouse", re: /^https?:\/\/job-boards\.greenhouse\.io\/([^/?#]+)/i },
+  // A greenhouse EU-boardjai külön hoston élnek (job-boards.eu.greenhouse.io) —
+  // pontosan ezt adja vissza a listázó API absolute_url-je EU-s cégeknél, tehát
+  // enélkül a SAJÁT ats-crawl sorunk url-jét sem ismernénk fel ATS-urlként (élő
+  // eset: abbyy). A slug ugyanaz, és a board a nem-EU-s boards-api hoston keresztül
+  // aratható — ezt az ats-crawl saját, már meglévő abbyy-sorai igazolják.
+  { provider: "greenhouse", re: /^https?:\/\/(?:job-)?boards(?:-api)?\.(?:eu\.)?greenhouse\.io\/(?:embed\/job_board\?for=)?([^/?#]+)/i },
+  { provider: "greenhouse", re: /^https?:\/\/job-boards\.(?:eu\.)?greenhouse\.io\/([^/?#]+)/i },
   { provider: "lever", re: /^https?:\/\/jobs\.(?:eu\.)?lever\.co\/([^/?#]+)/i },
   { provider: "smartrecruiters", re: /^https?:\/\/jobs\.smartrecruiters\.com\/([^/?#]+)/i },
   { provider: "smartrecruiters", re: /^https?:\/\/careers\.smartrecruiters\.com\/([^/?#]+)/i },
 ];
 
 // A greenhouse `embed/job_board?for=X` alak query-ben hozza a slugot.
-const GH_EMBED = /^https?:\/\/boards\.greenhouse\.io\/embed\/job_board\?for=([^&#]+)/i;
+const GH_EMBED = /^https?:\/\/boards\.(?:eu\.)?greenhouse\.io\/embed\/job_board\?for=([^&#]+)/i;
 
 /**
  * Kiszedi egy ATS-hirdetés url-jéből a providert és a cég-slugot.

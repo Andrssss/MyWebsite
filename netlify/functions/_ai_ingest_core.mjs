@@ -19,6 +19,7 @@ import {
   extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { atsHandoff, registerAtsTenant } from "./_ats_handoff.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
    Lives here so ai-ingest.mjs and ai-registry.mjs can't drift apart on what
@@ -287,10 +288,16 @@ async function upsertJob(client, source, job, resolvedExperience) {
  * @param {string}   [args.scopePrefix]  passed through to reconcileActive — restricts its
  *                                    writes to rows under one url prefix. Required when many
  *                                    independent full listings share ONE source value.
+ * @param {boolean} [args.handoffAtsUrls=false]  AI-callers only. An incoming url that resolves to a
+ *                                    known ATS board is NOT inserted; the tenant behind it is
+ *                                    registered instead and ats-crawl harvests the whole board
+ *                                    (_ats_handoff.mjs has the full reasoning). Deliberately
+ *                                    opt-in: ats-crawl and workable post ATS urls themselves and
+ *                                    must never hand their own rows away.
  */
 export async function ingestJobs(client, {
   source, jobs, fullListing = false, filters = [], categories = [],
-  rejectLocation = isNonBudapestLocation, scopePrefix = null,
+  rejectLocation = isNonBudapestLocation, scopePrefix = null, handoffAtsUrls = false,
 }) {
   await ensureTechnologiesColumn(client);
   const ok = jobs.length > 0;
@@ -303,10 +310,37 @@ export async function ingestJobs(client, {
   let skippedCompany = 0;
   let skippedNonIt = 0;
   let skippedLocation = 0;
+  // ATS-átadás könyvelése (csak handoffAtsUrls mellett mozdul).
+  const handedToAtsUrls = []; // ezekből tenant lesz, sor nem
+  const skippedLegacyAtsUrls = []; // ezeket már egy másik scraper hozza
+  /** @type {Map<string, {provider:string, slug:string, company:string|null}>} */
+  const atsTenants = new Map();
 
   for (const job of jobs) {
     if (!job || !job.title || !job.url) continue;
+    // foundUrls a szűrés ELŐTTI halmaz, és az átadott url-ek is benne maradnak:
+    // különben a reconcile "eltűntnek" látná őket, és deaktiválná a még élő
+    // AI-sort, amit épp az ats-crawl-nak adunk át.
     foundUrls.push(job.url);
+    // Az átadás a tartalmi kapuk ELŐTT dől el: a lead maga a BOARD, nem ez az
+    // egy hirdetés — egy nem-IT találat mögött is lehet olyan cég, akinek a
+    // boardján IT-állás van. A hirdetés-szintű szűrést az ats-crawl végzi el a
+    // saját körében.
+    if (handoffAtsUrls) {
+      const handoff = atsHandoff(job.url);
+      if (handoff) {
+        if (handoff.kind === "legacy") {
+          skippedLegacyAtsUrls.push(job.url);
+        } else {
+          handedToAtsUrls.push(job.url);
+          const key = `${handoff.provider}:${handoff.slug}`;
+          if (!atsTenants.has(key)) {
+            atsTenants.set(key, { provider: handoff.provider, slug: handoff.slug, company: job.company || null });
+          }
+        }
+        continue;
+      }
+    }
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
     if (shouldSkipTitleFilter(job.title, filters)) { skippedSenior++; continue; }
     if (rejectLocation(job.location)) { skippedLocation++; continue; }
@@ -317,6 +351,21 @@ export async function ingestJobs(client, {
     insertedUrls.push(job.url);
   }
 
+  // Tenant-felvétel a ciklus UTÁN, csoportosítva: egy boardról tíz hirdetés is
+  // jöhet, tenant-írás viszont csak egy kell belőle.
+  const atsTenantsAdded = [];
+  for (const t of atsTenants.values()) {
+    try {
+      if (await registerAtsTenant(client, { ...t, via: "ai-handoff" })) {
+        atsTenantsAdded.push(`${t.provider}:${t.slug}`);
+      }
+    } catch (err) {
+      // Az átadás már megtörtént (a sort nem szúrtuk be), tehát a lead elveszne
+      // — ezért ez hangosan naplózódik, nem csendben nyelődik el.
+      console.error(`[${source}] ats-tenant handoff FAILED for ${t.provider}:${t.slug}: ${err.message}`);
+    }
+  }
+
   let reconcile = { skipped: true };
   if (ok) {
     reconcile = await reconcileActive(client, source, foundUrls, { complete, scopePrefix });
@@ -325,5 +374,8 @@ export async function ingestJobs(client, {
   return {
     rows: jobs.length, inserted: insertedUrls.length, insertedUrls,
     skippedSenior, skippedCompany, skippedNonIt, skippedLocation, ok, complete, reconcile,
+    handedToAts: handedToAtsUrls.length, handedToAtsUrls,
+    skippedLegacyAts: skippedLegacyAtsUrls.length,
+    atsTenantsAdded,
   };
 }

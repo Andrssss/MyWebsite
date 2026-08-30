@@ -149,6 +149,9 @@ async function runSite(client, site) {
     fullListing: site.full_listing,
     filters: _filters,
     categories: _categories,
+    // Same rule as the ai-ingest endpoint: an ATS-hosted posting becomes an
+    // ats_tenants row, not a job_posts row (_ats_handoff.mjs).
+    handoffAtsUrls: true,
   });
   const cost = estimateCost(usage);
 
