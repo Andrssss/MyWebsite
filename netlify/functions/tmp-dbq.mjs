@@ -1,11 +1,12 @@
 /*
   DISPOSABLE read-only DB endpoint — delete after use.
-  Created 2026-08-30 to analyse talent source overlap with other sources.
+  Created 2026-08-30 to size the ats-crawl <-> other-source duplication
+  (exact-url dupes across sources + company|title dupes).
   Token is hardcoded on purpose: single-use, removed in the same session.
 */
 import { Pool } from "pg";
 
-const TOKEN = "6c3a9fbba79d572e1c241cdee80200d6c065e3b37abfedd3";
+const TOKEN = "afa9c395466a37b36508027c7d1dc923ef26f379564c2b96";
 const pool = new Pool({
   connectionString: process.env.NETLIFY_DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -20,7 +21,7 @@ export default async (req) => {
 
   const queries = Array.isArray(body.queries) ? body.queries : [{ sql: body.sql, params: body.params || [] }];
   for (const q of queries) {
-    if (!/^\s*select\b/i.test(q.sql || "")) {
+    if (!/^\s*(select|with)\b/i.test(q.sql || "")) {
       return new Response(JSON.stringify({ error: "read-only endpoint" }), { status: 400 });
     }
   }
