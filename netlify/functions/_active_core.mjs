@@ -460,6 +460,26 @@ export const BANNER_DEAD_SOURCES = {
   // lives in its own module; the original atj.graphisoft.com phrase from
   // 2026-07-30 is now one entry in its DEAD_PHRASES list.
   "AI-scraped": (row, body, res) => aiScrapedIsDead(row, body, res),
+  // ats-crawl runs on the SAME platforms the AI bucket's rules were written for
+  // (greenhouse / lever / ashby / smartrecruiters boards), so it reuses them
+  // verbatim rather than growing a second, drifting copy.
+  //
+  // Why it needs the sweep at all, when it has a scoped reconcileActive
+  // (2026-09-01): reconcile only deactivates when deriveScopePrefix resolves,
+  // and it never deactivates off an EMPTY board. Both gaps are real and were
+  // measured on the live bucket the same day — 41 of 150 active rows sat on
+  // tenants whose Greenhouse board points at the company's own domain
+  // (tulip.co/careers/…?gh_jid=), where no scope prefix can be derived, and
+  // OPSWAT had additionally dropped to zero HU postings, so even a fixed prefix
+  // would have had nothing to derive one FROM. Those rows had no deactivation
+  // path whatsoever: their own pages answer 200 for a removed posting, so the
+  // sweep's plain-404 default never fired either. 4 were provably dead
+  // (Greenhouse per-job API 404) and had been sitting active for days.
+  //
+  // Safe to enable wholesale: replaying this exact rule set over all 150 active
+  // rows on 2026-09-01 produced 4 death verdicts, every one of them confirmed
+  // absent from its board's own API, and 0 on the other 146.
+  "ats-crawl": (row, body, res) => aiScrapedIsDead(row, body, res),
 
   // Added 2026-07-22, each validated by fetching a currently-active listed job
   // for that exact source and confirming the phrase is ABSENT (the project's
@@ -631,6 +651,15 @@ export const SWEEP_PROBE_OVERRIDES = {
   // are unauthenticated per-job endpoints with no rate limit worth pacing for,
   // and ~150 rows in one sequential lane would dominate the sweep's runtime.
   "AI-scraped": aiScrapedProbe,
+
+  // ats-crawl (2026-09-01): same platforms, same probes — see the matching
+  // BANNER_DEAD_SOURCES entry for why this source needs the sweep despite
+  // having its own scoped reconcile. Every ats-crawl row is a Greenhouse /
+  // Lever / Ashby / SmartRecruiters posting, so in practice the fallback branch
+  // (probe the row's own url) is only reached for a Greenhouse board that still
+  // points at the company's own domain — which the crawler no longer stores,
+  // see the canonical-url note in _ats_providers.mjs's greenhouse adapter.
+  "ats-crawl": aiScrapedProbe,
 };
 
 /**

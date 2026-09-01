@@ -160,6 +160,36 @@ const ashby = {
    A lista alapból leírás NÉLKÜL jön; `?content=true` beletenné, de egy 451
    állásos boardnál (datadog) az több MB feleslegesen. Ezért lista → HU-szűrés
    → csak a megmaradt sorokra egy-egy detail-hívás. */
+/** A sor url-je: a Greenhouse-on hosztolt board-url, NEM a cég saját domainje.
+ *
+ *  Az `absolute_url` ott, ahol a cég beállított saját „job post url"-t, a cég
+ *  oldalára mutat (`tulip.co/careers/job-posting/?gh_jid=…`,
+ *  `www.taboola.com/careers/job/<id>?gh_jid=…`). Ez ugyanaz a hibaosztály,
+ *  amit a recruitee adapter is kerül: az ilyen url első path-szegmense nem a
+ *  tenant slugja, tehát deriveScopePrefix null-t ad → a reconcile azon a
+ *  tenanton ÖRÖKRE reactivate-only marad, a cég saját oldala pedig egy törölt
+ *  hirdetésre is 200-at ad, tehát a napi sweep sem viszi el. 2026-09-01-én ez
+ *  150 aktív ats-crawl sorból 41-et hagyott mindenféle deaktiválási út nélkül,
+ *  köztük 4 igazoltan halottat (per-job API 404, napok óta nyitva).
+ *
+ *  A kanonikus alak mindkét lyukat betömi: egységes `/{slug}/` előtagot ad a
+ *  reconcile-nak, és a SWEEP_PROBE_OVERRIDES boards-api próbája is felismeri.
+ *  Élőben mérve 2026-09-01: élő hirdetésnél 302-vel a cég saját oldalára visz
+ *  (a felhasználó ugyanoda jut), halottnál a board `?error=true`-jára — amit az
+ *  _ai_liveness.mjs külön szabálya is halálnak vesz. A US host az EU-boardokat
+ *  is kiszolgálja (abbyy: 200), de a MÁR greenhouse-on hosztolt url-eket
+ *  érintetlenül hagyjuk, különben a meglévő job-boards.eu.greenhouse.io sorok
+ *  mind új url-t, azaz új sort kapnának. */
+function greenhouseJobUrl(slug, job) {
+  if (!job.id) return job.absolute_url;
+  try {
+    if (/(^|\.)greenhouse\.io$/.test(new URL(job.absolute_url).hostname)) return job.absolute_url;
+  } catch {
+    // Nem parse-olható url → a kanonikus alak úgyis jobb.
+  }
+  return `https://job-boards.greenhouse.io/${encodeURIComponent(slug)}/jobs/${job.id}`;
+}
+
 const greenhouse = {
   id: "greenhouse",
   detectsMissingTenant: true,
@@ -175,7 +205,7 @@ const greenhouse = {
       .filter((j) => j && j.absolute_url && j.title)
       .map((j) => ({
         title: clean(j.title),
-        url: j.absolute_url,
+        url: greenhouseJobUrl(slug, j),
         location: joinLocations(j?.location?.name, (j.offices || []).map((o) => o?.name)),
         company: clean(j.company_name) || null,
         descriptionHtml: null,
