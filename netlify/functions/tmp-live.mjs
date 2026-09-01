@@ -24,12 +24,18 @@ export default async (req) => {
   try {
     if (action === "list") {
       const r = await client.query(
-        `SELECT url, source, title, company, first_seen, last_seen, sweep_dead
+        `SELECT url, source, title, company, first_seen, sweep_dead
            FROM job_posts
           WHERE active = true AND source = ANY($1::text[])
           ORDER BY source, first_seen`,
         [SOURCES]
       );
+      return json({ rowCount: r.rowCount, rows: r.rows });
+    }
+    if (action === "query") {
+      const body = await req.json();
+      if (!/^\s*select\b/i.test(body.sql || "")) return json({ error: "read-only" }, 400);
+      const r = await client.query(body.sql, body.params || []);
       return json({ rowCount: r.rowCount, rows: r.rows });
     }
     if (action === "deactivate") {
