@@ -155,7 +155,17 @@ const TECH_KEYWORDS = [
   ["centos", "CentOS"], ["gitops", "GitOps"], ["iis", "IIS"],
   ["pyspark", "Apache Spark"], ["sap", "SAP"], ["splunk", "Splunk"],
   ["ccna", "CCNA"], ["ccnp", "CCNP"], ["cissp", "CISSP"], ["oscp", "OSCP"], ["ceh", "CEH"],
-  ["business intelligence", "Business Intelligence"], ["computer vision", "Computer Vision"],
+  // ["business intelligence", …] ELTÁVOLÍTVA 2026-09-01: a 2026-08-06-os kör
+  // legnagyobb tétele volt (152 találat 1978 élő hirdetésen), de a hozamának
+  // ~30%-a olyan hirdetés, ahol ez lett az EGYETLEN tech-címke — és azok
+  // nem IT-állások: KYC Representative, Paralegal, Senior Tax Manager,
+  // Global HR Operations Specialist, Senior Content Marketing Strategist.
+  // A kiváltó szöveg mindig HR-frázis ("experience with advanced analytics
+  // or business intelligence platforms"), nem a hirdetés technológiája.
+  // A `job_categories` "BI (Business Intelligence)" KATEGÓRIÁHOZ semmi köze,
+  // az érintetlen. (Rokon tétel, ami MARAD: data warehouse/dwh — az konkrét
+  // rendszert jelöl, nem szerepkör-frázist.)
+  ["computer vision", "Computer Vision"],
   ["cuda", "CUDA"], ["cybersecurity", "Cybersecurity"], ["dagster", "Dagster"],
   ["data lake", "Data Lake"], ["data science", "Data Science"],
   ["generative ai", "Generative AI"], ["penetration testing", "Penetration Testing"],
@@ -165,6 +175,80 @@ const TECH_KEYWORDS = [
   ["smarty", "Smarty"], ["spi", "SPI"], ["stl", "STL"], ["svn", "SVN"],
   ["teamcity", "TeamCity"], ["ubuntu", "Ubuntu"], ["veeam", "Veeam"],
   ["wan", "WAN"], ["xsd", "XSD"], ["asyncio", "asyncio"], ["intune", "Microsoft Intune"],
+
+  /* ── 2026-09-01 bővítés — élő hirdetés-mintából, nem a DB-ből ───────────
+     Módszer (szándékosan nem a saját scrapereink kimenetéből, ld. CLAUDE.md
+     "validálj más csatornán"): 1978 élő greenhouse-hirdetés teljes leírása
+     (11 board, `?content=true`) + 279 élő profession.hu IT-hirdetés
+     (3 kategória-slice × 5 oldal). Jelöltek 3 csatornából: a profession
+     "Elvárt technológiák" strukturált tag-blokkja (188 hirdetésnél volt),
+     a listákban ISMERT kulcsszó MELLETT álló ismeretlen tagok, és a
+     szomszédság-alapú gyakorisági rangsor. Minden jelölt kézzel átnézve a
+     tényleges szövegkörnyezetében; küszöb: >=2 hirdetés a két korpuszon
+     együtt, ÉS egyértelmű jelentés.
+
+     Mérés közben ELUTASÍTVA, bizonyított fals pozitívval — ezeket ne vedd
+     fel később sem: `workday` ("alteration of workday", "free lunch every
+     workday" — 2/4 találat), `https` (a szövegbe írt URL-ekre illeszkedik),
+     `outlook` ("long-term outlook"), `vps` ("VPs of Merchandising" = vice
+     presidents), `assembly` ("fabrication and assembly"), `gtm` (a sales-
+     hirdetések "go-to-market"-je, 187 találat), `cursor` (adatbázis-/UI-
+     kurzor), `ecs` (a felében "Entity Component System", nem AWS), `unity`
+     (EMC Unity tároló vs. a játékmotor), `sas`/`sonar`/`elastic`/`nexus`/
+     `consul`/`nomad`/`vault` (kétértelmű köznevek, a bővebb termékalak már
+     bent van), `lan` ("LAN parti"). */
+
+  // ai / llm tooling
+  ["openai", "OpenAI"], ["chatgpt", "ChatGPT"], ["copilot", "Copilot"],
+  ["claude code", "Claude Code"], ["windsurf", "Windsurf"], ["llamaindex", "LlamaIndex"],
+  ["langgraph", "LangGraph"], ["hugging face", "Hugging Face"], ["vertex ai", "Vertex AI"],
+  ["scikit-learn", "scikit-learn"], ["sklearn", "scikit-learn"], ["pydantic", "Pydantic"],
+
+  // enterprise platforms
+  ["salesforce", "Salesforce"], ["sfdc", "Salesforce"], ["servicenow", "ServiceNow"],
+  ["hubspot", "HubSpot"], ["zendesk", "Zendesk"], ["shopify", "Shopify"],
+  ["google analytics", "Google Analytics"], ["togaf", "TOGAF"],
+  ["s/4hana", "SAP S/4HANA"], ["hana", "SAP HANA"], ["fiori", "SAP Fiori"],
+  ["power apps", "Power Apps"], ["powerapps", "Power Apps"],
+  ["power automate", "Power Automate"], ["power platform", "Power Platform"],
+
+  // data platforms / pipelines
+  ["airflow", "Apache Airflow"], ["bigquery", "BigQuery"], ["clickhouse", "ClickHouse"],
+  ["duckdb", "DuckDB"], ["cassandra", "Cassandra"], ["neo4j", "Neo4j"],
+  ["couchbase", "Couchbase"], ["hive", "Apache Hive"], ["flink", "Apache Flink"],
+  ["iceberg", "Apache Iceberg"], ["hadoop", "Hadoop"], ["talend", "Talend"],
+  ["informatica", "Informatica"], ["mulesoft", "MuleSoft"], ["looker", "Looker"],
+  ["kubeflow", "Kubeflow"], ["mlflow", "MLflow"], ["pulsar", "Apache Pulsar"],
+
+  // devops / infra / observability
+  ["rancher", "Rancher"], ["pulumi", "Pulumi"], ["saltstack", "SaltStack"], ["chef", "Chef"],
+  ["opentelemetry", "OpenTelemetry"], ["dynatrace", "Dynatrace"], ["new relic", "New Relic"],
+  ["loki", "Grafana Loki"], ["varnish", "Varnish"], ["hyper-v", "Hyper-V"], ["suse", "SUSE"],
+  ["macos", "macOS"], ["jfrog", "JFrog"], ["artifactory", "Artifactory"],
+  ["bitbucket", "Bitbucket"], ["eclipse", "Eclipse"], ["cucumber", "Cucumber"],
+  ["sre", "SRE"], ["devsecops", "DevSecOps"], ["apm", "APM"], ["esb", "ESB"],
+
+  // aws building blocks
+  ["s3", "Amazon S3"], ["ec2", "Amazon EC2"], ["sqs", "Amazon SQS"], ["sns", "Amazon SNS"],
+  ["vpc", "AWS VPC"], ["iam", "IAM"], ["api gateway", "API Gateway"],
+
+  // network / security
+  ["tls", "TLS"], ["ssl", "TLS"], ["udp", "UDP"], ["mpls", "MPLS"], ["bgp", "BGP"],
+  ["ddos", "DDoS"], ["http", "HTTP"], ["soap", "SOAP"], ["aix", "AIX"],
+  ["zero trust", "Zero Trust"], ["oauth", "OAuth"], ["saml", "SAML"], ["sso", "SSO"],
+  ["pki", "PKI"], ["ipsec", "IPsec"], ["dlp", "DLP"], ["okta", "Okta"], ["jamf", "Jamf"],
+  ["crowdstrike", "CrowdStrike"], ["wazuh", "Wazuh"], ["junos", "Junos"],
+  ["arista", "Arista"], ["nx-os", "NX-OS"], ["iso 27001", "ISO 27001"],
+  ["cisa", "CISA"], ["cism", "CISM"],
+  ["security+", "CompTIA Security+"], ["network+", "CompTIA Network+"],
+
+  /* Alias-lyukak: mindegyik olyan írásmód, amit a MEGLÉVŐ kulcs boundary-
+     regexe bizonyítottan NEM fog el (`plsql` != `pl/sql`, `dotnet` != `.net`,
+     `restful` != `rest api`, `k8s` != `kubernetes`), plus a két magyar alak —
+     az `agilis` a magyar minta 279 hirdetéséből 23-ban szerepel, tehát a
+     lista eddigi angol-only volta önmagában is lefedettségi hiba volt. */
+  ["k8s", "Kubernetes"], ["plsql", "PL/SQL"], ["dotnet", ".NET"], ["restful", "REST API"],
+  ["agilis", "Agile"], ["adattárház", "Data Warehouse"],
 ];
 
 module.exports = { TECH_KEYWORDS };
