@@ -24,9 +24,9 @@
 import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { isInternshipTitle } from "./_experience_core.mjs";
+import { isInternshipTitle, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
@@ -119,11 +119,17 @@ function postJson(url, body) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
+    [
+      source,
+      item.title,
+      item.url,
+      seniorAwareExperience(item.title, item.experience) ?? "-",
+      item.technologies ?? null,
+    ]
   );
   return res.rowCount > 0;
 }
@@ -141,6 +147,7 @@ export default withTimeout("cron_jobs_PRODIAK-background", async () => {
   let fetchFailed = false;
 
   try {
+    await ensureTechnologiesColumn(client);
     const foundUrls = [];
     let page = 1;
     let lastPage = 1;
@@ -152,7 +159,6 @@ export default withTimeout("cron_jobs_PRODIAK-background", async () => {
         result = await postJson(`${API}?page=${page}`, {});
       } catch (err) {
         fetchFailed = true;
-        await logFetchError("cron_jobs_PRODIAK-background", { url: `${API}?page=${page}`, message: err.message });
         console.error(`[prodiak] page ${page} fetch failed: ${err.message}`);
         break;
       }
@@ -179,12 +185,23 @@ export default withTimeout("cron_jobs_PRODIAK-background", async () => {
         const jobUrl = `${BASE}/allas/${job.slug}/${job.index_id}`;
         const experience = isInternshipTitle(title) ? "diákmunka" : "-";
 
-        const wasNew = await upsertJob(client, "prodiak", { title, url: jobUrl, experience });
+        // technologies: a lista-payload `description` mezőjéből, extra kérés
+        // nélkül. FIGYELEM — ez csak BEVEZETŐ (~90-150 karakter), nem a teljes
+        // hirdetés, tehát gyakran üresen tér vissza; detail-fetch NEM segítene:
+        // a /allas/... oldal Vue-SPA, a szerver-renderelt HTML csak page-chrome
+        // (~1150 karakter, a hirdetés törzse nélkül), és a detail API alakja
+        // ismeretlen (a /api/advert{,s}/{id} próbák az SPA index.html-jét adják
+        // vissza — élőben mérve 2026-09-01). Ennyi, amit ez a forrás kínál.
+        const technologies = extractTechnologies(
+          `<div class="description">${job.description || ""}</div>`
+        );
+
+        const wasNew = await upsertJob(client, "prodiak", { title, url: jobUrl, experience, technologies });
         foundUrls.push(jobUrl);
 
         if (wasNew) {
           newlyInserted++;
-          console.log(`[prodiak] NEW "${title}" → ${jobUrl}`);
+          console.log(`[prodiak] NEW "${title}" tech=[${technologies ?? "-"}] → ${jobUrl}`);
         } else {
           alreadyExisted++;
           console.log(`[prodiak] EXISTS "${title}"`);

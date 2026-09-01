@@ -4,8 +4,15 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { withTimeout } from "./_error-logger.mjs";
+import {
+  isInternshipTitle,
+  isJuniorTitle,
+  isMidLevelTitle,
+  isSeniorExperience,
+  extractTechnologies,
+  ensureTechnologiesColumn,
+} from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
@@ -194,6 +201,7 @@ export default withTimeout(JOB_NAME, async (request) => {
 
   _filters = await loadFilters();
   const client = await pool.connect();
+  await ensureTechnologiesColumn(client);
   const knownUrls = new Set(
     (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [SOURCE])).rows.map((r) => r.url)
   );
@@ -221,7 +229,6 @@ export default withTimeout(JOB_NAME, async (request) => {
           console.log(`[workly] pagination stopped at page ${page} (404)`);
           break;
         }
-        await logFetchError(JOB_NAME, { url: pageUrl, message: err.message });
         console.error(`[workly] page ${page} fetch failed: ${err.message}`);
         crawlError = true;
         break;
@@ -250,27 +257,33 @@ export default withTimeout(JOB_NAME, async (request) => {
         }
         foundUrls.push(entry.url);
 
+        // Ugyanaz az EGY detail-fetch adja a céget és a technologies-t is —
+        // a html már a kezünkben van, nincs plusz kérés. (2026-09-01-ig csak a
+        // company olvasódott ki belőle, a technologies oszlop az INSERT-listán
+        // sem szerepelt, így a workly örökre NULL maradt.)
         let company = null;
+        let technologies = null;
         if (!knownUrls.has(entry.url)) {
           try {
             await sleep(500);
             const detailHtml = await fetchText(entry.url);
             company = extractCompanyFromDetail(detailHtml);
+            technologies = extractTechnologies(detailHtml);
           } catch (err) {
-            await logFetchError(JOB_NAME, { url: entry.url, message: `company fetch: ${err.message}` });
+            console.warn(`[workly] detail fetch failed: ${entry.url} — ${err.message}`);
           }
         }
 
         const res = await client.query(
-          `INSERT INTO job_posts (source, title, url, experience, company, first_seen)
-           VALUES ($1,$2,$3,$4,$5,NOW())
+          `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen)
+           VALUES ($1,$2,$3,$4,$5,$6,NOW())
            ON CONFLICT (source, url) DO NOTHING
            RETURNING id;`,
-          [SOURCE, entry.title, entry.url, seniorAwareExperience(entry.title, experience), company]
+          [SOURCE, entry.title, entry.url, seniorAwareExperience(entry.title, experience), company, technologies]
         );
         if (res.rowCount > 0) {
           newlyInserted++;
-          console.log(`[workly] NEW "${entry.title}" → ${entry.url}`);
+          console.log(`[workly] NEW "${entry.title}" tech=[${technologies ?? "-"}] → ${entry.url}`);
         } else {
           alreadyExisted++;
         }

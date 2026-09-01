@@ -10,14 +10,16 @@
     2. Filter location_city = "Budapest"
     3. Senior filter via _filters
     4. Upsert to job_posts (source = "atlasz", experience = "diákmunka" always — student job site)
+    5. Detail-oldal (ad.php) fetch CSAK új url-re → technologies
 */
 
 import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, fetchText } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -111,14 +113,22 @@ function postJson(url, body) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
+    [
+      source,
+      item.title,
+      item.url,
+      seniorAwareExperience(item.title, item.experience) ?? "-",
+      item.technologies ?? null,
+    ]
   );
   return res.rowCount > 0;
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ── handler ─────────────────────────────────────────────────── */
 
@@ -130,7 +140,6 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
   try {
     apiResult = await postJson(API_URL, `job_ids[]=${IT_CAT_ID}`);
   } catch (err) {
-    await logFetchError("cron_jobs_ATLASZ-background", { url: API_URL, message: err.message });
     console.error(`[atlasz] API fetch failed: ${err.message}`);
     client.release();
     return;
@@ -143,9 +152,21 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
   let alreadyExisted = 0;
   let skippedSenior = 0;
   let skippedNonBudapest = 0;
+  let detailFetchFailed = 0;
   const foundUrls = [];
 
   try {
+    await ensureTechnologiesColumn(client);
+
+    // A jobsearch.php JSON csak cím/város/bér/óraszám — hirdetés-törzs nincs
+    // benne, ezért maradt a technologies 2026-09-01-ig NULL. Az ad.php detail-
+    // oldal viszont szerver-renderelt (élőben igazolva 2026-09-01), tehát csak
+    // a fetch hiányzott. CSAK genuinely-új url-re megy le a kérés — a lenti
+    // upsert ON CONFLICT DO NOTHING-ja meglévő sort úgysem írna felül.
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["atlasz"])).rows.map((r) => r.url)
+    );
+
     for (const job of jobs) {
       const title = normalizeWhitespace(job.position);
       if (!title) continue;
@@ -164,16 +185,29 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
 
       const jobUrl = normalizeUrl(new URL(job.url, BASE).toString());
 
+      // A teljes sor a beszúrás ELŐTT áll össze (nincs fetch-then-UPDATE).
+      let technologies = null;
+      if (!knownUrls.has(jobUrl)) {
+        await sleep(500);
+        try {
+          technologies = extractTechnologies(await fetchText(jobUrl));
+        } catch (err) {
+          detailFetchFailed++;
+          console.error(`[atlasz] technologies fetch failed ${jobUrl}: ${err.message}`);
+        }
+      }
+
       const wasNew = await upsertJob(client, "atlasz", {
         title,
         url: jobUrl,
         experience: "diákmunka",
+        technologies,
       });
       foundUrls.push(jobUrl);
 
       if (wasNew) {
         newlyInserted++;
-        console.log(`[atlasz] NEW "${title}" → ${jobUrl}`);
+        console.log(`[atlasz] NEW "${title}" tech=[${technologies ?? "-"}] → ${jobUrl}`);
       } else {
         alreadyExisted++;
         console.log(`[atlasz] EXISTS "${title}"`);
@@ -182,7 +216,8 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
 
     console.log(
       `[atlasz] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}`
+      `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}, ` +
+      `detail_fetch_failed=${detailFetchFailed}`
     );
 
     // Single API response = full current listing.

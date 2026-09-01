@@ -9,9 +9,10 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { seniorAwareExperience } from "./_seniority_policy.mjs";
+import { extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -49,8 +50,13 @@ const YDIAK_IT_DETAIL_RE = /^https:\/\/ydiak\.hu\/it-munka\/[^/?#]+$/;
 // FIGYELEM: a qdiak-ág a kategóriát MAGÁT használja IT-szűrőnek (csak Budapestre
 // szűr utána), tehát minden itt felvett kategória tartalma bekerül — új kategória
 // előtt mindig nézd meg élőben, mi van benne.
+// A `fields` lista SZŰKÍT — ami nincs benne, azt a Directus API nem küldi el.
+// Ezért maradt a qdiak technologies-e 2026-09-01-ig NULL: a hirdetés törzsét
+// hordozó három mező (allasleiras / feladatok / elvarasok, mind HTML) egyszerűen
+// nem volt kérve. Bekérve viszont ingyen van — extra kérés nélkül, ugyanabból a
+// válaszból (élőben igazolva 2026-09-01).
 const QDIAK_API_URL =
-  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=1,12,21&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno&limit=200";
+  "https://cloud.qdiak.hu/-/items/toborzas?filter[statusz][_eq]=aktiv&filter[kategoriak][munka_kategoria_id][_in]=1,12,21&fields=id,pozicio_neve,telepules_szabad,berezes_megjeleno,oraszam_megjeleno,allasleiras,feladatok,elvarasok&limit=200";
 
 /* ── shared helpers ─────────────────────────────────────────── */
 
@@ -142,10 +148,16 @@ async function upsertJob(client, sourceKey, item) {
   // esetén a meglévő sor változatlan marad.
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+      (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
+    [
+      sourceKey,
+      item.title,
+      item.url,
+      seniorAwareExperience(item.title, item.experience) ?? "-",
+      item.technologies ?? null,
+    ]
   );
 }
 
@@ -162,7 +174,6 @@ async function fetchYdiakItUrls() {
     console.log(`ydiak: ${urls.length} IT detail urls in sitemap`);
     return { urls, complete: true };
   } catch (err) {
-    await logFetchError("cron_jobs_DIAK_2", { url: YDIAK_SITEMAP_URL, message: err.message, extra: { source: "ydiak" } });
     console.log(`ydiak: sitemap fetch failed: ${err.message}`);
     return { urls: [], complete: false };
   }
@@ -175,11 +186,17 @@ function ydiakSlugTitle(url) {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Diákmunka";
 }
 
-async function fetchYdiakTitle(url) {
+// Ugyanaz az EGY detail-fetch adja a címet és a technologies-t is — a html már
+// a kezünkben van, nincs plusz kérés. (2026-09-01-ig csak a <h1>-et olvastuk ki
+// belőle, a technologies oszlop az INSERT-listán sem szerepelt.)
+async function fetchYdiakDetail(url) {
   const html = await fetchText(url);
   const $ = cheerioLoad(html);
   const h1 = normalizeWhitespace($("h1").first().text());
-  return h1 || ydiakSlugTitle(url);
+  return {
+    title: h1 || ydiakSlugTitle(url),
+    technologies: extractTechnologies(html),
+  };
 }
 
 /* ── Q Diák ─────────────────────────────────────────────────── */
@@ -187,6 +204,16 @@ async function fetchYdiakTitle(url) {
 function isBudapestQdiak(telepules) {
   const normalized = normalizeText(telepules);
   return normalized.includes("budapest") || normalized.includes("home office");
+}
+
+// A .description wrapper azért kell, hogy extractTechnologies a scoped ágán
+// fusson (itt nincs teljes oldal-body, amire visszaeshetne) — ugyanaz a minta,
+// mint a nofluffjobs serverApp-state blobjánál.
+function extractQdiakTechnologies(job) {
+  const parts = [job?.allasleiras, job?.feladatok, job?.elvarasok]
+    .filter((v) => typeof v === "string" && v);
+  if (!parts.length) return null;
+  return extractTechnologies(`<div class="description">${parts.join(" ")}</div>`);
 }
 
 function extractQdiakJobs(payload) {
@@ -198,6 +225,7 @@ function extractQdiakJobs(payload) {
       title: normalizeWhitespace(job.pozicio_neve),
       url: `https://cloud.qdiak.hu/munkak/${job.id}`,
       experience: "diákmunka",
+      technologies: extractQdiakTechnologies(job),
     }))
     .filter((job) => job.title && job.url);
 }
@@ -210,7 +238,6 @@ async function fetchAllQdiakJobs() {
     console.log(`qdiak: ${jobs.length} IT Budapest jobs found (from ${payload?.data?.length ?? 0} total IT)`);
     return jobs;
   } catch (err) {
-    await logFetchError("cron_jobs_DIAK_2", { url: QDIAK_API_URL, message: err.message, extra: { source: "qdiak" } });
     console.log(`qdiak: failed: ${err.message}`);
     return [];
   }
@@ -222,6 +249,7 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
   const client = await pool.connect();
 
   try {
+    await ensureTechnologiesColumn(client);
     /* Y Diák — sitemap-alapú ingest (2026-07-08). Detail-oldalt (cím: <h1>)
        csak ÚJ url-nél fetchelünk — meglévő sort az upsert úgysem írna felül. */
     const ydiak = await fetchYdiakItUrls();
@@ -234,13 +262,12 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
       for (const url of ydiak.urls) {
         if (known.has(url)) continue;
         try {
-          const title = await fetchYdiakTitle(url);
-          await upsertJob(client, "ydiak", { title, url, experience: "diákmunka" });
-          console.log(`ydiak: NEW "${title}" → ${url}`);
+          const { title, technologies } = await fetchYdiakDetail(url);
+          await upsertJob(client, "ydiak", { title, url, experience: "diákmunka", technologies });
+          console.log(`ydiak: NEW "${title}" tech=[${technologies ?? "-"}] → ${url}`);
         } catch (err) {
           // Detail-hiba: az ingest kimarad (a következő óránkénti run újrapróbálja),
           // de az url a foundUrls-ben marad — a sitemap-jelenlét a létezés bizonyítéka.
-          await logFetchError("cron_jobs_DIAK_2", { url, message: err.message, extra: { source: "ydiak" } });
         }
       }
     }

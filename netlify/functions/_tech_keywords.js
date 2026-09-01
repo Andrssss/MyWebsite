@@ -75,7 +75,12 @@ const TECH_KEYWORDS = [
   ["git", "Git"],
   ["rest api", "REST API"], ["rest apis", "REST API"],
   ["selenium", "Selenium"], ["maven", "Maven"], ["gradle", "Gradle"],
-  ["json", "JSON"], ["xml", "XML"], ["uml", "UML"], ["bpmn", "BPMN"], ["solid", "SOLID"],
+  ["json", "JSON"], ["xml", "XML"], ["uml", "UML"], ["bpmn", "BPMN"],
+  // ["solid", "SOLID"] — KIVÉVE 2026-09-01 (user-döntés). A hirdetésekben a
+  // "solid knowledge of…" / "solid experience" fordulat sokkal gyakoribb, mint
+  // a SOLID tervezési elvek említése, és a match kis-nagybetű-érzéketlen, így
+  // a címke többségében hamis volt. A kötelező nagybetűs illesztés (ami
+  // megkülönböztetné a kettőt) elvetve — inkább nincs, mint rosszul.
   ["infrastructure as code", "Infrastructure as Code"], ["swagger", "Swagger"],
   ["openapi", "OpenAPI"], ["scrum", "Scrum"], ["kanban", "Kanban"], ["itil", "ITIL"],
   ["itsm", "ITSM"], ["cmdb", "CMDB"], ["etl", "ETL"], ["elt", "ELT"],

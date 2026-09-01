@@ -19,9 +19,10 @@ import { Pool } from "pg";
 import https from "https";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, fetchText } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -152,11 +153,11 @@ function parseCards(viewHtml) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, "diákmunka")]
+    [source, item.title, item.url, seniorAwareExperience(item.title, "diákmunka"), item.technologies ?? null]
   );
   return res.rowCount > 0;
 }
@@ -171,9 +172,21 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
   let alreadyExisted = 0;
   let skippedSenior = 0;
   let fetchFailed = 0;
+  let detailFetchFailed = 0;
   const seen = new Set();
 
   try {
+    await ensureTechnologiesColumn(client);
+
+    // Az ajaxSearch `view` HTML-je csak kártya (cím + link) — hirdetés-törzs
+    // nincs benne, ezért maradt a technologies 2026-09-01-ig NULL. Az /allas/…
+    // detail-oldal viszont szerver-renderelt (élőben igazolva 2026-09-01),
+    // tehát csak a fetch hiányzott. CSAK genuinely-új url-re megy le — a lenti
+    // upsert ON CONFLICT DO NOTHING-ja meglévő sort úgysem írna felül.
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["pannondiak"])).rows.map((r) => r.url)
+    );
+
     const foundUrls = [];
     for (let page = 1; page <= 10; page++) {
       let result;
@@ -182,10 +195,6 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
         result = await postSearch(page);
       } catch (err) {
         fetchFailed++;
-        await logFetchError("cron_jobs_PANNONDIAK-background", {
-          url: `${SEARCH_URL}?page=${page}`,
-          message: err.message,
-        });
         console.error(`[pannondiak] page ${page} fetch failed: ${err.message}`);
         break;
       }
@@ -208,11 +217,22 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
           continue;
         }
 
+        // A teljes sor a beszúrás ELŐTT áll össze (nincs fetch-then-UPDATE).
+        if (!knownUrls.has(job.url)) {
+          await sleep(500);
+          try {
+            job.technologies = extractTechnologies(await fetchText(job.url));
+          } catch (err) {
+            detailFetchFailed++;
+            console.error(`[pannondiak] technologies fetch failed ${job.url}: ${err.message}`);
+          }
+        }
+
         const wasNew = await upsertJob(client, "pannondiak", job);
         foundUrls.push(job.url);
         if (wasNew) {
           newlyInserted++;
-          console.log(`[pannondiak] NEW "${job.title}" → ${job.url}`);
+          console.log(`[pannondiak] NEW "${job.title}" tech=[${job.technologies ?? "-"}] → ${job.url}`);
         } else {
           alreadyExisted++;
           console.log(`[pannondiak] EXISTS "${job.title}"`);
@@ -222,7 +242,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
 
     console.log(
       `[pannondiak] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
+      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}, detail_fetch_failed=${detailFetchFailed}`
     );
 
     const complete = fetchFailed === 0;

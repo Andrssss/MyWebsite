@@ -23,9 +23,15 @@
 import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import {
+  isInternshipTitle,
+  isJuniorTitle,
+  isMidLevelTitle,
+  extractTechnologies,
+  ensureTechnologiesColumn,
+} from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
@@ -133,13 +139,32 @@ function algoliaSearch(page) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
+    [
+      source,
+      item.title,
+      item.url,
+      seniorAwareExperience(item.title, item.experience) ?? "-",
+      item.technologies ?? null,
+    ]
   );
   return res.rowCount > 0;
+}
+
+// A hirdetés TELJES szövege benne van az Algolia-találatban (jobContent.*) —
+// nincs szükség detail-fetchre, csak a mezőket kell összefűzni. A .description
+// wrapper azért kell, hogy extractTechnologies a scoped ágán fusson és ne
+// essen vissza a (itt nem létező) teljes body-ra. Ugyanaz a minta, mint a
+// nofluffjobs serverApp-state blobjánál.
+function extractTrenkwalderTechnologies(hit) {
+  const c = hit?.jobContent || {};
+  const parts = [c.jobDescription, c.jobRequirements, c.companyInformation, c.compensationBenefits]
+    .filter((v) => typeof v === "string" && v);
+  if (!parts.length) return null;
+  return extractTechnologies(`<div class="description">${parts.join(" ")}</div>`);
 }
 
 /* ── handler ─────────────────────────────────────────────────── */
@@ -155,6 +180,7 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
   const seen = new Set();
 
   try {
+    await ensureTechnologiesColumn(client);
     const foundUrls = [];
     for (let page = 0; page < 10; page++) {
       let result;
@@ -163,10 +189,6 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
         result = await algoliaSearch(page);
       } catch (err) {
         fetchFailed++;
-        await logFetchError("cron_jobs_TRENKWALDER-background", {
-          url: `algolia:${ALGOLIA_INDEX}:page=${page}`,
-          message: err.message,
-        });
         console.error(`[trenkwalder] algolia page ${page} failed: ${err.message}`);
         break;
       }
@@ -198,11 +220,13 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
           : isMidLevelTitle(title) ? "medior"
           : "-";
 
-        const wasNew = await upsertJob(client, "trenkwalder", { title, url, experience });
+        const technologies = extractTrenkwalderTechnologies(hit);
+
+        const wasNew = await upsertJob(client, "trenkwalder", { title, url, experience, technologies });
         foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
-          console.log(`[trenkwalder] NEW "${title}" exp=${experience} → ${url}`);
+          console.log(`[trenkwalder] NEW "${title}" exp=${experience} tech=[${technologies ?? "-"}] → ${url}`);
         } else {
           alreadyExisted++;
           console.log(`[trenkwalder] EXISTS "${title}"`);

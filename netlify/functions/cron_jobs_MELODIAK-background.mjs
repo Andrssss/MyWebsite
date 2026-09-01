@@ -17,10 +17,11 @@
 import { Pool } from "pg";
 import https from "https";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { STRONG_IT_TITLE } from "./_ai_ingest_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, fetchText } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -131,11 +132,17 @@ function fetchJson(url) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
+    [
+      source,
+      item.title,
+      item.url,
+      seniorAwareExperience(item.title, item.experience) ?? "-",
+      item.technologies ?? null,
+    ]
   );
   return res.rowCount > 0;
 }
@@ -151,8 +158,21 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
   let skippedSenior = 0;
   let totalFetched = 0;
   let fetchFailed = 0;
+  let detailFetchFailed = 0;
 
   try {
+    await ensureTechnologiesColumn(client);
+
+    // A /v1/job-advertisement lista csak cím/város/bér/címkék — hirdetés-törzs
+    // nincs benne, ezért maradt a technologies 2026-09-01-ig NULL. A
+    // /diakmunkak/{slug} detail-oldal viszont szerver-renderelt (élőben
+    // igazolva 2026-09-01), tehát csak a fetch hiányzott. CSAK genuinely-új
+    // url-re megy le — a lenti upsert ON CONFLICT DO NOTHING-ja meglévő sort
+    // úgysem írna felül.
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["melodiak"])).rows.map((r) => r.url)
+    );
+
     const foundUrls = [];
     for (let page = 1; page <= 20; page++) {
       let result;
@@ -161,7 +181,6 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
         result = await fetchJson(`${API_BASE}?page=${page}`);
       } catch (err) {
         fetchFailed++;
-        await logFetchError("cron_jobs_MELODIAK-background", { url: `${API_BASE}?page=${page}`, message: err.message });
         console.error(`[melodiak] page ${page} fetch failed: ${err.message}`);
         break;
       }
@@ -192,16 +211,29 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
 
         const jobUrl = `${BASE}/diakmunkak/${job.slug}`;
 
+        // A teljes sor a beszúrás ELŐTT áll össze (nincs fetch-then-UPDATE).
+        let technologies = null;
+        if (!knownUrls.has(jobUrl)) {
+          await sleep(500);
+          try {
+            technologies = extractTechnologies(await fetchText(jobUrl));
+          } catch (err) {
+            detailFetchFailed++;
+            console.error(`[melodiak] technologies fetch failed ${jobUrl}: ${err.message}`);
+          }
+        }
+
         const wasNew = await upsertJob(client, "melodiak", {
           title,
           url: jobUrl,
           experience: "diákmunka",
+          technologies,
         });
         foundUrls.push(jobUrl);
 
         if (wasNew) {
           newlyInserted++;
-          console.log(`[melodiak] NEW "${title}" → ${jobUrl}`);
+          console.log(`[melodiak] NEW "${title}" tech=[${technologies ?? "-"}] → ${jobUrl}`);
         } else {
           alreadyExisted++;
           console.log(`[melodiak] EXISTS "${title}"`);
@@ -211,7 +243,7 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
 
     console.log(
       `[melodiak] DONE — fetched=${totalFetched}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}`
+      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}, detail_fetch_failed=${detailFetchFailed}`
     );
 
     const complete = fetchFailed === 0;

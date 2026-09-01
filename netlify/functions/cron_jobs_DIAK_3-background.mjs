@@ -26,7 +26,7 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -543,7 +543,6 @@ async function fetchDetailExperience(url) {
       technologies: extractTechnologies(normalizedHtml),
     };
   } catch (err) {
-    await logFetchError("cron_jobs_DIAK_3", { url, message: `detail experience: ${err.message}` });
     return { experience: null, technologies: null };
   }
 }
@@ -594,7 +593,7 @@ async function fetchMisziszTitle(url, fallbackTitle = null) {
       .trim();
     if (pageTitle) return pageTitle;
   } catch (err) {
-    await logFetchError("cron_jobs_DIAK_3", { url, message: `miszisz title: ${err.message}` });
+    console.warn(`[miszisz] title fetch failed: ${url} — ${err.message}`);
   }
 
   return cleanMisziszListTitle(fallbackTitle);
@@ -643,7 +642,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         console.log(`${tag}   Fetch OK – ${html.length} karakter`);
       } catch (err) {
         console.log(`${tag}   Fetch HIBA: ${err.message}`);
-        await logFetchError("cron_jobs_DIAK_3", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         foundBySource.get(source).allSucceeded = false;
         continue;
@@ -688,7 +686,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             pageHtml = await fetchText(nextUrl);
           } catch (err) {
             console.log(`${tag}   wherewework oldal ${pageNum} HIBA: ${err.message}`);
-            await logFetchError("cron_jobs_DIAK_3", { url: nextUrl, message: err.message });
             // részleges lista → a reconcile nem deaktiválhat belőle
             foundBySource.get(source).allSucceeded = false;
             sawEnd = true; // a hibát már jelöltük, a cap-guard ne írja felül a logot
@@ -740,7 +737,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             pageHtml = await fetchText(pageUrl);
           } catch (err) {
             console.log(`${tag}   otp lapozás HIBA (startrow=${startrow}): ${err.message}`);
-            await logFetchError("cron_jobs_DIAK_3", { url: pageUrl, message: err.message });
             foundBySource.get(source).allSucceeded = false;
             sawEnd = true; // a hibát már jelöltük, a cap-guard ne írja felül a logot
             break;
@@ -846,12 +842,18 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // rename its row away.
         const currentUrls = [...new Set([...merged.map((c) => c.url), ...foundBySource.get(source).urls])];
         const patternFor = VOLATILE_URL_PATTERNS[source];
-        // wherewework/otp: a detail-fetch (elvárt évek kiolvasása) csak ÚJ url-nél fut.
+        // A detail-fetch (elvárt évek + technologies) csak ÚJ url-nél fut.
         // Meglévő sornál kidobott munka: az ON CONFLICT sosem írja felül az
         // experience-t, a lista újra-fetchelése percekig tartana.
-        const knownUrls = (source === "wherewework" || source === "otp")
-          ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
-          : null;
+        //
+        // 2026-09-01: MINDEN forrásra felépül (korábban csak wherewework/otp-re).
+        // A DIAKMUNKA_SOURCES (vizmuvek/miszisz/onejob) fix "diákmunka"
+        // experience-t kap a cím alapján, sosem fetchelt törzset — így a
+        // technologies-ük örökre NULL maradt. Az alábbi backstop most rájuk is
+        // vonatkozik, és ahhoz kell a knownUrls-ük.
+        const knownUrls = new Set(
+          (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url)
+        );
         for (const item of matchedList) {
           const pattern = patternFor ? patternFor(item.url) : null;
           if (pattern) {
@@ -886,11 +888,13 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             await sleep(400);
           }
           // A cím-alapú gyorsítóágak (otp junior/medior/gyakornok, wherewework
-          // gyakornok) fent nem fetchelnek body-t → technologies fetch nélkül
-          // maradna. ÚJ posztingnál pótoljuk egyszer, beszúrás ELŐTT (nem
-          // update-del utólag) — meglévő sornál a fetch kárba veszne, mert az
-          // upsert ON CONFLICT-je úgysem írná felül.
-          if (item.technologies === undefined && (source === "otp" || source === "wherewework") && !knownUrls.has(item.url)) {
+          // gyakornok) és a fix-"diákmunka" ág (vizmuvek/miszisz/onejob) fent
+          // nem fetchelnek body-t → technologies fetch nélkül maradna. ÚJ
+          // posztingnál pótoljuk egyszer, beszúrás ELŐTT (nem update-del
+          // utólag) — meglévő sornál a fetch kárba veszne, mert az upsert
+          // ON CONFLICT-je úgysem írná felül. Csak a technologies-t vesszük át:
+          // a diákmunka-ág experience-ét egy null-extrakt nem írhatja felül.
+          if (item.technologies === undefined && !knownUrls.has(item.url)) {
             const { technologies } = await fetchDetailExperience(item.url);
             item.technologies = technologies;
             await sleep(400);

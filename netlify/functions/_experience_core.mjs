@@ -10,7 +10,6 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
-import { logFetchError } from "./_error-logger.mjs";
 import { TECH_KEYWORDS } from "./_tech_keywords.js";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -364,8 +363,19 @@ function techBoundaryRegex(keyword) {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Right boundary also accepts a directly-following digit — a version-number
   // suffix (HTML5, CSS3, C++11, C++20, PHP7, Vue3) otherwise fails to match
-  // since a digit counts as "still part of the word" under [^a-z0-9] alone.
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$|\\d)`, "i");
+  // since a digit counts as "still part of the word" under the boundary class
+  // alone.
+  //
+  // A boundary class MUST be Unicode-aware (\p{L}\p{N} + `u` flag). It used to
+  // be the ASCII [^a-z0-9], and an accented letter is not in [a-z] — so every
+  // Hungarian word that merely STARTS with a keyword and continues with an
+  // accented letter matched as if the keyword stood alone. Live evidence
+  // 2026-09-01: "elkötelezett" / "elkészítése" / "elképzelés" (everyday
+  // job-ad words) each stamped a posting with "ELK Stack", and "eltérő" /
+  // "eltöltött" / "eltávolítás" each stamped it "ELT" — on EVERY
+  // Hungarian-language source, since matchTechKeywords is shared by
+  // extractTechnologies and normalizeTechnologyList alike.
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$|\\d)`, "iu");
 }
 
 // Scans arbitrary text for TECH_KEYWORDS occurrences and returns the
@@ -608,11 +618,6 @@ export async function enrichExperience({
         success++;
         await sleep(sleepMs);
       } catch (err) {
-        await logFetchError(job, {
-          url: row.url,
-          message: err.message,
-          extra: { source: tag, jobId: row.id },
-        });
         console.error(`[experience:${tag}] FAILED ID:`, row.id, "|", err.message);
 
         const fallback = (

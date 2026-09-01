@@ -9,6 +9,7 @@
     3. Senior: experience contains "5 év fölött" or "vezető" (without junior/medior values)
               OR isSeniorLike(title)
     4. Intern: experience contains "Gyakornok" or "pályakezdő" OR isInternshipTitle(title)
+    5. Detail-oldal fetch CSAK új url-re → technologies (a lista nem hordoz törzset)
 */
 
 import { Pool } from "pg";
@@ -17,9 +18,15 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import {
+  isInternshipTitle,
+  isSeniorExperience,
+  extractTechnologies,
+  ensureTechnologiesColumn,
+  fetchText,
+} from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
@@ -176,14 +183,22 @@ async function fetchPage(page) {
 
 async function upsertJob(client, source, item) {
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, first_seen)
-     VALUES ($1,$2,$3,$4,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-"]
+    [
+      source,
+      item.title,
+      item.url,
+      seniorAwareExperience(item.title, item.experience) ?? "-",
+      item.technologies ?? null,
+    ]
   );
   return res.rowCount > 0;
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ── handler ─────────────────────────────────────────────────── */
 
@@ -191,6 +206,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
   try {
+    await ensureTechnologiesColumn(client);
     let crawlError = false;
     const foundUrls = [];
     const allRows = [];
@@ -203,7 +219,6 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
       try {
         res = await fetchPage(page);
       } catch (err) {
-        await logFetchError("cron_jobs_ERSTE-background", { url: API, message: err.message });
         console.error(`[erste] page ${page} fetch failed: ${err.message}`);
         crawlError = true;
         break;
@@ -235,12 +250,25 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
     // source, so migrateVolatileUrl must never rename its row away.
     const currentUrls = dedup.map((r) => `${BASE}${r.url}`);
 
+    // Az erste 2026-09-01-ig EGYÁLTALÁN nem töltötte le a hirdetés törzsét (az
+    // experience a lista-mezőből jött), így a `technologies` örökre NULL maradt
+    // — a K&H / Raiffeisen / UniCredit ugyanezen a jsbq platformon rég fetchel.
+    // A detail-oldal szerver-renderelt (élőben igazolva 2026-09-01: a
+    // "DevOps mérnök - Befektetési Zrt." oldala Docker/ELK/CI-CD/Prometheus/
+    // Zabbix-ot ad), szóval csak a fetch hiányzott. Mint mindenhol: CSAK
+    // genuinely-új url-re megy le a kérés — a lenti upsert ON CONFLICT DO
+    // NOTHING-ja egy meglévő sort úgysem írna felül, tehát a fetch kárba veszne.
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["erste"])).rows.map((r) => r.url)
+    );
+
     let newlyInserted = 0;
     let migratedUrls = 0;
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
     let notBudapest = 0;
+    let detailFetchFailed = 0;
 
     for (const row of dedup) {
       try {
@@ -298,6 +326,19 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
           continue;
         }
 
+        // A teljes sor a beszúrás ELŐTT áll össze (nincs fetch-then-UPDATE) —
+        // lásd az "Experience write policy" szabályt.
+        let technologies = null;
+        if (!knownUrls.has(url)) {
+          await sleep(800);
+          try {
+            technologies = extractTechnologies(await fetchText(url));
+          } catch (err) {
+            detailFetchFailed++;
+            console.error(`[erste] technologies fetch failed ${url}: ${err.message}`);
+          }
+        }
+
         const pattern = volatileUrlPattern(url);
         let migrated = pattern
           ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
@@ -306,14 +347,14 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
           const idPattern = idOnlyPattern(url);
           if (idPattern) migrated = await migrateVolatileUrl(client, source, url, idPattern, currentUrls);
         }
-        const wasNew = await upsertJob(client, source, { title, url, experience });
+        const wasNew = await upsertJob(client, source, { title, url, experience, technologies });
         foundUrls.push(url);
         if (migrated) {
           migratedUrls++;
           console.log(`[erste] MIGRATED [${source}] "${title}" → ${url}`);
         } else if (wasNew) {
           newlyInserted++;
-          console.log(`[erste] NEW [${source}] "${title}" exp=${experience} → ${url}`);
+          console.log(`[erste] NEW [${source}] "${title}" exp=${experience} tech=[${technologies ?? "-"}] → ${url}`);
         } else {
           alreadyExisted++;
           console.log(`[erste] EXISTS [${source}] "${title}" → ${url}`);
@@ -325,7 +366,8 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
 
     console.log(
       `[erste] DONE — total=${dedup.length}, new=${newlyInserted}, migrated=${migratedUrls}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}`
+      `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}, ` +
+      `detail_fetch_failed=${detailFetchFailed}`
     );
 
     const complete = !crawlError;
