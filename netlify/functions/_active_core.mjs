@@ -24,6 +24,7 @@
 // on the frontend instead.
 
 import { logRecovery } from "./_error-logger.mjs";
+import { aiScrapedProbe, aiScrapedIsDead } from "./_ai_liveness.mjs";
 
 // How long after first_seen a job is unconditionally active before it becomes
 // eligible for "is it still on the source?" checking.
@@ -448,18 +449,17 @@ export const BANNER_DEAD_SOURCES = {
     const m = body.slice(i, i + 400).match(/"status"\s*:\s*"([A-Z_]+)"/);
     return !!m && (m[1] === "DISABLED" || m[1] === "EXPIRED");
   },
-  // "AI-scraped" is one flat source spanning many unrelated companies' own
-  // career pages, so — unlike every other entry here — a plain-string rule
-  // would risk false-positiving on some other AI-scraped domain that happens
-  // to share wording. Scoped per-domain instead; add more domain branches
-  // here as new AI-scraped ATS platforms are found to soft-404.
-  // atj.graphisoft.com (Jobvite-style ATS): a filled posting stays HTTP 200
-  // with this exact phrase — found 2026-07-30 when Graphisoft's "Junior AI
-  // Engineer" closed within minutes of being AI-discovered.
-  "AI-scraped": (row, body) => {
-    if (row.url.includes("atj.graphisoft.com") && /sorry,\s*this position has been filled/i.test(body)) return true;
-    return false;
-  },
+  // "AI-scraped" is one flat source spanning ~255 unrelated companies' own
+  // career pages and ATS tenants, so — unlike every other entry here — it can
+  // never be a plain-string rule: a phrase that means "closed" on one domain is
+  // ordinary copy on another. It is also the only source where the sweep's
+  // plain-404 rule is nearly useless: 745 of its 755 active rows answered HTTP
+  // 200 on 2026-08-30, dead ones included, with exactly one hard 404 in the
+  // whole bucket. The per-platform rule set (SmartRecruiters/Workday/Ashby/
+  // Greenhouse/Lever APIs + host-scoped redirect and banner rules) therefore
+  // lives in its own module; the original atj.graphisoft.com phrase from
+  // 2026-07-30 is now one entry in its DEAD_PHRASES list.
+  "AI-scraped": (row, body, res) => aiScrapedIsDead(row, body, res),
 
   // Added 2026-07-22, each validated by fetching a currently-active listed job
   // for that exact source and confirming the phrase is ABSENT (the project's
@@ -622,6 +622,15 @@ export const SWEEP_PROBE_OVERRIDES = {
       minIntervalMs: 3200, // 20 req/min free tier, with headroom
     };
   },
+
+  // AI-scraped (2026-08-30): not one site but ~255 hosts, so the override
+  // dispatches on the ROW's host — Greenhouse / Lever / SmartRecruiters /
+  // Workday get asked at their own public job APIs, everything else falls back
+  // to the posting's own page (aiScrapedProbe returns null). See _ai_liveness.mjs
+  // for why each endpoint is the right question to ask. No minIntervalMs: these
+  // are unauthenticated per-job endpoints with no rate limit worth pacing for,
+  // and ~150 rows in one sequential lane would dominate the sweep's runtime.
+  "AI-scraped": aiScrapedProbe,
 };
 
 /**
@@ -629,13 +638,26 @@ export const SWEEP_PROBE_OVERRIDES = {
  * maintenance scripts ask the same question prod asks — the same reason
  * isDeadResult/isAliveResult are exported (a hand-copied mirror drifts).
  *
- * @returns {{url: string, headers: object|null, minIntervalMs: number, overridden: boolean}}
+ * `deadStatuses` is a narrow opt-in: HTTP statuses that are a positive DEATH
+ * verdict *at this probe's endpoint only*. It exists for Workday, whose CXS
+ * endpoint answers 403 for a posting that exists but is unpublished. 403 stays
+ * a non-verdict everywhere else on purpose (it is what a bot block looks like),
+ * so this must never be widened to a global rule — an endpoint only earns an
+ * entry once its 403 has been cross-checked against that platform's own search.
+ *
+ * @returns {{url: string, headers: object|null, minIntervalMs: number, deadStatuses: number[], overridden: boolean}}
  */
 export function sweepProbeFor(row) {
   const build = SWEEP_PROBE_OVERRIDES[row.source];
   const o = build ? build(row) : null;
-  if (!o) return { url: row.url, headers: null, minIntervalMs: 0, overridden: false };
-  return { url: o.url, headers: o.headers ?? null, minIntervalMs: o.minIntervalMs ?? 0, overridden: true };
+  if (!o) return { url: row.url, headers: null, minIntervalMs: 0, deadStatuses: [], overridden: false };
+  return {
+    url: o.url,
+    headers: o.headers ?? null,
+    minIntervalMs: o.minIntervalMs ?? 0,
+    deadStatuses: o.deadStatuses ?? [],
+    overridden: true,
+  };
 }
 
 function _pathOf(u) {
@@ -649,6 +671,11 @@ function _pathOf(u) {
 
 function _isDeadResult(row, res) {
   if (!res) return false;
+  // Statuses the probe's OWN endpoint declares fatal (Workday CXS 403). Scoped
+  // to overridden probes so it can never reinterpret a bot block on a public
+  // posting page; see sweepProbeFor's doc comment.
+  const probe = sweepProbeFor(row);
+  if (probe.overridden && probe.deadStatuses.includes(res.status)) return true;
   if (res.status === 404) {
     const aliveRule = SOFT_404_ALIVE_SOURCES[row.source];
     if (aliveRule && typeof res.body === "string" && aliveRule(row, res.body)) {
@@ -673,8 +700,11 @@ function _isDeadResult(row, res) {
   }
   const rule = BANNER_DEAD_SOURCES[row.source];
   if (rule && res.status === 200 && typeof res.body === "string") {
+    // Function rules also get the raw result: AI-scraped needs finalUrl to
+    // recognise the platforms that redirect a removed posting to their careers
+    // root instead of 404ing. Older rules simply ignore the third argument.
     if (typeof rule === "function") {
-      if (rule(row, res.body)) return true;
+      if (rule(row, res.body, res)) return true;
     } else if (res.body.toLowerCase().includes(rule)) {
       return true;
     }
@@ -774,7 +804,12 @@ async function _probeAll(rows, checkFinal, concurrency) {
   const plain = [];
   const pacedBySource = new Map();
   for (const row of rows) {
-    if (SWEEP_PROBE_OVERRIDES[row.source] && sweepProbeFor(row).overridden) {
+    // Only rows that actually ASK for pacing go into the sequential lane. An
+    // override with minIntervalMs 0 (AI-scraped's public ATS endpoints) has no
+    // rate limit to respect, and funnelling its ~150 rows through one lane
+    // would make the sweep's runtime an order of magnitude worse for nothing.
+    const p = SWEEP_PROBE_OVERRIDES[row.source] ? sweepProbeFor(row) : null;
+    if (p && p.overridden && p.minIntervalMs > 0) {
       if (!pacedBySource.has(row.source)) pacedBySource.set(row.source, []);
       pacedBySource.get(row.source).push(row);
     } else {
