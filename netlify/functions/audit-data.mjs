@@ -14,6 +14,16 @@
 //       → per-source summary rows:
 //         { source, active, inactive, newThisWeek, total, timeBased }
 //
+//   GET /audit-data?filters=1
+//       → the `job_filters` title denylist ({id, word}) plus the seniority
+//         words that PASS THROUGH it. The coverage routine used to read this
+//         straight off the public `GET /filters`, but the 2026-08-25
+//         admin-only lockdown put that behind `hasJobBoardAccess`, which
+//         AUDIT_TOKEN does not satisfy — so the 2026-08-30 run classified
+//         "blacklisted" from a code comment instead of a live read, and said
+//         so in its own report. Served here instead of widening /filters:
+//         the routine keeps its own narrow token.
+//
 //   GET /audit-data?source=<raw source>&sample=<n>&offset=<n>
 //       → that one source's counts + a page of active & inactive rows
 //         (url / title / firstSeen). A source with <= FULL_LIST_MAX active rows
@@ -25,6 +35,7 @@
 // routines, not the public.
 
 import { Pool } from "pg";
+import { SENIOR_TITLE_WORDS } from "./_seniority_policy.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -73,6 +84,20 @@ async function summary(client) {
     total: r.total,
     timeBased: TIME_BASED.has(r.source),
   }));
+}
+
+// The title denylist the scrapers apply at insert (load_filters.mjs reads the
+// same table). Read-only: this endpoint has no write path, so handing it to a
+// cloud routine never puts the destructive filter-write tier in a prompt.
+async function filterWords(client) {
+  const { rows } = await client.query(`SELECT id, word FROM job_filters ORDER BY word`);
+  return {
+    count: rows.length,
+    // Whole-word match, accent-insensitive — see filterRegex in _seniority_policy.mjs.
+    matching: "NFD accent-strip + lowercase + (^|[^a-z0-9])word([^a-z0-9]|$)",
+    seniorPassThrough: SENIOR_TITLE_WORDS,
+    words: rows,
+  };
 }
 
 async function sourceDetail(client, source, sample, offset) {
@@ -129,11 +154,13 @@ export default async (request) => {
 
   const url = new URL(request.url);
   const source = url.searchParams.get("source");
+  const wantFilters = url.searchParams.get("filters") === "1";
   const sample = Math.min(parseInt(url.searchParams.get("sample") || "15", 10) || 15, 100);
   const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
   const client = await pool.connect();
   try {
+    if (wantFilters) return json(200, await filterWords(client));
     if (source) return json(200, await sourceDetail(client, source, sample, offset));
     return json(200, { sources: await summary(client), generatedAt: new Date().toISOString() });
   } catch (err) {
