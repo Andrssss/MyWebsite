@@ -95,9 +95,10 @@ export default withDbAuditFlush("ai-ingest", async (request) => {
       // See _ats_handoff.mjs — this is the fix for the 55 bit-identical
       // AI-scraped / ats-crawl url duplicates measured on 2026-08-30.
       handoffAtsUrls: true,
+      skipCrossSourceDupes: true,
     });
     await consume(stats.insertedUrls.length);
-    console.log(`[ai-ingest ${source}] received=${payload.jobs.length} clean=${jobs.length} throttled=${throttled} handedToAts=${stats.handedToAts} atsTenantsAdded=${stats.atsTenantsAdded.length} ${JSON.stringify(stats)}`);
+    console.log(`[ai-ingest ${source}] received=${payload.jobs.length} clean=${jobs.length} throttled=${throttled} handedToAts=${stats.handedToAts} atsTenantsAdded=${stats.atsTenantsAdded.length} dupeSkipped=${stats.skippedDuplicate} ${JSON.stringify(stats)}`);
     return json(200, {
       source,
       received: payload.jobs.length,

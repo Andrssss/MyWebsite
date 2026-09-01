@@ -20,6 +20,7 @@ import {
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { atsHandoff, registerAtsTenant } from "./_ats_handoff.mjs";
+import { findCrossSourceDuplicates } from "./_ai_dupe_guard.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
    Lives here so ai-ingest.mjs and ai-registry.mjs can't drift apart on what
@@ -288,6 +289,13 @@ async function upsertJob(client, source, job, resolvedExperience) {
  * @param {string}   [args.scopePrefix]  passed through to reconcileActive — restricts its
  *                                    writes to rows under one url prefix. Required when many
  *                                    independent full listings share ONE source value.
+ * @param {boolean} [args.skipCrossSourceDupes=false]  AI-callers only. A candidate whose
+ *                                    (title, company) already exists as an ACTIVE row under a
+ *                                    DIFFERENT source is dropped instead of inserted — the same
+ *                                    role-separation idea as handoffAtsUrls, one level up
+ *                                    (_ai_dupe_guard.mjs). Opt-in for the same reason: ats-crawl and
+ *                                    workable own their sources' full listings and must not skip
+ *                                    rows just because another scraper also sees them.
  * @param {boolean} [args.handoffAtsUrls=false]  AI-callers only. An incoming url that resolves to a
  *                                    known ATS board is NOT inserted; the tenant behind it is
  *                                    registered instead and ats-crawl harvests the whole board
@@ -298,6 +306,7 @@ async function upsertJob(client, source, job, resolvedExperience) {
 export async function ingestJobs(client, {
   source, jobs, fullListing = false, filters = [], categories = [],
   rejectLocation = isNonBudapestLocation, scopePrefix = null, handoffAtsUrls = false,
+  skipCrossSourceDupes = false,
 }) {
   await ensureTechnologiesColumn(client);
   const ok = jobs.length > 0;
@@ -315,6 +324,13 @@ export async function ingestJobs(client, {
   const skippedLegacyAtsUrls = []; // ezeket már egy másik scraper hozza
   /** @type {Map<string, {provider:string, slug:string, company:string|null}>} */
   const atsTenants = new Map();
+  // Kereszt-forrás duplikátumok (_ai_dupe_guard.mjs) — egy lekérés az egész
+  // kötegre, a cikluson KÍVÜL.
+  const skippedDuplicateUrls = [];
+  const duplicateOf = [];
+  const dupes = skipCrossSourceDupes
+    ? await findCrossSourceDuplicates(client, source, jobs)
+    : new Map();
 
   for (const job of jobs) {
     if (!job || !job.title || !job.url) continue;
@@ -340,6 +356,15 @@ export async function ingestJobs(client, {
         }
         continue;
       }
+    }
+    // Amit egy meglévő forrás MÁR behozott (aktív sorként), azt nem szúrjuk be
+    // másodszor egy másik url alatt — az AI dolga a felderítés, nem az
+    // újraaratás (_ai_dupe_guard.mjs fejléc: BKK "BI elemző", 2026-09-01).
+    const dupe = dupes.get(job.url);
+    if (dupe) {
+      skippedDuplicateUrls.push(job.url);
+      duplicateOf.push({ url: job.url, title: job.title, existingSource: dupe.source, existingUrl: dupe.url });
+      continue;
     }
     if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
     if (shouldSkipTitleFilter(job.title, filters)) { skippedSenior++; continue; }
@@ -377,5 +402,6 @@ export async function ingestJobs(client, {
     handedToAts: handedToAtsUrls.length, handedToAtsUrls,
     skippedLegacyAts: skippedLegacyAtsUrls.length,
     atsTenantsAdded,
+    skippedDuplicate: skippedDuplicateUrls.length, skippedDuplicateUrls, duplicateOf,
   };
 }

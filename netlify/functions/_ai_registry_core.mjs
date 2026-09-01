@@ -151,20 +151,47 @@ export async function submitFindings(payload) {
     const client = await pool.connect();
     try {
       const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
-      const stats = await ingestJobs(client, { source: AI_SOURCE, jobs: allJobs, fullListing: false, filters, categories });
+      // ATS-átadás: egy ATS-boardra mutató találatból tenant lesz, nem job_posts
+      // sor (_ats_handoff.mjs). Ugyanaz a szabály, mint az ai-ingest.mjs-ben és a
+      // cron_jobs_AI-background.mjs-ben — ez a harmadik (és a felderítő rutin
+      // TÉNYLEGES) belépési pontja, 2026-09-01-ig tévedésből kimaradt innen,
+      // ezért a rutin ATS-találatai továbbra is duplikált AI-scraped sorként
+      // mentek be.
+      const stats = await ingestJobs(client, {
+        source: AI_SOURCE, jobs: allJobs, fullListing: false, filters, categories,
+        handoffAtsUrls: true,
+        // Amit már egy másik forrás behozott, azt nem duplázzuk (_ai_dupe_guard.mjs).
+        skipCrossSourceDupes: true,
+      });
       results[AI_SOURCE] = stats;
       totalWritten = stats.insertedUrls.length;
       console.log(
         `[ai-registry-core] ${AI_SOURCE}: rows=${stats.rows} inserted=${stats.inserted} ` +
         `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
-        `skip_non_it=${stats.skippedNonIt} skip_location=${stats.skippedLocation}`
+        `skip_non_it=${stats.skippedNonIt} skip_location=${stats.skippedLocation} ` +
+        `ats_handoff=${stats.handedToAts} ats_legacy=${stats.skippedLegacyAts} ` +
+        `ats_tenants_added=${JSON.stringify(stats.atsTenantsAdded)} ` +
+        `dupe_skipped=${stats.skippedDuplicate} ${JSON.stringify(stats.duplicateOf)}`
       );
 
       const insertedSet = new Set(stats.insertedUrls);
+      // Az ATS-nek átadott url-ek is "ismertnek" számítanak: sor nem lett
+      // belőlük, de a rutin `knownUrls` listája ebből épül, és enélkül minden
+      // futásban újra beküldené ugyanazt a boardot.
+      const handedSet = new Set(stats.handedToAtsUrls || []);
+      // Ugyanez a logika a kereszt-forrás duplikátumokra: sor nem lett belőlük,
+      // de ha nem jegyeznénk fel, a rutin minden futásban újra beküldené őket.
+      const dupeSet = new Set(stats.skippedDuplicateUrls || []);
       const known = new Set(reg.findings.map((f) => f.url));
       for (const j of allJobs) {
-        if (!insertedSet.has(j.url) || known.has(j.url)) continue;
-        reg.findings.push({ slug: slugByUrl.get(j.url), ...j, foundDate: now });
+        if (known.has(j.url)) continue;
+        if (insertedSet.has(j.url)) {
+          reg.findings.push({ slug: slugByUrl.get(j.url), ...j, foundDate: now });
+        } else if (handedSet.has(j.url)) {
+          reg.findings.push({ slug: slugByUrl.get(j.url), ...j, foundDate: now, handedToAts: true });
+        } else if (dupeSet.has(j.url)) {
+          reg.findings.push({ slug: slugByUrl.get(j.url), ...j, foundDate: now, duplicateOfOtherSource: true });
+        }
       }
     } finally {
       client.release();

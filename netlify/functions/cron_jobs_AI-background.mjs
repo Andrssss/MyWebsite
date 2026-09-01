@@ -166,6 +166,8 @@ async function runSite(client, site) {
     // Same rule as the ai-ingest endpoint: an ATS-hosted posting becomes an
     // ats_tenants row, not a job_posts row (_ats_handoff.mjs).
     handoffAtsUrls: true,
+    // Amit már egy másik forrás behozott, azt nem duplázzuk (_ai_dupe_guard.mjs).
+    skipCrossSourceDupes: true,
   });
   const cost = estimateCost(usage);
 

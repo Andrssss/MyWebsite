@@ -23,6 +23,14 @@ during a chat and extracts the jobs. Two ways to land them in the DB, both write
 - **Manual SQL path** — run the INSERT below directly against the DB (Neon console / `psql`). No
   deploy, no secret. Useful for a one-off backfill outside the routine's own cycle.
 
+**ATS-boardok: a rutin 2026-09-01 óta NEM arat rajtuk.** A greenhouse / lever / ashby /
+smartrecruiters / recruitee / personio / workday boardokat az `ats-crawl` forrás hozza be egészben, ezért
+a rutin promptja ezekre már nem futtat `site:` keresést, és ha mégis ilyen boardra fut, csak a BOARD-ot
+küldi be leadként (a `_ats_handoff.mjs` `ats_tenants` sort csinál belőle, `job_posts` sort nem). A
+`site:join.com` és `site:*.teamtailor.com` keresés MARAD — azokra a platformokra nincs ATS-adapterünk.
+Ugyanekkor javítva: az `ai-registry` útja (a rutin TÉNYLEGES belépési pontja) eddig nem adta tovább a
+`handoffAtsUrls` flaget, így az ATS-találatai duplikált `AI-scraped` sorként mentek be.
+
 ⚠️ **This file is documentation, not the routine's source of truth.** The routine never reads the
 repo's docs — it only knows what is in its own stored prompt. If you add or change a rule here,
 update the routine's prompt to match (`RemoteTrigger` `update`, or the claude.ai routines UI), or the
