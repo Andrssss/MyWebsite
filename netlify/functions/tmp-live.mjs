@@ -24,7 +24,7 @@ export default async (req) => {
   try {
     if (action === "list") {
       const r = await client.query(
-        `SELECT url, source, title, company, location, first_seen, last_seen, sweep_dead
+        `SELECT url, source, title, company, first_seen, last_seen, sweep_dead
            FROM job_posts
           WHERE active = true AND source = ANY($1::text[])
           ORDER BY source, first_seen`,
