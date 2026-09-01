@@ -19,7 +19,7 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
@@ -1563,7 +1563,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       try {
         html = await fetchText(p.url);
       } catch (err) {
-        await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: err.message });
         stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: err.message });
         continue;
       }
@@ -1605,7 +1604,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllZynternJobs({ maxPages: 10 });
         } catch (e) {
-          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Zyntern API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Zyntern API error: ${e.message}` });
           continue;
         }
@@ -1614,7 +1612,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           merged = await fetchMinddiakJobsFromApi({ limit: 50, maxPages: 20, debug });
           console.log(`[minddiak] fetched=${merged.length}`);
         } catch (e) {
-          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `MindDiák API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `MindDiák API error: ${e.message}` });
           continue;
         }
@@ -1641,7 +1638,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           });
           console.log(`[muisz] budapest_gate: ${budapest.length} / ${allMuisz.length}  →  it_gate: ${merged.length}`);
         } catch (e) {
-          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Muisz API error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Muisz API error: ${e.message}` });
           continue;
         }
@@ -1652,7 +1648,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           sourceComplete = r.complete;
           if (!r.complete) console.log(`[schonherz] PARTIAL listing — deactivation will be skipped`);
         } catch (e) {
-          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Schönherz pagination error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Schönherz pagination error: ${e.message}` });
           continue;
         }
@@ -1660,7 +1655,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         try {
           merged = await fetchAllTudasdiakJobs(html, p.url);
         } catch (e) {
-          await logFetchError("cron_jobs_DIAK_1", { url: p.url, message: `Tudasdiak Inertia error: ${e.message}` });
           stats.portals.push({ source, label: p.label, url: p.url, ok: false, error: `Tudasdiak Inertia error: ${e.message}` });
           continue;
         }
@@ -1784,7 +1778,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
                 const detailHtml = await fetchText(item.url);
                 item.technologies = extractTechnologies(detailHtml);
               } catch (err) {
-                await logFetchError("cron_jobs_DIAK_1", { url: item.url, message: `technologies fetch: ${err.message}` });
+                console.warn(`[schonherz] technologies fetch failed: ${item.url} — ${err.message}`);
               }
             }
             await upsertJob(client, source, item);

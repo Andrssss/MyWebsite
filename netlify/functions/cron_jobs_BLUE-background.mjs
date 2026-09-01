@@ -13,7 +13,7 @@ import http from "http";
 import zlib from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractBluebirdExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -243,7 +243,6 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
         jobs = await fetchRssJobs(p.url);
         console.log(`${p.key}: ${jobs.length} jobs found in RSS.`);
       } catch (err) {
-        await logFetchError("cron_jobs_BLUE", { url: p.url, message: err.message });
         console.error(p.key, "fetch failed:", err.message);
         crawlError = true;
         continue;
@@ -288,7 +287,7 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
             if (it.experience === "-") it.experience = extractBluebirdExperience(detailHtml) || "-";
             it.technologies = extractTechnologies(detailHtml);
           } catch (err) {
-            await logFetchError("cron_jobs_BLUE", { url: it.url, message: err.message });
+            console.warn(`[bluebird] detail fetch failed: ${it.url} — ${err.message}`);
           }
         }
         if (shouldSkipSeniorExperience(isSeniorExperience(it.experience))) {

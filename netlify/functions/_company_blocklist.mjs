@@ -85,6 +85,10 @@ const LISTS_BY_SOURCE = {
   // (Greenhouse company_name) vagy az ats_tenants sor — ugyanaz az alak, mint a
   // talent/alllocaljobs ágon, tehát a közös lista illeszkedik rá.
   "ats-crawl": COMPANY_BLOCKLIST,
+  // Workable országos feed (2026-08-30): a cégnév a `company.title` mezőből jön,
+  // display-formában ("Magyar Telekom Nyrt.") — ugyanaz az alak, mint a
+  // talent/alllocaljobs ágon, tehát a közös lista illeszkedik rá.
+  workable: COMPANY_BLOCKLIST,
 };
 
 function normalizeText(s) {

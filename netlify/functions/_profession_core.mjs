@@ -5,7 +5,6 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
@@ -663,7 +662,6 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
       merged = extractCandidates(html, p.url).filter((c) => looksLikeJobUrl(source, c.url));
     }
   } catch (err) {
-    await logFetchError(jobName, { url: p.url, message: err.message });
     console.error(`[${jobName}] fetch failed for ${p.url}: ${err.message}`);
     return { source, label: p.label, url: p.url, ok: false, error: err.message, foundUrls: [] };
   }
@@ -691,7 +689,6 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         await sleep(300);
         c.detailHtml = await fetchText(c.url);
       } catch (err) {
-        await logFetchError(jobName, { url: c.url, message: err.message });
         kept.push(c); // fail-open: ha nem tudjuk ellenőrizni, marad
         continue;
       }
@@ -760,7 +757,7 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
           if (!item.experience) item.experience = extractProfessionExperience(detailHtml) || "-";
           item.technologies = extractTechnologies(detailHtml);
         } catch (err) {
-          await logFetchError(jobName, { url: item.url, message: err.message });
+          console.warn(`[profession] detail fetch failed: ${item.url} — ${err.message}`);
         }
       }
       delete item.detailHtml;

@@ -148,3 +148,26 @@ export function rejectAtsLocation(location) {
   if (!hasHungarianHint(location)) return true;   // üres is ide esik
   return blockingPlace(location) !== null;
 }
+
+/**
+ * SZIGORÚBB változat: CSAK Budapest (user-döntés 2026-08-30, a Workable
+ * országos feedhez).
+ *
+ * Az `rejectAtsLocation`-tól abban tér el, hogy ott az "explicit HU-jelzés"
+ * elég (a "Hungary" város nélkül is átmegy), itt viszont a szövegben
+ * ténylegesen szerepelnie kell a Budapestnek. Erre azért van szükség, mert a
+ * Workable feed egész Magyarországra szűr: a 396 magyar hirdetésből több
+ * tucatnyi `city: ""` + `countryName: "Hungary"` alakú (vidéki vagy meg nem
+ * adott helyszín), amit a lazább kapu mind beengedne.
+ *
+ * A tiltott-hely lista ugyanaz (BLOCKED_PLACES), tehát a "Budapest, Debrecen"
+ * és a "Budapest | Berlin" is kiesik — az agglomeráció (Budaörs, Érd,
+ * Szentendre) szintén, mert az sem Budapest.
+ *
+ * @param {string} location  MINDEN helyszín egy stringben (ld. rejectAtsLocation)
+ */
+export function rejectNonBudapest(location) {
+  const n = normalize(location);
+  if (!n.includes("budapest")) return true;   // üres is ide esik
+  return blockingPlace(location) !== null;
+}

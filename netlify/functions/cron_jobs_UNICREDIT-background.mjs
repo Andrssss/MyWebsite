@@ -34,7 +34,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { isItJob } from "./_ai_ingest_core.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -188,7 +188,6 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
       try {
         pageHtml = await fetchText(pageUrl);
       } catch (err) {
-        await logFetchError("cron_jobs_UNICREDIT-background", { url: pageUrl, message: err.message });
         console.error(`[unicredit] list fetch failed (offset ${offset}): ${err.message}`);
         listFetchFailed = true;
         break;
@@ -263,7 +262,6 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
               technologies = extractTechnologies(normalizedHtml);
             } catch (err) {
               detailFetchFailed++;
-              await logFetchError("cron_jobs_UNICREDIT-background", { url: job.url, message: `technologies fetch: ${err.message}` });
               console.error(`[unicredit] technologies fetch failed ${job.url}: ${err.message}`);
             }
           }
@@ -281,7 +279,6 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
             // The old `continue` dropped it from foundUrls, so active-reconcile
             // could wrongly deactivate a live job on a flaky detail fetch.
             detailFetchFailed++;
-            await logFetchError("cron_jobs_UNICREDIT-background", { url: job.url, message: err.message });
             console.error(`[unicredit] detail fetch failed ${job.url}: ${err.message}`);
             experience = "-";
           }

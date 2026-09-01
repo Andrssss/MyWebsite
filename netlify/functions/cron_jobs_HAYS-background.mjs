@@ -55,7 +55,7 @@
 import { Pool } from "pg";
 import { chromium as playwrightCore } from "playwright-core";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import {
   isInternshipTitle,
@@ -260,7 +260,6 @@ const _runJob = withTimeout("cron_jobs_HAYS-background", async () => {
     rawJobs = [...jobs.values()];
     listingComplete = complete;
   } catch (err) {
-    await logFetchError("cron_jobs_HAYS-background", { url: LIST_URL, message: err.message });
     console.error(`[Hays] listing scrape failed: ${err.message}`);
     client.release();
     return;

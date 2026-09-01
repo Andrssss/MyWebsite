@@ -22,7 +22,7 @@
 // what it did this run ({findings, sitesChecked, rejected}) and the server
 // merges into stored state.
 //
-// State lives in Netlify Blobs (same store pattern as fetch-error-logs /
+// State lives in Netlify Blobs (same store pattern as recovery-logs /
 // weekly-backups) rather than Postgres — it's one small JSON doc of bookkeeping,
 // not relational data, and this avoids a schema migration for it.
 //

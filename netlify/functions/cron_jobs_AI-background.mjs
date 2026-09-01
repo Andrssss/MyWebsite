@@ -20,7 +20,7 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { ingestJobs, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import {
   extractJobsLLM,
@@ -64,6 +64,22 @@ async function ensureAiExtractorsTable(client) {
   // this makes wrongly deactivating page-2+ jobs impossible by default.
   await client.query(
     `ALTER TABLE ai_extractors ADD COLUMN IF NOT EXISTS full_listing boolean NOT NULL DEFAULT false`
+  );
+
+  // Keep the explicitly approved recurring source in the registry without
+  // overwriting an operator's mode, URL, or disabled state. This is only a
+  // first-run seed; the table remains the runtime source of truth afterwards.
+  await client.query(
+    `INSERT INTO ai_extractors (site, source_value, list_url, mode, full_listing)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (site) DO NOTHING`,
+    [
+      "ujbudaiallasok",
+      "AI - ujbudaiallasok",
+      "https://ujbudaiallasok.hu/job-category/informatika-telekommunikacio/",
+      "llm-read",
+      false,
+    ]
   );
 }
 
@@ -129,7 +145,6 @@ async function runSite(client, site) {
   try {
     html = await fetchPage(site.list_url);
   } catch (err) {
-    await logFetchError("cron_jobs_AI-background", { url: site.list_url, message: err.message });
     await bumpFailure(client, site);
     return;
   }
@@ -138,7 +153,6 @@ async function runSite(client, site) {
   try {
     ({ jobs, usage, recipe } = await extractForSite(site, html));
   } catch (err) {
-    await logFetchError("cron_jobs_AI-background", { url: site.list_url, message: `extract: ${err.message}` });
     await bumpFailure(client, site);
     return;
   }
@@ -206,7 +220,6 @@ async function scrapeAll(client) {
       await runSite(client, site);
     } catch (err) {
       // One site's failure must never abort the batch.
-      await logFetchError("cron_jobs_AI-background", { url: site.list_url, message: `site: ${err.message}` });
       console.error(`[AI - ${site.site}] failed: ${err.message}`);
     }
   }

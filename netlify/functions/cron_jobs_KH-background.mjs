@@ -24,7 +24,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -220,7 +220,6 @@ export default withTimeout("cron_jobs_KH-background", async () => {
       try {
         res = await fetchPage(page);
       } catch (err) {
-        await logFetchError("cron_jobs_KH-background", { url: API, message: err.message });
         console.error(`[kh] page ${page} fetch failed: ${err.message}`);
         crawlError = true;
         break;
@@ -302,7 +301,6 @@ export default withTimeout("cron_jobs_KH-background", async () => {
               technologies = extractTechnologies(detailHtml);
             } catch (err) {
               detailFetchFailed++;
-              await logFetchError("cron_jobs_KH-background", { url, message: `technologies fetch: ${err.message}` });
               console.error(`[kh] technologies fetch failed ${url}: ${err.message}`);
             }
           }
@@ -319,7 +317,6 @@ export default withTimeout("cron_jobs_KH-background", async () => {
             // gating `complete` on detail failures (below) disabled deactivation entirely
             // on flaky bank sites.
             detailFetchFailed++;
-            await logFetchError("cron_jobs_KH-background", { url, message: err.message });
             console.error(`[kh] detail fetch failed ${url}: ${err.message}`);
             experience = "-";
           }

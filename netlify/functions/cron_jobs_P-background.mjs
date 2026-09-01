@@ -1,5 +1,5 @@
 import { processProfessionSources } from "./_profession_core.mjs";
-import { flushErrors, flushRecoveries } from "./_error-logger.mjs";
+import { flushRecoveries } from "./_error-logger.mjs";
 
 const BASE_JOB_NAME = "cron_jobs_P-background";
 
@@ -44,7 +44,6 @@ export default async (request) => {
   try {
     response = await processProfessionSources(sources, BASE_JOB_NAME, fakeRequest);
   } finally {
-    await flushErrors(BASE_JOB_NAME).catch(() => {});
     await flushRecoveries(BASE_JOB_NAME).catch(() => {});
   }
   return response;

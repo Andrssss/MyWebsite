@@ -8,7 +8,13 @@
   datacenter IP-jét 403-mal tiltja MÁR AZ ELSŐ oldalon. Lakossági IP-ről (dry-run)
   MINDEN 200 — akár default curl-UA-val, cache-buszterrel is —, tehát IP/ASN-szintű
   blokk, header/UA-tuning BIZTOSAN nem segít (a kliens már böngésző-UA-t küld).
-  Ugyanaz az osztály, mint a workcenternél. A parse/lapozás/extrakció maga KÉSZ és
+  Ugyanaz az osztály, mint a workcenternél. ÚJRAELLENŐRIZVE 2026-09-01 (eldobható
+  tmp-endpoint prodból): mindhárom URL 403 + "Just a moment..." CF-interstitial,
+  a blokk VÁLTOZATLAN; ugyanakkor lakossági IP-ről a lista/lapozás/detail 200 és a
+  parser illeszkedik a mai HTML-re (14 oldal ≈ 200 állás). A szelet ~80%-a viszont
+  /munka/redirect/ → cvonline.hu feed, a cvonline maga Drupal, CF NÉLKÜL, SSR-listával
+  (/hu/allashirdetesek/it-informatika-0?page=N) — ha kell ez a készlet, valószínűleg
+  ott a jobb belépési pont, nem itt. A parse/lapozás/extrakció maga KÉSZ és
   lokálisan igazolt (lásd a kutatási jegyzet dry-run szakaszát) — csak a prod-fetch
   bukik a Cloudflare-IP-blokkon. A fájl megmarad; ha egyszer lesz proxy /
   nem-datacenter host, a `cron_scheduler.mjs` GRID-jébe 1 sor felvétele elég.
@@ -41,7 +47,7 @@
 import { Pool } from "pg";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
@@ -235,7 +241,6 @@ async function walkSlice(slice) {
   try {
     ({ body: firstBody } = await fetchFinal(pageUrl(slice, 1)));
   } catch (err) {
-    await logFetchError("cron_jobs_ALLASPORTAL-background", { url: pageUrl(slice, 1), message: err.message });
     console.error(`[allasportal] ${slice} page 1 failed: ${err.message}`);
     return { items, complete: false };
   }
@@ -262,7 +267,6 @@ async function walkSlice(slice) {
       }
       items.push(...cards);
     } catch (err) {
-      await logFetchError("cron_jobs_ALLASPORTAL-background", { url: pageUrl(slice, page), message: err.message });
       console.error(`[allasportal] ${slice} page ${page} failed: ${err.message}`);
       return { items, complete: false };
     }
@@ -345,7 +349,7 @@ async function scrapeAllasportal(client) {
           item.technologies = extractTechnologies(body);
         }
       } catch (err) {
-        await logFetchError("cron_jobs_ALLASPORTAL-background", { url: item.url, message: `detail: ${err.message}` });
+        console.warn(`[allasportal] detail fetch failed: ${item.url} — ${err.message}`);
       }
     }
 

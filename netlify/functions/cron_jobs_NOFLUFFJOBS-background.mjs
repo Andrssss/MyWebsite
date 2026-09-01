@@ -5,8 +5,8 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience } from "./_experience_core.mjs";
+import { withTimeout } from "./_error-logger.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
@@ -294,30 +294,104 @@ function extractSSR(html, baseUrl) {
   return dedupeByUrl(items);
 }
 
-/* ── experience fetch ───────────────────────────────────────── */
+/* ── detail fetch (experience + technologies) ───────────────── */
 
-async function fetchNofluffExperience(url) {
+// Az Angular state-transfer saját escape-táblája (platform-server escapeHtml).
+// EGY menetben kell visszafejteni: egymás utáni replace-ekkel egy szövegbeli
+// "&a;q;" tévesen idézőjellé alakulna.
+const NGSTATE_UNESCAPE = { "&a;": "&", "&q;": '"', "&s;": "'", "&l;": "<", "&g;": ">" };
+
+/*
+ * A nofluffjobs SSR-oldala a TELJES hirdetés-objektumot beágyazza a
+ * <script id="serverApp-state"> blokkba, "/posting/<slug>?..." kulcs alá.
+ * Innen jönnek az „Elvárások" / „Előnyt jelentő készségek" chipek
+ * (requirements.musts / requirements.nices) — a látható DOM-ban ezek csak
+ * szétszórt span-ekben ülnek, a #posting-requirements blokk pedig élő méréskor
+ * (2026-09-01) a követelmény-leírás felét sem tartalmazta.
+ *
+ * A teljes body-ra eresztett extractTechnologies itt KIFEJEZETTEN rossz: az
+ * oldal alján ott a „hasonló hirdetések" lista, és annak címeiből ragadt volna
+ * a hirdetésre Atlassian meg Jira — a „DevOps Engineer (Atlassian Service
+ * Management Tools)" ajánlásból —, plusz Oracle/SQL/Windows a láblécből.
+ * Ezért csak a hirdetés SAJÁT szövegét adjuk az extractornak.
+ *
+ * A requirements.languages (Angol/Magyar chipek) szándékosan kimarad: az nyelv,
+ * nem technológia.
+ */
+function extractPostingState(html) {
+  try {
+    const $ = cheerioLoad(html);
+    const raw = $("#serverApp-state").html() || $("#serverApp-state").text();
+    if (!raw) return null;
+    const json = raw.replace(/&[aqslg];/g, (m) => NGSTATE_UNESCAPE[m] ?? m);
+    const state = JSON.parse(json);
+    const key = Object.keys(state).find((k) => k.startsWith("/posting/"));
+    return key ? state[key] : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractNofluffTechnologies(html) {
+  const posting = extractPostingState(html);
+  if (!posting) return null;
+
+  const req = posting.requirements || {};
+  const parts = [];
+  for (const list of [req.musts, req.nices]) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const value = typeof entry === "string" ? entry : entry?.value;
+      if (value) parts.push(`<li>${value}</li>`);
+    }
+  }
+  if (typeof req.description === "string" && req.description) parts.push(req.description);
+  if (Array.isArray(posting.specs?.dailyTasks)) {
+    for (const task of posting.specs.dailyTasks) {
+      if (typeof task === "string" && task) parts.push(`<li>${task}</li>`);
+    }
+  }
+  if (!parts.length) return null;
+
+  // A .description wrapper azért kell, hogy extractTechnologies a scoped ágán
+  // fusson, ne a „rövid szöveg → teljes body" fallbackján.
+  return extractTechnologies(`<div class="description">${parts.join(" ")}</div>`);
+}
+
+async function fetchNofluffDetail(url) {
   try {
     const html = await fetchText(url);
     const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
-    return extractBodyExperience(normalizedHtml) || null;
+    return {
+      experience: extractBodyExperience(normalizedHtml) || null,
+      technologies: extractNofluffTechnologies(html) || null,
+    };
   } catch (err) {
-    await logFetchError("cron_jobs_NOFLUFFJOBS", { url, message: `nofluff experience: ${err.message}` });
-    return null;
+    return { experience: null, technologies: null };
   }
 }
 
 /* ── DB ──────────────────────────────────────────────────────── */
 
+/*
+ * A `technologies` 2026-09-01-ig egyáltalán nem szerepelt az oszloplistában,
+ * pedig a detail-fetch amúgy is lefut minden hirdetésre (az experience miatt) —
+ * emiatt a forrás MINDEN sora technológia nélkül állt. A DO UPDATE ág
+ * szándékosan CSAK NULL fölé ír (ugyanaz a guardolt backfill-minta, mint a
+ * cégnevet író scraperekben), így a meglévő sorok maguktól begyógyulnak a
+ * következő futásokon, és semmi mást nem írunk át. Az üres-string marker
+ * („ellenőrizve, nincs") is védve marad, mert az nem NULL.
+ */
 async function upsertJob(client, item) {
   const canonicalUrl = normalizeUrl(item.url);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, company, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
-     ON CONFLICT (source, url)
-        DO NOTHING;`,
-    ["nofluffjobs", item.title, item.url, canonicalUrl, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null]
+      (source, title, url, canonical_url, experience, company, technologies, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+     ON CONFLICT (source, url) DO UPDATE SET
+        technologies = EXCLUDED.technologies
+      WHERE job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL;`,
+    ["nofluffjobs", item.title, item.url, canonicalUrl, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
   );
 }
 
@@ -333,7 +407,6 @@ async function scrapeNofluffjobs(client) {
     try {
       html = await fetchText(sourceUrl);
     } catch (err) {
-      await logFetchError("cron_jobs_NOFLUFFJOBS", { url: sourceUrl, message: err.message });
       console.error(`[nofluffjobs] Fetch failed: ${err.message}`);
       continue;
     }
@@ -365,10 +438,11 @@ async function scrapeNofluffjobs(client) {
     console.log(`[nofluffjobs]   after filters: ${merged.length}`);
 
     for (const item of merged) {
-      const exp = await fetchNofluffExperience(item.url);
-      if (exp) item.experience = exp;
+      const detail = await fetchNofluffDetail(item.url);
+      if (detail.experience) item.experience = detail.experience;
+      if (detail.technologies) item.technologies = detail.technologies;
       await sleep(400);
-      console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] "${item.title}"`);
+      console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] [${item.technologies ?? "-"}] "${item.title}"`);
       await upsertJob(client, item);
       totalUpserted++;
     }
@@ -386,6 +460,7 @@ const _runJob = withTimeout("cron_jobs_NOFLUFFJOBS-background", async (request) 
   const client = await pool.connect();
 
   try {
+    await ensureTechnologiesColumn(client);
     const total = await scrapeNofluffjobs(client);
     console.log(`[nofluffjobs] done — ${total} jobs upserted`);
   } finally {

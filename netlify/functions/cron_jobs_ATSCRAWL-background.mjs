@@ -36,7 +36,7 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies } from "./_experience_core.mjs";
 import { getProvider, deriveScopePrefix } from "./_ats_providers.mjs";
@@ -103,6 +103,49 @@ const SEED_TENANTS = [
   { provider: "greenhouse", slug: "payoneer", company: "Payoneer" },
   { provider: "greenhouse", slug: "contentful", company: "Contentful" },
   { provider: "lever", slug: "nielsen", company: "Nielsen" },
+  // Recruitee (2026-08-30, a provider felvételekor élőben igazolt): a
+  // felderítő magától is megtalálná, de csak akkor, amikor a "blackbelt"
+  // jelölt sorra kerül a több ezres újrapróbálási backlogban — ez a sor
+  // ad neki azonnal egy bizonyítottan magyar hirdetéses recruitee-boardot.
+  { provider: "recruitee", slug: "blackbelt", company: "BlackBelt Technology" },
+  // Personio (2026-08-30): 76 magyar cég-slug lepróbálásából ez a két találat.
+  // A teliogroup budapesti IT-hirdetéseket ad; a szallas ma Miskolc/Cluj, tehát
+  // a helyszín-kapun elvérzik — mégis bent marad, mert holnap nyithat budapestit,
+  // és a `no_hu` rotáció pont erre való.
+  { provider: "personio", slug: "teliogroup", company: "Telio Group" },
+  { provider: "personio", slug: "szallas", company: "Szállás Group Zrt." },
+
+  /* Workday (2026-08-30). Ezek NEM tippek: mind a 23 tenant a saját
+     `job_posts`-unkból származik — olyan myworkdayjobs.com url-ek hostjából és
+     site-jából, amiket más forrásaink (zömmel AI-scraped) már behoztak, tehát
+     bizonyítottan hirdetnek Budapesten. A workday nem tippelhető provider (a
+     tenant+wdN+site hármas nem kitalálható), ezért a felderítő sem hozza be
+     őket — ez a lista a belépőjük. A cégnév a hozzájuk tartozó job_posts
+     sorokból van, nem slug-tippelésből.
+     Slug-alak: "<tenant>.<wdN>:<site>" (ld. _ats_providers.mjs parseWorkdaySlug). */
+  { provider: "workday", slug: "ms.wd5:External", company: "Morgan Stanley" },
+  { provider: "workday", slug: "accenture.wd103:AccentureCareers", company: "Accenture" },
+  { provider: "workday", slug: "mastercard.wd1:CorporateCareers", company: "Mastercard" },
+  { provider: "workday", slug: "genesys.wd1:Genesys", company: "Genesys" },
+  { provider: "workday", slug: "sanofi.wd3:SanofiCareers", company: "Sanofi" },
+  { provider: "workday", slug: "genpact.wd108:External_Careers", company: "Genpact" },
+  { provider: "workday", slug: "goto.wd5:GoToCareers", company: "GoTo" },
+  { provider: "workday", slug: "silabs.wd1:SiliconlabsCareers", company: "Silicon Labs" },
+  { provider: "workday", slug: "nngroup.wd3:WDExternal", company: "NN Group" },
+  { provider: "workday", slug: "pwc.wd3:Global_Campus_Careers", company: "PwC Hungary" },
+  { provider: "workday", slug: "dxctechnology.wd1:DXCJobs", company: "DXC Technology" },
+  { provider: "workday", slug: "kyndryl.wd5:KyndrylProfessionalCareers", company: "Kyndryl" },
+  { provider: "workday", slug: "transamerica.wd5:AegonGBSC", company: "Aegon Global Business Solutions Center" },
+  { provider: "workday", slug: "takkt.wd3:TAKKT", company: "TAKKT Group" },
+  { provider: "workday", slug: "peak6group.wd1:CapMan", company: "PEAK6" },
+  { provider: "workday", slug: "nvidia.wd5:NVIDIAExternalCareerSite", company: "NVIDIA" },
+  { provider: "workday", slug: "onehealthineers.wd3:SHSJB", company: "Siemens Healthineers" },
+  { provider: "workday", slug: "gehc.wd5:GEHC_ExternalSite", company: "GE HealthCare" },
+  { provider: "workday", slug: "jci.wd5:JCI", company: "Johnson Controls" },
+  { provider: "workday", slug: "icon.wd3:broadbean_external", company: "ICON plc" },
+  { provider: "workday", slug: "cognex.wd1:External_Career_Site", company: "Cognex" },
+  { provider: "workday", slug: "greif.wd5:Greif", company: "Greif" },
+  { provider: "workday", slug: "unisys.wd5:External", company: "Unisys" },
 ];
 
 let _schemaReady = false;
@@ -145,12 +188,24 @@ async function seedTenants(client) {
 }
 
 /*
- * Esedékes tenantok. A rendezés ELSŐ kulcsa szándékosan a `live` státusz: az
- * F2 felderítő tetszőleges számú boardot tud behozni, és azok többsége
- * `no_hu` lesz (idegen cégek, slug-egyezésből — lásd a felderítő addTenant
- * kommentjét). Puszta last_checked-rendezéssel egy nagy no_hu-tömeg kiszorítaná
- * a napi keretből azt a néhány boardot, amelyiken tényleg vannak magyar
- * hirdetések.
+ * Esedékes tenantok. A rendezés ELSŐ kulcsa szándékosan a BIZONYÍTOTTAN jó
+ * board: az F2 felderítő tetszőleges számú tenantot tud behozni, és azok
+ * többsége `no_hu` lesz (idegen cégek, slug-egyezésből — lásd a felderítő
+ * addTenant kommentjét). Puszta last_checked-rendezéssel egy nagy no_hu-tömeg
+ * kiszorítaná a napi keretből azt a néhány boardot, amelyiken tényleg vannak
+ * magyar hirdetések.
+ *
+ * ⚠️ 2026-08-30-ig a kulcs `(status = 'live')` volt, ami NEM ezt csinálta: az
+ * újonnan felderített tenant is `live` alapértékkel jön be (a felderítő nem
+ * állít státuszt), `last_checked IS NULL`-lal, tehát a rendezés a MÉG SOSEM
+ * LÁTOTT boardokat sorolta a bizonyítottan magyar hirdetéses boardok ELÉ —
+ * pont fordítva, mint ahogy a fenti bekezdés ígérte. Egy nagyobb felderítő-
+ * adag (pl. az SR globális kereső ~30 tenantja) így órákra kiszoríthatta volna
+ * a wolt/shapr3d/craftdocs/seon köröket. A `last_checked IS NOT NULL` feltétel
+ * a "már lekértük ÉS akkor volt rajta magyar hirdetés" halmazt jelöli ki, mert
+ * a nulla magyar sorral záruló futás `no_hu`-ra állítja a státuszt.
+ * A még sosem látott tenantok így a második csoport ELEJÉRE kerülnek
+ * (NULLS FIRST), tehát nem éheznek ki — csak nem tolakszanak előre.
  */
 async function dueTenants(client, limit) {
   const { rows } = await client.query(
@@ -162,7 +217,7 @@ async function dueTenants(client, limit) {
           OR status = 'live'
           OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days => $2::int))
         )
-      ORDER BY (status = 'live') DESC, last_checked ASC NULLS FIRST
+      ORDER BY (status = 'live' AND last_checked IS NOT NULL) DESC, last_checked ASC NULLS FIRST
       LIMIT $1`,
     [limit, RECHECK_NO_HU_DAYS]
   );
@@ -202,7 +257,6 @@ async function crawlTenant(client, tenant, { filters, categories }) {
   try {
     listing = await provider.list(tenant.slug);
   } catch (err) {
-    await logFetchError("cron_jobs_ATSCRAWL-background", { url: label, message: err.message });
     await recordTenantResult(client, tenant, { error: err.message.slice(0, 300) });
     console.error(`[atscrawl] ${label} list failed: ${err.message}`);
     return { failed: true };
@@ -270,7 +324,6 @@ async function crawlTenant(client, tenant, { filters, categories }) {
           url = detail.url ?? url;
         }
       } catch (err) {
-        await logFetchError("cron_jobs_ATSCRAWL-background", { url: job.detailRef, message: err.message });
         console.error(`[atscrawl] ${label} detail failed "${job.title}": ${err.message}`);
       }
     }
@@ -308,7 +361,14 @@ async function crawlTenant(client, tenant, { filters, categories }) {
   const scopeCandidates = (boardJobs.map((j) => j.url).filter(Boolean).length > 0)
     ? boardJobs.map((j) => j.url).filter(Boolean)
     : built.map((b) => b.url);
-  const scopePrefix = deriveScopePrefix(tenant.slug, scopeCandidates);
+  /* Az alapértelmezett szabály (a slug az url-ben van, ld. deriveScopePrefix)
+     nem minden providerre igaz: a workday-nél a tenantot a host ÉS a site
+     együtt azonosítja, az útvonal első szegmense meg az "en-US". Az ilyen
+     provider maga adja meg az előtagot — az egységesség-ellenőrzés (és így a
+     fail-safe "inkább nem deaktiválunk" irány) ott is kötelező. */
+  const scopePrefix = typeof provider.scopePrefix === "function"
+    ? provider.scopePrefix(tenant.slug, scopeCandidates)
+    : deriveScopePrefix(tenant.slug, scopeCandidates);
 
   // Teljes listázásnak CSAK akkor tekintjük, ha van egységes url-előtag ÉS a
   // board nem üres. Bármelyik hiánya → reactivate-only, a deaktiválást a napi

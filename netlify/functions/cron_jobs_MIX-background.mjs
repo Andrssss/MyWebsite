@@ -11,7 +11,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import {
   extractBodyExperience,
@@ -263,7 +263,7 @@ async function enrichIfNew(job, known, extract, jobName) {
     if (!job.experience || job.experience === "-") job.experience = extract(html) || "-";
     job.technologies = extractTechnologies(html);
   } catch (err) {
-    await logFetchError(jobName, { url: job.url, message: err.message });
+    console.warn(`[${jobName}] detail fetch failed: ${job.url} — ${err.message}`);
   }
 }
 
@@ -699,7 +699,6 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       const rc = await reconcileActive(client, "dreamjobs", currentUrls, { complete: dreamComplete });
       console.log(`[dreamjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
-      await logFetchError("cron_jobs_MIX", { url: "dreamjobs", message: err.message });
       console.error("dreamjobs fetch failed:", err.message);
     }
 
@@ -720,7 +719,6 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       const rc = await reconcileActive(client, "melonjobs", melonAllUrls, { complete: melonComplete });
       console.log(`[melonjobs] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
-      await logFetchError("cron_jobs_MIX", { url: "melonjobs", message: err.message });
       console.error("melonjobs fetch failed:", err.message);
     }
 
@@ -751,7 +749,6 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       const rc = await reconcileActive(client, "kuka", allKukaJobs.map((j) => j.url), { complete: kukaComplete });
       console.log(`[kuka] active reconcile — ${JSON.stringify(rc)}`);
     } catch (err) {
-      await logFetchError("cron_jobs_MIX", { url: "kuka", message: err.message });
       console.error("kuka fetch failed:", err.message);
     }
   } finally {

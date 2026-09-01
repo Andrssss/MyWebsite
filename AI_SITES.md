@@ -297,6 +297,12 @@ correctly (`true`/`false`), same as a fresh scraper row.
   candidates, rather than guessing custom-domain career pages one by one (most of those turned out to
   be JS-heavy enterprise ATS — see rejected list).
 
+- [x] **Újbuda Prizma Állásközvetítés – Informatika, telekommunikáció kategória** –
+  `https://ujbudaiallasok.hu/job-category/informatika-telekommunikacio/` - use the category/listing page
+  as the recurring source, not the concrete `programfejleszto-munkatars-xi-ker` detail URL. Keep
+  `full_listing: false`: this is a category window and the shared 404 sweep remains responsible for
+  deactivating dead postings.
+
 ## Approved / live
 | slug | listing URL | full_listing | cadence | status | notes |
 |------|-------------|:------------:|:-------:|--------|-------|
@@ -310,6 +316,7 @@ correctly (`true`/`false`), same as a fresh scraper row.
 | kfs1 (join.com) | https://join.com/companies/kfs1/16347911-junior-full-stack-developer-typescript-react-supabase-postgres | no | 5h | extracted | 1 job pulled 2026-07-17 (KFS GROUP), survives all filters; SQL handed to user |
 | biconsulting | https://biconsulting.hu/karrier/gyakornoki-program/dataviz-gyakornok/ | no | 5h | extracted | 1 job pulled 2026-07-17, survives all filters; SQL handed to user |
 | bap  | https://bap.hu/friss-allasajanlatok/kiemelt-szoftverfejleszto-allasok | no | 5h | candidate | 2026-07-16 batch: 0/4 survived (2 role-blacklisted, 2 senior-by-years). Nothing sent. Recheck later. |
+| ujbudaiallasok | https://ujbudaiallasok.hu/job-category/informatika-telekommunikacio/ | no | 5h | candidate | Category/listing source added 2026-08-31; do not use the concrete Programfejleszto detail URL as the source. |
 | capsys | https://www.capsys.hu/en/career | no | 5h | candidate | 2026-07-16 batch: 0/2 survived (1 title-blacklisted "Lead", 1 borderline-senior excluded by judgment). Structurally good site, recheck later. |
 
 - **slug** → DB source `AI - <slug>`.

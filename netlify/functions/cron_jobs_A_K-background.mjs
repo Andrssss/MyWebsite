@@ -10,7 +10,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -228,7 +228,6 @@ const SOURCES = [
     inertiaVersion = await getInertiaVersion();
     console.log("Inertia version:", inertiaVersion);
   } catch (err) {
-    await logFetchError("cron_jobs_A_K", { url: KARRIERHUNGARIA_BASE, message: err.message });
     console.error("Failed to get Inertia version:", err.message);
     return new Response("FAIL");
   }
@@ -253,7 +252,6 @@ const SOURCES = [
       try {
         jobs = await fetchKarrierJobs(url, inertiaVersion);
       } catch (err) {
-        await logFetchError("cron_jobs_A_K", { url, message: err.message });
         console.error("fetch failed:", url, err.message);
         crawlError = true;
         continue;
@@ -281,7 +279,7 @@ const SOURCES = [
             if (it.experience === "-") it.experience = extractBodyExperience(detailHtml) || "-";
             it.technologies = extractTechnologies(detailHtml);
           } catch (err) {
-            await logFetchError("cron_jobs_A_K", { url: it.url, message: err.message });
+            console.warn(`[karrierhungaria] detail fetch failed: ${it.url} — ${err.message}`);
           }
         }
         if (shouldSkipSeniorExperience(isSeniorExperience(it.experience))) {

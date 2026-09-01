@@ -23,7 +23,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -282,7 +282,6 @@ export default withTimeout("cron_jobs_VALOREBASIS-background", async () => {
         html = await fetchText(catUrl);
       } catch (err) {
         fetchFailed++;
-        await logFetchError("cron_jobs_VALOREBASIS-background", { url: catUrl, message: err.message });
         console.error(`[valorebasis] fetch failed ${catUrl}: ${err.message}`);
         continue;
       }

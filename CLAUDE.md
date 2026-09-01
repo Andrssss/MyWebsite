@@ -41,7 +41,7 @@ Deploy = push to `main`; Netlify builds per `netlify.toml` (publish `dist`, func
 | `visitor_click_dates` | visitor analytics | `visitor-click.js`, `daily-visitor.js` |
 
 **Netlify Blobs** stores:
-- `fetch-error-logs` + `recovery-logs` — scraper failures and self-healing events (URL migrations, reactivations), written by `_error-logger.mjs`; cleared manually via `clear-error-blobs.mjs`
+- `recovery-logs` — self-healing events (URL migrations, reactivations), written by `_error-logger.mjs` (the companion `fetch-error-logs` store and its `clear-error-blobs.mjs` cleanup endpoint were removed 2026-09-01 — scraper fetch failures now go to the Netlify function log only)
 - `weekly-backups` — `subject_reviews` JSON dumps (despite the name, runs monthly on the 1st, ~10-day retention — `weekly-backup.js`)
 - `ai-scraped-registry` — the AI discovery routine's cross-run memory (checked sites + `lastChecked`, permanently-rejected list, already-found URLs), read/written by `ai-registry.mjs`
 - `zip-jobs` — async Drive-folder ZIP job results (`download-folder-background.mjs` → `download-result.mjs`)
@@ -72,7 +72,7 @@ React Router SPA; all routes live in `src/App.jsx` with Hungarian paths: `/targy
 - Upsert keyed on `url`. Sources whose URLs contain volatile IDs must go through `migrateVolatileUrl` (`_active_core.mjs`) so the row migrates in place instead of churning (insert-new + deactivate-old breaks dedupe and stats).
 - At the end of a **complete** run call `reconcileActive(client, source, foundUrls)`: reactivates re-seen rows, deactivates rows older than `ACTIVE_GRACE_DAYS` (3, by `first_seen`) that vanished. It deliberately does nothing on an empty result set or `complete:false`, so a blocked/broken crawl can never mass-deactivate a source. Also beware two scrapers reconciling the same `source` value — they wipe each other's finds.
 - LinkedIn never uses the active model (it only sees a recent window); it stays time-based on the frontend.
-- Wrap every cron handler in `withTimeout` so failures land in the `fetch-error-logs` blob store instead of dying silently.
+- Wrap every cron handler in `withTimeout` so a crash or a hung run is logged (and the process killed) instead of dying silently.
 
 **Validating "is source X broken?" / "are there really no new postings?" — always check a different way than the scraper itself:**
 Never validate a scraper's live behavior by re-running (or re-importing) that scraper's own extraction/URL-building/filter functions against a fresh fetch — that only proves the code agrees with itself. A bug in the original logic (wrong category/tag IDs, a bad senior-filter, a broken slug-builder) reproduces identically and looks like confirmation instead of getting caught. Validate through a channel that shares no code or assumptions with the scraper: the public site's own listing/search UI, a broader/unfiltered query, a different endpoint, a sitemap, or a plain visual check of the source — then diff *that* against what's in the DB. (2026-07-21: "is dreamjobs broken" was checked by copy-pasting `buildDreamJobsUrl`/`isSeniorLike` out of `cron_jobs_MIX-background.mjs` and running them against a fresh pull of the scraper's own two hardcoded API URLs — worthless as independent proof, even though the conclusion happened to be right.)

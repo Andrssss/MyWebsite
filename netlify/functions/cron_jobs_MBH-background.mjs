@@ -20,7 +20,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -324,7 +324,6 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
         await sleep(1000);
       } catch (err) {
         listFetchFailed = true;
-        await logFetchError("cron_jobs_MBH-background", { url: listUrl, message: err.message });
         console.error(`[mbh] list fetch failed ${listUrl}: ${err.message}`);
       }
     }
@@ -395,7 +394,6 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
         // flaky detail can't get a live job deactivated by reconcile.
         detailFetchFailed++;
         foundUrls.push(detailUrl);
-        await logFetchError("cron_jobs_MBH-background", { url: detailUrl, message: err.message });
         console.error(`[mbh] detail fetch failed ${detailUrl}: ${err.message}`);
       }
     }

@@ -20,7 +20,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -279,7 +279,6 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
   try {
     listHtml = await fetchText(LIST_URL);
   } catch (err) {
-    await logFetchError("cron_jobs_EUDIAKOK-background", { url: LIST_URL, message: err.message });
     console.error(`[eudiakok] list fetch failed: ${err.message}`);
     client.release();
     return;
@@ -346,7 +345,6 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
         // blocked ALL deactivation whenever one detail hiccuped.
         detailFetchFailed++;
         foundUrls.push(detailUrl);
-        await logFetchError("cron_jobs_EUDIAKOK-background", { url: detailUrl, message: err.message });
         console.error(`[eudiakok] detail fetch failed ${detailUrl}: ${err.message}`);
       }
     }

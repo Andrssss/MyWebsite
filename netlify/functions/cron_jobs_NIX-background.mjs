@@ -40,7 +40,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import {
   isInternshipTitle,
@@ -251,7 +251,6 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
     try {
       vacancies = await getJson(VACANCY_API);
     } catch (err) {
-      await logFetchError("cron_jobs_NIX-background", { url: VACANCY_API, message: err.message });
       console.error(`[nix] vacancy api fetch failed: ${err.message}`);
       return new Response("fetch failed", { status: 200 });
     }

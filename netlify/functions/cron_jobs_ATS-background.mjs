@@ -9,7 +9,7 @@
 
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -165,7 +165,6 @@ async function fetchSmartRecruiters(src) {
         console.log(`[ats][${src.label}] skip no-applyUrl: "${title}" ref=${it.ref}`);
       }
     } catch (err) {
-      await logFetchError("cron_jobs_ATS-background", { url: it.ref, message: err.message });
       console.error(`[ats][${src.label}] detail fetch failed for "${title}" (${it.id}): ${err.message}`);
     }
 
@@ -251,7 +250,6 @@ export default withTimeout("cron_jobs_ATS-background", async () => {
         collected.push(...mapped);
       } catch (err) {
         anyFetchFailed = true;
-        await logFetchError("cron_jobs_ATS-background", { url: `SR:${src.company}`, message: err.message });
         console.error(`[ats] ${src.label} failed: ${err.message}`);
       }
     }

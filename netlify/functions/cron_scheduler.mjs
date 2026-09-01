@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "2,5,6,7,9,10,11,13,14,17,18,19,21,22,23,25 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,13,14,17,18,19,21,22,23,25,26 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -73,6 +73,15 @@ const GRID = {
   // Futásonként max 20 tenant (ATS_CRAWL_BATCH) → 16 óra × 20 = 320
   // board-lekérés/nap a plafon, akkor is, ha a felderítő több száz tenantot hoz be.
   14: [{ name: "cron_jobs_ATSCRAWL-background" }],   // ats-crawl (19 tenant)
+  // Workable országos feed (2026-08-30, WEB_CRAWLER_PLAN.md F5). NEM tenant-
+  // alapú: egyetlen lapozott kereső-hívás adja az ÖSSZES magyarországi
+  // Workable-hirdetést (08-30-i mérés: 396 hirdetés / 76 cég / 20 lap), a
+  // Budapest-szűrés nálunk fut. A perc a MEGLÉVŐ :00-:32 sávon belül van, tehát
+  // a Neon-számlát nem érinti (a költség a sáv hosszától függ, nem a hívások
+  // számától — ld. CRON_SCHEDULE.md). Host-ütközés nincs: a szomszédos slotok
+  // (:25 ATS-felderítés az ashby/greenhouse/lever API-kon, :28 LinkedIn) más
+  // hostot hívnak.
+  26: [{ name: "cron_jobs_WORKABLE-background" }],  // workable (~400 HU → BP-szűrve)
 };
 
 export default withTimeout("cron_scheduler", async () => {

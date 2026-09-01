@@ -4,13 +4,11 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError } from "./_error-logger.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
-const ENABLE_FETCH_ERROR_LOGGING = false;
 
 // =====================
 // DB
@@ -373,14 +371,8 @@ export async function processLinkedInSources(sources, jobName) {
       } catch (err) {
         if (err instanceof LinkedInBlockedError) {
           console.error(`${jobName}: BLOCKED by LinkedIn (HTTP ${err.status}) at ${p.url} — aborting cron run.`);
-          if (ENABLE_FETCH_ERROR_LOGGING) {
-            await logFetchError(jobName, { url: p.url, message: err.message, extra: { key: p.key, blocked: true } });
-          }
           blocked = true;
           continue;
-        }
-        if (ENABLE_FETCH_ERROR_LOGGING) {
-          await logFetchError(jobName, { url: p.url, message: err.message, extra: { key: p.key } });
         }
         console.error(p.key, "fetch failed:", err.message);
         continue;

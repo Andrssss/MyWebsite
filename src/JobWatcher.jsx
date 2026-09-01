@@ -4,6 +4,11 @@ import { FaEnvelope, FaLinkedin } from "react-icons/fa";
 import { adminFetch, purgeJobListCache, ensureAdminSecret } from "./adminAuth";
 import "./JobWatcher.css";
 import { useJobAccess } from "./JobAccessGate.jsx";
+import {
+  FALLBACK_CATEGORY,
+  UNCATEGORIZED,
+  getCategoriesForJob,
+} from "./lib/categorize.mjs";
 
 const API_BASE_URL = "/.netlify/functions";
 const TIME_RANGE_24H = "24h";
@@ -445,102 +450,13 @@ const getKeywordNotesForJob = (job) => {
 /* =======================
    KATEGÓRIÁK – dynamikusan betöltve az adatbázisból
 ======================= */
-// Kulcsszó → regex. Alapból MINDKÉT oldalon szóhatárt követel, hogy a "qa" ne
-// illeszkedjen a "qatar"-ra. A magyar viszont ragoz és összetesz, ezért a
-// kulcsszó `*`-gal jelölheti, hol NEM kell szóhatár:
-//   "fejlesztő"   → csak önálló szóként   (Webfejlesztő ✗, fejlesztőt ✗)
-//   "fejleszt*"   → előtagként            (fejlesztőt ✓, Webfejlesztő ✗)
-//   "*fejleszt*"  → bárhol a szóban       (Webfejlesztő ✓, Algoritmusfejlesztő ✓)
-// A `*` nélküli kulcsszavak viselkedése változatlan, tehát a meglévő ~465
-// kulcsszó közül egy sem illeszkedik másképp, mint eddig.
-function kwRegex(kw) {
-  const openLeft = kw.startsWith("*");
-  const openRight = kw.endsWith("*");
-  const core = kw.replace(/^\*/, "").replace(/\*$/, "");
-  // Csupa `*` kulcsszó mindenre illeszkedne — inkább semmire se.
-  if (!core) return /(?!)/;
-  const escaped = core.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const left = openLeft ? "" : "(^|[^a-z0-9])";
-  const right = openRight ? "" : "([^a-z0-9]|$)";
-  return new RegExp(`${left}${escaped}${right}`, "i");
-}
-
-// A két gyűjtő-kategória neve. Az első a DB-ben is így hívják (a legyengébb
-// prioritású kategória: "fejlesztő, de semmi konkrétabb nem derült ki a
-// címből"), a második nem DB-kategória, hanem a "semmire sem illeszkedett"
-// halom neve a felületen.
-const FALLBACK_CATEGORY = "Egyéb fejlesztő";
-const UNCATEGORIZED = "Nem kategorizált";
-
-// Kategória-prioritás (erős → gyenge) — CSAK VÉGSŐ TIE-BREAK: a fenti egyedi
-// szabályok után, ha még mindig több kategória maradt, ez választ közülük egyet.
-// A szabályokat NEM írja felül, csak a maradék többértelműséget oldja fel, hogy
-// egy állás pontosan egy kategóriába kerüljön. Új kategóriát ide is érdemes
-// felvenni; a listán kívüli a leggyengébb prioritást kapja.
-const CATEGORY_PRIORITY = [
-  "DevOps", "Security", "Data / AI", "Elemző / Analyst",
-  "QA / Tesztelő", "Mobil", "Menedzser / PM", "UX/UI Design", "Webfejlesztés",
-  "Hardware", "Mérnöki / Gyártás", "Hálózat / Infra", FALLBACK_CATEGORY,
-];
-const categoryRank = (c) => {
-  const i = CATEGORY_PRIORITY.indexOf(c);
-  return i === -1 ? CATEGORY_PRIORITY.length : i;
-};
-const collapseByPriority = (cats) => {
-  if (cats.length <= 1) return cats;
-  return [[...cats].sort((a, b) => categoryRank(a) - categoryRank(b))[0]];
-};
-
-const getCategoriesForJob = (job, jobCategories) => {
-  if (!job.title || !jobCategories.length) return [];
-  const title = job.title.toLowerCase();
-  const matches = jobCategories
-    .filter(([, keywords]) => keywords.some((kw) => kwRegex(kw.toLowerCase()).test(title)))
-    .map(([cat]) => cat);
-  // Az alábbi két kemény szabály a kulcsszavak MEGKERÜLÉSÉVEL sorol be. Ez a
-  // legtöbb esetben jó, de nem szabad felülírnia egy konkrét szakma-találatot:
-  // a "SOC Analyst" security-s, a "test analyst" tesztelő, a "UX Designer – AI
-  // experiences" pedig UX-es. Ezért ha a cím ezek valamelyikét konkrétan
-  // megnevezte, a kemény szabályok kimaradnak, és a normál sorrend dönt.
-  const STRONG_CATEGORIES = ["Security", "QA / Tesztelő", "UX/UI Design"];
-  const hasStrongMatch = matches.some((c) => STRONG_CATEGORIES.includes(c));
-
-  // Ha a title tartalmaz "analyst" vagy "elemző" → Elemző / Analyst (keywords-től függetlenül)
-  if (!hasStrongMatch && (title.includes("analyst") || title.includes("elemző"))) {
-    return ["Elemző / Analyst"];
-  }
-  // Ha a title-ben különálló szóként szerepel "AI" → Data / AI (keywords-től függetlenül).
-  // DE csak ha az AI a szakterület, nem ha csak jelző: az "AI-assisted developer"
-  // fejlesztő, aki AI-t HASZNÁL, nem AI-fejlesztő.
-  const aiIsModifier =
-    /(^|[^a-z0-9])ai[-\s](assisted|enabled|native|powered|empowered|driven|first|asszisztált|asszisztalt|alapú|alapu|támogatott|tamogatott)/i.test(job.title);
-  if (!hasStrongMatch && !aiIsModifier && /(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(job.title)) {
-    return ["Data / AI"];
-  }
-  // Ha több kategória matchelt, az egyik Elemző / Analyst, és a title tartalmaz "analyst"/"elemző" → csak Elemző / Analyst
-  if (!hasStrongMatch && matches.length > 1 && matches.includes("Elemző / Analyst") && (title.includes("analyst") || title.includes("elemző"))) {
-    return ["Elemző / Analyst"];
-  }
-  // Ha több kategória matchelt és az egyik DevOps → csak DevOps
-  if (matches.length > 1 && matches.includes("DevOps")) {
-    return ["DevOps"];
-  }
-  // Egyéb fejlesztő a leggyengébb prioritás: ha bármi más is matchelt, az nyerjen (így Hálózat/Infra és Mérnöki/Gyártás is erősebb nála)
-  const withoutFallback = matches.filter((c) => c !== FALLBACK_CATEGORY);
-  const effective = withoutFallback.length > 0 ? withoutFallback : matches;
-  // Hálózat / Infra alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
-  let result;
-  if (effective.length > 1 && effective.includes("Hálózat / Infra")) {
-    result = effective.filter((c) => c !== "Hálózat / Infra");
-  } else if (effective.length > 1 && effective.includes("Mérnöki / Gyártás")) {
-    // Mérnöki / Gyártás alacsony prioritású (de Fejlesztőnél erősebb): ha más nem-Fejlesztő is matchelt, az nyerjen
-    result = effective.filter((c) => c !== "Mérnöki / Gyártás");
-  } else {
-    result = effective;
-  }
-  // VÉGSŐ tie-break: ha a fenti szabályok után IS több kategória maradt, a prioritás dönt → egy kategória.
-  return collapseByPriority(result);
-};
+// A besorolás (cím → pontosan egy kategória) a közös `src/lib/categorize.mjs`-ben
+// lakik — ugyanaz a modul, amit a `netlify/functions/_stats_core.mjs` is használ,
+// és ami az `allasfigyelo` (pestidev.hu) repo `app/lib/categorize.ts`-ének 1-1
+// portja. **User-döntés 2026-09-01: a publikus oldal a referencia**, itt nem
+// tartunk külön másolatot — korábban három példány élt és mind szétcsúszott.
+// Ha ott változik a szabály, a közös modult kell frissíteni, és utána
+// újraépíteni a statisztikát.
 
 // A teljes Források/Kategóriák/Technológiák blokk FÖLÖTT mindig látható,
 // egyetlen közös csík az összes aktív (selected/excluded) szűrőből — akkor

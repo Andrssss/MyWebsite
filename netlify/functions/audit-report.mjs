@@ -2,7 +2,7 @@
 //
 // Where the two weekly AUDIT ROUTINES submit their results, and where the hidden
 // /allasfigyelo/audit page reads them. Netlify Blobs (same pattern as
-// ai-registry / fetch-error-logs) — one small JSON doc per routine, no schema
+// ai-registry / recovery-logs) — one small JSON doc per routine, no schema
 // migration, and it keeps a rolling weekly history.
 //
 //   POST /audit-report   (bearer)   body: { routine, summary?, findings?, ... }

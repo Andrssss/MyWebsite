@@ -205,8 +205,8 @@ invariants from `CLAUDE.md` and they are non-negotiable:
 - **`reconcileActive(client, 'AI - <site>', foundUrls, { complete })`** at the end of a *complete* run —
   reactivates re-seen rows, deactivates aged-out ones. Pass `complete:false` on any partial/failed
   fetch so a broken run can never mass-deactivate (same rule as every other scraper).
-- **`withTimeout("cron_jobs_AI-background", …)`** wrapper so failures land in the `fetch-error-logs`
-  blob instead of dying silently.
+- **`withTimeout("cron_jobs_AI-background", …)`** wrapper so failures land in the Netlify
+  function log instead of dying silently.
 - **Senior filter** (`loadFilters` + the title blacklist) and **company blocklist**
   (`_company_blocklist.mjs`, per-source list) applied before upsert, exactly like `ALLASPORTAL`.
   The `foundUrls` passed to reconcile must be the **full** pre-filter set (F3 rule) so a filter change

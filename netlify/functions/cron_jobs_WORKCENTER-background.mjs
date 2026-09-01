@@ -48,7 +48,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isInternshipTitle, extractYearsFromText } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -271,7 +271,6 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
           break;
         }
         fetchFailed++;
-        await logFetchError("cron_jobs_WORKCENTER-background", { url: apiUrl, message: err.message });
         console.error(`[workcenter] page ${page} fetch failed: ${err.message}`);
         break;
       }

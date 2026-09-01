@@ -13,7 +13,7 @@
 
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -137,10 +137,6 @@ export default withTimeout("cron_jobs_CG-background", async () => {
       try {
         payload = await fetchPage(page);
       } catch (err) {
-        await logFetchError("cron_jobs_CG-background", {
-          url: `${API_BASE}?location=${encodeURIComponent(LOCATION)}&page=${page}&size=${PAGE_SIZE}`,
-          message: err.message,
-        });
         console.error(`[cg-jobstream] page ${page} fetch failed: ${err.message}`);
         crawlError = true;
         break;

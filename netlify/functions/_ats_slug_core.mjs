@@ -120,9 +120,25 @@ const URL_PATTERNS = [
   { provider: "greenhouse", re: /^https?:\/\/(?:job-)?boards(?:-api)?\.(?:eu\.)?greenhouse\.io\/(?:embed\/job_board\?for=)?([^/?#]+)/i },
   { provider: "greenhouse", re: /^https?:\/\/job-boards\.(?:eu\.)?greenhouse\.io\/([^/?#]+)/i },
   { provider: "lever", re: /^https?:\/\/jobs\.(?:eu\.)?lever\.co\/([^/?#]+)/i },
+  // Recruitee: a tenant a HOST első címkéje, nem az útvonal első szegmense
+  // (blackbelt.recruitee.com/o/<hirdetés>). A cég saját domainje
+  // (karrier.blackbelt.hu) SZÁNDÉKOSAN nincs itt: abból nem olvasható ki a
+  // recruitee-slug, tehát learatni sem tudnánk a boardot.
+  { provider: "recruitee", re: /^https?:\/\/([^./]+)\.recruitee\.com\//i },
+  // Personio: szintén host-címke a tenant, és MINDKÉT platform-host ugyanazt a
+  // boardot szolgálja ki (`.jobs.personio.de` és `.jobs.personio.com` — élőben
+  // mérve bájtazonos), tehát a felismerésnek mindkettőt el kell fogadnia.
+  { provider: "personio", re: /^https?:\/\/([^./]+)\.jobs\.personio\.(?:com|de)\//i },
   { provider: "smartrecruiters", re: /^https?:\/\/jobs\.smartrecruiters\.com\/([^/?#]+)/i },
   { provider: "smartrecruiters", re: /^https?:\/\/careers\.smartrecruiters\.com\/([^/?#]+)/i },
 ];
+
+/* Workday: a tenantot HÁROM adat azonosítja (tenant + wdN + site), és
+   mindhárom ott van a hirdetés url-jében — a locale-szegmens opcionális
+   ("…/en-US/External/job/…" és "…/SanofiCareers/job/…" is előfordul a saját
+   sorainkban). Ezért nem fér bele a fenti egy-capture-ös mintába. A slug-alak
+   ugyanaz, amit a _ats_providers.mjs parseWorkdaySlug-ja vár. */
+const WORKDAY_URL = /^https?:\/\/([a-z0-9][a-z0-9-]*)\.(wd\d+)\.myworkdayjobs\.com\/(?:[a-z]{2}-[A-Za-z]{2}\/)?([A-Za-z0-9_-]+)\/job\//i;
 
 // A greenhouse `embed/job_board?for=X` alak query-ben hozza a slugot.
 const GH_EMBED = /^https?:\/\/boards\.(?:eu\.)?greenhouse\.io\/embed\/job_board\?for=([^&#]+)/i;
@@ -138,6 +154,13 @@ export function parseAtsUrl(rawUrl) {
   const embed = url.match(GH_EMBED);
   if (embed) return { provider: "greenhouse", slug: decodeURIComponent(embed[1]).toLowerCase() };
 
+  // Külön ág, mert a lenti ciklus mindent lowercase-el, a site nevét viszont
+  // eredeti alakban tartjuk meg. (A cxs-API maga kis-nagybetű-tűrő — élőben
+  // mérve External/external/EXTERNAL mind 200 —, de a tárolt PUBLIKUS url a
+  // board saját alakja legyen, ne a mi átírásunk.)
+  const wd = url.match(WORKDAY_URL);
+  if (wd) return { provider: "workday", slug: `${wd[1].toLowerCase()}.${wd[2].toLowerCase()}:${wd[3]}` };
+
   for (const { provider, re } of URL_PATTERNS) {
     const m = url.match(re);
     if (!m) continue;
@@ -152,16 +175,37 @@ export function parseAtsUrl(rawUrl) {
 
 /* ── próbálkozás ─────────────────────────────────────────────────── */
 
-// Csak ezeken tippelünk: mindhárom tiszta 404-et ad nemlétező slugra, tehát a
+// Csak ezeken tippelünk: mind tiszta 404-et ad nemlétező slugra, tehát a
 // negatív válasz is információ. A smartrecruiters szándékosan kimarad (lásd a
-// fájl fejlécét).
-export const PROBEABLE_PROVIDERS = ["ashby", "greenhouse", "lever"];
+// fájl fejlécét) — oda a globális kereső hozza a tenantokat.
+//
+// A recruitee 2026-08-30-án került be (élő mérés: nemlétező tenant →
+// 404 `{"error":"Not Found"}`). FONTOS: a jelölt-tábla ekkor már ki volt
+// merítve (mind a ~2300 slug lepróbálva a másik hármon), ezért a felderítő
+// PROVIDERENKÉNT könyveli, mit próbált már — különben egyetlen régi jelöltet
+// sem néznénk meg az új provideren, és az egész bővítés csak a jövőbeli új
+// cégnevekre hatna. Ld. cron_ats_discover-background.mjs `probed_providers`.
+export const PROBEABLE_PROVIDERS = ["ashby", "greenhouse", "lever", "recruitee", "personio"];
+
+const HOST_SLUG = /^[a-z0-9][a-z0-9-]*$/i;
 
 const PROBE_URL = {
   ashby: (s) => `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(s)}`,
   greenhouse: (s) => `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(s)}/jobs`,
   lever: (s) => `https://api.lever.co/v0/postings/${encodeURIComponent(s)}?mode=json`,
+  // A slug itt hostnév-részlet: a nem slug-alakú jelöltet meg sem próbáljuk.
+  recruitee: (s) => (HOST_SLUG.test(s) ? `https://${s}.recruitee.com/api/offers/` : null),
+  personio: (s) => (HOST_SLUG.test(s) ? `https://${s}.jobs.personio.com/xml` : null),
 };
+
+/* Providerenkénti "ez cáfolat, nem hiba" státuszok.
+   A personio ISMERETLEN aldomainre 429-et ad, nem 404-et (élőben mérve
+   2026-08-30: ugyanabban a másodpercben egy létező tenant 200-at adott, tehát
+   nem throttling). Enélkül minden személytelen personio-jelölt "error"-ként
+   ülne a táblában, és a 7 naponkénti újrapróbálás ÖRÖKRE elenné a napi
+   próba-keretet. A kockázat vállalt és tudatos: egy VALÓDI rate limit
+   pillanatában egy létező tenant is "miss"-re állna. */
+const PROBE_MISS_STATUS = { personio: [404, 429] };
 
 /**
  * Létezik-e ez a board? HEAD helyett GET, mert a három API közül kettő HEAD-re
@@ -173,12 +217,17 @@ const PROBE_URL = {
 export async function probeSlug(provider, slug, { timeoutMs = 15000 } = {}) {
   const build = PROBE_URL[provider];
   if (!build) return "error";
+  const url = build(slug);
+  // A provider maga mondta meg, hogy erre a slugra nem is értelmes a kérdés
+  // (pl. recruitee + hostnévbe nem illő karakterek) — ez cáfolat, nem hiba.
+  if (!url) return "miss";
   try {
-    const res = await fetch(build(slug), {
+    const res = await fetch(url, {
       headers: { "User-Agent": "JobWatcher/1.0 (+https://bakan7.netlify.app)", Accept: "application/json" },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (res.status === 404) return "miss";
+    if ((PROBE_MISS_STATUS[provider] || []).includes(res.status)) return "miss";
     if (!res.ok) return "error"; // 429/5xx → nem cáfolat, később újrapróbálható
     return "hit";
   } catch {

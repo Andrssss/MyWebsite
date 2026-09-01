@@ -109,7 +109,7 @@ import { Pool } from "pg";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isItJob } from "./_ai_ingest_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
@@ -375,7 +375,6 @@ async function walkSlice(slug, jar, { listUrl = sliceUrl(slug), maxPages = MAX_L
     items.push(...cards);
     if (!next) naturalEnd = true;
   } catch (err) {
-    await logFetchError("cron_jobs_ALLLOCALJOBS-background", { url: listUrl, message: err.message });
     console.error(`[alllocaljobs] ${slug} page 1 failed: ${err.message}`);
     return { items, complete: false };
   }
@@ -397,7 +396,6 @@ async function walkSlice(slug, jar, { listUrl = sliceUrl(slug), maxPages = MAX_L
       next = parseNextParams(body);
       if (!next) naturalEnd = true;
     } catch (err) {
-      await logFetchError("cron_jobs_ALLLOCALJOBS-background", { url: `${slug} vacancy-search/next page=${next.page}`, message: err.message });
       console.error(`[alllocaljobs] ${slug} page ${next.page} failed: ${err.message}`);
       return { items, complete: false };
     }
@@ -583,7 +581,7 @@ async function scrapeAlllocaljobs(client) {
         if (item.experience === "-") item.experience = extractBodyExperience(detailBody) || "-";
         item.technologies = extractTechnologies(detailBody);
       } catch (err) {
-        await logFetchError("cron_jobs_ALLLOCALJOBS-background", { url: item.url, message: `detail: ${err.message}` });
+        console.warn(`[alllocaljobs] detail fetch failed: ${item.url} — ${err.message}`);
       }
     }
 

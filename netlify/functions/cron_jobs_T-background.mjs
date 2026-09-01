@@ -10,7 +10,7 @@ import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
@@ -285,7 +285,6 @@ async function fetchAllTalentJobs() {
       try {
         html = await fetchText(pageUrl);
       } catch (err) {
-        await logFetchError("cron_jobs_T", { url: pageUrl, message: err.message, extra: { source: "talent" } });
         console.log(`talent: failed ${pageUrl}: ${err.message}`);
         stopReason = "fetch-error";
         complete = false;
@@ -372,7 +371,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
           if (job.experience === "-") job.experience = extractTalentExperience(normalizedHtml) || "-";
           job.technologies = extractTechnologies(normalizedHtml);
         } catch (err) {
-          await logFetchError("cron_jobs_T", { url: job.url, message: err.message, extra: { source: "talent" } });
+          console.warn(`[talent] detail fetch failed: ${job.url} — ${err.message}`);
         }
       }
       if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;

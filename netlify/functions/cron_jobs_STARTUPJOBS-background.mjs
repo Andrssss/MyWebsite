@@ -41,7 +41,7 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { loadFilters } from "./load_filters.mjs";
-import { logFetchError, withTimeout } from "./_error-logger.mjs";
+import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceDupe } from "./_cross_source_dupe.mjs";
 import {
@@ -224,7 +224,6 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
         result = await getJson(pageUrl);
       } catch (err) {
         fetchFailed = true;
-        await logFetchError("cron_jobs_STARTUPJOBS-background", { url: pageUrl, message: err.message });
         console.error(`[startupjobs] page ${page} fetch failed: ${err.message}`);
         break;
       }
