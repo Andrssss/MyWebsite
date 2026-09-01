@@ -34,6 +34,11 @@
 
 import pkg from "pg";
 const { Pool } = pkg;
+// Az import önmagában nem használt: `_db_audit.js` CommonJS-ből `require`-öli a
+// @netlify/blobs-ot, amit az esbuild NEM lát a bundle-be — enélkül a függvény
+// már a betöltéskor elszáll ("Cannot find module '@netlify/blobs'"). Egy
+// explicit ESM-import viszont behúzza. Ugyanez a minta a tmp-stats-rebuild-ben.
+import "@netlify/blobs";
 import { extractTechnologies, fetchText, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { withDbAuditFlush } from "./_db_audit.js";
 
