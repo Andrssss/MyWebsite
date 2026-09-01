@@ -96,7 +96,7 @@ export default async (req) => {
     // hirdetés-url megléte a bizonyíték.
     const probeMiss = [];
     const probeError = [];
-    for (const [key, t] of confirmed) {
+    for (const [key, t] of toRegister) {
       if (!PROBEABLE_PROVIDERS.includes(t.provider)) continue;
       const r = await probeSlug(t.provider, t.slug);
       if (r === "miss") probeMiss.push(key);
@@ -128,7 +128,7 @@ export default async (req) => {
     if (dry) return json(200, plan);
 
     const registered = [];
-    for (const [key, t] of toRegister) {
+    for (const [key, t] of confirmed) {
       if (await registerAtsTenant(client, { ...t, via: "ai-handoff-backfill" })) registered.push(key);
     }
 
