@@ -93,6 +93,9 @@ const QUERY_BANK = [
   "site:jobs.smartrecruiters.com Budapest",
   "site:jobs.ashbyhq.com gyakornok",
   "site:job-boards.greenhouse.io \"Budapest, Hungary\" engineer",
+  "site:teamtailor.com Budapest",
+  "site:teamtailor.com Magyarország",
+  "site:bamboohr.com/careers Budapest",
 ];
 
 // Napi rotáció: a routine nem tárol állapotot futások között, tehát ha mindig a

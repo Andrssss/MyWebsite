@@ -131,6 +131,11 @@ const URL_PATTERNS = [
   { provider: "personio", re: /^https?:\/\/([^./]+)\.jobs\.personio\.(?:com|de)\//i },
   { provider: "smartrecruiters", re: /^https?:\/\/jobs\.smartrecruiters\.com\/([^/?#]+)/i },
   { provider: "smartrecruiters", re: /^https?:\/\/careers\.smartrecruiters\.com\/([^/?#]+)/i },
+  // BambooHR és Teamtailor: mint a recruitee/personio, a tenant a HOST első
+  // címkéje, nem az útvonal első szegmense (<slug>.bamboohr.com/careers/…,
+  // <slug>.teamtailor.com/jobs/…).
+  { provider: "bamboohr", re: /^https?:\/\/([^./]+)\.bamboohr\.com\//i },
+  { provider: "teamtailor", re: /^https?:\/\/([^./]+)\.teamtailor\.com\//i },
 ];
 
 /* Workday: a tenantot HÁROM adat azonosítja (tenant + wdN + site), és
@@ -185,7 +190,9 @@ export function parseAtsUrl(rawUrl) {
 // PROVIDERENKÉNT könyveli, mit próbált már — különben egyetlen régi jelöltet
 // sem néznénk meg az új provideren, és az egész bővítés csak a jövőbeli új
 // cégnevekre hatna. Ld. cron_ats_discover-background.mjs `probed_providers`.
-export const PROBEABLE_PROVIDERS = ["ashby", "greenhouse", "lever", "recruitee", "personio"];
+export const PROBEABLE_PROVIDERS = [
+  "ashby", "greenhouse", "lever", "recruitee", "personio", "bamboohr", "teamtailor",
+];
 
 const HOST_SLUG = /^[a-z0-9][a-z0-9-]*$/i;
 
@@ -196,6 +203,8 @@ const PROBE_URL = {
   // A slug itt hostnév-részlet: a nem slug-alakú jelöltet meg sem próbáljuk.
   recruitee: (s) => (HOST_SLUG.test(s) ? `https://${s}.recruitee.com/api/offers/` : null),
   personio: (s) => (HOST_SLUG.test(s) ? `https://${s}.jobs.personio.com/xml` : null),
+  bamboohr: (s) => (HOST_SLUG.test(s) ? `https://${s}.bamboohr.com/careers/list` : null),
+  teamtailor: (s) => (HOST_SLUG.test(s) ? `https://${s}.teamtailor.com/jobs` : null),
 };
 
 /* Providerenkénti "ez cáfolat, nem hiba" státuszok.
@@ -204,8 +213,14 @@ const PROBE_URL = {
    nem throttling). Enélkül minden személytelen personio-jelölt "error"-ként
    ülne a táblában, és a 7 naponkénti újrapróbálás ÖRÖKRE elenné a napi
    próba-keretet. A kockázat vállalt és tudatos: egy VALÓDI rate limit
-   pillanatában egy létező tenant is "miss"-re állna. */
-const PROBE_MISS_STATUS = { personio: [404, 429] };
+   pillanatában egy létező tenant is "miss"-re állna.
+   A bamboohr NEM 404-gyel válaszol nemlétező tenantra, hanem 302-vel a
+   marketingoldalra (ld. _ats_providers.mjs fejléce) — ezért ide a redirect-
+   státuszok kellenek, ÉS a lenti probeSlug-nak `redirect:"manual"`-lal kell
+   hívnia (különben a fetch automatikusan követné a 302-t, és egy 200-as
+   marketingoldalt kapnánk vissza "hit"-ként). */
+const PROBE_MISS_STATUS = { personio: [404, 429], bamboohr: [301, 302, 303, 307, 308] };
+const PROBE_MANUAL_REDIRECT = new Set(["bamboohr"]);
 
 /**
  * Létezik-e ez a board? HEAD helyett GET, mert a három API közül kettő HEAD-re
@@ -225,6 +240,7 @@ export async function probeSlug(provider, slug, { timeoutMs = 15000 } = {}) {
     const res = await fetch(url, {
       headers: { "User-Agent": "JobWatcher/1.0 (+https://bakan7.netlify.app)", Accept: "application/json" },
       signal: AbortSignal.timeout(timeoutMs),
+      ...(PROBE_MANUAL_REDIRECT.has(provider) ? { redirect: "manual" } : {}),
     });
     if (res.status === 404) return "miss";
     if ((PROBE_MISS_STATUS[provider] || []).includes(res.status)) return "miss";

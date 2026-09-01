@@ -108,6 +108,10 @@ const SEED_TENANTS = [
   // jelölt sorra kerül a több ezres újrapróbálási backlogban — ez a sor
   // ad neki azonnal egy bizonyítottan magyar hirdetéses recruitee-boardot.
   { provider: "recruitee", slug: "blackbelt", company: "BlackBelt Technology" },
+  // Teamtailor (2026-09-01, a provider felvételekor élőben igazolt): a
+  // felderítő magától is megtalálná, de ez ad neki azonnal egy bizonyítottan
+  // magyar hirdetéses boardot, mielőtt a slug-jelöltek sorára kerülne.
+  { provider: "teamtailor", slug: "kpmgglobalservices", company: "KPMG Global Services Hungary" },
   // Personio (2026-08-30): 76 magyar cég-slug lepróbálásából ez a két találat.
   // A teliogroup budapesti IT-hirdetéseket ad; a szallas ma Miskolc/Cluj, tehát
   // a helyszín-kapun elvérzik — mégis bent marad, mert holnap nyithat budapestit,

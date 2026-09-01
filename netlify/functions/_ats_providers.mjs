@@ -658,7 +658,190 @@ const personio = {
   async detail() { return null; },
 };
 
-export const PROVIDERS = { ashby, greenhouse, lever, smartrecruiters, recruitee, workday, personio };
+/* ── BambooHR ─────────────────────────────────────────────────────────
+   Élő mérés 2026-09-01 (curl, valós ügyfél-tenant: amacon):
+    • Lista: `https://<slug>.bamboohr.com/careers/list` — publikus, hitelesítés
+      nélküli JSON, EGY körben az összes nyitott pozícióval (`meta.totalCount`
+      == a `result` tömb hossza, nincs lapozás). A leírás NEM jön vele.
+    • Detail: `https://<slug>.bamboohr.com/careers/<id>/detail` — a teljes
+      leírás NYERS HTML-ként (nem entitáskódolva, ellentétben a greenhouse-zal),
+      tehát decodeEntities nem kell rá.
+    • Nemlétező tenant: a `careers/list` NEM 404-et ad, hanem 302-t a
+      `https://www.bamboohr.com` marketingoldalra (`redirect:"manual"`-lal
+      igazolva — automata redirect-követéssel ez egy 200 HTML lenne, tehát a
+      `res.json()` values félrevezető hibával bukna). Ezért a lista-hívás
+      MANUÁLIS redirect-tel megy, és bármilyen 3xx = nincs ilyen tenant.
+    • Nemlétező job-id VALÓDI tenanton viszont tiszta 404 JSON-t ad a detail-
+      végponton (`{"type":"not_found",...}`) — ott a megszokott HttpError-ág jó.
+    • Cégnév: a payload nem hozza; a `<slug>.bamboohr.com/careers` oldal
+      `og:site_name` meta tagje adja pontosan (élőben igazolt: "Amacon"). */
+const BAMBOOHR_FETCH_TIMEOUT = FETCH_TIMEOUT_MS;
+
+async function bamboohrListRaw(slug) {
+  const res = await fetch(`https://${encodeURIComponent(slug)}.bamboohr.com/careers/list`, {
+    redirect: "manual",
+    headers: { "User-Agent": UA, Accept: "application/json" },
+    signal: AbortSignal.timeout(BAMBOOHR_FETCH_TIMEOUT),
+  });
+  // 3xx = a nemlétező tenant a marketingoldalra redirectel — sosem a board maga.
+  if (res.status >= 300 && res.status < 400) return null;
+  if (!res.ok) throw new HttpError(res.status, res.url);
+  return res.json();
+}
+
+function companyFromMeta(html, property) {
+  const re = new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']*)["']`, "i");
+  const m = html.match(re);
+  if (!m) return null;
+  const name = clean(decodeEntities(m[1]));
+  return name || null;
+}
+
+async function companyFromOgSiteName(url) {
+  let html;
+  try {
+    html = await fetchText(url);
+  } catch {
+    return null;
+  }
+  return companyFromMeta(html, "og:site_name");
+}
+
+const bamboohr = {
+  id: "bamboohr",
+  detectsMissingTenant: true,
+  async list(slug) {
+    const data = await bamboohrListRaw(slug);
+    if (data === null) return { notFound: true, jobs: [] };
+    const jobs = (data?.result || [])
+      .filter((j) => j && j.id && j.jobOpeningName)
+      .map((j) => ({
+        title: clean(j.jobOpeningName),
+        url: `https://${encodeURIComponent(slug)}.bamboohr.com/careers/${j.id}`,
+        location: joinLocations(j?.location?.city, j?.location?.state),
+        company: null,
+        descriptionHtml: null,
+        detailRef: `https://${encodeURIComponent(slug)}.bamboohr.com/careers/${j.id}/detail`,
+      }));
+    return { notFound: false, jobs };
+  },
+  async detail(job) {
+    const d = await fetchJson(job.detailRef);
+    return d?.result?.jobOpening?.description || null;
+  },
+  async companyName(slug) {
+    return companyFromOgSiteName(`https://${encodeURIComponent(slug)}.bamboohr.com/careers`);
+  },
+};
+
+/* ── Teamtailor ───────────────────────────────────────────────────────
+   Élő mérés 2026-09-01 (curl, valós magyar tenant: kpmgglobalservices):
+    • NINCS publikus JSON lista-API kulcs nélkül (a hivatalos api.teamtailor.com
+      céges API-tokent kér) — a `/jobs` oldal viszont szerveroldalon renderelt
+      HTML (nem puszta SPA-shell), és a hirdetés-linkek (`/jobs/<id>-<szlug>`)
+      MINDIG jelen vannak benne, mert ez routing, nem téma. A lista-kártya
+      körüli szöveg (cím + részleg + helyszín) a beépített "Jobs list" blokk
+      markup-ja — ha egy tenant más blokk-elrendezést használ, a `title`/
+      `location` mezők üresen maradnak ARRA a tenantra, ami fail-closed módon
+      egyszerűen "nincs magyar hirdetés"-ként landol (ld. _ats_location.mjs),
+      nem hibázik és nem hoz be szemetet.
+    • A hirdetés-oldal FEJLÉCÉBEN van egy szabványos schema.org JobPosting
+      `application/ld+json` blokk — ez SEO-metaadat, a témától függetlenül
+      stabil. `hiringOrganization.name`-je a cégnév, `description`-je a teljes
+      leírás (entitáskódolt HTML, mint a greenhouse `content`-je). A nyers
+      JSON-ban a leírás-mezőben literál sortörések vannak (nem `\n`-escape-elve)
+      → `JSON.parse` control-character hibával bukna, ezért a sortörést előbb
+      szóközre cseréljük.
+    • Nemlétező tenant → tiszta 404 a `/jobs` oldalon (élőben igazolt).
+    • Cégnév a listaoldal `og:site_name` meta tagjéből (ugyanaz a minta, mint
+      BambooHR-nél) — nem kell külön JSON-LD-fetch a cégnév-feloldáshoz. */
+const TT_JOB_LINK_RE = /href="(https:\/\/[a-z0-9-]+\.teamtailor\.com\/jobs\/(\d+)-([a-z0-9-]+))"/gi;
+const TT_META_DIV_RE = /class="[^"]*mt-1 text-md[^"]*">([\s\S]*?)<\/div>/;
+const TT_TITLE_ATTR_RE = /title="([^"]+)"/;
+const TT_ALT_IMG_RE = /alt="([^"]+?)\s*image"/i;
+
+function teamtailorParseListing(html) {
+  const matches = [...html.matchAll(TT_JOB_LINK_RE)];
+  const seen = new Set();
+  const jobs = [];
+  for (let i = 0; i < matches.length; i += 1) {
+    const m = matches[i];
+    const id = m[2];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const start = m.index;
+    const end = i + 1 < matches.length ? matches[i + 1].index : Math.min(html.length, start + 4000);
+    const segment = html.slice(start, end);
+    const titleAttr = segment.match(TT_TITLE_ATTR_RE);
+    const altImg = segment.match(TT_ALT_IMG_RE);
+    const title = titleAttr
+      ? clean(decodeEntities(titleAttr[1]))
+      : (altImg ? clean(decodeEntities(altImg[1])) : null);
+    const metaDiv = segment.match(TT_META_DIV_RE);
+    const location = metaDiv
+      ? clean(decodeEntities(metaDiv[1].replace(/<[^>]+>/g, " ").replace(/&middot;/g, " ")))
+      : "";
+    jobs.push({ url: m[1], title, location });
+  }
+  return jobs;
+}
+
+function teamtailorExtractJobPosting(html) {
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  for (const b of blocks) {
+    const raw = b[1].replace(/[\r\n\t]+/g, " ");
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (data && data["@type"] === "JobPosting") return data;
+  }
+  return null;
+}
+
+const teamtailor = {
+  id: "teamtailor",
+  detectsMissingTenant: true,
+  async list(slug) {
+    let html;
+    try {
+      html = await fetchText(`https://${encodeURIComponent(slug)}.teamtailor.com/jobs`);
+    } catch (err) {
+      if (err.status === 404) return { notFound: true, jobs: [] };
+      throw err;
+    }
+    const jobs = teamtailorParseListing(html)
+      .filter((j) => j.title && j.url)
+      .map((j) => ({
+        title: j.title,
+        url: j.url,
+        location: j.location,
+        company: null,
+        descriptionHtml: null,
+        detailRef: j.url,
+      }));
+    return { notFound: false, jobs };
+  },
+  async detail(job) {
+    let html;
+    try {
+      html = await fetchText(job.detailRef);
+    } catch {
+      return null;
+    }
+    const posting = teamtailorExtractJobPosting(html);
+    return posting?.description ? decodeEntities(String(posting.description)) : null;
+  },
+  async companyName(slug) {
+    return companyFromOgSiteName(`https://${encodeURIComponent(slug)}.teamtailor.com/jobs`);
+  },
+};
+
+export const PROVIDERS = {
+  ashby, greenhouse, lever, smartrecruiters, recruitee, workday, personio, bamboohr, teamtailor,
+};
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS);
 
