@@ -96,6 +96,28 @@ function isSeniorLike(title) {
   return shouldSkipTitleFilter(title, _filters);
 }
 
+// Az Erste a POZÍCIÓ mögé odaírja a foglalkoztató jogi entitását is:
+// "DevOps mérnök - Befektetési Zrt.", "Front alkalmazás üzemeltető ... -
+// Befektetési Zrt.".  A `job_filters` viszont egy közös, szóhatáros CÍM-
+// denylist, és van benne egy csupasz "Befektetesi" szó (nyilván a
+// "Befektetési tanácsadó" típusú nem-IT sorokra) — ez a cégnév-utótagon
+// keresztül MINDEN Befektetési Zrt.-s hirdetést megölt, a pozíciótól
+// függetlenül.  Élő bizonyíték 2026-09-01: a szűrt jsbq API visszaadja a
+// "DevOps mérnök - Befektetési Zrt." (id 8967) és a "Front alkalmazás
+// üzemeltető és adatbázis kezelő munkatárs - Befektetési Zrt." (8972) sort is,
+// a job_posts-ban egyik sincs benne — és a DB-ben EGYETLEN sor sincs, aminek a
+// címében szerepelne a szó, egyik forrásból sem.
+// Ugyanaz a szerkezeti hiba, mint a wherewework dátum-utótagjánál
+// (cleanWhereweworkTitle): a címhez ragasztott, nem-pozíció rész a denylistet
+// eteti.  A javítás is ugyanaz — a cégnév-utótagot a denylist-ellenőrzés ELŐTT
+// levágjuk.  A TÁROLT cím érintetlen marad (a "- Befektetési Zrt." infó),
+// és a valódi "Befektetési tanácsadó" sorokat továbbra is kidobja a szó.
+const ENTITY_SUFFIX_RE = /\s*[-–—]\s*[^-–—]*\b(?:zrt|nyrt|kft|bt)\b\.?\s*$/i;
+function titleForFilters(title) {
+  const stripped = String(title || "").replace(ENTITY_SUFFIX_RE, "").trim();
+  return stripped || title;
+}
+
 function postForm(url, body) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
@@ -247,7 +269,7 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
         // (user-döntés 2026-07-20). Az explicit tapasztalat-sáv ("5 év fölött")
         // NEM dob többé: elmentjük, az experience az expCombined marad (pl.
         // "5 év fölött" → a frontend badge évszám alapján jelöli).
-        if (shouldSkipTitleFilter(title, _filters)) {
+        if (shouldSkipTitleFilter(titleForFilters(title), _filters)) {
           skippedSenior++;
           console.log(`[erste] SKIP senior "${title}" → ${url}`);
           continue;
