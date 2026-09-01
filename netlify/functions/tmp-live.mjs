@@ -51,6 +51,23 @@ export default async (req) => {
       );
       return json({ requested: urls.length, updated: r.rowCount });
     }
+    if (action === "migrate") {
+      // One-off url rewrite for the custom-domain Greenhouse ats-crawl rows,
+      // mirroring migrateVolatileUrl: same row, new url, sweep_dead cleared.
+      const body = await req.json();
+      const pairs = Array.isArray(body.pairs) ? body.pairs : [];
+      if (!pairs.length) return json({ error: "no pairs" }, 400);
+      const out = [];
+      for (const [from, to] of pairs) {
+        const r = await client.query(
+          `UPDATE job_posts SET url = $2, sweep_dead = false
+            WHERE source = 'ats-crawl' AND url = $1`,
+          [from, to]
+        );
+        out.push({ from, to, updated: r.rowCount });
+      }
+      return json({ pairs: pairs.length, migrated: out.filter((o) => o.updated).length, out });
+    }
     return json({ error: "unknown action" }, 400);
   } catch (e) {
     return json({ error: e.message }, 500);
