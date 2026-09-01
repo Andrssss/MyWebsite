@@ -28,6 +28,7 @@
 */
 import { Pool } from "pg";
 import { atsHandoff, registerAtsTenant, ensureAtsTenantTable } from "./_ats_handoff.mjs";
+import { probeSlug, PROBEABLE_PROVIDERS } from "./_ats_slug_core.mjs";
 
 const TOKEN = "8f2dfb68966333295ec90b6ce382bb9aa3053361aa2b8ffd";
 const AI_SOURCES = ["AI-scraped", "ai-scraped"];
@@ -88,13 +89,32 @@ export default async (req) => {
     const heldBack = dupes.filter((d) => !(d.ats_active || !d.ai_active));
     const needHide = deletable.filter((d) => d.ai_hidden && !d.ats_hidden);
 
+    // Élő próba, mielőtt bármit felveszünk — ugyanaz a szabály, mint az
+    // ats-tenants.mjs rendes útján: egy megszűnt board (a lever a mérés napján
+    // kettőt is adott: fliff, civitta) csak szemetelne a rotációban.
+    // A smartrecruiters kimarad, az nemlétező cégre is 200-at ad; ott a
+    // hirdetés-url megléte a bizonyíték.
+    const probeMiss = [];
+    const probeError = [];
+    for (const [key, t] of confirmed) {
+      if (!PROBEABLE_PROVIDERS.includes(t.provider)) continue;
+      const r = await probeSlug(t.provider, t.slug);
+      if (r === "miss") probeMiss.push(key);
+      else if (r === "error") probeError.push(key);
+      await new Promise((res) => setTimeout(res, 150));
+    }
+    const skipKeys = new Set([...probeMiss, ...probeError]);
+    const confirmed = toRegister.filter(([k]) => !skipKeys.has(k));
+
     const plan = {
       dryRun: dry,
       aiRows: aiRows.length,
       classified: { atsUrls: wanted.size, legacyRows, nonAtsRows },
       tenants: {
         knownBefore: known.length,
-        toRegister: toRegister.map(([k]) => k),
+        toRegister: confirmed.map(([k]) => k),
+        probeMiss,
+        probeError,
       },
       dupes: {
         total: dupes.length,
