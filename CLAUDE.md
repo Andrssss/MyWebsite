@@ -30,7 +30,7 @@ Deploy = push to `main`; Netlify builds per `netlify.toml` (publish `dist`, func
 | Table | What it holds | Writers → readers |
 |---|---|---|
 | `job_posts` | every scraped job posting; **`url` is the row identity**; `active` flag = still listed on source | all `cron_jobs_*` scrapers → `jobs.js` API |
-| `job_daily_stats` | daily per-source aggregates | `cron_daily_stats.mjs` → `job-stats.js`; pruned by `cron_stats_cleanup.mjs` |
+| `job_daily_stats` | daily per-source aggregates | `cron_daily_stats.mjs` → `job-stats.js` (and pestidev.hu's stats page); never pruned — rebuilt instead, see below |
 | `job_daily_categories` | daily per-category counts (`intern:` prefix = student/intern split) | same writers/readers as `job_daily_stats` |
 | `job_categories` | category → keyword lists for classification | edited via `categories.js`, read by `load_categories.mjs` (5-min cache) |
 | `job_filters` | title filter words | `filters.js`, `load_filters.mjs` |
@@ -65,7 +65,7 @@ React Router SPA; all routes live in `src/App.jsx` with Hungarian paths: `/targy
 ### Scraper/cron system
 ~30 `cron_jobs_<SOURCE>-background.mjs` Netlify **background** functions ingest into `job_posts`. Scheduling is two-tier (reference doc: `netlify/functions/CRON_SCHEDULE.md`):
 
-- **Directly scheduled** via `export const config = { schedule: "..." }` in-file: LinkedIn shards `cron_jobs_L_1..L_8` (staggered minutes, hours `4-22` UTC), `cron_experience-background.mjs`, `cron_daily_stats.mjs` (23:59), `weekly-backup.js`. (`cron_stats_cleanup.mjs` has **no** `config.schedule` and nothing invokes it — it never runs, which is why the monthly "delete last month" it implements has not been eating the 6-month graph.)
+- **Directly scheduled** via `export const config = { schedule: "..." }` in-file: LinkedIn shards `cron_jobs_L_1..L_8` (staggered minutes, hours `4-22` UTC), `cron_experience-background.mjs`, `cron_daily_stats.mjs` (23:59), `weekly-backup.js`. (`cron_stats_cleanup.mjs` — a monthly "archive last month to the `stats-backups` blob store, then DELETE it from both stats tables" job — was **deleted 2026-09-01**: it had no `config.schedule` and no caller, so it had never actually run, and had it ever been wired up it would have eaten the 6-month graph that pestidev.hu's stats page draws. The stats are derived data — rebuild them, don't prune them.)
 - **Dispatcher-triggered**: `cron_dispatcher.mjs` (hourly, high-volume sources), `cron_dispatcher_daily.mjs` (14:00 UTC, sources with <10 postings), `cron_dispatcher_test.mjs`, and `cron_jobs_P.mjs` POST to the background workers with `Authorization: Bearer $CRON_SECRET`. Workers reject requests without the secret.
 
 **Scraper invariants — keep these when touching any scraper:**

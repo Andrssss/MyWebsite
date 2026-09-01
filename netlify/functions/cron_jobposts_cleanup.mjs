@@ -1,7 +1,9 @@
 // netlify/functions/cron_jobposts_cleanup.mjs
 // Havonta egyszer (1-jén 03:00 UTC) archiválja a régóta inaktív job_posts
 // sorokat Netlify Blobs-ba, majd törli őket az adatbázisból. Ugyanaz a
-// mintázat, mint cron_stats_cleanup.mjs a job_daily_stats-nál.
+// mintázat, mint a `weekly-backup.js` a subject_reviews-nál. (A hasonló célú
+// cron_stats_cleanup.mjs 2026-09-01-én TÖRÖLVE lett: sosem futott, és a napi
+// statisztikát nem archiválni kell, hanem a nyers hirdetésekből újraépíteni.)
 //
 // Küszöb (ARCHIVE_AFTER_DAYS = 60): egy inaktív sort csak akkor archiválunk,
 // ha már túl van MINDKÉT élő kódúton, ami még hozzányúlhatna:
@@ -56,7 +58,7 @@ const TIME_BASED_ONLY_SOURCES = ["LinkedIn"];
 const TIME_BASED_ARCHIVE_AFTER_DAYS = 30;
 
 export const config = {
-  schedule: "0 3 1 * *", // havonta 1-jén 03:00 UTC (a stats/backup cleanup-ok után)
+  schedule: "0 3 1 * *", // havonta 1-jén 03:00 UTC (a weekly-backup után)
 };
 
 // Óra is a névben, hogy egy ugyanaznapi kézi újrafuttatás (pl. tesztelés)
