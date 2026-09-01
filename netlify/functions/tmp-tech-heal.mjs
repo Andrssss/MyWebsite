@@ -170,14 +170,22 @@ async function scan(client) {
 //   A) hamis ELK Stack / ELT címkét viselő, ÚJRAFETCHELHETŐ sorok
 //   B) a 10 forrás NULL-technologies sorai (csak ami a frontenden látszik:
 //      aktív VAGY 30 napnál frissebb — a régi inaktívakat felesleges hajtani)
-// A LinkedIn KIMARAD a fetch-ágból: a hirdetés-oldalait login-wall/anti-bot
-// védi, egy 999-es válasz nem bizonyítéka semminek — azok a sorok a `strip`
-// ágon kapják meg a címke-törlést.
+// KIMARAD a bogus-ágból, szándékosan:
+//   • LinkedIn (64 sor) — a hirdetés-oldalt login-wall/anti-bot védi, egy 999-es
+//     válasz semmit nem bizonyít. Ezek a sorok amúgy is időablakosak a
+//     frontenden (30 nap), tehát maguktól kikopnak; jobb egy elavult címke,
+//     mint egy tévedésből kitörölt valódi.
+//   • AI-scraped (18 sor) — ott a technologies nem oldal-body-ból jön, hanem az
+//     LLM saját listájából (normalizeTechnologyList). Ahhoz, hogy ott hamis ELK
+//     szülessen, az LLM-nek magának kellett volna „elkötelezett"-et írnia a
+//     technológia-listába — gyakorlatilag kizárt, tehát ezek valódiak. Az
+//     oldalról újraszámolni ráadásul MÁS módszer: alul-detektálna (élő példa:
+//     egy Azure-os adatmérnök sor elvesztette volna az „Azure Data Factory"-t).
 const SQL_WORK = `
   SELECT id, source, url, technologies, 'bogus' AS reason
     FROM job_posts
    WHERE technologies IS NOT NULL
-     AND source <> 'LinkedIn'
+     AND source NOT IN ('LinkedIn', 'AI-scraped')
      AND ${hasLabel("$1")}
    UNION ALL
   SELECT id, source, url, technologies, 'missing' AS reason
@@ -185,6 +193,18 @@ const SQL_WORK = `
    WHERE source = ANY($2::text[])
      AND technologies IS NULL
      AND (active OR first_seen > NOW() - INTERVAL '30 days')`;
+
+// Egy fetch-hiba csak akkor jogosít címke-törlésre, ha VÉGLEGES (a hirdetés
+// tényleg nincs meg). Egy 6 mp-es timeout NEM az: élő példa ebből a futásból —
+// az attrecto.com DevOps-hirdetése timeoutolt, és majdnem elvesztette a
+// TÉNYLEG kiírt ELK Stack címkéjét. Tranziens hibánál a sor érintetlen marad
+// és a következő kör újrapróbálja.
+function isPermanentFailure(message) {
+  const m = /HTTP (\d{3})/.exec(String(message || ""));
+  if (!m) return false; // timeout / ECONNRESET / DNS → tranziens
+  const code = Number(m[1]);
+  return code >= 400 && code < 500 && code !== 429;
+}
 
 async function queueSize(client) {
   const { rows } = await client.query(
@@ -196,10 +216,14 @@ async function queueSize(client) {
 
 /* ── 3. heal (html-fetch + újraszámolás) ─────────────────────── */
 
-async function heal(client, limit) {
+async function heal(client, limit, offset) {
+  // Az `offset` a tranziens hibák megkerülésére kell: a javított sorok maguktól
+  // kiesnek a sorból, a makacsul hibázók viszont az elején ragadnának és
+  // eltorlaszolnák a haladást. A hívó annyival lép előre, ahány sort feldolgozott
+  // anélkül, hogy bármit írt volna.
   const { rows: work } = await client.query(
-    `SELECT * FROM (${SQL_WORK}) q ORDER BY reason, id LIMIT $3`,
-    [BOGUS_LABELS, BACKFILL_SOURCES, limit]
+    `SELECT * FROM (${SQL_WORK}) q ORDER BY reason, id LIMIT $3 OFFSET $4`,
+    [BOGUS_LABELS, BACKFILL_SOURCES, limit, offset]
   );
 
   const started = Date.now();
@@ -207,6 +231,7 @@ async function heal(client, limit) {
   let processed = 0;
   let updated = 0;
   let fetchFailed = 0;
+  let transientSkips = 0;
 
   for (const row of work) {
     if (Date.now() - started > BUDGET_MS) break;
@@ -217,14 +242,18 @@ async function heal(client, limit) {
       html = await withDeadline(fetchText(row.url), FETCH_TIMEOUT_MS, row.url);
     } catch (err) {
       fetchFailed++;
-      // Elérhetetlen sor. 'missing' esetben nincs mit tenni (marad NULL, a
-      // következő futás újrapróbálja); 'bogus' esetben viszont a hamis címkét
-      // akkor is le kell szedni — a maradékot érintetlenül hagyva.
-      if (row.reason === "bogus") {
+      // 'missing': nincs mit tenni, marad NULL, a következő kör újrapróbálja.
+      // 'bogus': a hamis címkét CSAK véglegesen halott hirdetésnél szedjük le
+      // (a hirdetés nincs meg, a rossz címkét nincs mihez mérni) — tranziens
+      // hibánál érintetlenül hagyjuk, különben egy pillanatnyi timeout töröl
+      // ki valódi adatot.
+      if (row.reason === "bogus" && isPermanentFailure(err.message)) {
         const next = stripLabels(row.technologies, BOGUS_LABELS);
         await client.query(`UPDATE job_posts SET technologies = $1 WHERE id = $2`, [next, row.id]);
         updated++;
-        samples.push({ id: row.id, source: row.source, reason: "bogus/unreachable", from: row.technologies, to: next, err: err.message });
+        if (samples.length < 40) samples.push({ id: row.id, source: row.source, reason: "bogus/dead", from: row.technologies, to: next, err: err.message });
+      } else {
+        transientSkips++;
       }
       continue;
     }
@@ -252,7 +281,7 @@ async function heal(client, limit) {
     }
   }
 
-  return { processed, updated, fetchFailed, samples, remaining: await queueSize(client) };
+  return { processed, updated, fetchFailed, transientSkips, samples, remaining: await queueSize(client) };
 }
 
 /* ── 4. api (qdiak + trenkwalder saját listájából) ───────────── */
@@ -333,16 +362,19 @@ async function healTrenkwalder(client) {
 
 /* ── 5. strip (maradék hamis címkék, hálózat nélkül) ─────────── */
 
+// Csak a DEAD_LABELS (SOLID) megy ki hálózat nélkül, GLOBÁLISAN — az a kulcsszó
+// megszűnt, tehát sehol nem lehet valódi. Az ELK Stack / ELT SZÁNDÉKOSAN nincs
+// benne: azok valódiak is lehetnek, ezért csak a `heal` ág dönthet róluk (élő
+// oldal alapján), és csak véglegesen halott hirdetésnél töröljük vakon.
 async function strip(client) {
-  const all = [...BOGUS_LABELS, ...DEAD_LABELS];
   const { rows } = await client.query(
     `SELECT id, source, technologies FROM job_posts
       WHERE technologies IS NOT NULL AND ${hasLabel("$1")}`,
-    [all]
+    [DEAD_LABELS]
   );
   const bySource = {};
   for (const row of rows) {
-    const next = stripLabels(row.technologies, all);
+    const next = stripLabels(row.technologies, DEAD_LABELS);
     if (next === row.technologies) continue;
     await client.query(`UPDATE job_posts SET technologies = $1 WHERE id = $2`, [next, row.id]);
     bySource[row.source] = (bySource[row.source] || 0) + 1;
@@ -361,13 +393,14 @@ export default withDbAuditFlush("tmp_tech_heal", async (request) => {
 
   const action = url.searchParams.get("action") || "scan";
   const limit = Math.min(Number(url.searchParams.get("limit")) || 25, 100);
+  const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
 
   const client = await pool.connect();
   try {
     await ensureTechnologiesColumn(client);
 
     if (action === "scan") return json(200, { ok: true, ...(await scan(client)) });
-    if (action === "heal") return json(200, { ok: true, ...(await heal(client, limit)) });
+    if (action === "heal") return json(200, { ok: true, ...(await heal(client, limit, offset)) });
     if (action === "strip") return json(200, { ok: true, ...(await strip(client)) });
     if (action === "api") {
       const qdiak = await healQdiak(client).catch((e) => ({ error: e.message }));
