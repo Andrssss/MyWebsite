@@ -197,7 +197,7 @@ async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
     setStatus(`Letöltés... (0/${files.length})`);
 
     // Párhuzamos letöltés korlátozott számú egyidejű kéréssel
-    const CONCURRENCY = 6;
+    const CONCURRENCY = 24;
     let next = 0;
     const worker = async () => {
       while (true) {

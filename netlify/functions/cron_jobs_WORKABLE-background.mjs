@@ -47,7 +47,11 @@ import { withTimeout } from "./_error-logger.mjs";
 import { migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies } from "./_experience_core.mjs";
 import { rejectNonBudapest } from "./_ats_location.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe } from "./_cross_source_dupe.mjs";
+import {
+  loadCrossSourceDupeIndex,
+  isCrossSourceDupe,
+  CROSS_SOURCE_DUPE_SOURCES,
+} from "./_cross_source_dupe.mjs";
 import { ingestJobs, normalizeUrl } from "./_ai_ingest_core.mjs";
 
 export const WORKABLE_SOURCE = "workable";
@@ -200,8 +204,11 @@ const _runJob = withTimeout("cron_jobs_WORKABLE-background", async () => {
           workable-sort később egy másik forrás is megtalál, a reconcile
           deaktiválja a workable-példányt.  Ez a szándékolt viselkedés (a
           duplikátum eltűnik a boardról), nem hiba.
-       Kikapcsolni = ezt a blokkot és a `dupe`-szűrést kivenni; a többi kód nem függ tőle. */
-    const dupeIndex = await loadCrossSourceDupeIndex(client, WORKABLE_SOURCE);
+       Kikapcsolni = ezt a blokkot és a `dupe`-szűrést kivenni; a többi kód nem függ tőle.
+
+       2026-09-02: a megosztott CROSS_SOURCE_DUPE_SOURCES listára szűkítve (nem
+       a teljes tábla) — ld. _cross_source_dupe.mjs. */
+    const dupeIndex = await loadCrossSourceDupeIndex(client, WORKABLE_SOURCE, { onlySources: CROSS_SOURCE_DUPE_SOURCES });
     console.log(`[workable] cross-source dupe index: ${dupeIndex.size} keys`);
     let skippedDupe = 0;
     const deduped = rows.filter((r) => {

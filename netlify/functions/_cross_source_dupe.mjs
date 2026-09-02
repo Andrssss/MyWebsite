@@ -11,11 +11,18 @@
 
       <first real word of company>  |  <normalized title>
 
-  ...and it is matched against EVERY other source, not a whitelist. A hardcoded
-  "sources worth checking" list is the exact bug class this repo keeps hitting
-  (see the melonjobs / unicredit taxonomy-ID lists): the moment a new scraper
-  lands, the list is silently wrong. Checking all of them costs one extra query
-  per run.
+  2026-08-28 to 2026-09-01: matched against EVERY other source, not a
+  whitelist — a hardcoded "sources worth checking" list is the exact bug class
+  this repo keeps hitting (melonjobs / unicredit taxonomy-ID lists), and
+  checking all of them cost only one extra query per run.
+
+  2026-09-02: switched to a shared whitelist (`CROSS_SOURCE_DUPE_SOURCES`
+  below) once a 3rd caller (ats-crawl) needed the same guard but only overlaps
+  a handful of sources — indexing the whole table for it would have been a much
+  bigger query for no extra hit rate. The whitelist-drift risk above is still
+  real, so there is exactly ONE list, shared by every caller (not one per
+  file): a newly found overlap gets added here once and every caller picks it
+  up, instead of three lists silently diverging.
 
   Company-name normalization has to survive raw ATS entity labels, which is
   what startup.jobs actually serves: "100 Shift4 Payments, LLC",
@@ -78,8 +85,30 @@ export function dupeKey(company, title) {
   return `${c}|${t}`;
 }
 
+// The sources that measurably re-list postings other scrapers already carry
+// (2026-08-28 startup.jobs analysis: 45/56 rows already present under one of
+// these; 2026-08-30 workable analysis: 40/186 Budapest rows, same pattern).
+// Every current cross-source-dupe caller (startupjobs, workable, ats-crawl)
+// scopes its index to this shared list instead of the whole table — see
+// loadCrossSourceDupeIndex's `onlySources`. Extend this list, not a
+// per-caller one, when a new overlap is found, so all callers benefit and
+// stay consistent (a per-file list is exactly the hardcoded-whitelist bug
+// class the rest of this repo keeps hitting — see the header history below).
+export const CROSS_SOURCE_DUPE_SOURCES = [
+  "ats-crawl",
+  "LinkedIn",
+  "AI-scraped",
+  "profession-intern",
+  "alllocaljobs",
+  "talent",
+  "startupjobs",
+];
+
 /*
-  Build the lookup set from every row of every OTHER source.
+  Build the lookup set from every row of every OTHER source (or, with
+  `onlySources`, from just the given source list — always excluding
+  `ownSource` even then, so a source can never dupe-match against its own
+  rows).
 
   Scope is "every row still in job_posts", inactive ones included, on purpose:
   keying only on active rows would let a posting bounce back in the moment the
@@ -88,15 +117,25 @@ export function dupeKey(company, title) {
   archived out of the table by cron_jobposts_cleanup.mjs, so this stays bounded
   on its own.
 */
-export async function loadCrossSourceDupeIndex(client, ownSource) {
-  const { rows } = await client.query(
-    `SELECT company, title
-       FROM job_posts
-      WHERE source <> $1
-        AND company IS NOT NULL AND company <> ''
-        AND title IS NOT NULL AND title <> ''`,
-    [ownSource]
-  );
+export async function loadCrossSourceDupeIndex(client, ownSource, { onlySources } = {}) {
+  const { rows } = onlySources
+    ? await client.query(
+        `SELECT company, title
+           FROM job_posts
+          WHERE source = ANY($1::text[])
+            AND source <> $2
+            AND company IS NOT NULL AND company <> ''
+            AND title IS NOT NULL AND title <> ''`,
+        [onlySources, ownSource]
+      )
+    : await client.query(
+        `SELECT company, title
+           FROM job_posts
+          WHERE source <> $1
+            AND company IS NOT NULL AND company <> ''
+            AND title IS NOT NULL AND title <> ''`,
+        [ownSource]
+      );
   const index = new Set();
   for (const r of rows) {
     const k = dupeKey(r.company, r.title);

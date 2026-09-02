@@ -31,6 +31,16 @@
     2026-08-26, üres helyszín itt ELDOBÁS, a rendszer többi részével ellentétben.
   • Senior: NEM dobjuk el (2026-08-25-i szabály) — az ingestJobs
     seniorAwareExperience-e címkézi, a frontend rejti.
+
+  2026-09-02: a board nem-IT sorai (amiket az ingestJobs isItJob-kapuja amúgy
+  is eldob) NEM vesznek el — ha a cím a marketing_scraper testvérprojekt
+  hatókörébe esik (_marketing_match.mjs, marketing/sales/HR/admin), a worker
+  átadja őket a marketing_scraper saját ai-ingest.mjs végpontjának
+  (_marketing_handoff.mjs, `source: "ATS"`). Ez pontosan az a lista-hívás,
+  amit a marketing_scraper korábbi, önálló ATS-crawlere is elvégzett volna
+  ugyanezekre a boardokra — a duplikált crawlelést törölve, egy lekérés két
+  célra megy. A hand-off fail-soft: hiba esetén csak naplóz, az IT-oldalt
+  nem érinti.
 */
 
 import { Pool } from "pg";
@@ -41,9 +51,26 @@ import { migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies } from "./_experience_core.mjs";
 import { getProvider, deriveScopePrefix } from "./_ats_providers.mjs";
 import { rejectAtsLocation } from "./_ats_location.mjs";
-import { ingestJobs, normalizeUrl } from "./_ai_ingest_core.mjs";
+import { ingestJobs, normalizeUrl, isItJob } from "./_ai_ingest_core.mjs";
+import {
+  loadCrossSourceDupeIndex,
+  isCrossSourceDupe,
+  CROSS_SOURCE_DUPE_SOURCES,
+} from "./_cross_source_dupe.mjs";
+import { isInScopeTitle } from "./_marketing_match.mjs";
+import { postMarketingCandidates } from "./_marketing_handoff.mjs";
 
 export const ATS_SOURCE = "ats-crawl";
+
+// ats-crawl aratja a cégek SAJÁT board-jait, de ugyanazok a pozíciók gyakran
+// felbukkannak máshol is, mielőtt idekerülnének — user-megfigyelés 2026-09-02.
+// A megosztott CROSS_SOURCE_DUPE_SOURCES listát használja (ugyanaz, mint a
+// startupjobs/workable guard-ja, ld. _cross_source_dupe.mjs) — nem "minden más
+// forrás": a query így néhány sorra korlátozódik a teljes tábla helyett, saját
+// forrásunk (ats-crawl) pedig automatikusan kiesik az összehasonlításból. A
+// kulcs company+title, tehát egy tenant board-ján lévő sor akkor esik ki, ha a
+// listán szereplő valamelyik forráson már szerepel ugyanaz a cég (első szó) +
+// ugyanaz a pozíció (normalizált cím).
 
 // Hány tenantot dolgozunk fel egy futásban. A background function 15 percet kap;
 // egy board = 1 lista-hívás + a HU-sorok detail-hívásai, tipikusan pár másodperc.
@@ -288,7 +315,7 @@ function srVolatilePattern(url) {
   return m ? `^${escapeRegex(m[1])}\\d+-${escapeRegex(m[2])}$` : null;
 }
 
-async function crawlTenant(client, tenant, { filters, categories }) {
+async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
   const provider = getProvider(tenant.provider);
   if (!provider) {
     await recordTenantResult(client, tenant, { status: "dead", error: `unknown provider ${tenant.provider}` });
@@ -352,9 +379,29 @@ async function crawlTenant(client, tenant, { filters, categories }) {
     }
   }
 
+  // 1.5) cross-source dupe-szűrés — a helyszín-kapu UTÁN (kevesebb sor), de a
+  // detail-hívás ELŐTT (ld. a fájl fejlécét: DUPE_CHECK_SOURCES), hogy egy már
+  // profession/talent/LinkedIn/startupjobs alatt meglévő pozíció ne kössön le
+  // felesleges detail-kérést sem, ne csak insertet.
+  let dedupedHuJobs = huJobs;
+  if (dupeIndex) {
+    dedupedHuJobs = [];
+    for (const job of huJobs) {
+      const company = job.company || tenant.company || null;
+      if (isCrossSourceDupe(dupeIndex, company, job.title)) {
+        console.log(`[atscrawl] ${label} SKIP cross-source dupe "${job.title}" @ ${company}`);
+        continue;
+      }
+      dedupedHuJobs.push(job);
+    }
+    if (dedupedHuJobs.length !== huJobs.length) {
+      console.log(`[atscrawl] ${label} cross-source dupes skipped: ${huJobs.length - dedupedHuJobs.length}`);
+    }
+  }
+
   // 2) a HU-sorok teljes felépítése (insert ELŐTT, egyetlen detail-hívással)
   const built = [];
-  for (const job of huJobs) {
+  for (const job of dedupedHuJobs) {
     let html = job.descriptionHtml;
     let url = job.url;
     if (job.detailRef) {
@@ -431,9 +478,17 @@ async function crawlTenant(client, tenant, { filters, categories }) {
     scopePrefix,
   });
 
+  // A nem-IT sorok (ingestJobs úgyis eldobta volna őket, ld. skippedNonIt) a
+  // marketing_scraper hatókörére nézve még lehetnek relevánsak — ugyanazon a
+  // board-lekérésen belül, második, olcsó kapu (csak a cím alapján dönt).
+  const marketingCandidates = built.filter(
+    (job) => !isItJob(job.title, categories) && isInScopeTitle(job.title)
+  );
+
   console.log(
     `[atscrawl] ${label} → hu=${huJobs.length} built=${built.length} inserted=${result.inserted} ` +
-    `nonIt=${result.skippedNonIt} filtered=${result.skippedSenior} reconcile=${JSON.stringify(result.reconcile)}`
+    `nonIt=${result.skippedNonIt} filtered=${result.skippedSenior} marketing=${marketingCandidates.length} ` +
+    `reconcile=${JSON.stringify(result.reconcile)}`
   );
 
   await recordTenantResult(client, tenant, {
@@ -443,7 +498,7 @@ async function crawlTenant(client, tenant, { filters, categories }) {
     error: null,
   });
 
-  return { huCount: huJobs.length, inserted: result.inserted };
+  return { huCount: huJobs.length, inserted: result.inserted, marketingCandidates };
 }
 
 const _runJob = withTimeout("cron_jobs_ATSCRAWL-background", async () => {
@@ -453,6 +508,7 @@ const _runJob = withTimeout("cron_jobs_ATSCRAWL-background", async () => {
   let checked = 0;
   let totalHu = 0;
   let totalInserted = 0;
+  const marketingCandidates = [];
   try {
     await ensureTenantSchema(client);
     const seeded = await seedTenants(client);
@@ -461,16 +517,28 @@ const _runJob = withTimeout("cron_jobs_ATSCRAWL-background", async () => {
     const tenants = await dueTenants(client, BATCH_SIZE);
     console.log(`[atscrawl] due tenants: ${tenants.length}`);
 
+    const dupeIndex = await loadCrossSourceDupeIndex(client, ATS_SOURCE, { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[atscrawl] cross-source dupe index: ${dupeIndex.size} keys`);
+
     for (const tenant of tenants) {
-      const r = await crawlTenant(client, tenant, { filters, categories });
+      const r = await crawlTenant(client, tenant, { filters, categories, dupeIndex });
       checked += 1;
       totalHu += r.huCount ?? 0;
       totalInserted += r.inserted ?? 0;
+      if (r.marketingCandidates?.length) marketingCandidates.push(...r.marketingCandidates);
     }
 
     console.log(`[atscrawl] DONE — tenants=${checked} hu_rows=${totalHu} inserted=${totalInserted}`);
   } finally {
     client.release();
+  }
+
+  // A DB-kapcsolat lezárása UTÁN — ez egy külső HTTP-hívás a testvérprojekt
+  // felé, nem kell hozzá a pool-kliens, és a fail-soft hiba (ld. header) itt
+  // sem érintheti a fenti IT-oldali munkát.
+  if (marketingCandidates.length) {
+    console.log(`[atscrawl] marketing hand-off: ${marketingCandidates.length} candidate(s)`);
+    await postMarketingCandidates(marketingCandidates);
   }
 
   return new Response("OK");

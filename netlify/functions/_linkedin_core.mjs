@@ -5,7 +5,10 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
-import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle } from "./_experience_core.mjs";
+import {
+  INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle,
+  extractLinkedInExperience, extractTechnologies, ensureTechnologiesColumn,
+} from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 
 let _filters = [];
@@ -239,33 +242,39 @@ function isHungarianLinkedInUrl(rawUrl) {
   }
 }
 
+// Title-only guess, used both as the insert-time fallback (fetch failed/
+// skipped) and to decide whether a detail-page fetch can even improve on it.
+function inferTitleExperience(title) {
+  if (isInternshipTitle(title)) return "diákmunka";
+  if (isJuniorTitle(title)) return "junior";
+  if (isMidLevelTitle(title)) return "medior";
+  return "-";
+}
+
 // =====================
 // DB upsert
 // =====================
+// Row must be fully built (title-or-fetched experience + technologies)
+// BEFORE this runs — no separate later pass patches it in (user rule,
+// 2026-09-02: this used to be LinkedIn's one allowed exception).
 async function upsertJob(client, source, item) {
   const canonicalUrl =
     source === "LinkedIn"
       ? canonicalizeLinkedInJobUrl(item.url)
       : item.url;
-  const experience = seniorAwareExperience(
-    item.title,
-    isInternshipTitle(item.title) ? "diákmunka"
-      : isJuniorTitle(item.title) ? "junior"
-      : isMidLevelTitle(item.title) ? "medior"
-      : "-",
-  );
+  const experience = seniorAwareExperience(item.title, item.experience ?? inferTitleExperience(item.title));
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, company, first_seen)
-     SELECT $1,$2,$3,$4,$5,$6,NOW()
+      (source, title, url, canonical_url, experience, company, technologies, first_seen)
+     SELECT $1,$2,$3,$4,$5,$6,$7,NOW()
      WHERE NOT EXISTS (
        SELECT 1 FROM job_posts WHERE source = $1 AND canonical_url = $4
      )
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl, experience, item.company || null]
+    [source, item.title, item.url, canonicalUrl, experience, item.company || null, item.technologies ?? null]
   );
 }
 
@@ -350,6 +359,19 @@ export async function processLinkedInSources(sources, jobName) {
   let blocked = false;
 
   try {
+    await ensureTechnologiesColumn(client);
+
+    // Known canonical urls for the whole run — a genuinely new posting gets
+    // its detail page fetched once, right here, before it's ever inserted;
+    // an already-known one is never re-fetched (see upsertJob's WHERE NOT
+    // EXISTS — inserting for it would be a no-op anyway). Updated in-memory
+    // as we go so the same new posting surfacing under two search shards in
+    // one run only gets fetched once.
+    const { rows: knownRows } = await client.query(
+      `SELECT canonical_url FROM job_posts WHERE source = 'LinkedIn' AND canonical_url IS NOT NULL`
+    );
+    const knownCanonicalUrls = new Set(knownRows.map(r => r.canonical_url));
+
     for (const p of sources) {
       if (blocked) {
         console.warn(`${jobName}: aborting remaining sources after LinkedIn block.`);
@@ -388,6 +410,29 @@ export async function processLinkedInSources(sources, jobName) {
       });
 
       for (const it of items) {
+        const canonical = canonicalizeLinkedInJobUrl(it.url);
+        it.experience = inferTitleExperience(it.title);
+
+        // New posting: fetch its detail page ONCE, right now, so experience
+        // (if the title alone didn't already resolve it) and technologies
+        // land in the row before it's ever inserted — no later backfill pass.
+        if (!knownCanonicalUrls.has(canonical)) {
+          try {
+            await randomDelay();
+            const html = await fetchText(it.url, { userAgent: ua });
+            if (it.experience === "-") it.experience = extractLinkedInExperience(html) || "-";
+            it.technologies = extractTechnologies(html);
+          } catch (err) {
+            if (err instanceof LinkedInBlockedError) {
+              console.error(`${jobName}: BLOCKED by LinkedIn (HTTP ${err.status}) fetching detail ${it.url} — aborting cron run.`);
+              blocked = true;
+              break;
+            }
+            console.warn(`[LinkedIn] detail fetch failed: ${it.url} — ${err.message}`);
+          }
+          knownCanonicalUrls.add(canonical);
+        }
+
         try {
           await upsertJob(client, p.key, it);
         } catch (err) {

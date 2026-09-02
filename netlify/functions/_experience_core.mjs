@@ -1,24 +1,14 @@
 /* =========================
    EXPERIENCE EXTRACTION — shared core
-   Per-source extractors + generic enrichment helper.
-   Used by source cron files (cron_jobs_*-background.mjs) and
-   by cron_experience-background.mjs for LinkedIn.
+   Per-source extractors, used by source cron files
+   (cron_jobs_*-background.mjs) to build a row fully before insert.
    ========================= */
 
-import { Pool } from "pg";
 import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { TECH_KEYWORDS } from "./_tech_keywords.js";
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-if (!connectionString) throw new Error("NETLIFY_DATABASE_URL missing");
-
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
 
 /* ======================
    Helpers
@@ -99,10 +89,6 @@ export const INTERN_SOURCES = [
   "minddiak", "muisz", "zyntern", "schonherz",
   "tudasdiak", "tudatosdiak", "ydiak", "qdiak", "miszisz",
 ];
-
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
 
 /* ======================
    Fetch
@@ -541,126 +527,4 @@ export async function ensureTechnologiesColumn(client) {
   _techSchemaReady = true;
 }
 
-/* ======================
-   Generic enrichment
-====================== */
-/**
- * Enrich job_posts.experience by fetching each job URL and applying an extractor.
- *
- * @param {object} opts
- * @param {string} opts.sourceFilter  - SQL fragment, e.g. "source = 'kuka'"
- * @param {(html:string) => string|null} opts.extract
- * @param {string} [opts.label]       - log label
- * @param {string} [opts.jobName]     - cron job name (for error logging)
- * @param {number} [opts.intervalMinutes=30]
- * @param {number} [opts.limit=300]
- * @param {string[]} [opts.extraInternKeywords]
- * @param {string} [opts.experienceCondition] - default "(experience IS NULL OR experience = '-')"
- * @param {number} [opts.sleepMs=250]
- */
-export async function enrichExperience({
-  sourceFilter,
-  extract,
-  label,
-  jobName,
-  intervalMinutes = 30,
-  limit = 300,
-  extraInternKeywords,
-  experienceCondition = "(experience IS NULL OR experience = '-')",
-  sleepMs = 250,
-}) {
-  const tag = label || sourceFilter;
-  const job = jobName || "experience-enrich";
-  const client = await pool.connect();
-
-  try {
-    await ensureTechnologiesColumn(client);
-
-    const { rows } = await client.query(
-      `SELECT id, url, title
-         FROM job_posts
-        WHERE first_seen >= NOW() - INTERVAL '${intervalMinutes} minutes'
-          AND ${experienceCondition}
-          AND ${sourceFilter}
-        ORDER BY first_seen DESC
-        LIMIT ${limit}`
-    );
-
-    console.log(`[experience:${tag}] ${rows.length} rows to enrich`);
-
-    let success = 0;
-    let failed = 0;
-    // Fetches must stay sequential (one HTTP round-trip + a politeness sleep
-    // per row), but the DB writes don't — collect them here and flush as at
-    // most two batched UPDATEs after the loop instead of one UPDATE per row.
-    const successRows = []; // { id, experience, technologies }
-    const failedRows = []; // { id, experience }
-
-    for (const row of rows) {
-      try {
-        const html = await fetchText(row.url);
-        let experience = extract(html);
-        const technologies = extractTechnologies(html);
-
-        // Title always overrides (highest priority)
-        if (
-          isInternshipTitle(row.title) ||
-          extraInternKeywords?.some(k => normalizeText(row.title).includes(k))
-        ) {
-          experience = "diákmunka";
-        } else if (isJuniorTitle(row.title)) {
-          experience = "junior";
-        } else if (isMidLevelTitle(row.title)) {
-          experience = "medior";
-        }
-
-        successRows.push({ id: row.id, experience: experience || "-", technologies: technologies ?? null });
-        success++;
-        await sleep(sleepMs);
-      } catch (err) {
-        console.error(`[experience:${tag}] FAILED ID:`, row.id, "|", err.message);
-
-        const fallback = (
-          isInternshipTitle(row.title) || extraInternKeywords?.some(k => normalizeText(row.title).includes(k))
-        ) ? "diákmunka"
-          : isJuniorTitle(row.title) ? "junior"
-          : isMidLevelTitle(row.title) ? "medior"
-          : "-";
-
-        failedRows.push({ id: row.id, experience: fallback });
-        failed++;
-      }
-    }
-
-    // Tech precedence: fresh extract > existing value > '' marker (the
-    // marker says "body checked, no keyword" so the cross-source
-    // technologies backfill never re-fetches this row).
-    if (successRows.length) {
-      await client.query(
-        `UPDATE job_posts AS jp
-            SET experience = v.experience,
-                technologies = COALESCE(v.technologies, jp.technologies, '')
-           FROM unnest($1::int[], $2::text[], $3::text[]) AS v(id, experience, technologies)
-          WHERE jp.id = v.id`,
-        [successRows.map(r => r.id), successRows.map(r => r.experience), successRows.map(r => r.technologies)]
-      );
-    }
-    // Failed rows only get the title-based fallback experience — technologies
-    // stays untouched (a fetch failure must not stamp the "checked, no tech" marker).
-    if (failedRows.length) {
-      await client.query(
-        `UPDATE job_posts AS jp
-            SET experience = v.experience
-           FROM unnest($1::int[], $2::text[]) AS v(id, experience)
-          WHERE jp.id = v.id`,
-        [failedRows.map(r => r.id), failedRows.map(r => r.experience)]
-      );
-    }
-
-    console.log(`[experience:${tag}] done — success: ${success}, failed: ${failed}`);
-    return { success, failed, total: rows.length };
-  } finally {
-    client.release();
-  }
-}
 

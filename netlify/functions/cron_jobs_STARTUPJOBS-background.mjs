@@ -43,7 +43,11 @@ import zlib from "zlib";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe } from "./_cross_source_dupe.mjs";
+import {
+  loadCrossSourceDupeIndex,
+  isCrossSourceDupe,
+  CROSS_SOURCE_DUPE_SOURCES,
+} from "./_cross_source_dupe.mjs";
 import {
   isInternshipTitle,
   isJuniorTitle,
@@ -207,7 +211,9 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
     // of its 56 rows were already on the board from the employer-side sources,
     // with no discovery-time advantage. Anything another source already carries
     // under the same <company first word>|<title> key is dropped before insert.
-    const dupeIndex = await loadCrossSourceDupeIndex(client, "startupjobs");
+    // Scoped to the shared CROSS_SOURCE_DUPE_SOURCES list (2026-09-02) instead
+    // of the whole table — see _cross_source_dupe.mjs.
+    const dupeIndex = await loadCrossSourceDupeIndex(client, "startupjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
     console.log(`[startupjobs] cross-source dupe index: ${dupeIndex.size} keys`);
 
     let cursor = null;
