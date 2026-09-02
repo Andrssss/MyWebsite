@@ -207,7 +207,7 @@ export async function submitFindings(payload) {
         `[ai-registry-core] ${AI_SOURCE}: rows=${stats.rows} inserted=${stats.inserted} ` +
         `skip_senior=${stats.skippedSenior} skip_company=${stats.skippedCompany} ` +
         `skip_non_it=${stats.skippedNonIt} skip_location=${stats.skippedLocation} ` +
-        `ats_handoff=${stats.handedToAts} ats_legacy=${stats.skippedLegacyAts} ` +
+        `ats_handoff=${stats.handedToAts} ` +
         `ats_tenants_added=${JSON.stringify(stats.atsTenantsAdded)} ` +
         `dupe_skipped=${stats.skippedDuplicate} ${JSON.stringify(stats.duplicateOf)}`
       );

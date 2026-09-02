@@ -14,7 +14,7 @@ import { withTimeout } from "./_error-logger.mjs";
  * stay on the hourly dispatcher.
  *
  * Sources (approx. counts at time of split, 2026-07-01):
- *   A_K=karrierhungaria(3), CG=cg-jobstream(7), ATS=wise(7)+roland(1),
+ *   A_K=karrierhungaria(3), CG=cg-jobstream(7),
  *   MFB(5), UNICREDIT(1), EUDIAKOK(3), MELODIAK(2), ATLASZ(1),
  *   PANNONDIAK(1), TRENKWALDER(5), WORKCENTER(9)
  * Added 2026-07-20: DIAK_2=ydiak(0)+qdiak(7) — a mixed scraper, but BOTH its
@@ -23,7 +23,8 @@ import { withTimeout } from "./_error-logger.mjs";
 const TARGETS = [
   { name: "cron_jobs_A_K-background" },
   { name: "cron_jobs_CG-background" },
-  { name: "cron_jobs_ATS-background" },
+  // cron_jobs_ATS-background removed 2026-09-02: merged into ats-crawl
+  // (wise/rolandberger became regular smartrecruiters tenants there).
   { name: "cron_jobs_MFB-background" },
   { name: "cron_jobs_UNICREDIT-background" },
   { name: "cron_jobs_EUDIAKOK-background" },

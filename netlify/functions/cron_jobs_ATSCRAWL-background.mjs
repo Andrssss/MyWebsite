@@ -77,11 +77,17 @@ const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
    érintetlen marad. Tenantot NE innen töröljünk kikapcsoláshoz — a törölt sor a
    következő deploynál visszajön; helyette status='dead'.
 
-   KIHAGYVA szándékosan: smartrecruiters/Wise és smartrecruiters/RolandBerger —
-   azokat a cron_jobs_ATS-background.mjs már aratja "wise"/"roland" source alatt.
-   Két scraper ugyanarra a hirdetésre két külön sort írna (a `source` része a
-   sor-identitásnak), ami megduplázná őket a listában. */
+   2026-09-02: smartrecruiters/wise és smartrecruiters/rolandberger IDE KÖLTÖZTEK.
+   Korábban a külön cron_jobs_ATS-background.mjs aratta "wise"/"roland" source
+   alatt (két scraper egy hirdetésre = duplikáció, ezért maradtak eddig itt
+   kihagyva) — a fájl megszűnt, a meglévő sorok source-a egyszeri migrációval
+   át lett írva "ats-crawl"-ra, az `_ats_handoff.mjs` legacy-kivétele törölve. */
 const SEED_TENANTS = [
+  // SmartRecruiters — a régi cron_jobs_ATS-background.mjs örökösei (2026-09-02).
+  // A cégazonosító a SmartRecruiters API-ban kis-nagybetű-tűrő (élőben mérve),
+  // a slug itt ezért lowercase, konzisztensen a többi providerrel.
+  { provider: "smartrecruiters", slug: "wise", company: "Wise" },
+  { provider: "smartrecruiters", slug: "rolandberger", company: "RolandBerger" },
   // Van élő budapesti hirdetése (2026-08-26-i mérés)
   { provider: "greenhouse", slug: "wolt", company: "Wolt" },
   { provider: "ashby", slug: "shapr3d", company: "Shapr3D" },

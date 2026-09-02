@@ -321,7 +321,6 @@ export async function ingestJobs(client, {
   let skippedLocation = 0;
   // ATS-átadás könyvelése (csak handoffAtsUrls mellett mozdul).
   const handedToAtsUrls = []; // ezekből tenant lesz, sor nem
-  const skippedLegacyAtsUrls = []; // ezeket már egy másik scraper hozza
   /** @type {Map<string, {provider:string, slug:string, company:string|null}>} */
   const atsTenants = new Map();
   // Kereszt-forrás duplikátumok (_ai_dupe_guard.mjs) — egy lekérés az egész
@@ -345,14 +344,10 @@ export async function ingestJobs(client, {
     if (handoffAtsUrls) {
       const handoff = atsHandoff(job.url);
       if (handoff) {
-        if (handoff.kind === "legacy") {
-          skippedLegacyAtsUrls.push(job.url);
-        } else {
-          handedToAtsUrls.push(job.url);
-          const key = `${handoff.provider}:${handoff.slug}`;
-          if (!atsTenants.has(key)) {
-            atsTenants.set(key, { provider: handoff.provider, slug: handoff.slug, company: job.company || null });
-          }
+        handedToAtsUrls.push(job.url);
+        const key = `${handoff.provider}:${handoff.slug}`;
+        if (!atsTenants.has(key)) {
+          atsTenants.set(key, { provider: handoff.provider, slug: handoff.slug, company: job.company || null });
         }
         continue;
       }
@@ -400,7 +395,6 @@ export async function ingestJobs(client, {
     rows: jobs.length, inserted: insertedUrls.length, insertedUrls,
     skippedSenior, skippedCompany, skippedNonIt, skippedLocation, ok, complete, reconcile,
     handedToAts: handedToAtsUrls.length, handedToAtsUrls,
-    skippedLegacyAts: skippedLegacyAtsUrls.length,
     atsTenantsAdded,
     skippedDuplicate: skippedDuplicateUrls.length, skippedDuplicateUrls, duplicateOf,
   };

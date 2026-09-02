@@ -28,36 +28,27 @@
   beengedett volna, így kimaradhat.  Tudatos csere; a visszaadott
   `handedToAtsUrls` lista teszi utólag mérhetővé, mi ment át ezen az úton.
 
-  ── Kivétel: amit már egy másik scraper arat ─────────────────────────────
-  A `smartrecruiters/wise` és `smartrecruiters/rolandberger` boardokat a
-  cron_jobs_ATS-background.mjs viszi `wise` / `roland` source alatt (SR_SOURCES),
-  és a cron_jobs_ATSCRAWL seed-listája is szándékosan kihagyja őket.  Tenantként
-  felvenni ugyanazt a duplikációt szülné, amit itt megszüntetünk — ezért ezeknél
-  a sort eldobjuk (a másik forrás már hozza), tenantot viszont NEM veszünk fel.
-  Ha az SR_SOURCES valaha bővül, ezt a listát is bővíteni kell.
+  ── A korábbi kivétel megszűnt (2026-09-02) ──────────────────────────────
+  A `smartrecruiters/wise` és `smartrecruiters/rolandberger` boardokat eddig a
+  külön cron_jobs_ATS-background.mjs arata "wise"/"roland" source alatt, ezért
+  itt tenantként felvenni duplikációt szült volna. Az a fájl megszűnt, a két
+  board most rendes ats-crawl tenant (lásd cron_jobs_ATSCRAWL-background.mjs
+  SEED_TENANTS) — tehát minden ATS-url ugyanazon az úton megy, kivétel nélkül.
 */
 
 import { parseAtsUrl } from "./_ats_slug_core.mjs";
-
-// "provider:slug" alakban — lásd a fejléc kivétel-szakaszát.
-export const LEGACY_ATS_TENANTS = new Set([
-  "smartrecruiters:wise",
-  "smartrecruiters:rolandberger",
-]);
 
 /**
  * Mi legyen ezzel az url-lel az AI-ingest útján?
  *
  * @param {string} url
- * @returns {null | {kind:"legacy", provider:string, slug:string}
- *                 | {kind:"tenant", provider:string, slug:string}}
+ * @returns {null | {kind:"tenant", provider:string, slug:string}}
  *   null = nem ATS-url, menjen a szokásos úton.
  */
 export function atsHandoff(url) {
   const parsed = parseAtsUrl(url);
   if (!parsed) return null;
-  const key = `${parsed.provider}:${parsed.slug}`;
-  return { kind: LEGACY_ATS_TENANTS.has(key) ? "legacy" : "tenant", ...parsed };
+  return { kind: "tenant", ...parsed };
 }
 
 // Az `ats_tenants` táblát rendes körülmények között a cron_jobs_ATSCRAWL hozza
