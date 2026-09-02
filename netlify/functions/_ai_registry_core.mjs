@@ -22,6 +22,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
+import { normTitle, normCompany } from "./_ai_dupe_guard.mjs";
 
 // Same module-level pool pattern as every other function here (ai-ingest.mjs,
 // the old ai-registry.mjs) — created once per warm container, connect/release
@@ -72,13 +73,50 @@ function groupBySlug(findings) {
 
 /* ── GET: hand the routine its memory ───────────────────────────────── */
 
+// Lets the discovery routine skip a detail-page fetch for a posting some
+// OTHER scraper (hand-written or AI, any source) already has live, instead of
+// learning that only after paying for the fetch AND the reasoning to decide
+// what to submit — the server-side reject (_ai_dupe_guard.mjs) runs too late
+// to save either. Same normTitle/normCompany the cross-source dupe guard uses,
+// so a (company, title) pair listed here is exactly one that guard would drop
+// on submission anyway. Deliberately covers EVERY source, not just non-AI
+// ones (unlike _ai_dupe_guard's own `source <> $1`), so two AI-discovered
+// companies that turn out to post the same requisition also show up here —
+// that guard only ever compares an AI candidate against OTHER sources.
+async function getActiveTitlesByCompany() {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      `SELECT title, company FROM job_posts
+        WHERE active = TRUE AND company IS NOT NULL AND btrim(company) <> ''`
+    );
+    const byCompany = new Map();
+    for (const r of rows) {
+      const c = normCompany(r.company);
+      const t = normTitle(r.title);
+      if (!c || !t) continue;
+      if (!byCompany.has(c)) byCompany.set(c, new Set());
+      byCompany.get(c).add(t);
+    }
+    const out = {};
+    for (const [c, titles] of byCompany) out[c] = [...titles];
+    return out;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getRegistrySnapshot() {
   const reg = await readRegistry();
   const budget = await checkBudget();
+  const activeTitlesByCompany = await getActiveTitlesByCompany();
   return {
     sites: reg.sites,
     permanentlyRejected: reg.permanentlyRejected,
     knownUrls: reg.findings.map((f) => f.url).filter(Boolean),
+    // Keyed by normCompany() — look up a candidate company the same way
+    // _ai_dupe_guard.mjs does before spending a detail-page fetch on it.
+    activeTitlesByCompany,
     uploadBudget: {
       remaining: budget.remaining,
       limit: budget.limit,
