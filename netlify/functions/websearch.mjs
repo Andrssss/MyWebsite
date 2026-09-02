@@ -52,8 +52,10 @@ export default async (request) => {
   if (!expected || token !== expected) return json(401, { error: "Unauthorized" });
   if (request.method !== "GET") return json(405, { error: "GET only" });
 
-  const key = process.env.GOOGLE_CSE_KEY;
-  const cx = process.env.GOOGLE_CSE_CX;
+  // .trim(): egy dashboardon beillesztett érték végén könnyen marad szóköz vagy
+  // sortörés, és a Google arra egy teljesen félrevezető hibaüzenettel válaszol.
+  const key = (process.env.GOOGLE_CSE_KEY || "").trim();
+  const cx = (process.env.GOOGLE_CSE_CX || "").trim();
   if (!key || !cx) {
     return json(503, {
       error: "search_not_configured",
@@ -100,6 +102,21 @@ export default async (request) => {
   clearTimeout(timer);
 
   if (!res.ok) {
+    // A Google 403-a NEM futásidejű hiba, hanem KONFIGURÁCIÓ: a kulcs projektjében
+    // nincs engedélyezve a Custom Search API, vagy a kulcs API-korlátozása másra
+    // szól ("This project does not have the access to Custom Search JSON API",
+    // élő eset 2026-09-01). A hívónak ez ugyanaz a helyzet, mint a hiányzó env:
+    // a kereső most nem használható, essen vissza a saját eszközére. Ezért
+    // ugyanazt a 503 `search_not_configured` alakot kapja — a `details` megőrzi
+    // a Google eredeti üzenetét, hogy a valódi ok ne vesszen el.
+    if (res.status === 403) {
+      return json(503, {
+        error: "search_not_configured",
+        status: 403,
+        details: body?.error?.message || null,
+        hint: "A Google elutasította a kulcsot (nincs engedélyezve a Custom Search API, vagy rossz az API-korlátozás). Használd helyette a saját WebSearch eszközödet.",
+      });
+    }
     // A kvóta-kimerülést (429) és minden más Google-hibát változatlan
     // státusszal adunk vissza, hogy a hívó meg tudja különböztetni őket.
     return json(res.status, {
