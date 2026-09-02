@@ -209,10 +209,28 @@ async function seedTenants(client) {
  * a "már lekértük ÉS akkor volt rajta magyar hirdetés" halmazt jelöli ki, mert
  * a nulla magyar sorral záruló futás `no_hu`-ra állítja a státuszt.
  * A még sosem látott tenantok így a második csoport ELEJÉRE kerülnek
- * (NULLS FIRST), tehát nem éheznek ki — csak nem tolakszanak előre.
+ * (NULLS FIRST) — ELMÉLETBEN nem éheznek ki, csak nem tolakszanak előre.
+ *
+ * ⚠️ 2026-09-02, élőben igazolva: A GYAKORLATBAN teljesen kiéheznek, ha az
+ * első csoport (checked live) mérete eléri/meghaladja a `limit`-et. A `LIMIT`
+ * a rendezés SZERINT válogat, nem arányosan a két csoportból — ha az első
+ * csoportban ≥ `limit` sor van, a második csoport (last_checked IS NULL vagy
+ * esedékes no_hu) EGYETLEN sort sem kap, SOHA, mert az első csoport minden
+ * futás után önmagát tölti újra (a lekért 20 tenant last_checked-je frissül,
+ * a csoport mérete így stabilan a limit fölött marad). Ez pont bekövetkezett:
+ * a `live` tenantok száma a felderítő miatt 180-ra nőtt (BATCH_SIZE=20), így
+ * hetek óta ugyanaz a ~180 tenant körforog, a kézzel felvett "bizonyítottan
+ * jó" jelöltek egy része (pl. personio/teliogroup, a workday-lista fele) meg
+ * a felderítő teljes `no_hu`-utánpótlása egyszer sem futott le — ez adta a
+ * "ma nem talált semmit" panaszt: nem a jó boardokon nincs új hirdetés, hanem
+ * az ígéretes újak sosem jutnak sorra. Fix: a második csoportnak KÜLÖN, a
+ * `limit`-en FELÜLI, nem elvehető keretet adunk — additív, nem csökkenti az
+ * élő tenantok meglévő óránkénti recheck-gyakoriságát.
  */
+const NEVER_CHECKED_RESERVE = 10;
+
 async function dueTenants(client, limit) {
-  const { rows } = await client.query(
+  const { rows: primary } = await client.query(
     `SELECT provider, slug, company
        FROM ats_tenants
       WHERE status <> 'dead'
@@ -225,7 +243,22 @@ async function dueTenants(client, limit) {
       LIMIT $1`,
     [limit, RECHECK_NO_HU_DAYS]
   );
-  return rows;
+
+  const seen = new Set(primary.map((r) => `${r.provider} ${r.slug}`));
+  const { rows: reserveRows } = await client.query(
+    `SELECT provider, slug, company
+       FROM ats_tenants
+      WHERE status <> 'dead'
+        AND (
+          last_checked IS NULL
+          OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days => $2::int))
+        )
+      ORDER BY last_checked ASC NULLS FIRST
+      LIMIT $1`,
+    [NEVER_CHECKED_RESERVE, RECHECK_NO_HU_DAYS]
+  );
+
+  return [...primary, ...reserveRows.filter((r) => !seen.has(`${r.provider} ${r.slug}`))];
 }
 
 async function recordTenantResult(client, tenant, { status, huCount, inserted, error }) {
