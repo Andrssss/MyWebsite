@@ -6,9 +6,11 @@
 // No DB writes. Delete after use.
 
 import { getStore } from "@netlify/blobs";
+import { Pool } from "pg";
 
 const TOKEN = "7c9f1e4a2b6d8035c1e7a9f4b62d0e58a3c7f19b";
 const STORE_NAME = "db-write-audit";
+const pool = new Pool({ connectionString: process.env.NETLIFY_DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 export default async (request) => {
   const auth = (request.headers.get("authorization") || "").trim();
@@ -19,6 +21,31 @@ export default async (request) => {
   const datePrefix = url.searchParams.get("date") || "2026-09-02";
   const fromHour = Number(url.searchParams.get("fromHour") ?? 17);
   const toHour = Number(url.searchParams.get("toHour") ?? 22);
+  const mode = url.searchParams.get("mode") || "blobs";
+
+  if (mode === "sql") {
+    const client = await pool.connect();
+    try {
+      const byMinute = await client.query(`
+        SELECT date_trunc('minute', first_seen) AS minute, count(*)::int AS n
+        FROM job_posts
+        WHERE first_seen >= $1::timestamptz AND first_seen < $2::timestamptz
+        GROUP BY 1 ORDER BY 1
+      `, [`${datePrefix}T17:00:00Z`, `${datePrefix}T22:00:00Z`]);
+      const bySource = await client.query(`
+        SELECT source, count(*)::int AS n
+        FROM job_posts
+        WHERE first_seen >= $1::timestamptz AND first_seen < $2::timestamptz
+        GROUP BY 1 ORDER BY 2 DESC
+      `, [`${datePrefix}T17:30:00Z`, `${datePrefix}T18:30:00Z`]);
+      const wiseRoland = await client.query(`SELECT source, count(*)::int AS n FROM job_posts WHERE source IN ('wise','roland') GROUP BY 1`);
+      return new Response(JSON.stringify({ byMinute: byMinute.rows, bySource: bySource.rows, wiseRoland: wiseRoland.rows }, null, 2), {
+        headers: { "content-type": "application/json" },
+      });
+    } finally {
+      client.release();
+    }
+  }
 
   try {
     const store = getStore(STORE_NAME);
