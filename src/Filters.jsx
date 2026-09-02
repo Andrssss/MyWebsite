@@ -160,7 +160,7 @@ const Filters = () => {
             navigator.clipboard?.writeText(id).catch(() => {});
             setError(`Eszköz-azonosító (vágólapra másolva): ${id}`);
           }}
-          title="Ezt az UUID-t kell egy LITTLE_ADMIN* env-változóba tenni a Netlify-on"
+          title="Ezt az UUID-t kell egy ADMIN_<n> env-változóba tenni a Netlify-on"
         >
           Eszköz-azonosító
         </button>

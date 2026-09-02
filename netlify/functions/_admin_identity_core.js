@@ -1,11 +1,9 @@
 // netlify/functions/_admin_identity_core.js
 //
-// Shared identity resolution for the two admin tiers, used by jobs.js and
-// job-applied.js. Centralized on purpose: each file used to keep its own copy
-// of this env-var discovery regex, and they drifted — the 2026-07-23
-// LITTLE_ADMIN_4..7 → ADMIN_1..4 rename broke jobs.js's copy while
-// job-applied.js's (password-only) check kept working, silently, because
-// nothing forced the two to agree. One copy can't drift from itself.
+// 2026-09-01: the second, read-only "little admin" tier was REMOVED. It existed
+// to let a device see `hidden` rows without holding a write credential, but the
+// board became admin-only on 2026-08-25, so the two tiers had converged to the
+// same page-level access anyway. There is now exactly one tier: ADMIN_*.
 const crypto = require("crypto");
 
 const VISITOR_COOKIE = "jobWatcherVisitorId";
@@ -18,16 +16,12 @@ function envKeys(pattern) {
     .filter((v) => v.length > 0);
 }
 
-// Real admins: ADMIN_1, ADMIN_2… — same UUIDs as the old committed
+// Admins: ADMIN_1, ADMIN_2… — same UUIDs as the old committed
 // ADMIN_VISITOR_IDS allowlist, now env-only. Share ONE applied-jobs bucket.
+// Adding a device is an env change only: the regex discovers every ADMIN_<n>,
+// so a misspelled name grants nobody access instead of silently becoming a key.
 function adminKeys() {
   return envKeys(/^ADMIN_\d+$/);
-}
-
-// Little admins: LITTLE_ADMIN, LITTLE_ADMIN_2… — read-only hidden-row tier.
-// Each gets their OWN applied-jobs bucket, kept apart from the real admins'.
-function littleAdminKeys() {
-  return envKeys(/^LITTLE_ADMIN(_\d+)?$/);
 }
 
 function safeEqual(a, b) {
@@ -73,26 +67,24 @@ function readCookie(event, name) {
   return "";
 }
 
-// Does this request's visitor cookie belong to EITHER admin tier? Used by
-// jobs.js to decide hidden-row visibility — both tiers see hidden rows there.
+// Does this request's visitor cookie belong to an admin? Used by jobs.js to
+// decide hidden-row visibility.
 function isRecognizedAdmin(event) {
   const cookie = readCookie(event, VISITOR_COOKIE);
   if (!cookie) return false;
-  return matchesAny(cookie, adminKeys()) || matchesAny(cookie, littleAdminKeys());
+  return matchesAny(cookie, adminKeys());
 }
 
 // Which applied-jobs bucket does this request belong to?
-//   'admin'  → one of the real ADMIN_* UUIDs (shared bucket, all real admins)
-//   'little' → any LITTLE_ADMIN* UUID (shared bucket, all little-admins together —
-//              separate from 'admin', but little-admins share ONE list among
-//              themselves too, same as the real admins do)
-//   null     → visitor cookie matches neither tier
+//   'admin' → one of the ADMIN_* UUIDs (ONE shared bucket for all admins)
+//   null    → the visitor cookie matches no admin
+// Kept as a string rather than a boolean because it IS the stored `owner_key`
+// column value in admin_applied_jobs; rows written by the removed 'little' tier
+// are still in that table, simply no longer reachable by anyone.
 function resolveOwnerKey(event) {
   const cookie = readCookie(event, VISITOR_COOKIE);
   if (!cookie) return null;
-  if (matchesAny(cookie, adminKeys())) return "admin";
-  if (matchesAny(cookie, littleAdminKeys())) return "little";
-  return null;
+  return matchesAny(cookie, adminKeys()) ? "admin" : null;
 }
 
 function hasAdminSecret(event) {
@@ -110,8 +102,8 @@ function hasAdminSecret(event) {
 // server-side half of that rule — a client-side redirect on its own would leave
 // every endpoint openly callable by anyone who knows the URL.
 //
-// Either admin tier qualifies by visitor cookie; an ADMIN_SECRET bearer also
-// does, so the repo's own maintenance scripts (scripts/audit_all_sources.mjs,
+// An admin cookie qualifies; an ADMIN_SECRET bearer also does, so the repo's
+// own maintenance scripts (scripts/audit_all_sources.mjs,
 // scripts/check_false_deactivations.mjs, ad-hoc curl checks) keep working
 // without a browser cookie.
 function hasJobBoardAccess(event) {
@@ -121,7 +113,6 @@ function hasJobBoardAccess(event) {
 module.exports = {
   VISITOR_COOKIE,
   adminKeys,
-  littleAdminKeys,
   safeEqual,
   matchesAny,
   readCookie,

@@ -6,7 +6,7 @@
 // the page itself never mounts, so not one of its data fetches ever fires.
 //
 // The verdict CANNOT be decided client-side: the credential is the visitor
-// cookie matched against the ADMIN_* / LITTLE_ADMIN* env vars, which only the
+// cookie matched against the ADMIN_* env vars, which only the
 // server can see. So exactly one endpoint stays callable by everyone —
 // `job-access`, which returns a boolean and no data at all — and every other
 // job-board function is gated server-side too (_admin_identity_core.js →
@@ -16,7 +16,8 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 const ACCESS_API = "/.netlify/functions/job-access";
 export const REROUTE_URL = "https://pestidev.hu/?fresh=today";
 
-// tier: "admin" | "little" — children only ever render with one of the two.
+// tier: "admin" — the only granted value since the read-only "little" tier was
+// removed 2026-09-01; kept as a string so a future second tier needs no reshape.
 const JobAccessContext = createContext({ tier: null });
 
 export const useJobAccess = () => useContext(JobAccessContext);

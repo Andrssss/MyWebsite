@@ -8,8 +8,8 @@
 // This endpoint is now the only way to hide/unhide: bury a posting you don't
 // want on the board without claiming you applied to it.
 //
-// Auth = ADMIN_SECRET (the WRITE tier), deliberately NOT the LITTLE_ADMIN
-// cookie: that one is read-only by design, so a leaked LITTLE_ADMIN can never
+// Auth = ADMIN_SECRET (the WRITE tier), deliberately NOT the admin visitor
+// cookie: that cookie is a read credential by design, so a leaked one can never
 // be used to mass-hide the board. See the admin-credentials note in CLAUDE.md.
 //
 //   POST { url, hidden: true|false, source? }

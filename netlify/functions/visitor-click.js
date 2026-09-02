@@ -1,7 +1,7 @@
 // netlify/functions/visitor-click.js
 const { Pool } = require("pg");
 const { withDbAuditFlush } = require("./_db_audit.js");
-const { hasJobBoardAccess } = require("./_admin_identity_core");
+const { hasJobBoardAccess, adminKeys, matchesAny } = require("./_admin_identity_core");
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) {
@@ -17,12 +17,15 @@ const sql = { query: (text, params) => pool.query(text, params) };
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
-const ADMIN_VISITOR_IDS = new Set([
-  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
-  "69872482-1311-4702-a5e5-a782ca9f2669",
-  "82906f93-dfbb-4684-b2b1-a948b99553e0",
-  "b878ceed-55b7-47db-87ec-c4e2825246f8",
-]);
+// Admin visitor UUIDs come from the ADMIN_* env vars via _admin_identity_core —
+// they used to be a hardcoded Set right here, which meant this public repo WAS
+// the credential (2026-09-01: Netlify's secrets scanner failed the build over
+// exactly these four literals, which is the correct verdict). adminKeys() re-reads
+// process.env per call, so adding a device stays an env-only change, and the
+// comparison is the same timing-safe, case-insensitive one the rest of the site uses.
+function isAdminVisitor(id) {
+  return matchesAny(id, adminKeys());
+}
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 30;
@@ -99,7 +102,7 @@ exports.handler = withDbAuditFlush("visitor-click", async (event) => {
   if (event.httpMethod === "GET") {
     if (event.queryStringParameters?.detail === "1") {
       const adminId = event.queryStringParameters?.adminId || "";
-      if (!ADMIN_VISITOR_IDS.has(adminId)) {
+      if (!isAdminVisitor(adminId)) {
         return jsonResponse(403, { error: "Forbidden" });
       }
       try {
@@ -112,7 +115,7 @@ exports.handler = withDbAuditFlush("visitor-click", async (event) => {
            WHERE visitor_cookie <> ALL($1::text[])
            ORDER BY created_at DESC
            LIMIT 2000`,
-          [[...ADMIN_VISITOR_IDS]]
+          [adminKeys()]
         );
         return jsonResponse(200, { rows });
       } catch (err) {
@@ -137,7 +140,7 @@ exports.handler = withDbAuditFlush("visitor-click", async (event) => {
          GROUP BY clicked_on
          ORDER BY count DESC
          LIMIT $2`,
-        [[...ADMIN_VISITOR_IDS], limit]
+        [adminKeys(), limit]
       );
       return jsonResponse(200, { clicks: rows }, { "Cache-Control": "public, max-age=60" });
     } catch (err) {
@@ -177,7 +180,7 @@ exports.handler = withDbAuditFlush("visitor-click", async (event) => {
   if (visitorId.length > 128) return jsonResponse(400, { error: "visitorId too long" });
   if (target.length > 512) return jsonResponse(400, { error: "target too long" });
 
-  if (ADMIN_VISITOR_IDS.has(visitorId)) {
+  if (isAdminVisitor(visitorId)) {
     return jsonResponse(200, { ok: true, skipped: true });
   }
 

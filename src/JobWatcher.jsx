@@ -60,7 +60,7 @@ const createVisitorId = () => {
 };
 
 // A látogatói UUID egyszerre analitika-azonosító ÉS a little-admin kulcs
-// (jobs.js a cookie-t hasonlítja a LITTLE_ADMIN* env-ekhez), ezért nem mindegy,
+// (jobs.js a cookie-t hasonlítja az ADMIN_* env-ekhez), ezért nem mindegy,
 // mennyire tartós. "Soha nem lejáró" cookie nincs: a Chrome 104+ MINDEN cookie
 // lejáratát 400 napra vágja, a Safari ITP a JS-ből írt cookie-t 7 napra, expires
 // nélkül pedig session-cookie lenne (böngészőzáráskor elveszne). Ezért:
@@ -507,14 +507,13 @@ const JobWatcher = () => {
   // Both admin tiers come from JobAccessGate, which already asked the server
   // (`job-access`) before this component was allowed to mount. That verdict is
   // SERVER-CONFIRMED — the credential is the visitor cookie matched against the
-  // ADMIN_* / LITTLE_ADMIN* env vars, so faking the cookie client-side changes
+  // ADMIN_* env vars, so faking the cookie client-side changes
   // nothing: every job-board endpoint re-checks it on its own.
   //
   // This replaced two older client-side signals: a source-committed UUID
   // allowlist (public in the repo, so not a credential at all) and a
   // `jobs?limit=1` probe that sniffed for the `hidden` column.
   const { tier } = useJobAccess();
-  const isLittleAdmin = tier === "little";
   const [loading, setLoading] = useState(true);
   const [loadingSources, setLoadingSources] = useState(true);
   const [status, setStatus] = useState("");
@@ -619,7 +618,7 @@ const JobWatcher = () => {
   // now redirected there by JobAccessGate before this component mounts, so this
   // can no longer be true in practice — it stays as the in-component fallback
   // in case JobWatcher is ever rendered outside the gate.
-  const isRestricted = !isAdmin && !isLittleAdmin;
+  const isRestricted = !isAdmin;
 
   useEffect(() => {
     if (isRestricted) setShowAppliedOnly(true);
@@ -643,7 +642,7 @@ const JobWatcher = () => {
   // device can write to the same shared bucket at any time, and without this
   // a long-open tab would keep showing a pre-change snapshot indefinitely.
   useEffect(() => {
-    if (!isAdmin && !isLittleAdmin) return;
+    if (!isAdmin) return;
     let cancelled = false;
 
     const loadApplied = async () => {
@@ -721,12 +720,12 @@ const JobWatcher = () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [isAdmin, isLittleAdmin, myVisitorId]);
+  }, [isAdmin, myVisitorId]);
 
   // Persist an applied/interview change to the shared DB (admins only).
   // Resolves to true when the DB write succeeded (non-admin: false, no write).
   const persistAdminApplied = (jobKey, applied, interview, job) => {
-    if (!isAdmin && !isLittleAdmin) return Promise.resolve(false);
+    if (!isAdmin) return Promise.resolve(false);
     return adminFetch(JOB_APPLIED_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1027,7 +1026,7 @@ const JobWatcher = () => {
   const [showEmail, setShowEmail] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin && !isLittleAdmin) return;
+    if (!isAdmin) return;
     fetch("/.netlify/functions/last-deploy")
       .then((r) => r.json())
       .then((data) => {
@@ -1039,7 +1038,7 @@ const JobWatcher = () => {
         );
       })
       .catch(() => {});
-  }, [isAdmin, isLittleAdmin]);
+  }, [isAdmin]);
 
   /* =======================
      FETCH
@@ -1136,19 +1135,19 @@ const JobWatcher = () => {
   };
 
   useEffect(() => {
-    if (!isAdmin && !isLittleAdmin) return;
+    if (!isAdmin) return;
     fetchSources();
     fetchCategories();
     fetchTechnologies();
-  }, [isAdmin, isLittleAdmin]);
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!isAdmin && !isLittleAdmin) {
+    if (!isAdmin) {
       setLoading(false);
       return;
     }
     fetchJobs(time24h, time7d, false, timeToday);
-  }, [isAdmin, isLittleAdmin, time24h, time7d, timeToday]);
+  }, [isAdmin, time24h, time7d, timeToday]);
 
   /* Források/Kategóriák/Technológiák közül csak egy lehet nyitva egyszerre —
      az egyik megnyitása a másik kettőt automatikusan csukja. */
@@ -2069,7 +2068,7 @@ const JobWatcher = () => {
           >
             {showAppliedOnly ? `✓ Jelentkezések (${appliedKeys.size})` : `Jelentkezések (${appliedKeys.size})`}
           </button>
-          {(isAdmin || isLittleAdmin) && (
+          {isAdmin && (
             <button
               className={`job-btn job-btn--toggle${showHiddenOnly ? " active" : ""}`}
               onClick={() => setShowHiddenOnly((v) => !v)}
@@ -2638,7 +2637,7 @@ const JobWatcher = () => {
                 >
                   {isHighlighted ? "★ Kiemelve" : "☆ Kiemelés"}
                 </button>
-                {(isLittleAdmin || isAdmin) && job.url && (
+                {isAdmin && job.url && (
                   <button
                     className={`job-hide-btn${isHidden ? " job-hide-btn--on" : ""}`}
                     onClick={() => toggleHidden(job)}

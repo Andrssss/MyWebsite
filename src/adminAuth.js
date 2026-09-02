@@ -82,13 +82,16 @@ export async function adminFetch(url, options = {}) {
   return res;
 }
 
-// ── "Little admin" ─────────────────────────────────────────────────────────
-// Read-only elevated access: jobs.js returns `hidden` rows when this device's
-// visitor UUID matches one of the LITTLE_ADMIN* env vars. Same shape as the old
+// ── Admin device identity ──────────────────────────────────────────────────
+// Elevated read access: jobs.js returns `hidden` rows when this device's
+// visitor UUID matches one of the ADMIN_* env vars. Same shape as the old
 // ADMIN_VISITOR_IDS allowlist, except the accepted UUIDs live ONLY in the
 // Netlify env — never in source, which is what makes them a credential at all.
 // Nothing to set up per device: the visitor cookie already exists; you just
 // paste the device's UUID into the Netlify env.
+//
+// The second, read-only "little admin" tier this section used to describe was
+// removed 2026-09-01 — there is one tier now.
 const VISITOR_COOKIE = "jobWatcherVisitorId";
 
 // JobWatcher caches the job list in localStorage for 5 minutes under a key that
@@ -105,8 +108,8 @@ export function purgeJobListCache() {
   }
 }
 
-// This device's visitor UUID — the value to paste into a LITTLE_ADMIN* env var
-// to grant this browser read access to hidden rows.
+// This device's visitor UUID — the value to paste into an ADMIN_<n> env var
+// to grant this browser admin access.
 export function getDeviceVisitorId() {
   for (const part of document.cookie.split(";")) {
     const idx = part.indexOf("=");
@@ -117,8 +120,7 @@ export function getDeviceVisitorId() {
   return "";
 }
 
-// NOTE: deliberately no `hasLittleAdminCookie()` helper here. Gating admin UI on
-// the cookie's mere presence would let anyone reveal the controls by setting
+// NOTE: deliberately no `hasAdminCookie()` helper here. Gating admin UI on the
+// cookie's mere presence would let anyone reveal the controls by setting
 // `jw_pref=anything` in devtools. JobWatcher instead derives admin-ness from the
-// server's response (the `hidden` column, which jobs.js sends only to a verified
-// little-admin), so the check cannot be spoofed client-side.
+// server's verdict (job-access.js), so the check cannot be spoofed client-side.

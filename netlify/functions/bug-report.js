@@ -12,14 +12,19 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+const { adminKeys, matchesAny } = require("./_admin_identity_core");
+
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
-const ADMIN_VISITOR_IDS = new Set([
-  "43e878e0-f5fd-45f3-bfd4-9473e5deec11",
-  "69872482-1311-4702-a5e5-a782ca9f2669",
-  "82906f93-dfbb-4684-b2b1-a948b99553e0",
-  "b878ceed-55b7-47db-87ec-c4e2825246f8",
-]);
+// Admin visitor UUIDs come from the ADMIN_* env vars via _admin_identity_core —
+// they used to be a hardcoded Set right here, which meant this public repo WAS
+// the credential (2026-09-01: Netlify's secrets scanner failed the build over
+// exactly these four literals, which is the correct verdict). adminKeys() re-reads
+// process.env per call, so adding a device stays an env-only change, and the
+// comparison is the same timing-safe, case-insensitive one the rest of the site uses.
+function isAdminVisitor(id) {
+  return matchesAny(id, adminKeys());
+}
 
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 const RATE_LIMIT_MAX = 1;
@@ -101,7 +106,7 @@ exports.handler = withDbAuditFlush("bug-report", async (event) => {
 
   if (event.httpMethod === "GET") {
     const adminId = event.queryStringParameters?.adminId || "";
-    if (!ADMIN_VISITOR_IDS.has(adminId)) {
+    if (!isAdminVisitor(adminId)) {
       return jsonResponse(403, { error: "Forbidden" });
     }
     try {
@@ -124,7 +129,7 @@ exports.handler = withDbAuditFlush("bug-report", async (event) => {
       return jsonResponse(400, { error: "Invalid JSON" });
     }
     const adminId = String(body.adminId || "");
-    if (!ADMIN_VISITOR_IDS.has(adminId)) {
+    if (!isAdminVisitor(adminId)) {
       return jsonResponse(403, { error: "Forbidden" });
     }
     const id = parseInt(body.id, 10);

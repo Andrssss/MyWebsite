@@ -100,22 +100,18 @@ const CACHE_HEADERS = {
   Vary: "Cookie",
 };
 
-// Admin ("little admin") responses contain hidden rows → they must NEVER be
+// Admin responses contain hidden rows → they must NEVER be
 // stored by the shared Netlify CDN, only by that one browser.
 const PRIVATE_HEADERS = {
   "Cache-Control": "private, no-store",
   Vary: "Cookie",
 };
 
-// Read-only elevated access: seeing `hidden` job rows. Deliberately a SEPARATE
-// credential from ADMIN_SECRET (which authorizes destructive actions) — if this
-// one leaks, the blast radius is "someone sees hidden ads", not data loss.
-//
-// Identity resolution (which env vars count, cookie matching, timing-safe
-// compare) lives in _admin_identity_core.js, shared with job-applied.js — a
-// duplicated copy here is exactly what caused the 2026-07-23 LITTLE_ADMIN_4..7
-// → ADMIN_1..4 rename to silently break this file while job-applied.js's
-// separate check kept working.
+// Elevated read access: seeing `hidden` job rows. The credential is the device's
+// own visitor cookie, deliberately SEPARATE from ADMIN_SECRET (which authorizes
+// destructive actions) — if a cookie leaks, the blast radius is "someone sees
+// hidden ads", not data loss.
+
 const { isRecognizedAdmin, hasJobBoardAccess } = require("./_admin_identity_core");
 
 // One-line boot log so "is any key even configured?" is answerable from the
@@ -123,12 +119,10 @@ const { isRecognizedAdmin, hasJobBoardAccess } = require("./_admin_identity_core
 // per call (cheap: a handful of string comparisons), so this is diagnostic
 // only, not a cached gate.
 console.log(
-  `[jobs] admin/little-admin env keys present: ${
-    Object.keys(process.env).filter((k) => /^(LITTLE_ADMIN(_\d+)?|ADMIN_\d+)$/.test(k)).length
+  `[jobs] admin env keys present: ${
+    Object.keys(process.env).filter((k) => /^ADMIN_\d+$/.test(k)).length
   }`
 );
-
-const isLittleAdmin = isRecognizedAdmin;
 
 // FIXED lista (key/label)
 const FIXED = [
@@ -226,7 +220,7 @@ exports.handler = async (event) => {
 
   // Does this request see hidden rows? Decided ONCE per request and folded into
   // the cache key + response headers below.
-  const admin = isLittleAdmin(event);
+  const admin = isRecognizedAdmin(event);
   const respHeaders = admin ? PRIVATE_HEADERS : CACHE_HEADERS;
 
   if (method === "GET") {
@@ -272,10 +266,10 @@ exports.handler = async (event) => {
 
       // Hidden-row predicate. NOT user input — derived from the boolean above,
       // so interpolating it into the SQL text is safe (no injection surface).
-      // Ordinary visitors get the hidden-filter; little-admin gets everything.
+      // Ordinary visitors get the hidden-filter; an admin gets everything.
       const HID = admin ? "TRUE" : "hidden = false";
 
-      // The `hidden` flag itself is only ever sent to little-admin, so the
+      // The `hidden` flag itself is only ever sent to an admin, so the
       // public response shape stays byte-for-byte what it was before.
       const HIDCOL = admin ? ", hidden" : "";
 

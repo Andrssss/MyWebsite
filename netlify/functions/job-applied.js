@@ -2,17 +2,18 @@
 // "Applied jobs" list, partitioned per owner in the SAME table/DB.
 //
 // `applied_by` is the partition key, resolved SERVER-SIDE from the visitor
-// cookie (never trusted from the client): the four real admins all resolve to
-// the literal 'admin' bucket (shared — that's the point, any of the 4 sees
-// what the others marked), while each little-admin gets `little:<their UUID>`,
-// their OWN bucket, so they can't collide with or see the real admins' list.
+// cookie (never trusted from the client): every admin resolves to the literal
+// 'admin' bucket (shared — that's the point, any of them sees what the others
+// marked). The read-only "little admin" tier, which used to get its own
+// separate bucket here, was removed 2026-09-01; its rows are still in the table
+// but nothing resolves to them any more.
 //
 // A row exists while a job has any status. Two flags per job:
 //   applied   → "Jelentkeztem"
 //   interview → "Interjú" (a sub-state; only meaningful while applied)
 //
 // Every request needs `Authorization: Bearer $ADMIN_SECRET` AND a visitor
-// cookie recognized by _admin_identity_core (either tier) — knowing the
+// cookie recognized by _admin_identity_core — knowing the
 // password alone is no longer enough, closing a gap the old UUID-only auth
 // didn't have either (anyone with a leaked/guessed secret could hit this
 // regardless of who they were).
