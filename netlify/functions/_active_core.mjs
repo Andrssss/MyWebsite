@@ -25,6 +25,7 @@
 
 import { logRecovery } from "./_error-logger.mjs";
 import { aiScrapedProbe, aiScrapedIsDead } from "./_ai_liveness.mjs";
+import { dupeKey, technologiesExactMatch } from "../../src/lib/crossSourceDupe.mjs";
 
 // How long after first_seen a job is unconditionally active before it becomes
 // eligible for "is it still on the source?" checking.
@@ -362,6 +363,54 @@ export async function hasActiveDuplicateByTitleCompany(client, source, newUrl, t
     [source, title, company ?? null, newUrl]
   );
   return rowCount > 0;
+}
+
+/**
+ * Same idea as hasActiveDuplicateByTitleCompany, for a source whose own
+ * scraped title/company TEXT isn't byte-stable across re-postings (raw exact
+ * string equality misses it) — confirmed live 2026-09-03 on LinkedIn: 8
+ * duplicate pairs where the company text varies ("Kostal Global Business
+ * Services Center" vs "Kostal Group") or the title spelling varies
+ * ("front-end" vs "frontend"), none of which LinkedIn's own
+ * canonicalizeLinkedInJobUrl (numeric-suffix-only stripping) could catch.
+ *
+ * Uses dupeKey (first-word company + accent/spelling-normalized title, see
+ * src/lib/crossSourceDupe.mjs) instead of raw equality, batched into an index
+ * ONCE per run — build with loadSameSourceDupeIndex, then call
+ * findSameSourceDuplicate per candidate row (O(1) map lookup instead of a
+ * query per item). A match still requires an EXACT technologies match
+ * (technologiesExactMatch) before being trusted, same "same-source
+ * extraction is internally consistent" reasoning as isLikelySamePosting.
+ */
+export async function loadSameSourceDupeIndex(client, source) {
+  await ensureActiveSchema(client);
+  const { rows } = await client.query(
+    `SELECT url, company, title, technologies FROM job_posts
+      WHERE source = $1 AND active = true
+        AND company IS NOT NULL AND company <> ''
+        AND title IS NOT NULL AND title <> ''`,
+    [source]
+  );
+  const index = new Map();
+  for (const r of rows) {
+    const key = dupeKey(r.company, r.title);
+    if (!key) continue;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(r);
+  }
+  return index;
+}
+
+// Returns the matching existing row ({url, technologies}) or null. Caller
+// should also add the new item to the index once it's inserted (see
+// _linkedin_core.mjs) so a second near-duplicate discovered later in the
+// SAME run is caught too — the index is only seeded from the DB once.
+export function findSameSourceDuplicate(index, newUrl, company, title, technologies) {
+  const key = dupeKey(company, title);
+  if (!key) return null;
+  const candidates = index.get(key);
+  if (!candidates) return null;
+  return candidates.find((r) => r.url !== newUrl && technologiesExactMatch(r.technologies, technologies)) || null;
 }
 
 // Sources whose sites answer a DEAD job url with a 200 redirect to a generic

@@ -10,6 +10,8 @@ import {
   extractLinkedInExperience, extractTechnologies, ensureTechnologiesColumn,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
+import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 
 let _filters = [];
 
@@ -372,6 +374,15 @@ export async function processLinkedInSources(sources, jobName) {
     );
     const knownCanonicalUrls = new Set(knownRows.map(r => r.canonical_url));
 
+    // Broader same-posting guard, on top of the canonical_url check above —
+    // canonicalizeLinkedInJobUrl only strips the trailing numeric id, so it
+    // misses a re-post whose SLUG TEXT itself changed (company name variant,
+    // "front-end" vs "frontend" spelling). Confirmed live 2026-09-03: 8 such
+    // duplicate pairs. Built once here, updated as we go so a second
+    // near-duplicate discovered later in this SAME run is also caught (the
+    // Innoview lesson — see pestidev-job-scraper PR #14).
+    const sameSourceDupeIndex = await loadSameSourceDupeIndex(client, "LinkedIn");
+
     for (const p of sources) {
       if (blocked) {
         console.warn(`${jobName}: aborting remaining sources after LinkedIn block.`);
@@ -433,8 +444,22 @@ export async function processLinkedInSources(sources, jobName) {
           knownCanonicalUrls.add(canonical);
         }
 
+        const dupe = findSameSourceDuplicate(sameSourceDupeIndex, it.url, it.company, it.title, it.technologies);
+        if (dupe) {
+          console.log(`[LinkedIn] SKIP same-source dupe "${it.title}" @ ${it.company || "-"} — already active at ${dupe.url}`);
+          continue;
+        }
+
         try {
           await upsertJob(client, p.key, it);
+          // Seed the index with this item too, so a second near-duplicate
+          // discovered later in THIS run (different search shard, same real
+          // posting) is caught as well — not just ones already in the DB.
+          const key = dupeKey(it.company, it.title);
+          if (key) {
+            if (!sameSourceDupeIndex.has(key)) sameSourceDupeIndex.set(key, []);
+            sameSourceDupeIndex.get(key).push({ url: it.url, technologies: it.technologies });
+          }
         } catch (err) {
           console.error(err);
         }
