@@ -8,6 +8,8 @@ import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
+import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 
 let _filters = [];
 
@@ -401,6 +403,14 @@ async function scrapeNofluffjobs(client) {
   const seen = new Set();
   let totalUpserted = 0;
 
+  // Same-source duplicate guard (2026-09-04): nofluffjobs re-lists a bumped
+  // ad under a brand-new numeric id (confirmed live: Deutsche Telekom
+  // "DevOps Engineer" — 4 separate ids for what turned out to be 2 real
+  // reqs, "Cloud DevOps" similarly). No existing url-stability mechanism for
+  // this source at all. Built once per run, updated as items get inserted so
+  // a duplicate found across two source URLs in the SAME run is also caught.
+  const sameSourceDupeIndex = await loadSameSourceDupeIndex(client, "nofluffjobs");
+
   for (const sourceUrl of NOFLUFF_SOURCES) {
     console.log(`[nofluffjobs] Fetching: ${sourceUrl}`);
     let html;
@@ -442,9 +452,22 @@ async function scrapeNofluffjobs(client) {
       if (detail.experience) item.experience = detail.experience;
       if (detail.technologies) item.technologies = detail.technologies;
       await sleep(400);
+
+      const dupe = findSameSourceDuplicate(sameSourceDupeIndex, item.url, item.company, item.title, item.technologies);
+      if (dupe) {
+        console.log(`[nofluffjobs]   SKIP same-source dupe "${item.title}" @ ${item.company || "-"} — already active at ${dupe.url}`);
+        continue;
+      }
+
       console.log(`[nofluffjobs]   upsert [${item.experience ?? "-"}] [${item.technologies ?? "-"}] "${item.title}"`);
       await upsertJob(client, item);
       totalUpserted++;
+
+      const key = dupeKey(item.company, item.title);
+      if (key) {
+        if (!sameSourceDupeIndex.has(key)) sameSourceDupeIndex.set(key, []);
+        sameSourceDupeIndex.get(key).push({ url: item.url, technologies: item.technologies });
+      }
     }
 
     await sleep(1000);

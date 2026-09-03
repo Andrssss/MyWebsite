@@ -42,11 +42,12 @@ import http from "http";
 import zlib from "zlib";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import {
   loadCrossSourceDupeIndex,
   isCrossSourceDupe,
   CROSS_SOURCE_DUPE_SOURCES,
+  dupeKey,
 } from "./_cross_source_dupe.mjs";
 import {
   isInternshipTitle,
@@ -216,6 +217,13 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
     const dupeIndex = await loadCrossSourceDupeIndex(client, "startupjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
     console.log(`[startupjobs] cross-source dupe index: ${dupeIndex.size} keys`);
 
+    // Same-source duplicate guard (2026-09-04): startup.jobs re-lists a
+    // re-posted ad under a brand-new listing id (confirmed live: LTG
+    // "Backend Engineer – Voyager Team", two ids, one had a slightly
+    // different slug too). Built once per run, updated as items get inserted.
+    let skippedSameSourceDupe = 0;
+    const sameSourceDupeIndex = await loadSameSourceDupeIndex(client, "startupjobs");
+
     let cursor = null;
     let page = 0;
 
@@ -277,11 +285,24 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
             continue;
           }
 
+          const sameSourceDupe = findSameSourceDuplicate(sameSourceDupeIndex, url, company, title, technologies);
+          if (sameSourceDupe) {
+            skippedSameSourceDupe++;
+            console.log(`[startupjobs] SKIP same-source dupe "${title}" @ ${company ?? "-"} — already active at ${sameSourceDupe.url}`);
+            foundUrls.push(url); // still "live" on the source, keep it out of reconcile's deactivation path
+            continue;
+          }
+
           const wasNew = await upsertJob(client, "startupjobs", { title, url, experience, company, technologies });
           foundUrls.push(url);
           if (wasNew) {
             newlyInserted++;
             console.log(`[startupjobs] NEW "${title}" @ ${company ?? "-"} exp=${experience} → ${url}`);
+            const key = dupeKey(company, title);
+            if (key) {
+              if (!sameSourceDupeIndex.has(key)) sameSourceDupeIndex.set(key, []);
+              sameSourceDupeIndex.get(key).push({ url, technologies });
+            }
           } else {
             alreadyExisted++;
           }
@@ -297,7 +318,7 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
       `[startupjobs] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_wrong_country=${skippedWrongCountry}, ` +
       `skipped_no_data=${skippedNoData}, skipped_dupe=${skippedCrossSourceDupe}, ` +
-      `fetch_failed=${fetchFailed}`
+      `skipped_same_source_dupe=${skippedSameSourceDupe}, fetch_failed=${fetchFailed}`
     );
 
     // Reactivate-only — see file header: the API only surfaces the last 14

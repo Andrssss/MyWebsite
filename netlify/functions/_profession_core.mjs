@@ -5,7 +5,8 @@ import { load as cheerioLoad } from "cheerio";
 import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
+import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -580,8 +581,19 @@ export async function processProfessionSources(sources, jobName, request, pageOp
       const knownBySource = new Map(sourceKeys.map((k) => [k, new Set()]));
       for (const r of knownRows) knownBySource.get(r.source)?.add(r.url);
 
+      // Same-source duplicate guard (2026-09-04, same pattern as LinkedIn):
+      // profession.hu re-lists a re-posted ad under a brand-new numeric id
+      // (not a rotating id within a stable pattern, so migrateVolatileUrl
+      // doesn't catch it) — confirmed live, 5 duplicate clusters. Built once
+      // per source key, updated as items get inserted so a duplicate found
+      // across two different P_* task URLs in the SAME run is also caught.
+      const sameSourceDupeIndexes = new Map();
+      for (const key of sourceKeys) {
+        sameSourceDupeIndexes.set(key, await loadSameSourceDupeIndex(client, key));
+      }
+
       for (const p of sources) {
-        const result = await processOneSource(client, p, jobName, pageOptions, knownBySource);
+        const result = await processOneSource(client, p, jobName, pageOptions, knownBySource, sameSourceDupeIndexes.get(p.key));
         const urls = foundBySource.get(result.source) || [];
         // Found urls still feed reconcile as reactivation signal (presence =
         // alive) even on a partial crawl — see the reactivate-only note below.
@@ -642,7 +654,7 @@ export async function processProfessionSources(sources, jobName, request, pageOp
   });
 }
 
-async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}, knownBySource = null) {
+async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}, knownBySource = null, sameSourceDupeIndex = null) {
   const source = p.key;
 
   let merged = [];
@@ -772,7 +784,24 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
         const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
         if (migrated) console.log(`[${source}] MIGRATED url → ${item.url}`);
       }
+
+      if (sameSourceDupeIndex) {
+        const dupe = findSameSourceDuplicate(sameSourceDupeIndex, item.url, item.company, item.title, item.technologies);
+        if (dupe) {
+          console.log(`[${source}] SKIP same-source dupe "${item.title}" @ ${item.company || "-"} — already active at ${dupe.url}`);
+          continue;
+        }
+      }
+
       await upsertJob(client, source, item);
+
+      if (sameSourceDupeIndex) {
+        const key = dupeKey(item.company, item.title);
+        if (key) {
+          if (!sameSourceDupeIndex.has(key)) sameSourceDupeIndex.set(key, []);
+          sameSourceDupeIndex.get(key).push({ url: item.url, technologies: item.technologies });
+        }
+      }
     }
 
   }
