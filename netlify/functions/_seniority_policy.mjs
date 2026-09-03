@@ -21,7 +21,7 @@
  */
 import { isSeniorExperience } from "./_experience_core.mjs";
 
-export const STORE_SENIOR_JOBS = true;
+export const STORE_SENIOR_JOBS = false; // 2026-09-04: ideiglenesen kikapcsolva, user-döntés
 
 // CSAK a tiszta senior-jelzők (2026-08-25, user-döntés: "csak a senior, lead ne
 // legyen, azokat még nem gyűjtjük"). A vezetői/lead címek — lead, leader,
