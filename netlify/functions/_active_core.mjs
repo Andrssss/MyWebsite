@@ -286,10 +286,16 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
  * `/view?id=<digits>`, confirmed 2026-09-03 to change between two fetches of
  * the identical search page a few minutes apart, for the exact same listed
  * card — not just across genuine reposts). Correlates by (title, company)
- * instead: if `newUrl` isn't stored yet but an existing row for this source
- * has the same title+company under a DIFFERENT url that this run's crawl did
- * NOT also see (so it isn't a second, genuinely concurrent posting), that row
- * is renamed to `newUrl` in place rather than inserted as a fresh duplicate.
+ * instead: if `newUrl` isn't stored yet but an INACTIVE existing row for this
+ * source has the same title+company under a DIFFERENT url that this run's
+ * crawl did NOT also see, that row is renamed to `newUrl` in place rather
+ * than inserted as a fresh duplicate. Deliberately restricted to inactive
+ * victims only (2026-09-03, user correction): an ACTIVE row with the same
+ * title+company might genuinely be a second, still-open posting (same
+ * generic title, same employer, two concurrent openings) — merging into it
+ * would silently destroy that second listing. An inactive victim is the safe
+ * case: a previously-seen posting for this exact title+company is gone, and
+ * the fresh crawl just found what looks like its replacement.
  *
  * @param {import("pg").PoolClient} client
  * @param {string} source
@@ -308,10 +314,11 @@ export async function migrateByTitleCompany(client, source, newUrl, title, compa
          WHERE source = $1
            AND title = $2
            AND company IS NOT DISTINCT FROM $3
+           AND active = false
            AND url <> $4
            AND url <> ALL($5::text[])
            AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = $1 AND url = $4)
-         ORDER BY active DESC, first_seen DESC
+         ORDER BY first_seen DESC
          LIMIT 1)
      UPDATE job_posts
         SET url = $4, active = true, sweep_dead = false
