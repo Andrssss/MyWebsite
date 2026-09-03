@@ -74,10 +74,10 @@ const SR_QUERY_BANK = ["Budapest", "Hungary"];
 const SR_PAGE_LIMIT = 100;
 const SR_MAX_PAGES = 8; // kulcsszavanként max 800 sor
 const SR_SEARCH_URL = "https://jobs.smartrecruiters.com/sr-jobs/search";
-// A régi cron_jobs_ATS-background.mjs saját `wise`/`roland` source alatt már
-// aratja ezt a két boardot. Két scraper ugyanarra a hirdetésre két külön sort
-// írna (a `source` része a sor-identitásnak) — ugyanaz a kizárás, mint az
-// ATSCRAWL SEED_TENANTS listájánál.
+// wise/rolandberger már direktben fel vannak véve az ATSCRAWL SEED_TENANTS
+// listájában (2026-09-02, a korábbi külön cron_jobs_ATS-background.mjs
+// összevonásakor) — nincs értelme a felderítőnek is jelöltként újra
+// megtalálnia és `ats_slug_candidates`-be tennie őket.
 const SR_COVERED_ELSEWHERE = new Set(["wise", "rolandberger"]);
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
