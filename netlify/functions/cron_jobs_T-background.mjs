@@ -11,7 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateByTitleCompany } from "./_active_core.mjs";
+import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -369,11 +369,20 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     // Before inserting, try to match it to an existing row by title+company
     // and rename that row's url in place instead (mirrors migrateVolatileUrl,
     // just content-keyed since there's no stable url component to regex on).
+    // If it can't be merged (existing match is active — see that function's
+    // doc), it must still NOT be inserted as a fresh row: an active row for
+    // the identical title+company is already on the board, so a plain insert
+    // here would just recreate the duplicate-row bug under a different name.
     let contentMerged = 0;
+    let contentSkippedActive = 0;
     for (const job of talentJobs) {
       if (!known.has(job.url)) {
         if (await migrateByTitleCompany(client, "talent", job.url, job.title, job.company, allUrls)) {
           contentMerged += 1;
+          continue;
+        }
+        if (await hasActiveDuplicateByTitleCompany(client, "talent", job.url, job.title, job.company)) {
+          contentSkippedActive += 1;
           continue;
         }
         try {
@@ -389,7 +398,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
       if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
       await upsertJob(client, "talent", job);
     }
-    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged)`);
+    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged, ${contentSkippedActive} skipped as active duplicates)`);
 
     // complete:false → reactivate-only, NEVER listing-diff deactivation.
     // talent's search results are a rotating nondeterministic SUBSET of the

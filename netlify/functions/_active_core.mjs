@@ -340,6 +340,30 @@ export async function migrateByTitleCompany(client, source, newUrl, title, compa
   return migrated;
 }
 
+/**
+ * Companion to migrateByTitleCompany: true if an ACTIVE row already exists
+ * for this source with the same title+company under a different url. The
+ * caller should skip inserting a fresh row in that case — migrateByTitleCompany
+ * deliberately won't merge into an active row (it might be a second, genuinely
+ * concurrent posting), but that does NOT mean a plain insert is safe either:
+ * for a source whose url is not a stable job identifier (see
+ * migrateByTitleCompany's doc), a "new" url this close a match is far more
+ * likely to be the same posting re-served under a fresh id than an actual
+ * second opening — inserting would recreate the exact duplicate-row bug this
+ * pair of functions exists to fix (2026-09-03 user correction).
+ */
+export async function hasActiveDuplicateByTitleCompany(client, source, newUrl, title, company) {
+  await ensureActiveSchema(client);
+  const { rowCount } = await client.query(
+    `SELECT 1 FROM job_posts
+      WHERE source = $1 AND title = $2 AND company IS NOT DISTINCT FROM $3
+        AND active = true AND url <> $4
+      LIMIT 1`,
+    [source, title, company ?? null, newUrl]
+  );
+  return rowCount > 0;
+}
+
 // Sources whose sites answer a DEAD job url with a 200 redirect to a generic
 // listing page instead of a 404 (ydiak → /aktualis-diakmunkaink, eudiakok →
 // /404), so the plain 404 rule never fires. For these, "redirected to a
