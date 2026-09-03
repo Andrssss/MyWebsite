@@ -840,7 +840,16 @@ function _isDeadResult(row, res) {
   // posting page; see sweepProbeFor's doc comment.
   const probe = sweepProbeFor(row);
   if (probe.overridden && probe.deadStatuses.includes(res.status)) return true;
-  if (res.status === 404) {
+  // 410 Gone is treated exactly like 404: a deliberate "permanently removed"
+  // signal, not a transient error like 403/429/5xx. Added 2026-09-04 — the
+  // 2026-08-30 activation audit found 2 talent rows answering HTTP 410 while
+  // still active in the DB; talent's own dead-rules only ever checked the
+  // response BODY (banner text / system_status), never the raw status, so a
+  // hard 410 fell all the way through to "not dead" and the row never got a
+  // chance to be re-evaluated. SOFT_404_ALIVE_SOURCES still guards this per
+  // source (talent: only alive if the id's own system_status says so), so a
+  // 410 whose body happens to prove the posting live is unaffected.
+  if (res.status === 404 || res.status === 410) {
     const aliveRule = SOFT_404_ALIVE_SOURCES[row.source];
     if (aliveRule && typeof res.body === "string" && aliveRule(row, res.body)) {
       return false;
@@ -923,8 +932,8 @@ export const isAliveResult = _isAliveResult;
  * current listing. Windowed / synthetic-URL sources (RSS "latest N", hash URLs)
  * can't, so their dead jobs never fall out of the set. This sweep instead asks
  * each active job's OWN URL whether it still exists, and deactivates the ones
- * that are provably gone: final HTTP 404, for REDIRECT_DEAD_SOURCES a 200 that
- * landed on a different path (listing-page redirect), or for
+ * that are provably gone: final HTTP 404 or 410, for REDIRECT_DEAD_SOURCES a
+ * 200 that landed on a different path (listing-page redirect), or for
  * BANNER_DEAD_SOURCES a 200 whose body carries the source's closed-banner.
  *
  * Network-agnostic: the caller injects
