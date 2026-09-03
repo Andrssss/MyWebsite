@@ -382,7 +382,13 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
   // 1.5) cross-source dupe-szűrés — a helyszín-kapu UTÁN (kevesebb sor), de a
   // detail-hívás ELŐTT (ld. a fájl fejlécét: DUPE_CHECK_SOURCES), hogy egy már
   // profession/talent/LinkedIn/startupjobs alatt meglévő pozíció ne kössön le
-  // felesleges detail-kérést sem, ne csak insertet.
+  // felesleges detail-kérést sem, ne csak insertet. Emiatt itt nincs
+  // `technologies` (az csak a detail-oldalból jön) — az isCrossSourceDupe hívás
+  // szándékosan csak cím+cég alapján dönt (2026-09-03: lásd
+  // _cross_source_dupe.mjs — a technologies paraméter hiánya = régi, kulcs-only
+  // viselkedés). NE told előre a detail-fetch-et csak azért, hogy ide is jusson
+  // technologies — az pont azt a kérés-spórolást venné el, amiért ez a blokk itt
+  // van a fetch előtt.
   let dedupedHuJobs = huJobs;
   if (dupeIndex) {
     dedupedHuJobs = [];

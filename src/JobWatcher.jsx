@@ -11,6 +11,7 @@ import {
 } from "./lib/categorize.mjs";
 import {
   dupeKey,
+  isLikelySamePosting,
   CROSS_SOURCE_DUPE_SOURCES,
 } from "./lib/crossSourceDupe.mjs";
 
@@ -1919,9 +1920,16 @@ const JobWatcher = () => {
   }, [preTechJobs, techStates, globalTechCounts, showHiddenOnly, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
 
   // url -> a többi forrás neve, amiben ugyanaz a hirdetés (cím+cég-első-szó
-  // egyezés alapján) feltehetően megvan. Csak az egymást átfedő forrásokon
-  // belül csoportosít (DUPLICATE_PRONE_SOURCES), a jelenleg látott listán —
-  // ha egy forrás ki van szűrve, nem hoz létre hamis egyezést.
+  // egyezés ÉS technológia-átfedés alapján) feltehetően megvan. Csak az
+  // egymást átfedő forrásokon belül csoportosít (DUPLICATE_PRONE_SOURCES), a
+  // jelenleg látott listán — ha egy forrás ki van szűrve, nem hoz létre hamis
+  // egyezést.
+  //
+  // Egy cím+cég kulcson belül a jobokat MÉG szét kell bontani technológia
+  // szerint (isLikelySamePosting): egy nagy cég (pl. Deutsche Telekom) tud
+  // több, valóban különböző pozíciót hirdetni azonos, generikus címmel — ez
+  // nem duplikátum, csak a kulcs ütközik. Union-find, mert egy kulcson belül
+  // több különálló klaszter is lehet (nem csak páronkénti egyezés).
   const crossSourceDuplicates = useMemo(() => {
     const groups = new Map();
     for (const job of visibleJobs) {
@@ -1932,14 +1940,39 @@ const JobWatcher = () => {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(job);
     }
+
     const result = new Map();
     for (const jobs of groups.values()) {
-      const sources = new Set(jobs.map((j) => displaySource(j.source)));
-      if (sources.size < 2) continue;
-      for (const job of jobs) {
-        if (!job.url) continue;
-        const others = [...sources].filter((s) => s !== displaySource(job.source));
-        result.set(job.url, others);
+      if (jobs.length < 2) continue;
+
+      const parent = jobs.map((_, i) => i);
+      const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+      const union = (i, j) => {
+        const a = find(i);
+        const b = find(j);
+        if (a !== b) parent[a] = b;
+      };
+      for (let i = 0; i < jobs.length; i++) {
+        for (let j = i + 1; j < jobs.length; j++) {
+          if (isLikelySamePosting(jobs[i], jobs[j])) union(i, j);
+        }
+      }
+
+      const clusters = new Map();
+      jobs.forEach((job, i) => {
+        const root = find(i);
+        if (!clusters.has(root)) clusters.set(root, []);
+        clusters.get(root).push(job);
+      });
+
+      for (const cluster of clusters.values()) {
+        const sources = new Set(cluster.map((j) => displaySource(j.source)));
+        if (sources.size < 2) continue;
+        for (const job of cluster) {
+          if (!job.url) continue;
+          const others = [...sources].filter((s) => s !== displaySource(job.source));
+          result.set(job.url, others);
+        }
       }
     }
     return result;

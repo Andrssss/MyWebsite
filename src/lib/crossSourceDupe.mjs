@@ -100,4 +100,60 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   "alllocaljobs",
   "talent",
   "startupjobs",
+  // 2026-09-03: added after a live-DB coverage audit found 44 real cross-source
+  // duplicates the whitelist was silently missing, 33 of them explained by just
+  // these two. wherewework's overlap is with AI-scraped (Bosch postings, 1:1
+  // specific titles). nofluffjobs' overlap spans several tracked sources — but
+  // nofluffjobs ALSO produced the title+company false-positive that motivated
+  // TECH_MATCH_THRESHOLD below (two genuinely different "DevOps Engineer" reqs
+  // at Deutsche Telekom IT Solutions), so it only got added once tech-overlap
+  // was in place to guard against that. See cross-source-dupe-coverage memory.
+  "wherewework",
+  "nofluffjobs",
 ];
+
+function splitTechList(technologies) {
+  return technologies
+    ? String(technologies).split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
+}
+
+// Jaccard similarity of the two technology-tag sets. Tags are a canonical
+// keyword table (_tech_keywords.js) applied identically regardless of source,
+// so exact string equality is enough — no fuzzy matching needed.
+// Returns null when either side has no extracted technologies at all: callers
+// must treat that as "cannot compare" (fall back to title+company alone),
+// never as "no overlap" — most sources still lack rich tech extraction, and
+// treating missing data as a rejection would silently reopen the 44 blind
+// spots the whitelist was just closing.
+export function technologyOverlap(techA, techB) {
+  const a = new Set(splitTechList(techA));
+  const b = new Set(splitTechList(techB));
+  if (a.size === 0 || b.size === 0) return null;
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared++;
+  const union = a.size + b.size - shared;
+  return union === 0 ? null : shared / union;
+}
+
+// 2026-09-03: two live NoFluffJobs postings, both "DevOps Engineer" @ Deutsche
+// Telekom IT Solutions Hungary — same dupeKey, but genuinely different reqs
+// (21 vs 25 tags, 8 shared → Jaccard ≈0.21). Generic titles at big
+// outsourcing/BPO employers collide on company+title alone with no other
+// signal to split them apart. Threshold sits clearly below normal same-posting
+// extraction noise (expected to score high — same description, same
+// keyword table) and clearly above that observed false-positive.
+export const TECH_MATCH_THRESHOLD = 0.4;
+
+// True duplicate-of-the-same-posting check: title+company key must match AND,
+// whenever both sides have technologies to compare, they must overlap enough.
+// When either side has no technologies, the key match alone stands (see
+// technologyOverlap above) — this is the ONLY place that matters: ats-crawl's
+// cross-source check runs before its detail-page fetch (so it has no
+// technologies yet) and deliberately keeps working key-only, unchanged.
+export function isLikelySamePosting(a, b) {
+  const key = dupeKey(a.company, a.title);
+  if (!key || key !== dupeKey(b.company, b.title)) return false;
+  const overlap = technologyOverlap(a.technologies, b.technologies);
+  return overlap === null || overlap >= TECH_MATCH_THRESHOLD;
+}

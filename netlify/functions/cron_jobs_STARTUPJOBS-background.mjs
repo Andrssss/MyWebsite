@@ -265,7 +265,7 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
           const technologies = extractTechnologies(descriptionHtml);
           const company = normalizeWhitespace(job?.company?.name) || null;
 
-          if (isCrossSourceDupe(dupeIndex, company, title)) {
+          if (isCrossSourceDupe(dupeIndex, company, title, technologies)) {
             skippedCrossSourceDupe++;
             console.log(`[startupjobs] SKIP cross-source dupe "${title}" @ ${company} → ${url}`);
             continue;
