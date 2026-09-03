@@ -140,9 +140,20 @@ export function technologyOverlap(techA, techB) {
 // Telekom IT Solutions Hungary — same dupeKey, but genuinely different reqs
 // (21 vs 25 tags, 8 shared → Jaccard ≈0.21). Generic titles at big
 // outsourcing/BPO employers collide on company+title alone with no other
-// signal to split them apart. Threshold sits clearly below normal same-posting
-// extraction noise (expected to score high — same description, same
-// keyword table) and clearly above that observed false-positive.
+// signal to split them apart.
+//
+// 0.4 (not higher): a genuine duplicate is the SAME posting text run through
+// the SAME canonical keyword table (_tech_keywords.js) from two different
+// scrapers, so it should usually extract a near-identical tag set — confirmed
+// live, the "Beyond Sports" LinkedIn/ats-crawl duplicate from this same
+// session scored Jaccard 1.0. A much higher bar (e.g. 0.95) would reject a
+// real duplicate the moment one scraper's extraction misses even a single tag
+// (shorter description fetch, one keyword just under the detection threshold),
+// which is common enough that it isn't worth it just to be stricter than the
+// 0.21 the Deutsche Telekom false-positive actually scored. 0.4 already sits
+// comfortably above that case with real margin — start here, revisit if a
+// false positive with genuine tech overlap ever turns up (see
+// cross-source-dupe-coverage memory for the decision history).
 export const TECH_MATCH_THRESHOLD = 0.4;
 
 // True duplicate-of-the-same-posting check: title+company key must match AND,
