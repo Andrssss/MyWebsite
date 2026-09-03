@@ -36,8 +36,11 @@ export default async (request) => {
     let fullyCovered = 0;
     let partiallyCovered = 0;
     let notCovered = 0;
+    let flaggedButIncomplete = 0;
+    let trueBlindSpot = 0;
     const sampleNotCovered = [];
     const samplePartial = [];
+    const sampleBlindSpot = [];
 
     for (const [key, group] of groups) {
       const sources = [...new Set(group.map((r) => r.source))];
@@ -51,10 +54,30 @@ export default async (request) => {
 
       if (outList.length === 0) {
         fullyCovered++;
-      } else if (inList.length > 0) {
+      } else if (inList.length >= 2) {
+        // Badge/guard still fires — at least 2 tracked sources remain in the
+        // group even after the untracked one(s) are excluded from grouping.
         partiallyCovered++;
+        flaggedButIncomplete++;
         if (samplePartial.length < 25) {
           samplePartial.push({
+            key,
+            title: group[0].title,
+            company: group[0].company,
+            sources,
+            inList,
+            outList,
+            urls: group.map((r) => `${r.source}: ${r.url}`),
+          });
+        }
+      } else if (inList.length === 1) {
+        // Silent miss: only ONE tracked source is present, so the frontend's
+        // own grouping (which drops untracked-source rows before counting
+        // distinct sources) never sees >=2 members and never fires at all.
+        partiallyCovered++;
+        trueBlindSpot++;
+        if (sampleBlindSpot.length < 60) {
+          sampleBlindSpot.push({
             key,
             title: group[0].title,
             company: group[0].company,
@@ -95,9 +118,12 @@ export default async (request) => {
           duplicateGroups: fullyCovered + partiallyCovered + notCovered,
           fullyCovered,
           partiallyCovered,
+          flaggedButIncomplete,
+          trueBlindSpot,
           notCoveredAtAll: notCovered,
           topSourcePairs: topPairs,
           samplePartiallyCovered: samplePartial,
+          sampleBlindSpot,
           sampleNotCovered,
         },
         null,
