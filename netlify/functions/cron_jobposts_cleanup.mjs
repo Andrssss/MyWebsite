@@ -15,25 +15,16 @@
 // 60 nap biztos tartalékot ad mindkét fölött, úgyhogy ami ide kerül, azt élő
 // kód többé nem olvassa vissza — bátran törölhető a select után.
 //
-// LinkedIn KIVÉTEL (user-döntés 2026-08-18): a LinkedIn sosem használja az
-// active modellt (reconcileActive nem fut rá, ld. jobs.js TIME_BASED_SOURCES
-// / _active_core.mjs) — a sorai gyakorlatilag örökké active=true maradnak,
-// úgyhogy az "active = false" feltétel ŐKET SOHA nem engedné archiválni. A
-// frontend rájuk is a 30 napos first_seen-alapú ablakot alkalmazza (jobs.js)
-// — ezért a LinkedIn forrásnál az active flag-től FÜGGETLENÜL archiválunk,
-// kizárólag first_seen alapján. Minden más forrásnál változatlanul
-// active=false kell.
-//
-// LinkedIn küszöb 60 → 30 nap (user-döntés 2026-08-19): a többi forrásnál a
-// 60 nap a reviveSweepDead 45 napos self-healing ablaka miatt kellett
-// tartalékként — de a LinkedIn ki van véve a SWEEP_EXCLUDED_SOURCES-ből
-// (_active_core.mjs), rá sosem fut reviveSweepDead, tehát nincs mit védeni
-// 30 napon túl. Onnantól egy LinkedIn-sor pontosan úgy láthatatlan a
-// frontendnek, mint 60 nap után — a 30-60 nap közti "holt zóna" csak
-// feleslegesen ült a táblában, és növelte az esélyét, hogy egy időközben
-// törölt sor gyorsan visszajöjjön frissnek látszó first_seen-nel (élő
-// eset: egy LinkedIn job-id 21:34 UTC-kor archiválva, 22:01 UTC-kor már
-// vissza is jött — 27 perc).
+// LinkedIn KIVÉTEL — 2026-09-04-től SAJÁT FÁJLBAN: a LinkedIn sosem
+// használja az active modellt (reconcileActive nem fut rá), úgyhogy az
+// "active = false" feltétel itt SOHA nem engedné törölni. 2026-08-18 és
+// 2026-09-04 között ez a fájl egy first_seen-alapú kivétellel kezelte
+// LinkedInt is, de csak havi cadenciával — ami egy 30 napos küszöbhöz túl
+// ritka (a hónap nagy részében fölöslegesen ült a táblában egy már
+// láthatatlan sor). Kiszervezve `cron_linkedin_cleanup.mjs`-be, ami
+// 2 naponta fut, közvetlenül a napi utolsó LinkedIn-scraper (L_8, ~22:28
+// UTC) után. Ez a fájl mostantól tényleg csak a nem-LinkedIn forrásokat
+// kezeli, egyszerű active=false + 60 napos szabállyal.
 //
 // A job_posts identitása (source, url) — ez alapján töröljük ugyanazokat a
 // sorokat, amiket archiváltunk (nem egy külön WHERE-újrafuttatással, hogy egy
@@ -54,8 +45,6 @@ const pool = new Pool({
 
 const STORE_NAME = "job-posts-archive";
 const ARCHIVE_AFTER_DAYS = 60;
-const TIME_BASED_ONLY_SOURCES = ["LinkedIn"];
-const TIME_BASED_ARCHIVE_AFTER_DAYS = 30;
 
 export const config = {
   schedule: "0 3 1 * *", // havonta 1-jén 03:00 UTC (a weekly-backup után)
@@ -81,18 +70,14 @@ export default withDbAuditFlush("cron_jobposts_cleanup", async function handler(
   try {
     const { rows: oldPosts } = await client.query(
       `SELECT * FROM job_posts
-        WHERE (
-          (source = ANY($1::text[]) AND first_seen < NOW() - make_interval(days => $2::int))
-          OR
-          (NOT (source = ANY($1::text[])) AND active = false AND first_seen < NOW() - make_interval(days => $3::int))
-        )
+        WHERE active = false AND first_seen < NOW() - make_interval(days => $1::int)
         ORDER BY first_seen`,
-      [TIME_BASED_ONLY_SOURCES, TIME_BASED_ARCHIVE_AFTER_DAYS, ARCHIVE_AFTER_DAYS]
+      [ARCHIVE_AFTER_DAYS]
     );
 
     if (oldPosts.length === 0) {
       console.log(
-        `[jobposts_cleanup] Nincs archiválható sor (${TIME_BASED_ARCHIVE_AFTER_DAYS} napnál régebbi LinkedIn / ${ARCHIVE_AFTER_DAYS} napnál régebbi inaktív egyéb), kihagyva.`
+        `[jobposts_cleanup] Nincs archiválható sor (${ARCHIVE_AFTER_DAYS} napnál régebbi inaktív), kihagyva.`
       );
       return;
     }
@@ -106,8 +91,6 @@ export default withDbAuditFlush("cron_jobposts_cleanup", async function handler(
         {
           exportedAt: new Date().toISOString(),
           archiveAfterDays: ARCHIVE_AFTER_DAYS,
-          timeBasedArchiveAfterDays: TIME_BASED_ARCHIVE_AFTER_DAYS,
-          timeBasedSources: TIME_BASED_ONLY_SOURCES,
           count: oldPosts.length,
           rows: oldPosts,
         },
@@ -125,8 +108,8 @@ export default withDbAuditFlush("cron_jobposts_cleanup", async function handler(
         WHERE (source, url) IN (
           SELECT s, u FROM unnest($1::text[], $2::text[]) AS t(s, u)
         )
-          AND (source = ANY($3::text[]) OR active = false)`,
-      [sources, urls, TIME_BASED_ONLY_SOURCES]
+          AND active = false`,
+      [sources, urls]
     );
 
     console.log(
