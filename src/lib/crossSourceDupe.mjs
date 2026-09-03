@@ -118,43 +118,57 @@ function splitTechList(technologies) {
     : [];
 }
 
-// Jaccard similarity of the two technology-tag sets. Tags are a canonical
+// Overlap coefficient (Szymkiewicz–Simpson) of the two technology-tag sets:
+// shared ÷ min(|A|, |B|) — NOT Jaccard (shared ÷ union). Tags are a canonical
 // keyword table (_tech_keywords.js) applied identically regardless of source,
 // so exact string equality is enough — no fuzzy matching needed.
-// Returns null when either side has no extracted technologies at all: callers
-// must treat that as "cannot compare" (fall back to title+company alone),
-// never as "no overlap" — most sources still lack rich tech extraction, and
-// treating missing data as a rejection would silently reopen the 44 blind
-// spots the whitelist was just closing.
+//
+// Jaccard was tried first and broke on real data: extraction depth varies a
+// lot between site templates (a thin page yields fewer tags even for the
+// IDENTICAL posting), and Jaccard punishes the thinner side's set size even
+// when it's a clean subset of the richer one. Overlap coefficient instead
+// asks "is virtually everything the WEAKER extraction found also present on
+// the other side?" — the right question when one source just extracts less.
+//
+// Returns null (cannot compare — caller falls back to title+company alone)
+// whenever the SMALLER side has under MIN_TAGS_FOR_COMPARISON tags. Below
+// that, the signal is too weak either direction: a match on 1-3 shared tags
+// out of a tiny set isn't trustworthy evidence of "same posting", but a tiny
+// set NOT fully contained in the other isn't trustworthy evidence of
+// "different posting" either — confirmed live 2026-09-03, a pestidev.hu
+// "Test Automation Engineer" @ MP Solutions duplicate (workable, 7 tags; vs
+// AI-scraped, only 2 tags, one of which — "Test Automation" — wasn't even in
+// workable's list despite the title). Requiring ≥4 tags on the thinner side
+// before trusting a rejection would have kept that case falling back to the
+// key-only accept, instead of the accidental near-miss it would score with
+// Jaccard-style union-punishing math.
+const MIN_TAGS_FOR_COMPARISON = 4;
+
 export function technologyOverlap(techA, techB) {
   const a = new Set(splitTechList(techA));
   const b = new Set(splitTechList(techB));
-  if (a.size === 0 || b.size === 0) return null;
+  const minSize = Math.min(a.size, b.size);
+  if (minSize < MIN_TAGS_FOR_COMPARISON) return null;
   let shared = 0;
   for (const t of a) if (b.has(t)) shared++;
-  const union = a.size + b.size - shared;
-  return union === 0 ? null : shared / union;
+  return shared / minSize;
 }
 
 // 2026-09-03: two live NoFluffJobs postings, both "DevOps Engineer" @ Deutsche
 // Telekom IT Solutions Hungary — same dupeKey, but genuinely different reqs
-// (21 vs 25 tags, 8 shared → Jaccard ≈0.21). Generic titles at big
-// outsourcing/BPO employers collide on company+title alone with no other
-// signal to split them apart.
+// (21 vs 25 tags, 8 shared → overlap coefficient 8/21 ≈ 0.38). Generic titles
+// at big outsourcing/BPO employers collide on company+title alone with no
+// other signal to split them apart. Both sides had plenty of tags (well above
+// MIN_TAGS_FOR_COMPARISON), so this is a case where the reject is trustworthy.
 //
-// 0.4 (not higher): a genuine duplicate is the SAME posting text run through
-// the SAME canonical keyword table (_tech_keywords.js) from two different
-// scrapers, so it should usually extract a near-identical tag set — confirmed
-// live, the "Beyond Sports" LinkedIn/ats-crawl duplicate from this same
-// session scored Jaccard 1.0. A much higher bar (e.g. 0.95) would reject a
-// real duplicate the moment one scraper's extraction misses even a single tag
-// (shorter description fetch, one keyword just under the detection threshold),
-// which is common enough that it isn't worth it just to be stricter than the
-// 0.21 the Deutsche Telekom false-positive actually scored. 0.4 already sits
-// comfortably above that case with real margin — start here, revisit if a
-// false positive with genuine tech overlap ever turns up (see
-// cross-source-dupe-coverage memory for the decision history).
-export const TECH_MATCH_THRESHOLD = 0.4;
+// 0.5: comfortable margin above that 0.38 false-positive score, while every
+// confirmed genuine duplicate found live this session clears it easily —
+// "Beyond Sports" (identical lists, 1.0), "test engineer" @ SEON (identical
+// 10-tag lists, 1.0), "Embedded C++" @ MP Solutions (workable 12 tags, talent
+// 4 tags, all 4 contained → 4/4 = 1.0). Revisit if a false positive with
+// genuine, well-populated tech overlap ever turns up (see
+// cross-source-dupe-coverage memory for the full decision history).
+export const TECH_MATCH_THRESHOLD = 0.5;
 
 // True duplicate-of-the-same-posting check: title+company key must match AND,
 // whenever both sides have technologies to compare, they must overlap enough.
