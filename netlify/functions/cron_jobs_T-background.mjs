@@ -11,7 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, migrateByTitleCompany } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -356,14 +356,26 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     // experience assignment below is skipped once the title already resolved it.
     // Either way the row is built COMPLETE before it's ever inserted — no
     // separate pass comes back later to patch it in.
+    const allUrls = talentJobs.map((j) => j.url);
     const { rows: knownRows } = await client.query(
       `SELECT url FROM job_posts WHERE source = 'talent' AND url = ANY($1::text[])`,
-      [talentJobs.map((j) => j.url)]
+      [allUrls]
     );
     const known = new Set(knownRows.map((r) => r.url));
 
+    // talent's /view?id=<digits> is a per-fetch tracking id, not a stable job
+    // id (confirmed 2026-09-03: the same listed card got a different id on
+    // requests minutes apart) — a "new" url here often isn't a new posting.
+    // Before inserting, try to match it to an existing row by title+company
+    // and rename that row's url in place instead (mirrors migrateVolatileUrl,
+    // just content-keyed since there's no stable url component to regex on).
+    let contentMerged = 0;
     for (const job of talentJobs) {
       if (!known.has(job.url)) {
+        if (await migrateByTitleCompany(client, "talent", job.url, job.title, job.company, allUrls)) {
+          contentMerged += 1;
+          continue;
+        }
         try {
           await sleep(400);
           const html = await fetchText(job.url);
@@ -377,7 +389,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
       if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
       await upsertJob(client, "talent", job);
     }
-    console.log(`talent: ${talentJobs.length} jobs processed`);
+    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged)`);
 
     // complete:false → reactivate-only, NEVER listing-diff deactivation.
     // talent's search results are a rotating nondeterministic SUBSET of the
@@ -389,7 +401,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     // id-anchored system_status=2, _active_core.mjs BANNER_DEAD_SOURCES), and
     // its kills are sticky (sweep_dead + STICKY_SWEEP_DEAD_SOURCES) so this
     // reactivation can't resurrect a closed-but-still-listed job either.
-    const rc = await reconcileActive(client, "talent", talentJobs.map((j) => j.url), { complete: false });
+    const rc = await reconcileActive(client, "talent", allUrls, { complete: false });
     console.log(`[talent] active reconcile (reactivate-only) — ${JSON.stringify(rc)}`);
   } finally {
     client.release();

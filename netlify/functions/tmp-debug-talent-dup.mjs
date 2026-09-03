@@ -13,6 +13,17 @@ export default async (request) => {
 
   const client = await pool.connect();
   try {
+    if (request.method === "POST") {
+      // Deactivate the two later-inserted duplicate rows, keep the earliest.
+      const { rows } = await client.query(
+        `UPDATE job_posts SET active = false
+          WHERE id IN (3075716, 3077208)
+          RETURNING id, url, active`
+      );
+      return new Response(JSON.stringify(rows, null, 2), {
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      });
+    }
     const { rows } = await client.query(
       `SELECT id, source, title, url, company, active, first_seen
        FROM job_posts

@@ -280,6 +280,59 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
   return migrated;
 }
 
+/**
+ * Same purpose as migrateVolatileUrl, for sources whose url has NO stable
+ * component to regex on — the whole path is an opaque per-request id (talent:
+ * `/view?id=<digits>`, confirmed 2026-09-03 to change between two fetches of
+ * the identical search page a few minutes apart, for the exact same listed
+ * card — not just across genuine reposts). Correlates by (title, company)
+ * instead: if `newUrl` isn't stored yet but an existing row for this source
+ * has the same title+company under a DIFFERENT url that this run's crawl did
+ * NOT also see (so it isn't a second, genuinely concurrent posting), that row
+ * is renamed to `newUrl` in place rather than inserted as a fresh duplicate.
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {string} source
+ * @param {string} newUrl        url built from the current listing
+ * @param {string} title
+ * @param {string|null} company
+ * @param {string[]} currentUrls ALL urls seen on the source this run (a row
+ *                                still listed must never be renamed away)
+ * @returns {Promise<boolean>}   true if an old row was renamed to newUrl
+ */
+export async function migrateByTitleCompany(client, source, newUrl, title, company, currentUrls) {
+  await ensureActiveSchema(client);
+  const res = await client.query(
+    `WITH victim AS (
+        SELECT id, url FROM job_posts
+         WHERE source = $1
+           AND title = $2
+           AND company IS NOT DISTINCT FROM $3
+           AND url <> $4
+           AND url <> ALL($5::text[])
+           AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = $1 AND url = $4)
+         ORDER BY active DESC, first_seen DESC
+         LIMIT 1)
+     UPDATE job_posts
+        SET url = $4, active = true, sweep_dead = false
+       FROM victim
+      WHERE job_posts.id = victim.id
+      RETURNING victim.url AS old_url`,
+    [source, title, company ?? null, newUrl, (currentUrls || []).filter(Boolean)]
+  );
+  const migrated = (res.rowCount ?? 0) > 0;
+  if (migrated) {
+    logRecovery({
+      type: "url-migrated",
+      source,
+      from: res.rows[0].old_url,
+      to: newUrl,
+      reason: "title+company match",
+    });
+  }
+  return migrated;
+}
+
 // Sources whose sites answer a DEAD job url with a 200 redirect to a generic
 // listing page instead of a 404 (ydiak → /aktualis-diakmunkaink, eudiakok →
 // /404), so the plain 404 rule never fires. For these, "redirected to a
@@ -326,8 +379,10 @@ export const REDIRECT_DEAD_SOURCES = new Set(["ydiak", "eudiakok", "profession-i
 // reactivation skips rows the 404-sweep proved dead at their own detail page
 // (sweep_dead=true) — without this the hourly crawl would resurrect every
 // sweep kill and the pair would flip-flop daily. One-way by design: a
-// sweep_dead row only returns via migrateVolatileUrl (new URL), which is fine —
-// talent ids are single-use (reposts get a fresh id) and purged ids stay 404.
+// sweep_dead row only returns via a url-identity migration (migrateVolatileUrl
+// or, for talent, migrateByTitleCompany — new URL), which is fine — talent ids
+// are single-use (reposts, or even a same-listing refetch, get a fresh id;
+// see migrateByTitleCompany's doc comment) and purged ids stay 404.
 //
 // talent (2026-07-10): its search results are ALSO a rotating nondeterministic
 // subset of the source (live jobs drop in/out run-to-run), so its scraper
