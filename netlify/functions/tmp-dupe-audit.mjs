@@ -1,32 +1,17 @@
-// DISPOSABLE cleanup endpoint — 2026-09-03, revised design per user direction:
-//
-//   - SAME-SOURCE duplicates (same dupeKey, same source, different url): the
-//     source's own extraction is internally consistent, so technology IS a
-//     trustworthy signal here. If tech clearly differs (isLikelySamePosting
-//     false), keep both -- they're genuinely different postings that happen
-//     to share a title+company (the Deutsche Telekom pattern, which in the
-//     original find WAS same-source, all 4 rows on nofluffjobs itself). If
-//     tech matches or can't be compared, they're the same posting re-listed
-//     -- deactivate all but the earliest-first_seen row.
-//
-//   - CROSS-SOURCE duplicates (same dupeKey, different sources): technology
-//     extraction quality varies too much between site templates to trust as
-//     a signal (proven today on live data multiple times). So for these we
-//     do NOT use tech, and we do NOT auto-act (no deactivation) -- we only
-//     RECORD the candidate cluster to a Netlify Blob store for later human
-//     analysis, exactly as instructed.
-//
-// Default is a DRY RUN (no writes at all, DB or blob) -- pass ?commit=1 to
-// actually deactivate same-source dupes AND write the cross-source report
-// blob. Delete this file after use.
+// DISPOSABLE cleanup endpoint — 2026-09-04. Finds same-source duplicate
+// clusters (exact tech match, same as isLikelySamePosting) among currently
+// ACTIVE rows in the tracked sources, and HARD DELETES every row in a
+// cluster except the earliest-first_seen one. ats-crawl rows are excluded
+// entirely (left alone -- likely genuine parallel Workday reqs, not dupes).
+// Default is a DRY RUN (no writes) -- pass ?commit=1 to actually delete.
+// Delete this file after use.
 
 import { Pool } from "pg";
-import { getStore } from "@netlify/blobs";
 import { dupeKey, isLikelySamePosting, CROSS_SOURCE_DUPE_SOURCES } from "../../src/lib/crossSourceDupe.mjs";
 
-const TOKEN = "d11950281aa2e71303553b45821c4ffe7685e80a";
+const TOKEN = "2892bc66f219c5dc6313e22f74a080534ae6593a";
 const pool = new Pool({ connectionString: process.env.NETLIFY_DATABASE_URL, ssl: { rejectUnauthorized: false } });
-const REPORT_STORE = "cross-source-dupe-candidates";
+const EXCLUDED_SOURCES = new Set(["ats-crawl"]);
 
 function clusterByPosting(rows) {
   const parent = rows.map((_, i) => i);
@@ -78,14 +63,12 @@ export default async (request) => {
       keyGroups.get(key).push(r);
     }
 
-    const toDeactivate = [];
-    const sameSourceReport = [];
-    const crossSourceCandidates = [];
-
-    for (const [key, groupRows] of keyGroups) {
-      // 1) same-source sub-clustering, tech-aware
+    const toDelete = [];
+    const report = [];
+    for (const groupRows of keyGroups.values()) {
       const bySource = new Map();
       for (const r of groupRows) {
+        if (EXCLUDED_SOURCES.has(r.source)) continue;
         if (!bySource.has(r.source)) bySource.set(r.source, []);
         bySource.get(r.source).push(r);
       }
@@ -96,50 +79,21 @@ export default async (request) => {
           const sorted = [...cluster].sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen));
           const keep = sorted[0];
           const drop = sorted.slice(1);
-          for (const d of drop) toDeactivate.push(d.id);
-          sameSourceReport.push({
-            key,
+          for (const d of drop) toDelete.push(d.id);
+          report.push({
+            source: keep.source,
             title: keep.title,
             company: keep.company,
-            source: keep.source,
-            keep: `${keep.first_seen}: ${keep.url}`,
-            deactivate: drop.map((d) => `${d.first_seen}: ${d.url}`),
+            keep: keep.url,
+            deleted: drop.map((d) => d.url),
           });
         }
-      }
-
-      // 2) cross-source candidates -- key match alone, no tech filtering,
-      // never deactivated, only reported.
-      const distinctSources = new Set(groupRows.map((r) => r.source));
-      if (distinctSources.size >= 2) {
-        crossSourceCandidates.push({
-          key,
-          title: groupRows[0].title,
-          company: groupRows[0].company,
-          rows: groupRows.map((r) => ({
-            source: r.source,
-            url: r.url,
-            first_seen: r.first_seen,
-            technologyCount: (r.technologies || "").split(",").filter((t) => t.trim()).length,
-          })),
-        });
       }
     }
 
     let committed = false;
-    let blobKey = null;
-    if (commit) {
-      if (toDeactivate.length > 0) {
-        await client.query(`UPDATE job_posts SET active = false WHERE id = ANY($1::int[])`, [toDeactivate]);
-      }
-      const store = getStore(REPORT_STORE);
-      blobKey = `report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-      await store.setJSON(blobKey, {
-        generatedAt: new Date().toISOString(),
-        totalActiveRowsScanned: rows.length,
-        crossSourceCandidateClusters: crossSourceCandidates.length,
-        candidates: crossSourceCandidates,
-      });
+    if (commit && toDelete.length > 0) {
+      await client.query(`DELETE FROM job_posts WHERE id = ANY($1::int[])`, [toDelete]);
       committed = true;
     }
 
@@ -148,13 +102,10 @@ export default async (request) => {
         {
           mode: commit ? "COMMIT" : "DRY_RUN",
           committed,
-          blobKey,
           totalActiveRowsScanned: rows.length,
-          sameSourceDupeClusters: sameSourceReport.length,
-          sameSourceRowsToDeactivate: toDeactivate.length,
-          sameSourceReport,
-          crossSourceCandidateClusters: crossSourceCandidates.length,
-          crossSourceCandidates,
+          clustersFound: report.length,
+          rowsDeleted: toDelete.length,
+          report,
         },
         null,
         2
