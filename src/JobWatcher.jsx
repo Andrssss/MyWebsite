@@ -9,6 +9,10 @@ import {
   UNCATEGORIZED,
   getCategoriesForJob,
 } from "./lib/categorize.mjs";
+import {
+  dupeKey,
+  CROSS_SOURCE_DUPE_SOURCES,
+} from "./lib/crossSourceDupe.mjs";
 
 const API_BASE_URL = "/.netlify/functions";
 const TIME_RANGE_24H = "24h";
@@ -331,6 +335,11 @@ function jobMatchesSourceKey(jobSource, key) {
 function displaySource(jobSource) {
   return (jobSource || "").startsWith("AI - ") ? "AI-scraped" : jobSource;
 }
+
+// Ugyanaz a forráslista és kulcs, amit az ingest-oldali guard használ
+// (netlify/functions/_cross_source_dupe.mjs → src/lib/crossSourceDupe.mjs) —
+// EGY hely, hogy ne váljon szét két külön dupe-logika.
+const DUPLICATE_PRONE_SOURCES = new Set(CROSS_SOURCE_DUPE_SOURCES);
 
 const JUNIOR_EXCLUDED_SOURCES = [
   "minddiak",
@@ -1909,6 +1918,33 @@ const JobWatcher = () => {
     );
   }, [preTechJobs, techStates, globalTechCounts, showHiddenOnly, showAppliedOnly, appliedKeys, appliedCache, q, activeSavedSearches, savedSearches]);
 
+  // url -> a többi forrás neve, amiben ugyanaz a hirdetés (cím+cég-első-szó
+  // egyezés alapján) feltehetően megvan. Csak az egymást átfedő forrásokon
+  // belül csoportosít (DUPLICATE_PRONE_SOURCES), a jelenleg látott listán —
+  // ha egy forrás ki van szűrve, nem hoz létre hamis egyezést.
+  const crossSourceDuplicates = useMemo(() => {
+    const groups = new Map();
+    for (const job of visibleJobs) {
+      const src = displaySource(job.source);
+      if (!DUPLICATE_PRONE_SOURCES.has(src)) continue;
+      const key = dupeKey(job.company, job.title);
+      if (!key) continue;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(job);
+    }
+    const result = new Map();
+    for (const jobs of groups.values()) {
+      const sources = new Set(jobs.map((j) => displaySource(j.source)));
+      if (sources.size < 2) continue;
+      for (const job of jobs) {
+        if (!job.url) continue;
+        const others = [...sources].filter((s) => s !== displaySource(job.source));
+        result.set(job.url, others);
+      }
+    }
+    return result;
+  }, [visibleJobs]);
+
   // Az exporthoz mindig a TELJES jelentkezés-lista kell, függetlenül attól,
   // be van-e kapcsolva a "Jelentkezések" szűrő vagy van-e aktív kereső szó —
   // ezért ez külön van a visibleJobs-tól, ami mindkettőtől függ.
@@ -2501,6 +2537,7 @@ const JobWatcher = () => {
           // ordinary visitors.
           const isHidden = job.hidden === true;
           const isHighlighted = highlightedKeys.has(appliedKey);
+          const dupSources = job.url ? crossSourceDuplicates.get(job.url) : null;
 
           return (
             <li key={rowKey} className={`job-card${isVisited ? " job-card--visited" : ""}${isApplied ? " job-card--applied" : ""}${isInterview ? " job-card--interview" : ""}${isInactive ? " job-card--inactive" : ""}${isHidden ? " job-card--hidden" : ""}${isHighlighted ? " job-card--highlighted" : ""}`}>
@@ -2565,6 +2602,14 @@ const JobWatcher = () => {
 
               <div className="job-meta">
                 {isNew && <span className="job-badge">Új</span>}
+                {dupSources && dupSources.length > 0 && (
+                  <span
+                    className="job-duplicate-badge"
+                    title={`Valószínűleg ugyanez a hirdetés más forrásból is bejött (cím + cég első szava egyezik): ${dupSources.join(", ")}`}
+                  >
+                    ⧉ Átfedés: {dupSources.join(", ")}
+                  </span>
+                )}
                 {isSeniorExperience(job.experience, job.title) && (
                   <span
                     className="job-senior-badge"

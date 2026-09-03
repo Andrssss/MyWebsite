@@ -1411,6 +1411,22 @@ html, body {
 /* Senior flag — a hirdetést nem szűrjük ki, csak jelöljük: min. tapasztalat
    >= 5 év (isSeniorExperience). Amber "figyelem" pill, elkülönül a zöld "Új"
    és a szürke "Lejárt" badge-től. */
+/* Cross-source átfedés (cím + cég első szava egyezik LinkedIn/talent/
+   ats-crawl/alllocaljobs/AI-scraped/startupjobs között) — csak jelzés,
+   nem törli/rejti egyik találatot sem. */
+.job-duplicate-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(107, 114, 128, 0.18);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.4);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
 .job-senior-badge {
   display: inline-block;
   padding: 4px 10px;
