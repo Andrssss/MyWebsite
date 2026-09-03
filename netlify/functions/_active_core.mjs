@@ -621,7 +621,22 @@ export const BANNER_DEAD_SOURCES = {
   // repeated "SPA template noise" trap — see the doc comment above and
   // qdiak's entry below for why that check matters).
   schonherz: "sajnos ez a hirdetés már nem aktuális",
-  minddiak: "ez az álláshirdetés már nem érhető el",
+  // minddiak.hu is an unrendered Angular 13 SPA (ng-version="13.4.0", no SSR) —
+  // confirmed live 2026-09-04 that a plain GET of a KNOWN-DEAD posting returns
+  // only the <app-root> shell (nav/footer), never the "Hoppá... már nem
+  // érhető el" banner a real browser shows, because that banner is painted
+  // client-side after Angular's own API call resolves. The string rule that
+  // used to sit here (added 2026-07-22) could therefore never fire — it only
+  // ever got verified ABSENT on a live posting, never PRESENT on a dead one,
+  // so the gap went unnoticed until a full-source audit flagged 2 correctly-
+  // inactive rows as false positives ("still alive") purely because this rule
+  // never triggered the real dead-detection it looked like it provided.
+  // No entry here means minddiak gets NO signal from a 200 response — which is
+  // fine, because reconcileActive (cron_jobs_DIAK_1-background.mjs) is what
+  // actually deactivates it: minddiak's own listing API is re-fetched on every
+  // run and a posting that drops out of it ages out after ACTIVE_GRACE_DAYS.
+  // A future fix would need to probe minddiak's JSON API by id (same shape as
+  // qdiak's/talent's own-status check below), not the rendered HTML page.
   miszisz: "lejárt a jelentkezési",
   // melodiak's plain phrase ("Lezárt hirdetés") is ALSO baked into every page
   // as i18n props JSON (`"section3":{"text1":"Lezárt hirdetés",...}`, present
@@ -664,12 +679,22 @@ export const BANNER_DEAD_SOURCES = {
   // above for the "UNVERIFIED" history this closes). Confirmed absent on a
   // live sample from the same session.
   startupjobs: "this job is no longer available",
-  // kuka/cg-jobstream/wise's ATS renders in the visitor's locale, so both an
-  // English and a German "closed" string were seen live; checking either
-  // covers kuka specifically (cg-jobstream/wise only showed the English one).
+  // kuka/cg-jobstream/wise's ATS renders in the visitor's locale, so an
+  // English, a German, and (added 2026-09-04) a Hungarian "closed" string have
+  // all been seen live; checking any of them covers kuka specifically
+  // (cg-jobstream/wise only showed the English one). The Hungarian phrase was
+  // missing entirely until a full-source audit found a genuinely closed kuka
+  // posting ("Sajnáljuk, de ezt az állást már betöltötték.") sitting active —
+  // confirmed absent on a live control posting (Microsoft 365 Administrator)
+  // the same day before adding it.
   kuka: (row, body) => {
     const lower = body.toLowerCase();
-    return lower.includes("position has been filled") || lower.includes("job has expired") || lower.includes("bereits besetzt");
+    return (
+      lower.includes("position has been filled") ||
+      lower.includes("job has expired") ||
+      lower.includes("bereits besetzt") ||
+      lower.includes("betöltötték")
+    );
   },
   // qdiak's own phrase ("Ez az állás már nem elérhető") is NOT safe as a plain
   // substring — confirmed live 2026-07-22 that it's baked into every page as
