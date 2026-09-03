@@ -213,7 +213,7 @@ const _runJob = withTimeout("cron_jobs_WORKABLE-background", async () => {
     let skippedDupe = 0;
     const deduped = rows.filter((r) => {
       if (!budapestUrlSet.has(r.url)) return true; // nem-budapesti váz: a reconcile-halmazt tölti
-      if (!isCrossSourceDupe(dupeIndex, r.company, r.title, r.technologies)) return true;
+      if (!isCrossSourceDupe(dupeIndex, r.company, r.title)) return true;
       skippedDupe += 1;
       console.log(`[workable] SKIP cross-source dupe "${r.title}" @ ${r.company}`);
       return false;

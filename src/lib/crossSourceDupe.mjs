@@ -118,67 +118,44 @@ function splitTechList(technologies) {
     : [];
 }
 
-// Overlap coefficient (Szymkiewicz–Simpson) of the two technology-tag sets:
-// shared ÷ min(|A|, |B|) — NOT Jaccard (shared ÷ union). Tags are a canonical
-// keyword table (_tech_keywords.js) applied identically regardless of source,
-// so exact string equality is enough — no fuzzy matching needed.
+// 2026-09-03: tried a fuzzy overlap-coefficient threshold first, dropped it —
+// extraction depth varies too wildly between site templates (same posting,
+// 12 tags on one source vs 2 on another, sometimes not even a strict subset)
+// to trust ANY numeric threshold across different sources' extraction
+// pipelines. Explicitly rejected by the site owner as "40% bullshit" after
+// several live near-misses.
 //
-// Jaccard was tried first and broke on real data: extraction depth varies a
-// lot between site templates (a thin page yields fewer tags even for the
-// IDENTICAL posting), and Jaccard punishes the thinner side's set size even
-// when it's a clean subset of the richer one. Overlap coefficient instead
-// asks "is virtually everything the WEAKER extraction found also present on
-// the other side?" — the right question when one source just extracts less.
+// This function is scoped to SAME-SOURCE comparisons ONLY (two rows from the
+// identical scraper, same dupeKey, different url — e.g. a source with no
+// stable URL re-listing the same posting, or a title+company that genuinely
+// collides across different real reqs on that one source, like the Deutsche
+// Telekom "DevOps Engineer" case, which was 4 rows on nofluffjobs itself).
+// Within ONE source, the extraction pipeline is identical every time, so an
+// EXACT tag-set match is the trustworthy signal: same posting re-scraped →
+// same tags; a different req sharing the same title+company → different
+// tags. No threshold, no partial credit.
 //
-// Returns null (cannot compare — caller falls back to title+company alone)
-// whenever the SMALLER side has under MIN_TAGS_FOR_COMPARISON tags. Below
-// that, the signal is too weak either direction: a match on 1-3 shared tags
-// out of a tiny set isn't trustworthy evidence of "same posting", but a tiny
-// set NOT fully contained in the other isn't trustworthy evidence of
-// "different posting" either — confirmed live 2026-09-03, a pestidev.hu
-// "Test Automation Engineer" @ MP Solutions duplicate (workable, 7 tags; vs
-// AI-scraped, only 2 tags, one of which — "Test Automation" — wasn't even in
-// workable's list despite the title). Requiring ≥4 tags on the thinner side
-// before trusting a rejection would have kept that case falling back to the
-// key-only accept, instead of the accidental near-miss it would score with
-// Jaccard-style union-punishing math.
-const MIN_TAGS_FOR_COMPARISON = 4;
-
-export function technologyOverlap(techA, techB) {
-  const a = new Set(splitTechList(techA));
-  const b = new Set(splitTechList(techB));
-  const minSize = Math.min(a.size, b.size);
-  if (minSize < MIN_TAGS_FOR_COMPARISON) return null;
-  let shared = 0;
-  for (const t of a) if (b.has(t)) shared++;
-  return shared / minSize;
+// NEVER use this for cross-source comparisons — see CROSS_SOURCE_DUPE_SOURCES
+// below and isLikelySamePosting's doc comment.
+export function technologiesExactMatch(techA, techB) {
+  const a = splitTechList(techA);
+  const b = splitTechList(techB);
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every((t) => setB.has(t));
 }
 
-// 2026-09-03: two live NoFluffJobs postings, both "DevOps Engineer" @ Deutsche
-// Telekom IT Solutions Hungary — same dupeKey, but genuinely different reqs
-// (21 vs 25 tags, 8 shared → overlap coefficient 8/21 ≈ 0.38). Generic titles
-// at big outsourcing/BPO employers collide on company+title alone with no
-// other signal to split them apart. Both sides had plenty of tags (well above
-// MIN_TAGS_FOR_COMPARISON), so this is a case where the reject is trustworthy.
-//
-// 0.5: comfortable margin above that 0.38 false-positive score, while every
-// confirmed genuine duplicate found live this session clears it easily —
-// "Beyond Sports" (identical lists, 1.0), "test engineer" @ SEON (identical
-// 10-tag lists, 1.0), "Embedded C++" @ MP Solutions (workable 12 tags, talent
-// 4 tags, all 4 contained → 4/4 = 1.0). Revisit if a false positive with
-// genuine, well-populated tech overlap ever turns up (see
-// cross-source-dupe-coverage memory for the full decision history).
-export const TECH_MATCH_THRESHOLD = 0.5;
-
-// True duplicate-of-the-same-posting check: title+company key must match AND,
-// whenever both sides have technologies to compare, they must overlap enough.
-// When either side has no technologies, the key match alone stands (see
-// technologyOverlap above) — this is the ONLY place that matters: ats-crawl's
-// cross-source check runs before its detail-page fetch (so it has no
-// technologies yet) and deliberately keeps working key-only, unchanged.
+// Same-source duplicate check: title+company key must match AND the
+// technology tag sets must match EXACTLY (see technologiesExactMatch above).
+// Scoped to SAME-SOURCE use only — two rows from the SAME `source` value.
+// Cross-source matching must use dupeKey() alone, with no technology
+// involved at all: extraction quality differs too much between site
+// templates to trust as a cross-source signal (confirmed on live data
+// several times 2026-09-03 — see cross-source-dupe-coverage memory). Cross-
+// source candidates are recorded for human review, never auto-merged; they
+// do not call this function.
 export function isLikelySamePosting(a, b) {
   const key = dupeKey(a.company, a.title);
   if (!key || key !== dupeKey(b.company, b.title)) return false;
-  const overlap = technologyOverlap(a.technologies, b.technologies);
-  return overlap === null || overlap >= TECH_MATCH_THRESHOLD;
+  return technologiesExactMatch(a.technologies, b.technologies);
 }
