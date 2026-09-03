@@ -606,6 +606,7 @@ const JobWatcher = () => {
   const [appliedCache, setAppliedCache] = useState(() => loadAppliedCache());
   const [showAppliedOnly, setShowAppliedOnly] = useState(false);
   const [showHiddenOnly, setShowHiddenOnly] = useState(false);
+  const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
 
   const [manualAppliedTitle, setManualAppliedTitle] = useState("");
   const [manualAppliedSource, setManualAppliedSource] = useState("");
@@ -1954,6 +1955,14 @@ const JobWatcher = () => {
     return result;
   }, [visibleJobs]);
 
+  // "Csak duplikátumok" szűrő — a crossSourceDuplicates-et SZÁNDÉKOSAN a teljes
+  // visibleJobs-ból számoljuk (fent), nem ebből a szűrt listából, hogy a
+  // kapcsoló bekapcsolása ne szűkítse önmaga összehasonlítási alapját.
+  const displayedJobs = useMemo(() => {
+    if (!showDuplicatesOnly) return visibleJobs;
+    return visibleJobs.filter((j) => j.url && crossSourceDuplicates.has(j.url));
+  }, [visibleJobs, showDuplicatesOnly, crossSourceDuplicates]);
+
   // Az exporthoz mindig a TELJES jelentkezés-lista kell, függetlenül attól,
   // be van-e kapcsolva a "Jelentkezések" szűrő vagy van-e aktív kereső szó —
   // ezért ez külön van a visibleJobs-tól, ami mindkettőtől függ.
@@ -1978,8 +1987,8 @@ const JobWatcher = () => {
 
   // Csak azokat tudjuk megnyitni, amiknek van linkjük.
   const openableJobs = useMemo(
-    () => visibleJobs.filter((j) => j.url),
-    [visibleJobs]
+    () => displayedJobs.filter((j) => j.url),
+    [displayedJobs]
   );
 
   /* Bulk: az összes leszűrt állás megnyitása új lapokon + mindet "megtekintettnek"
@@ -2124,6 +2133,15 @@ const JobWatcher = () => {
                 : `🚫 Rejtettek (${jobs.filter((j) => j.hidden === true).length})`}
             </button>
           )}
+          <button
+            className={`job-btn job-btn--toggle${showDuplicatesOnly ? " active" : ""}`}
+            onClick={() => setShowDuplicatesOnly((v) => !v)}
+            title="Csak azok a hirdetések, amiknél a rendszer valószínű átfedést (ugyanaz a hirdetés más forrásból) észlelt"
+          >
+            {showDuplicatesOnly
+              ? `✓ Duplikátumok (${crossSourceDuplicates.size})`
+              : `⧉ Duplikátumok (${crossSourceDuplicates.size})`}
+          </button>
           <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
            📊 Statisztikák
           </button>
@@ -2471,7 +2489,7 @@ const JobWatcher = () => {
       {/* ===== TALÁLATOK ===== */}
       {!loading && (
         <div className="job-status">
-          Aktív időszűrő: {activeTimeLabel} · Találatok: {visibleJobs.length}
+          Aktív időszűrő: {activeTimeLabel} · Találatok: {displayedJobs.length}
         </div>
       )}
     </div>
@@ -2514,9 +2532,9 @@ const JobWatcher = () => {
 
     {loading ? (
       <div className="job-status">Betöltés…</div>
-    ) : visibleJobs.length === 0 && !showAppliedOnly ? (
+    ) : displayedJobs.length === 0 && !showAppliedOnly ? (
       <div className="job-status job-status--empty">
-        <p>Nincs találat.</p>
+        <p>{showDuplicatesOnly ? "Nincs duplikátumként jelölt hirdetés." : "Nincs találat."}</p>
         {activeFilterReasons.length > 0 && (
           <p className="job-empty-reason">
             Ezt az aktív szűrőid okozhatják: {activeFilterReasons.join(", ")}.
@@ -2525,7 +2543,7 @@ const JobWatcher = () => {
       </div>
     ) : (
       <ul className="job-list">
-        {visibleJobs.map((job) => {
+        {displayedJobs.map((job) => {
           const isNew =
             job.firstSeen && hoursSince(job.firstSeen) <= 1;
           const notes = getKeywordNotesForJob(job);
@@ -2709,7 +2727,7 @@ const JobWatcher = () => {
           );
         })}
 
-        {visibleJobs.length === 0 && showAppliedOnly && (
+        {displayedJobs.length === 0 && showAppliedOnly && (
           <li className="job-status">Még nincs mentett jelentkezés.</li>
         )}
 
