@@ -3,9 +3,9 @@
   Terv: WEB_CRAWLER_PLAN.md (F1). Adapterek: _ats_providers.mjs.
 
   Mit csinál:
-    ats_tenants tábla (provider + cég-slug) → futásonként BATCH_SIZE tenant →
-    egy lista-hívás boardonként → szigorú HU-helyszín kapu → (ha kell) EGY
-    detail-hívás soronként → ingestJobs.
+    ats_tenants (provider + cég-slug, 2026-09-03 óta Blobs, ld. _ats_state.mjs)
+    → futásonként BATCH_SIZE tenant → egy lista-hívás boardonként → szigorú
+    HU-helyszín kapu → (ha kell) EGY detail-hívás soronként → ingestJobs.
 
   Miért nem "web crawler": nincs frontier, nincs link-bejárás. A cég-slug az
   egyetlen bemenet, a board API pedig egy körben adja a teljes nyitott listát.
@@ -50,6 +50,7 @@ import { withTimeout } from "./_error-logger.mjs";
 import { migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies } from "./_experience_core.mjs";
 import { getProvider, deriveScopePrefix } from "./_ats_providers.mjs";
+import { addTenantIfNew, applyTenantResult, selectDueTenants, readTenants, writeTenants } from "./_ats_state.mjs";
 import { rejectAtsLocation } from "./_ats_location.mjs";
 import { ingestJobs, normalizeUrl, isItJob } from "./_ai_ingest_core.mjs";
 import {
@@ -99,9 +100,11 @@ const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 /* ── seed ─────────────────────────────────────────────────────────────
    2026-08-26-i kézi próbából (scratch-script, 64 cég × 4 provider). A lista
-   MINDIG lefut ON CONFLICT DO NOTHING-gal, tehát ide felvenni új tenantot =
-   deploy után magától bekerül, a meglévők könyvelése (last_checked, hit_count)
-   érintetlen marad. Tenantot NE innen töröljünk kikapcsoláshoz — a törölt sor a
+   MINDIG lefut, de addTenantIfNew (_ats_state.mjs) a meglévő kulcsokra
+   tényleg semmit nem ír — nem csak "no-op update", hanem szó szerint nincs
+   blob-írás, ha nincs új tenant. Ide felvenni új tenantot = deploy után
+   magától bekerül, a meglévők könyvelése (last_checked, hit_count) érintetlen
+   marad. Tenantot NE innen töröljünk kikapcsoláshoz — a törölt sor a
    következő deploynál visszajön; helyette status='dead'.
 
    2026-09-02: smartrecruiters/wise és smartrecruiters/rolandberger IDE KÖLTÖZTEK.
@@ -185,41 +188,14 @@ const SEED_TENANTS = [
   { provider: "workday", slug: "unisys.wd5:External", company: "Unisys" },
 ];
 
-let _schemaReady = false;
-
-async function ensureTenantSchema(client) {
-  if (_schemaReady) return;
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ats_tenants (
-      provider        text NOT NULL,
-      slug            text NOT NULL,
-      company         text,
-      status          text NOT NULL DEFAULT 'live',
-      last_checked    timestamptz,
-      last_hu_count   integer NOT NULL DEFAULT 0,
-      hit_count       integer NOT NULL DEFAULT 0,
-      last_error      text,
-      discovered_via  text,
-      created_at      timestamptz NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (provider, slug)
-    )
-  `);
-  await client.query(
-    `CREATE INDEX IF NOT EXISTS idx_ats_tenants_due ON ats_tenants (status, last_checked)`
-  );
-  _schemaReady = true;
-}
-
-async function seedTenants(client) {
+// 2026-09-03: ats_tenants Blobs-ra költözött (_ats_state.mjs) — az itt maradó
+// egyetlen dolog a SEED_TENANTS lista alábbi felvétele, in-memory.
+function seedTenants(tenants) {
   let added = 0;
   for (const t of SEED_TENANTS) {
-    const res = await client.query(
-      `INSERT INTO ats_tenants (provider, slug, company, discovered_via)
-       VALUES ($1,$2,$3,$4)
-       ON CONFLICT (provider, slug) DO NOTHING`,
-      [t.provider, t.slug, t.company, "manual-probe-2026-08-26"]
-    );
-    added += res.rowCount ?? 0;
+    if (addTenantIfNew(tenants, t.provider, t.slug, { company: t.company, discoveredVia: "manual-probe-2026-08-26" })) {
+      added += 1;
+    }
   }
   return added;
 }
@@ -260,52 +236,10 @@ async function seedTenants(client) {
  * `limit`-en FELÜLI, nem elvehető keretet adunk — additív, nem csökkenti az
  * élő tenantok meglévő óránkénti recheck-gyakoriságát.
  */
+// A fenti indoklás 2026-09-03 óta selectDueTenants-ban (_ats_state.mjs) él,
+// pontosan ugyanezzel a kétlépcsős logikával, csak Object.values()+sort a
+// két SQL SELECT helyett.
 const NEVER_CHECKED_RESERVE = 10;
-
-async function dueTenants(client, limit) {
-  const { rows: primary } = await client.query(
-    `SELECT provider, slug, company
-       FROM ats_tenants
-      WHERE status <> 'dead'
-        AND (
-          last_checked IS NULL
-          OR status = 'live'
-          OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days => $2::int))
-        )
-      ORDER BY (status = 'live' AND last_checked IS NOT NULL) DESC, last_checked ASC NULLS FIRST
-      LIMIT $1`,
-    [limit, RECHECK_NO_HU_DAYS]
-  );
-
-  const seen = new Set(primary.map((r) => `${r.provider} ${r.slug}`));
-  const { rows: reserveRows } = await client.query(
-    `SELECT provider, slug, company
-       FROM ats_tenants
-      WHERE status <> 'dead'
-        AND (
-          last_checked IS NULL
-          OR (status = 'no_hu' AND last_checked < NOW() - make_interval(days => $2::int))
-        )
-      ORDER BY last_checked ASC NULLS FIRST
-      LIMIT $1`,
-    [NEVER_CHECKED_RESERVE, RECHECK_NO_HU_DAYS]
-  );
-
-  return [...primary, ...reserveRows.filter((r) => !seen.has(`${r.provider} ${r.slug}`))];
-}
-
-async function recordTenantResult(client, tenant, { status, huCount, inserted, error }) {
-  await client.query(
-    `UPDATE ats_tenants
-        SET last_checked  = NOW(),
-            status        = COALESCE($3, status),
-            last_hu_count = COALESCE($4, last_hu_count),
-            hit_count     = hit_count + COALESCE($5, 0),
-            last_error    = $6
-      WHERE provider = $1 AND slug = $2`,
-    [tenant.provider, tenant.slug, status ?? null, huCount ?? null, inserted ?? 0, error ?? null]
-  );
-}
 
 // jobs.smartrecruiters.com/{Company}/{id}-{slug} — a numerikus id ROTÁL, amikor
 // a hirdetést frissítik, tehát önmagában nem lehet sor-identitás. Ugyanaz a
@@ -315,10 +249,10 @@ function srVolatilePattern(url) {
   return m ? `^${escapeRegex(m[1])}\\d+-${escapeRegex(m[2])}$` : null;
 }
 
-async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
+async function crawlTenant(client, tenant, { filters, categories, dupeIndex, tenants }) {
   const provider = getProvider(tenant.provider);
   if (!provider) {
-    await recordTenantResult(client, tenant, { status: "dead", error: `unknown provider ${tenant.provider}` });
+    applyTenantResult(tenants, tenant.provider, tenant.slug, { status: "dead", error: `unknown provider ${tenant.provider}` });
     return { skipped: true };
   }
 
@@ -327,7 +261,7 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
   try {
     listing = await provider.list(tenant.slug);
   } catch (err) {
-    await recordTenantResult(client, tenant, { error: err.message.slice(0, 300) });
+    applyTenantResult(tenants, tenant.provider, tenant.slug, { error: err.message.slice(0, 300) });
     console.error(`[atscrawl] ${label} list failed: ${err.message}`);
     return { failed: true };
   }
@@ -335,7 +269,7 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
   // Nemlétező board — csak ott hihető, ahol a provider tényleg 404-el
   // (smartrecruiters nem, ld. _ats_providers.mjs fejléc).
   if (listing.notFound && provider.detectsMissingTenant) {
-    await recordTenantResult(client, tenant, { status: "dead", huCount: 0, error: "board 404" });
+    applyTenantResult(tenants, tenant.provider, tenant.slug, { status: "dead", huCount: 0, error: "board 404" });
     console.log(`[atscrawl] ${label} → DEAD (404)`);
     return { dead: true };
   }
@@ -365,11 +299,11 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
     try {
       const name = await provider.companyName(tenant.slug);
       if (name) {
+        // `tenant` UGYANAZ az objektum-referencia, mint ami a `tenants` dict-ben
+        // ül (selectDueTenants Object.values()-ból ad vissza, nem másolatot),
+        // tehát ez a mutáció önmagában elég — a run végi egyetlen writeTenants
+        // ezt is elviszi, külön írás nem kell.
         tenant.company = name;
-        await client.query(
-          `UPDATE ats_tenants SET company = $3 WHERE provider = $1 AND slug = $2 AND company IS NULL`,
-          [tenant.provider, tenant.slug, name]
-        );
         console.log(`[atscrawl] ${label} company resolved → "${name}"`);
       } else {
         console.log(`[atscrawl] ${label} company unresolved (board title gave nothing)`);
@@ -497,7 +431,7 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex }) {
     `reconcile=${JSON.stringify(result.reconcile)}`
   );
 
-  await recordTenantResult(client, tenant, {
+  applyTenantResult(tenants, tenant.provider, tenant.slug, {
     status: huJobs.length > 0 ? "live" : "no_hu",
     huCount: huJobs.length,
     inserted: result.inserted,
@@ -515,19 +449,27 @@ const _runJob = withTimeout("cron_jobs_ATSCRAWL-background", async () => {
   let totalHu = 0;
   let totalInserted = 0;
   const marketingCandidates = [];
+  // Egy olvasás, egy írás a teljes futásra — a korábbi Postgres-verzió
+  // tenantonként írt + a seed-lista minden futásban újra próbálkozott
+  // (2026-09-03 előtt: ~35 no-op INSERT óránként, örökre). A végi
+  // writeTenants csak akkor fut, ha VALÓBAN történt változás.
+  const tenants = await readTenants();
+  const seeded = seedTenants(tenants);
+  if (seeded) console.log(`[atscrawl] seeded ${seeded} new tenant(s)`);
+
+  const dueList = selectDueTenants(tenants, {
+    limit: BATCH_SIZE,
+    reserveLimit: NEVER_CHECKED_RESERVE,
+    recheckNoHuDays: RECHECK_NO_HU_DAYS,
+  });
+  console.log(`[atscrawl] due tenants: ${dueList.length}`);
+
   try {
-    await ensureTenantSchema(client);
-    const seeded = await seedTenants(client);
-    if (seeded) console.log(`[atscrawl] seeded ${seeded} new tenant(s)`);
-
-    const tenants = await dueTenants(client, BATCH_SIZE);
-    console.log(`[atscrawl] due tenants: ${tenants.length}`);
-
     const dupeIndex = await loadCrossSourceDupeIndex(client, ATS_SOURCE, { onlySources: CROSS_SOURCE_DUPE_SOURCES });
     console.log(`[atscrawl] cross-source dupe index: ${dupeIndex.size} keys`);
 
-    for (const tenant of tenants) {
-      const r = await crawlTenant(client, tenant, { filters, categories, dupeIndex });
+    for (const tenant of dueList) {
+      const r = await crawlTenant(client, tenant, { filters, categories, dupeIndex, tenants });
       checked += 1;
       totalHu += r.huCount ?? 0;
       totalInserted += r.inserted ?? 0;
@@ -538,6 +480,8 @@ const _runJob = withTimeout("cron_jobs_ATSCRAWL-background", async () => {
   } finally {
     client.release();
   }
+
+  if (seeded || dueList.length > 0) await writeTenants(tenants);
 
   // A DB-kapcsolat lezárása UTÁN — ez egy külső HTTP-hívás a testvérprojekt
   // felé, nem kell hozzá a pool-kliens, és a fail-soft hiba (ld. header) itt

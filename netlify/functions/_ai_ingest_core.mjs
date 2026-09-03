@@ -19,7 +19,7 @@ import {
   extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
-import { atsHandoff, registerAtsTenant } from "./_ats_handoff.mjs";
+import { atsHandoff, registerAtsTenants } from "./_ats_handoff.mjs";
 import { findCrossSourceDuplicates } from "./_ai_dupe_guard.mjs";
 
 /* ── url/row normalization (shared by every caller-supplied write path) ──
@@ -372,17 +372,19 @@ export async function ingestJobs(client, {
   }
 
   // Tenant-felvétel a ciklus UTÁN, csoportosítva: egy boardról tíz hirdetés is
-  // jöhet, tenant-írás viszont csak egy kell belőle.
-  const atsTenantsAdded = [];
-  for (const t of atsTenants.values()) {
+  // jöhet, tenant-írás viszont csak egy kell belőle. Az egész köteg EGYBEN megy
+  // a blob-store-nak (_ats_state.mjs) — egy futás legfeljebb egy olvasás + egy
+  // írás, ne tenantonként egy.
+  let atsTenantsAdded = [];
+  if (atsTenants.size > 0) {
     try {
-      if (await registerAtsTenant(client, { ...t, via: "ai-handoff" })) {
-        atsTenantsAdded.push(`${t.provider}:${t.slug}`);
-      }
+      atsTenantsAdded = await registerAtsTenants(
+        [...atsTenants.values()].map((t) => ({ ...t, via: "ai-handoff" }))
+      );
     } catch (err) {
-      // Az átadás már megtörtént (a sort nem szúrtuk be), tehát a lead elveszne
-      // — ezért ez hangosan naplózódik, nem csendben nyelődik el.
-      console.error(`[${source}] ats-tenant handoff FAILED for ${t.provider}:${t.slug}: ${err.message}`);
+      // Az átadás már megtörtént (a sorokat nem szúrtuk be), tehát a leadek
+      // elvesznének — ezért ez hangosan naplózódik, nem csendben nyelődik el.
+      console.error(`[${source}] ats-tenant handoff FAILED for ${atsTenants.size} tenant(s): ${err.message}`);
     }
   }
 

@@ -34,9 +34,17 @@
   itt tenantként felvenni duplikációt szült volna. Az a fájl megszűnt, a két
   board most rendes ats-crawl tenant (lásd cron_jobs_ATSCRAWL-background.mjs
   SEED_TENANTS) — tehát minden ATS-url ugyanazon az úton megy, kivétel nélkül.
+
+  ── 2026-09-03: ats_tenants Blobs-ra költözött ────────────────────────────
+  Ez a fájl a Postgres-klienst már nem használja — a tenant-felvétel a
+  _ats_state.mjs blob-store-ján fut. A hívó (_ai_ingest_core.mjs) egy
+  ingestJobs-futáson belül összegyűjti az ÖSSZES handoff-jelöltet, és EGYBEN
+  adja át (registerAtsTenants), hogy egy futás legfeljebb egy blob-olvasás +
+  egy blob-írás legyen, ne tenantonként egy.
 */
 
 import { parseAtsUrl } from "./_ats_slug_core.mjs";
+import { readTenants, writeTenants, addTenantIfNew } from "./_ats_state.mjs";
 
 /**
  * Mi legyen ezzel az url-lel az AI-ingest útján?
@@ -51,51 +59,29 @@ export function atsHandoff(url) {
   return { kind: "tenant", ...parsed };
 }
 
-// Az `ats_tenants` táblát rendes körülmények között a cron_jobs_ATSCRAWL hozza
-// létre; ha az AI-ingest fut előbb egy friss adatbázison, az átadás nem halhat
-// el "reláció nem létezik" hibával — akkor ugyanis a sort már eldobtuk, a leadet
-// meg elveszítenénk.  Ugyanaz a séma, mint az ats-tenants.mjs ensureSchema-jában.
-let _tableReady = false;
-export async function ensureAtsTenantTable(client) {
-  if (_tableReady) return;
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ats_tenants (
-      provider        text NOT NULL,
-      slug            text NOT NULL,
-      company         text,
-      status          text NOT NULL DEFAULT 'live',
-      last_checked    timestamptz,
-      last_hu_count   integer NOT NULL DEFAULT 0,
-      hit_count       integer NOT NULL DEFAULT 0,
-      last_error      text,
-      discovered_via  text,
-      created_at      timestamptz NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (provider, slug)
-    )
-  `);
-  _tableReady = true;
-}
-
 /**
- * Tenant felvétele egy AI-találat url-je alapján.  Nem probálunk: a hirdetés
- * url-je maga a bizonyíték, hogy a board létezik (ugyanez az elv, mint az
- * ats-tenants.mjs `fromUrl` ágán).
+ * Tenant-felvétel egy köteg AI-találat url-je alapján. Nem probálunk: a
+ * hirdetés url-je maga a bizonyíték, hogy a board létezik (ugyanez az elv,
+ * mint az ats-tenants.mjs `fromUrl` ágán).
  *
  * A `company` szándékosan NULL marad — a beküldött nevet csak eredet-megjegyzés-
- * ként tároljuk a `discovered_via`-ban.  Indoklás az ats-tenants.mjs-ben: egy
+ * ként tároljuk a `discoveredVia`-ban. Indoklás az ats-tenants.mjs-ben: egy
  * hibás névből a board MINDEN hirdetésére hibás cégnév kerülne; a valódi nevet a
  * provider adja, ha tudja.
  *
- * @returns {Promise<boolean>} true, ha új sor keletkezett
+ * @param {Array<{provider:string, slug:string, company?:string|null, via?:string}>} entries
+ * @returns {Promise<string[]>} az ÚJONNAN felvett "<provider>:<slug>" kulcsok
  */
-export async function registerAtsTenant(client, { provider, slug, company = null, via = "ai-handoff" }) {
-  await ensureAtsTenantTable(client);
-  const note = company ? `${via}:${String(company).slice(0, 150)}` : via;
-  const res = await client.query(
-    `INSERT INTO ats_tenants (provider, slug, company, discovered_via)
-     VALUES ($1,$2,NULL,$3)
-     ON CONFLICT (provider, slug) DO NOTHING`,
-    [provider, slug, note]
-  );
-  return res.rowCount > 0;
+export async function registerAtsTenants(entries) {
+  if (!entries?.length) return [];
+  const tenants = await readTenants();
+  const added = [];
+  for (const { provider, slug, company = null, via = "ai-handoff" } of entries) {
+    const discoveredVia = company ? `${via}:${String(company).slice(0, 150)}` : via;
+    if (addTenantIfNew(tenants, provider, slug, { discoveredVia })) {
+      added.push(`${provider}:${slug}`);
+    }
+  }
+  if (added.length > 0) await writeTenants(tenants);
+  return added;
 }

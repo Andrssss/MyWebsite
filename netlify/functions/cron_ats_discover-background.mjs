@@ -26,6 +26,10 @@
 import { Pool } from "pg";
 import { withTimeout } from "./_error-logger.mjs";
 import { candidateSlugs, probeSlug, PROBEABLE_PROVIDERS } from "./_ats_slug_core.mjs";
+import {
+  readTenants, writeTenants, addTenantIfNew,
+  readCandidateState, writeCandidateState, addCandidateIfNew, applyCandidateResult, selectDueCandidates,
+} from "./_ats_state.mjs";
 
 const CANDIDATE_INTAKE = Number(process.env.ATS_DISCOVER_INTAKE || 300);
 const PROBE_BUDGET = Number(process.env.ATS_DISCOVER_BUDGET || 45);
@@ -34,11 +38,6 @@ const PROBE_BUDGET = Number(process.env.ATS_DISCOVER_BUDGET || 45);
 const PROBE_GAP_MS = 150;
 // Hálózati hibára (429/5xx/timeout) a jelölt nem "miss", csak elhalasztjuk.
 const RETRY_ERROR_DAYS = 7;
-// Amivel a 2026-08-30 ELŐTT lepróbált jelöltek `probed_providers`-e feltöltődik
-// (a recruitee felvétele előtt ez a három volt a PROBEABLE_PROVIDERS). Nem
-// PROBEABLE_PROVIDERS-ből származtatva: az a lista bővülni fog, ez a historikus
-// tény pedig fix.
-const LEGACY_PROBED_PROVIDERS = ["ashby", "greenhouse", "lever"];
 
 /* ── 2. ÁG: SmartRecruiters globális kereső (2026-08-30) ──────────────────
    A fenti cégnév-tippelés SZÁNDÉKOSAN kihagyja a SmartRecruiterst: ott a
@@ -85,96 +84,40 @@ if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
-let _schemaReady = false;
-
-async function ensureSchema(client) {
-  if (_schemaReady) return;
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ats_slug_candidates (
-      slug            text PRIMARY KEY,
-      source_company  text,
-      status          text NOT NULL DEFAULT 'new',
-      hit_provider    text,
-      probed_at       timestamptz,
-      created_at      timestamptz NOT NULL DEFAULT NOW()
-    )
-  `);
-  await client.query(
-    `CREATE INDEX IF NOT EXISTS idx_ats_candidates_status ON ats_slug_candidates (status, probed_at)`
-  );
-  /* Provideronkénti könyvelés (2026-08-30, a recruitee felvételekor).
-     A `status` egyetlen szó az EGÉSZ jelöltre ("miss" = egyik provideren sem
-     volt), ami addig elég, amíg a providerek listája nem bővül. A bővüléskor
-     viszont pont a régi, "miss"-re állított jelölteket kellene megnézni az ÚJ
-     provideren — a status alapján viszont azok soha többé nem kerülnének sorra,
-     tehát a bővítés csak a jövőbeli új cégnevekre hatna, a meglévő ~2300
-     lepróbált slugra (köztük az összes eddig ismert magyar cégnevünkre) nem. */
-  await client.query(
-    `ALTER TABLE ats_slug_candidates
-       ADD COLUMN IF NOT EXISTS probed_providers text[] NOT NULL DEFAULT '{}'`
-  );
-  // Egyszeri visszamenőleges feltöltés: ami a bővítés ELŐTT már le volt
-  // próbálva, azt a régi három provideren próbáltuk. A második futástól ez a
-  // feltétel nem illeszkedik semmire (a probed_providers már nem üres).
-  await client.query(
-    `UPDATE ats_slug_candidates
-        SET probed_providers = $1::text[]
-      WHERE probed_at IS NOT NULL AND cardinality(probed_providers) = 0`,
-    [LEGACY_PROBED_PROVIDERS]
-  );
-  // A "melyik cégnevet dolgoztuk már fel" könyvelése KÜLÖN tábla, nem az
-  // ats_slug_candidates.source_company. Azért, mert több cégnév ugyanarra a
-  // slugra vezet ("Telekom Kft." és "Magyar Telekom Nyrt." → `telekom`), és a
-  // slug elsődleges kulcs: a másodikként érkező cégnév ON CONFLICT DO NOTHING
-  // miatt SEMMILYEN sort nem hagyna maga után, tehát minden futásban újra
-  // kiválasztódna, és örökre elfogyasztaná az intake-keretet.
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ats_seen_companies (
-      company    text PRIMARY KEY,
-      seen_at    timestamptz NOT NULL DEFAULT NOW(),
-      slug_count integer NOT NULL DEFAULT 0
-    )
-  `);
-  // Az ats_tenants táblát az ATSCRAWL worker hozza létre; ha ez a job futna
-  // előbb, itt is meg kell lennie, különben a találatot nincs hova írni.
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ats_tenants (
-      provider        text NOT NULL,
-      slug            text NOT NULL,
-      company         text,
-      status          text NOT NULL DEFAULT 'live',
-      last_checked    timestamptz,
-      last_hu_count   integer NOT NULL DEFAULT 0,
-      hit_count       integer NOT NULL DEFAULT 0,
-      last_error      text,
-      discovered_via  text,
-      created_at      timestamptz NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (provider, slug)
-    )
-  `);
-  _schemaReady = true;
-}
+// 2026-09-03: ats_slug_candidates / ats_seen_companies / ats_tenants mind
+// Blobs-ra költöztek (_ats_state.mjs) — nincs séma, ami itt kellene. A
+// `provideronkénti könyvelés` (probedProviders tömb) és a "melyik cégnevet
+// dolgoztuk már fel" (seenCompanies) logikája szerkezetében változatlan, csak
+// a hordozó nem Postgres-oszlop/tábla, hanem blob-mező. Az egyszeri
+// visszamenőleges LEGACY_PROBED_PROVIDERS-feltöltés (2026-08-30, a régi
+// Postgres-migráció) nem került át — a blob-store frissen jött létre azzal az
+// állapottal, amit az akkori egyszeri UPDATE már beírt, tehát a régi jelöltek
+// probedProviders-e élesben már a helyes érték.
 
 /**
  * Új slug-jelöltek felvétele a job_posts cégneveiből.
  *
- * Minden feldolgozott cégnév bekerül az `ats_seen_companies`-be — akkor is, ha
- * nem született belőle egyetlen jelölt sem (csupa általános szó), és akkor is,
- * ha a jelöltjeit egy másik cégnév már felvette. Ez az egyetlen könyvelés, ami
+ * Minden feldolgozott cégnév bekerül a `seenCompanies`-be — akkor is, ha nem
+ * született belőle egyetlen jelölt sem (csupa általános szó), és akkor is, ha
+ * a jelöltjeit egy másik cégnév már felvette. Ez az egyetlen könyvelés, ami
  * garantálja, hogy a cégnév-lista ténylegesen körbeér.
+ *
+ * A kizárás (mely cégneveket ne hozza vissza a lekérdezés) egyetlen olvasó
+ * SQL-lel megy, a blobban tárolt `seenCompanies` kulcsait paraméterként adva
+ * — ez az EGYETLEN pont, ahol ez a job Postgrest olvas (a job_posts.company
+ * a blob-store-ban nem létezik, azt nem lehet máshonnan levezetni).
  */
-async function intakeCandidates(client, limit) {
+async function intakeCandidates(client, state, limit) {
+  const seenNames = Object.keys(state.seenCompanies);
   const { rows } = await client.query(
     `SELECT DISTINCT company
        FROM job_posts
       WHERE company IS NOT NULL
         AND length(trim(company)) > 2
-        AND NOT EXISTS (
-          SELECT 1 FROM ats_seen_companies s WHERE s.company = job_posts.company
-        )
+        AND company <> ALL($1::text[])
       ORDER BY company
-      LIMIT $1`,
-    [limit]
+      LIMIT $2`,
+    [seenNames, limit]
   );
 
   let added = 0;
@@ -183,63 +126,11 @@ async function intakeCandidates(client, limit) {
     const slugs = candidateSlugs(company);
     if (slugs.length === 0) unusable += 1;
     for (const slug of slugs) {
-      const res = await client.query(
-        `INSERT INTO ats_slug_candidates (slug, source_company)
-         VALUES ($1, $2)
-         ON CONFLICT (slug) DO NOTHING`,
-        [slug, company]
-      );
-      added += res.rowCount ?? 0;
+      if (addCandidateIfNew(state.candidates, slug, company)) added += 1;
     }
-    await client.query(
-      `INSERT INTO ats_seen_companies (company, slug_count) VALUES ($1, $2)
-       ON CONFLICT (company) DO NOTHING`,
-      [company, slugs.length]
-    );
+    state.seenCompanies[company] = { seenAt: new Date().toISOString(), slugCount: slugs.length };
   }
   return { companies: rows.length, added, unusable };
-}
-
-/*
- * Esedékes jelöltek. Három csoport, ebben a fontossági sorrendben:
- *   1. `new`   — még sosem próbált slug (ide esnek az új cégnevek is)
- *   2. `error` — hálózati hiba miatt eldöntetlen, RETRY_ERROR_DAYS után újra
- *   3. `miss`  — cáfolt, DE van olyan providerünk, amin még nem próbáltuk
- *                (provider-bővítés; ld. a probed_providers oszlop kommentjét)
- *
- * A rendezés első kulcsa azért a `new`, mert a 3. csoport egy több ezres
- * egyszeri backlog: nélküle egy frissen felvett cégnév napokig a sor végén
- * ülne. (Ugyanaz a kiéheztetési hibaosztály, mint az ATSCRAWL tenant-
- * rotációjánál.)
- */
-async function dueCandidates(client, limit) {
-  const { rows } = await client.query(
-    `SELECT slug, source_company, probed_providers
-       FROM ats_slug_candidates
-      WHERE status = 'new'
-         OR (status = 'error' AND probed_at < NOW() - make_interval(days => $2::int))
-         OR (status = 'miss' AND NOT (probed_providers @> $3::text[]))
-      ORDER BY (status = 'new') DESC, probed_at ASC NULLS FIRST, created_at ASC
-      LIMIT $1`,
-    [limit, RETRY_ERROR_DAYS, PROBEABLE_PROVIDERS]
-  );
-  return rows;
-}
-
-// `probedProviders` = a slugra EDDIG kipróbált providerek uniója (a hívó
-// számolja ki, mert az előző értéket úgyis kézben tartja). A hit_provider
-// COALESCE-szal íródik, hogy egy későbbi, más provideren futó kör ne törölje
-// az eredeti találat provideret.
-async function recordCandidate(client, slug, status, hitProvider, probedProviders) {
-  await client.query(
-    `UPDATE ats_slug_candidates
-        SET status = $2,
-            hit_provider = COALESCE($3, hit_provider),
-            probed_at = NOW(),
-            probed_providers = $4::text[]
-      WHERE slug = $1`,
-    [slug, status, hitProvider ?? null, probedProviders]
-  );
 }
 
 /*
@@ -263,14 +154,10 @@ async function recordCandidate(client, slug, status, hitProvider, probedProvider
  * naponkénti rotációban ülnek. Ha egyszer mégis nyitnak budapesti pozíciót, azt
  * meg is találjuk — csak épp helyes cégnévvel, nem a tippelttel.
  */
-async function addTenant(client, provider, slug, guessedCompany) {
-  const res = await client.query(
-    `INSERT INTO ats_tenants (provider, slug, company, discovered_via)
-     VALUES ($1,$2,NULL,$3)
-     ON CONFLICT (provider, slug) DO NOTHING`,
-    [provider, slug, `company-probe:${String(guessedCompany ?? "").slice(0, 150)}`]
-  );
-  return (res.rowCount ?? 0) > 0;
+function addTenant(tenants, provider, slug, guessedCompany) {
+  return addTenantIfNew(tenants, provider, slug, {
+    discoveredVia: `company-probe:${String(guessedCompany ?? "").slice(0, 150)}`,
+  });
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -331,92 +218,104 @@ async function collectSrTenants() {
   return found;
 }
 
-async function discoverSmartRecruiters(client) {
-  const tenants = await collectSrTenants();
+async function discoverSmartRecruiters(tenants) {
+  const srTenants = await collectSrTenants();
   let added = 0;
-  for (const [slug, company] of tenants) {
+  for (const [slug, company] of srTenants) {
     // A slug az SR saját kanonikus alakja ("Hiflylabs"), és az API
     // kis-nagybetűre érzéketlen (élőben ellenőrizve: `Hiflylabs` és
     // `hiflylabs` ugyanazt a boardot adja), tehát a tárolt alak
     // megjelenítés kérdése, nem működésé.
-    const res = await client.query(
-      `INSERT INTO ats_tenants (provider, slug, company, discovered_via)
-       VALUES ('smartrecruiters', $1, $2, 'sr-global-search')
-       ON CONFLICT (provider, slug) DO NOTHING`,
-      [slug, company]
-    );
-    if (res.rowCount) {
+    if (addTenantIfNew(tenants, "smartrecruiters", slug, { company, discoveredVia: "sr-global-search" })) {
       added += 1;
       console.log(`[atsdiscover] SR tenant added: ${slug} ("${company ?? "?"}")`);
     }
   }
-  return { seen: tenants.size, added };
+  return { seen: srTenants.size, added };
 }
 
 const _runJob = withTimeout("cron_ats_discover-background", async () => {
-  const client = await pool.connect();
   let probed = 0;
   let hits = 0;
   let newTenants = 0;
   let errors = 0;
+
+  // Egy olvasás + egy írás store-onként a teljes futásra (2026-09-03,
+  // ld. _ats_state.mjs fejléce) — a korábbi Postgres-verzió candidate-enként
+  // és tenantonként külön UPDATE/INSERT-et adott ki.
+  const tenants = await readTenants();
+  let tenantsDirty = false;
+
+  // 2. ág ELŐSZÖR: pár lekérés, és a legjobb hozamú (a tippelés hit-rate-je
+  // ~18%, itt minden találat bizonyítottan magyar hirdetéses board).
+  const sr = await discoverSmartRecruiters(tenants);
+  if (sr.added) tenantsDirty = true;
+  console.log(`[atsdiscover] SR global search: ${sr.seen} HU tenant(s) seen, ${sr.added} new`);
+
+  const state = await readCandidateState();
+  let candidatesDirty = false;
+
+  const client = await pool.connect();
   try {
-    await ensureSchema(client);
-
-    // 2. ág ELŐSZÖR: pár lekérés, és a legjobb hozamú (a tippelés hit-rate-je
-    // ~18%, itt minden találat bizonyítottan magyar hirdetéses board).
-    const sr = await discoverSmartRecruiters(client);
-    console.log(`[atsdiscover] SR global search: ${sr.seen} HU tenant(s) seen, ${sr.added} new`);
-
-    const intake = await intakeCandidates(client, CANDIDATE_INTAKE);
+    const intake = await intakeCandidates(client, state, CANDIDATE_INTAKE);
+    if (intake.companies > 0) candidatesDirty = true;
     console.log(`[atsdiscover] intake: ${intake.companies} new company name(s) → ${intake.added} candidate slug(s), ${intake.unusable} name(s) yielded none`);
-
-    const candidates = await dueCandidates(client, PROBE_BUDGET);
-    console.log(`[atsdiscover] probing ${candidates.length} candidate(s)`);
-
-    for (const { slug, source_company: company, probed_providers: already } of candidates) {
-      let outcome = "miss";
-      let hitProvider = null;
-      let sawError = false;
-
-      // Csak azt próbáljuk, amit erre a slugra még nem kérdeztünk meg. Egy
-      // provider-bővítés után a régi jelöltek így 1 kérésbe kerülnek, nem
-      // annyiba, ahány providerünk van.
-      const done = new Set(already || []);
-      const todo = PROBEABLE_PROVIDERS.filter((p) => !done.has(p));
-      const tried = [...done];
-
-      for (const provider of todo) {
-        const r = await probeSlug(provider, slug);
-        // A hálózati hiba NEM válasz: ilyenkor a providert szándékosan nem
-        // könyveljük elpróbáltként, különben a 7 nap múlva újra sorra kerülő
-        // `error` sornak üres lenne a todo-ja, és próbálkozás nélkül csúszna át
-        // "miss"-be.
-        if (r === "error") { sawError = true; continue; }
-        tried.push(provider);
-        if (r === "hit") { outcome = "hit"; hitProvider = provider; break; }
-      }
-      // Hálózati hiba mellett a "miss" nem bizonyíték — maradjon újrapróbálható.
-      if (outcome === "miss" && sawError) outcome = "error";
-
-      probed += 1;
-      if (outcome === "hit") {
-        hits += 1;
-        const added = await addTenant(client, hitProvider, slug, company);
-        if (added) newTenants += 1;
-        console.log(`[atsdiscover] HIT ${hitProvider}/${slug} (from "${company}")${added ? " → tenant added" : " (already tracked)"}`);
-      } else if (outcome === "error") {
-        errors += 1;
-      }
-      await recordCandidate(client, slug, outcome, hitProvider, tried);
-      await sleep(PROBE_GAP_MS);
-    }
-
-    console.log(
-      `[atsdiscover] DONE — probed=${probed} hits=${hits} new_tenants=${newTenants} errors=${errors}`
-    );
   } finally {
     client.release();
   }
+
+  const candidates = selectDueCandidates(state.candidates, {
+    limit: PROBE_BUDGET,
+    retryErrorDays: RETRY_ERROR_DAYS,
+    probeableProviders: PROBEABLE_PROVIDERS,
+  });
+  console.log(`[atsdiscover] probing ${candidates.length} candidate(s)`);
+
+  for (const { slug, sourceCompany: company, probedProviders: already } of candidates) {
+    let outcome = "miss";
+    let hitProvider = null;
+    let sawError = false;
+
+    // Csak azt próbáljuk, amit erre a slugra még nem kérdeztünk meg. Egy
+    // provider-bővítés után a régi jelöltek így 1 kérésbe kerülnek, nem
+    // annyiba, ahány providerünk van.
+    const done = new Set(already || []);
+    const todo = PROBEABLE_PROVIDERS.filter((p) => !done.has(p));
+    const tried = [...done];
+
+    for (const provider of todo) {
+      const r = await probeSlug(provider, slug);
+      // A hálózati hiba NEM válasz: ilyenkor a providert szándékosan nem
+      // könyveljük elpróbáltként, különben a 7 nap múlva újra sorra kerülő
+      // `error` sornak üres lenne a todo-ja, és próbálkozás nélkül csúszna át
+      // "miss"-be.
+      if (r === "error") { sawError = true; continue; }
+      tried.push(provider);
+      if (r === "hit") { outcome = "hit"; hitProvider = provider; break; }
+    }
+    // Hálózati hiba mellett a "miss" nem bizonyíték — maradjon újrapróbálható.
+    if (outcome === "miss" && sawError) outcome = "error";
+
+    probed += 1;
+    if (outcome === "hit") {
+      hits += 1;
+      const added = addTenant(tenants, hitProvider, slug, company);
+      if (added) { newTenants += 1; tenantsDirty = true; }
+      console.log(`[atsdiscover] HIT ${hitProvider}/${slug} (from "${company}")${added ? " → tenant added" : " (already tracked)"}`);
+    } else if (outcome === "error") {
+      errors += 1;
+    }
+    applyCandidateResult(state.candidates, slug, outcome, hitProvider, tried);
+    candidatesDirty = true;
+    await sleep(PROBE_GAP_MS);
+  }
+
+  if (tenantsDirty) await writeTenants(tenants);
+  if (candidatesDirty) await writeCandidateState(state);
+
+  console.log(
+    `[atsdiscover] DONE — probed=${probed} hits=${hits} new_tenants=${newTenants} errors=${errors}`
+  );
 
   return new Response("OK");
 });

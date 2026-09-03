@@ -34,18 +34,13 @@
 //     -H "Authorization: Bearer $AI_INGEST_TOKEN" -H "Content-Type: application/json" \
 //     -d '{"urls":["https://jobs.ashbyhq.com/seon/abc"],"tenants":[{"provider":"lever","slug":"acme"}]}'
 
-import { Pool } from "pg";
 import { parseAtsUrl, probeSlug, PROBEABLE_PROVIDERS } from "./_ats_slug_core.mjs";
 import { PROVIDER_IDS } from "./_ats_providers.mjs";
+import { readTenants, writeTenants, addTenantIfNew, readCandidateState, tenantKey } from "./_ats_state.mjs";
 
 // Egy kérésben ennyi tenant vehető fel. Nem visszaélés-védelem (a token úgyis
 // bizalmi), hanem a futásidő korlátja: minden elem egy élő HTTP-próba.
 const MAX_ITEMS = 40;
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
-
-const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -137,41 +132,28 @@ function routineInstructions() {
   };
 }
 
-async function ensureSchema(client) {
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ats_tenants (
-      provider        text NOT NULL,
-      slug            text NOT NULL,
-      company         text,
-      status          text NOT NULL DEFAULT 'live',
-      last_checked    timestamptz,
-      last_hu_count   integer NOT NULL DEFAULT 0,
-      hit_count       integer NOT NULL DEFAULT 0,
-      last_error      text,
-      discovered_via  text,
-      created_at      timestamptz NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (provider, slug)
-    )
-  `);
-}
+async function handleGet() {
+  const tenantsByKey = await readTenants();
+  const tenants = Object.values(tenantsByKey)
+    .map((t) => ({
+      provider: t.provider,
+      slug: t.slug,
+      company: t.company,
+      status: t.status,
+      last_hu_count: t.lastHuCount,
+      last_checked: t.lastChecked,
+    }))
+    .sort((a, b) => (a.provider === b.provider ? a.slug.localeCompare(b.slug) : a.provider.localeCompare(b.provider)));
 
-async function handleGet(client) {
-  await ensureSchema(client);
-  const { rows: tenants } = await client.query(
-    `SELECT provider, slug, company, status, last_hu_count, last_checked
-       FROM ats_tenants ORDER BY provider, slug`
-  );
   // A már cáfolt slugok is a memória része: enélkül a routine ugyanazt a
   // nemlétező boardot javasolná minden héten.
-  let knownMisses = [];
-  try {
-    const { rows } = await client.query(
-      `SELECT slug FROM ats_slug_candidates WHERE status = 'miss' ORDER BY slug LIMIT 2000`
-    );
-    knownMisses = rows.map((r) => r.slug);
-  } catch {
-    // A jelölt-táblát a discover worker hozza létre; ha még nem futott, üres lista.
-  }
+  const { candidates } = await readCandidateState();
+  const knownMisses = Object.values(candidates)
+    .filter((c) => c.status === "miss")
+    .map((c) => c.slug)
+    .sort()
+    .slice(0, 2000);
+
   return json(200, {
     instructions: routineInstructions(),
     suggestedQueries: suggestedQueries(),
@@ -189,15 +171,13 @@ async function handleGet(client) {
   });
 }
 
-async function handlePost(client, request) {
+async function handlePost(request) {
   let payload;
   try {
     payload = await request.json();
   } catch {
     return json(400, { error: "Invalid JSON body" });
   }
-
-  await ensureSchema(client);
 
   /** @type {Map<string, {provider:string, slug:string, company:string|null, fromUrl:boolean}>} */
   const wanted = new Map();
@@ -237,12 +217,14 @@ async function handlePost(client, request) {
   const alreadyKnown = [];
   const notFound = [];
 
+  // Egy olvasás + (csak ha valóban lett új tenant) egy írás a teljes
+  // kérésre — a korábbi Postgres-verzió itemenként adott ki egy SELECT +
+  // legfeljebb egy INSERT-et.
+  const tenants = await readTenants();
+  let dirty = false;
+
   for (const item of items) {
-    const { rows: existing } = await client.query(
-      `SELECT 1 FROM ats_tenants WHERE provider = $1 AND slug = $2`,
-      [item.provider, item.slug]
-    );
-    if (existing.length > 0) { alreadyKnown.push(`${item.provider}:${item.slug}`); continue; }
+    if (tenants[tenantKey(item.provider, item.slug)]) { alreadyKnown.push(`${item.provider}:${item.slug}`); continue; }
 
     // Az url-ből származó SmartRecruiters-tenantot nem tudjuk leprobálni, de az
     // url megléte már bizonyíték; a többit élesben ellenőrizzük.
@@ -257,18 +239,14 @@ async function handlePost(client, request) {
     // és egy hibás névből a hirdetéseinkre hibás cégnév kerülne. A beküldött
     // nevet eredet-megjegyzésként tároljuk, nem tényként — a valódi cégnevet a
     // provider adja, ha tudja.
-    await client.query(
-      `INSERT INTO ats_tenants (provider, slug, company, discovered_via)
-       VALUES ($1,$2,NULL,$3)
-       ON CONFLICT (provider, slug) DO NOTHING`,
-      [
-        item.provider,
-        item.slug,
-        `${item.fromUrl ? "search-url" : "search-slug"}${item.company ? `:${item.company.slice(0, 150)}` : ""}`,
-      ]
-    );
+    addTenantIfNew(tenants, item.provider, item.slug, {
+      discoveredVia: `${item.fromUrl ? "search-url" : "search-slug"}${item.company ? `:${item.company.slice(0, 150)}` : ""}`,
+    });
+    dirty = true;
     added.push(`${item.provider}:${item.slug}`);
   }
+
+  if (dirty) await writeTenants(tenants);
 
   return json(200, {
     submitted: items.length,
@@ -283,12 +261,7 @@ async function handlePost(client, request) {
 export default async (request) => {
   if (!authorized(request)) return json(401, { error: "Unauthorized", ...authDiagnostic(request) });
 
-  const client = await pool.connect();
-  try {
-    if (request.method === "GET") return await handleGet(client);
-    if (request.method === "POST") return await handlePost(client, request);
-    return json(405, { error: "GET or POST only" });
-  } finally {
-    client.release();
-  }
+  if (request.method === "GET") return await handleGet();
+  if (request.method === "POST") return await handlePost(request);
+  return json(405, { error: "GET or POST only" });
 };
