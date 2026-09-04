@@ -29,9 +29,33 @@ export default async (req) => {
        LIMIT 40`
     );
 
+    // Rows where the EXTRACTED experience text implies senior (>=5 years or a
+    // senior/lead/etc keyword in the experience string itself) regardless of
+    // title wording — this is what shouldSkipSeniorExperience(isSeniorExperience(experience))
+    // catches on every other source but LinkedIn never calls at all.
+    const yearsSeniorRows = await client.query(
+      `SELECT title, experience, first_seen
+       FROM job_posts
+       WHERE source LIKE 'LinkedIn%'
+         AND active = true
+         AND experience ~* '\\d+'
+       ORDER BY first_seen DESC
+       LIMIT 500`
+    );
+
     const totalLinkedInActive = await client.query(
       `SELECT COUNT(*)::int AS c FROM job_posts WHERE source LIKE 'LinkedIn%' AND active = true`
     );
+
+    function isSeniorExperience(experience) {
+      const n = String(experience ?? "").toLowerCase();
+      if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(n)) return true;
+      const nums = n.match(/\d+/g);
+      if (!nums) return false;
+      return Math.min(...nums.map((x) => parseInt(x, 10))) >= 5;
+    }
+
+    const yearsSenior = yearsSeniorRows.rows.filter((r) => isSeniorExperience(r.experience));
 
     return new Response(
       JSON.stringify(
@@ -40,6 +64,8 @@ export default async (req) => {
           totalLinkedInActive: totalLinkedInActive.rows[0].c,
           seniorLookingLinkedInCount: seniorRows.rowCount,
           sample: seniorRows.rows,
+          yearsBasedSeniorCount: yearsSenior.length,
+          yearsBasedSample: yearsSenior.slice(0, 25),
         },
         null,
         2
