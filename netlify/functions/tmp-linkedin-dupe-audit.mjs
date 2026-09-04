@@ -95,10 +95,16 @@ export default async (req) => {
        FROM job_posts WHERE source = 'LinkedIn' AND company ILIKE '%e.on%'`
     );
 
+    const { rows: scriptideRows } = await client.query(
+      `SELECT id, url, canonical_url, active, company, title, technologies, experience, first_seen
+       FROM job_posts WHERE source = 'LinkedIn' AND (company ILIKE '%scriptide%' OR title ILIKE '%scriptide%')`
+    );
+
     return new Response(
       JSON.stringify(
         {
           eonRows,
+          scriptideRows,
           totalActiveLinkedIn: rows.length,
           canonStats: canonStats[0],
           sameKeyDupeGroups: sameKeyDupes.length,
