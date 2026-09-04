@@ -458,9 +458,7 @@ const isSeniorExperience = (experience, title = "") => {
 };
 
 // job_posts.level — a backend computeLevel()-je (src/lib/experienceLevel.mjs)
-// már beszúráskor kiszámolja ezt, DB-oszlopként (2026-09-04). Ez itt csak
-// megjelenítés — nem szűrünk vele még, és szándékosan nem váltja ki a fenti
-// isSeniorExperience-alapú ⚠ Senior badge-et (az egy külön, tisztázandó kérdés).
+// már beszúráskor kiszámolja ezt, DB-oszlopként (2026-09-04).
 const LEVEL_LABELS = {
   intern: "Gyakornok",
   junior: "Junior",
@@ -468,6 +466,15 @@ const LEVEL_LABELS = {
   senior: "Senior",
   ambiguous: "Nincs infó",
 };
+
+// ⚠ Senior badge/szűrő: a DB-mező a megbízható forrás, ha megvan (level csak
+// az insert-time computeLevel()-t futtató kód óta beszúrt/backfillelt sorokra
+// van kitöltve — a backfill csak az utolsó 30 napot fedte le, tehát egy
+// 30 napnál régebbi, még mindig aktív sor level nélkül maradhat). Ilyenkor a
+// régi cím/leírás-regex a tartalék, nehogy egy korábban jogosan elrejtett
+// régi senior hirdetés hirtelen látszódjon.
+const isSeniorJob = (job) =>
+  job.level ? job.level === "senior" : isSeniorExperience(job.experience, job.title);
 
 const getKeywordNotesForJob = (job) => {
   if (!job.title) return [];
@@ -1508,7 +1515,7 @@ const JobWatcher = () => {
 
     // Alapból a senior-jelölésű állásokat elrejtjük; a "Csak senior" mód
     // megfordítja ezt, és KIZÁRÓLAG a senior-jelölésűeket mutatja.
-    list = list.filter((j) => isSeniorExperience(j.experience, j.title) === seniorMode);
+    list = list.filter((j) => isSeniorJob(j) === seniorMode);
 
     const selected = Object.keys(sourceStates).filter(
       (k) => sourceStates[k] === "selected"
@@ -2646,7 +2653,7 @@ const JobWatcher = () => {
                     ⧉ Átfedés: {dupSources.join(", ")}
                   </span>
                 )}
-                {isSeniorExperience(job.experience, job.title) && (
+                {isSeniorJob(job) && (
                   <span
                     className="job-senior-badge"
                     title="Minimum tapasztalat ≥ 5 év — valószínűleg nem belépő/junior szint"
@@ -2658,7 +2665,7 @@ const JobWatcher = () => {
                   <span
                     className={
                       "job-experience" +
-                      (isSeniorExperience(job.experience, job.title) ? " job-experience--senior" : "")
+                      (isSeniorJob(job) ? " job-experience--senior" : "")
                     }
                   >
                     {job.experience}
