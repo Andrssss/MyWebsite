@@ -8,8 +8,9 @@ import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractLinkedInExperience, extractTechnologies, ensureTechnologiesColumn,
+  isSeniorExperience,
 } from "./_experience_core.mjs";
-import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 
@@ -484,6 +485,17 @@ export async function processLinkedInSources(sources, jobName) {
         // half-empty row.
         if (!it.technologies && it.experience === "-") {
           console.log(`[LinkedIn] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${it.url}`);
+          continue;
+        }
+
+        // Title-only denylist (job_filters) only catches literal "senior"/
+        // "szenior"/"sr." in the title — it never sees years-of-experience
+        // language pulled from the detail page ("5+ years", "legalább 5 év"…).
+        // Every other source runs this check before insert; LinkedIn never
+        // did, so senior-level postings whose title doesn't say "senior"
+        // (2026-09-04 user report) sailed straight through.
+        if (shouldSkipSeniorExperience(isSeniorExperience(it.experience))) {
+          console.log(`[LinkedIn] SKIP senior experience "${it.experience}" — ${it.title}`);
           continue;
         }
 

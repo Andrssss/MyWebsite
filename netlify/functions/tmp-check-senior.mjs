@@ -7,10 +7,37 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+function isSeniorExperience(experience) {
+  const n = String(experience ?? "").toLowerCase();
+  if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(n)) return true;
+  const nums = n.match(/\d+/g);
+  if (!nums) return false;
+  return Math.min(...nums.map((x) => parseInt(x, 10))) >= 5;
+}
+
 export default async (req) => {
   const auth = req.headers.get("authorization") || "";
   if (auth.replace(/^Bearer\s+/i, "").trim() !== TOKEN) {
     return new Response("unauthorized", { status: 401 });
+  }
+
+  if (req.method === "POST" && new URL(req.url).searchParams.get("action") === "delete") {
+    const client = await pool.connect();
+    try {
+      const rows = await client.query(
+        `SELECT id, title, experience FROM job_posts WHERE source LIKE 'LinkedIn%' AND active = true AND experience ~* '\\d+'`
+      );
+      const toDelete = rows.rows.filter((r) => isSeniorExperience(r.experience));
+      if (toDelete.length) {
+        await client.query(`DELETE FROM job_posts WHERE id = ANY($1::int[])`, [toDelete.map((r) => r.id)]);
+      }
+      return new Response(
+        JSON.stringify({ deletedCount: toDelete.length, deleted: toDelete }, null, 2),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    } finally {
+      client.release();
+    }
   }
 
   const client = await pool.connect();
@@ -46,14 +73,6 @@ export default async (req) => {
     const totalLinkedInActive = await client.query(
       `SELECT COUNT(*)::int AS c FROM job_posts WHERE source LIKE 'LinkedIn%' AND active = true`
     );
-
-    function isSeniorExperience(experience) {
-      const n = String(experience ?? "").toLowerCase();
-      if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(n)) return true;
-      const nums = n.match(/\d+/g);
-      if (!nums) return false;
-      return Math.min(...nums.map((x) => parseInt(x, 10))) >= 5;
-    }
 
     const yearsSenior = yearsSeniorRows.rows.filter((r) => isSeniorExperience(r.experience));
 
