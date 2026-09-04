@@ -114,3 +114,34 @@ export function isJuniorTrackCandidate(job) {
   const internTitle = INTERN_KEYWORDS.some((k) => title.includes(k));
   return !internSource && !internTitle && !internExp;
 }
+
+export const LEVEL_VALUES = ["intern", "junior", "medior", "senior", "ambiguous"];
+
+/**
+ * Egyetlen szint-érték egy hirdetésre — a `job_posts.level` mezőt ez tölti fel.
+ * A fenti eligibility-függvények (isJunior/isMedior/isSenior/isInternLike) egy-egy
+ * szűrőre válaszolnak és szándékosan permisszívek (egy ismeretlen experience-re
+ * mindkettő true); ez a függvény ELSŐ TALÁLATOS prioritási sorrendben egyetlen
+ * értéket választ, hogy SQL-ben egyszerűen lehessen szűrni rá.
+ *
+ * Sorrend: diákszövetkezeti FORRÁS mindig intern (a szövegtől függetlenül) >
+ * senior (isSenior — csak az experience szövegre néz, cím-alapú senior-szót
+ * szándékosan NEM néz, ld. a 2026-09-04-es JobWatcher.jsx-javítást a "Staff"
+ * címekről) > cím/experience-kulcsszó alapú intern (isInternLike) > explicit
+ * medior-token (isMedior && !isJunior — a medior nyer, ha mindkettő jelen van,
+ * ld. isMedior/isJunior tie-breaket) > explicit junior-token vagy 0/1 év >
+ * "ambiguous" (nincs experience-adat, vagy egyik token/évszám sem egyértelmű).
+ */
+export function computeLevel(job) {
+  if (isInternSource(job.source)) return "intern";
+  if (isSenior(job.experience)) return "senior";
+  if (isInternLike(job)) return "intern";
+
+  if (isUnknownValue(job.experience)) return "ambiguous";
+
+  const medior = isMedior(job.experience);
+  const junior = isJunior(job.experience);
+  if (medior && !junior) return "medior";
+  if (junior && !medior) return "junior";
+  return "ambiguous";
+}

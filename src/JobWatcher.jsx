@@ -429,18 +429,29 @@ const isMediorExperience = (experience) => {
 };
 
 // Senior JELÖLÉS + szűrés: alapból elrejtjük, "Csak senior" módban KIZÁRÓLAG
-// ezeket mutatjuk (ld. preTechJobs). Badge-elés is ebből. Két jel:
-//   1) explicit senioritási címke (pl. senior/lead/head/principal/staff/chief/
-//      director/VP; NIX taxonómia "senior", MFB/
-//      Raiffeisen "Szenior" szint) — egyértelmű, nem évszám;
+// ezeket mutatjuk (ld. preTechJobs). Badge-elés is ebből. Három jel:
+//   1) explicit senioritási szó a leírásban/experience mezőben (pl. senior/lead/
+//      head/principal/staff/chief/director/VP; NIX taxonómia "senior", MFB/
+//      Raiffeisen "Szenior" szint) — ott ezek a szavak tartalmi jelek, nem a
+//      címből jönnek, tehát nem kétértelműek;
 //   2) évszám: a leírásból kinyert "5-10 years"/"7+ years"/"10 év" — a LEGKISEBB
-//      évszámot vesszük, csak ha az is >= SENIOR_MIN_YEARS ("3-5 év" min 3 → NEM).
+//      évszámot vesszük, csak ha az is >= SENIOR_MIN_YEARS ("3-5 év" min 3 → NEM);
+//   3) a CÍMBEN csak a szűk senior/szenior/sr szó számít jelnek — "Staff",
+//      "Principal", "Lead", "Head", "Chief", "Director", "VP" a címben ÖNMAGÁBAN
+//      túl kétértelmű (pl. "Staff Software Engineer" gyakran nem senior), ezért
+//      ezeket a beszúráskor is szándékosan kihagyja a `SENIOR_TITLE_WORDS` a
+//      `_seniority_policy.mjs`-ben (2026-08-25-ös döntés) — ez a frontend-másolat
+//      korábban nem követte ezt, és a leírással összefésült széles regexet
+//      futtatta a címre is, ezért kaptak pl. "Staff Software Engineer" hirdetések
+//      hibásan ⚠ Senior jelölést (2026-09-04 javítva).
 // Junior/medior/diákmunka/- szint-tokenben nincs se szám, se senior-szó → nem az.
 const SENIOR_MIN_YEARS = 5;
+const SENIOR_TITLE_TOKENS = /\b(senior|szenior|sr)\b/;
 const isSeniorExperience = (experience, title = "") => {
   const n = normalizeExperience(experience);
   const titleNorm = normalizeExperience(title);
-  if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(`${n} ${titleNorm}`)) return true;
+  if (/\b(senior|szenior|lead|head|principal|staff|chief|director|vp|vice president)\b/.test(n)) return true;
+  if (SENIOR_TITLE_TOKENS.test(titleNorm)) return true;
   const nums = n.match(/\d+/g);
   if (!nums) return false;
   return Math.min(...nums.map((x) => parseInt(x, 10))) >= SENIOR_MIN_YEARS;
