@@ -14,6 +14,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadCategories } from "./load_categories.mjs";
 import { computeDayStats } from "./_stats_core.mjs";
+import { appendDayIfMissing } from "./_daily_stats_store.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -44,38 +45,14 @@ export default withTimeout("cron_daily_stats", async function handler() {
     const { totalJobs, internJobs, categories, internCategories } =
       computeDayStats(todayRows, JOB_CATEGORIES);
 
-    // Upsert a napi statisztikába
-    await client.query(
-      `INSERT INTO job_daily_stats (date, total_jobs, intern_jobs)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (date)
-       DO NOTHING`,
-      [today, totalJobs, internJobs]
-    );
+    const { skipped } = await appendDayIfMissing(today, {
+      totalJobs,
+      internJobs,
+      categories,
+      internCategories,
+    });
 
-    // Kategória bontás mentése (összes, senior nélkül)
-    for (const { category, count } of categories) {
-      await client.query(
-        `INSERT INTO job_daily_categories (date, category, count)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (date, category)
-          DO NOTHING`,
-        [today, category, count]
-      );
-    }
-
-    // Intern kategória bontás mentése (prefix: "intern:")
-    for (const { category, count } of internCategories) {
-      await client.query(
-        `INSERT INTO job_daily_categories (date, category, count)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (date, category)
-          DO NOTHING`,
-        [today, `intern:${category}`, count]
-      );
-    }
-
-    console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}, intern_categories=${internCategories.length}`);
+    console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}, intern_categories=${internCategories.length}${skipped ? " (already present, skipped)" : ""}`);
   } catch (err) {
     console.error("[daily_stats] Error:", err);
   } finally {

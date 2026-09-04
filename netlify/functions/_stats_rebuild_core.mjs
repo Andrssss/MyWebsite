@@ -19,6 +19,7 @@
 
 import { getStore } from "@netlify/blobs";
 import { computeDayStats } from "./_stats_core.mjs";
+import { replaceDays } from "./_daily_stats_store.mjs";
 
 const ARCHIVE_STORE = "job-posts-archive";
 
@@ -129,10 +130,11 @@ export async function fetchLiveRows(client, { from, to } = {}) {
   return rows;
 }
 
-// Egyetlen tranzakcióban: a megadott tartomány TELJES törlése mindkét
-// stats-táblából, majd az újraszámolt napok beírása. Így a statisztika soha
-// nem marad félig üresen, ha menet közben hiba van.
-export async function writeDays(client, byDay, jobCategories, { from, to }) {
+// Egyetlen blob-írásban: a megadott tartomány TELJES cseréje az újraszámolt
+// napokra (replaceDays maga olvassa be a jelenlegi blobot, szűri ki a
+// tartományt, majd egyben ír vissza — nincs félig-üres közbenső állapot,
+// mert a régi sorok a sikeres írásig megmaradnak).
+export async function writeDays(byDay, jobCategories, { from, to }) {
   const days = [...byDay.keys()].sort();
   const perDay = [];
   const statRows = [];
@@ -148,9 +150,10 @@ export async function writeDays(client, byDay, jobCategories, { from, to }) {
       continue;
     }
 
-    statRows.push([day, totalJobs, internJobs]);
-    for (const { category, count } of categories) catRows.push([day, category, count]);
-    for (const { category, count } of internCategories) catRows.push([day, `intern:${category}`, count]);
+    statRows.push({ date: day, total_jobs: totalJobs, intern_jobs: internJobs });
+    for (const { category, count } of categories) catRows.push({ date: day, category, count });
+    for (const { category, count } of internCategories)
+      catRows.push({ date: day, category: `intern:${category}`, count });
 
     perDay.push({
       date: day,
@@ -161,57 +164,13 @@ export async function writeDays(client, byDay, jobCategories, { from, to }) {
     });
   }
 
-  await client.query("BEGIN");
-  try {
-    const delParams = [];
-    const delConds = [];
-    if (from) {
-      delParams.push(from);
-      delConds.push(`date >= $${delParams.length}`);
-    }
-    if (to) {
-      delParams.push(to);
-      delConds.push(`date <= $${delParams.length}`);
-    }
-    const delWhere = delConds.length ? `WHERE ${delConds.join(" AND ")}` : "";
-    const { rowCount: deletedStats } = await client.query(
-      `DELETE FROM job_daily_stats ${delWhere}`,
-      delParams
-    );
-    const { rowCount: deletedCats } = await client.query(
-      `DELETE FROM job_daily_categories ${delWhere}`,
-      delParams
-    );
+  await replaceDays(statRows, catRows, { from, to });
 
-    if (statRows.length) {
-      await client.query(
-        `INSERT INTO job_daily_stats (date, total_jobs, intern_jobs)
-         SELECT d::date, t, i
-           FROM unnest($1::text[], $2::int[], $3::int[]) AS x(d, t, i)`,
-        [statRows.map((r) => r[0]), statRows.map((r) => r[1]), statRows.map((r) => r[2])]
-      );
-    }
-    if (catRows.length) {
-      await client.query(
-        `INSERT INTO job_daily_categories (date, category, count)
-         SELECT d::date, c, n
-           FROM unnest($1::text[], $2::text[], $3::int[]) AS x(d, c, n)`,
-        [catRows.map((r) => r[0]), catRows.map((r) => r[1]), catRows.map((r) => r[2])]
-      );
-    }
-
-    await client.query("COMMIT");
-    return {
-      deletedStats,
-      deletedCats,
-      insertedStats: statRows.length,
-      insertedCategories: catRows.length,
-      perDay,
-    };
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  }
+  return {
+    insertedStats: statRows.length,
+    insertedCategories: catRows.length,
+    perDay,
+  };
 }
 
 /* ── teljes futtatás egy hívásban ────────────────────────────────── */
@@ -252,7 +211,7 @@ export async function rebuildStats(client, jobCategories, { from, to, dryRun = f
     return { ...summary, ms: Date.now() - startedAt, perDay: preview };
   }
 
-  const written = await writeDays(client, byDay, jobCategories, {
+  const written = await writeDays(byDay, jobCategories, {
     from: summary.from,
     to: summary.to,
   });

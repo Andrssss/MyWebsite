@@ -1,17 +1,13 @@
 // netlify/functions/job-stats.js
 // API endpoint: GET /.netlify/functions/job-stats
 // Returns daily stats for the last 30 days + last 10 days.
+//
+// job_daily_stats / job_daily_categories moved from Postgres to a Netlify
+// Blob (2026-09-04) — see _daily_stats_store.mjs. This endpoint no longer
+// touches the DB at all; it reads the whole blob and reproduces the same
+// date-range/grouping logic in JS that used to be SQL.
 
-const { Pool } = require("pg");
 const { hasJobBoardAccess } = require("./_admin_identity_core");
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
-
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
 
 function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
@@ -32,8 +28,10 @@ exports.handler = async (event = {}) => {
     return jsonResponse(401, { error: "Unauthorized" }, { "Cache-Control": "private, no-store" });
   }
 
-  const client = await pool.connect();
   try {
+    const { readDailyStats } = await import("./_daily_stats_store.mjs");
+    const { dailyStats, dailyCategories } = await readDailyStats();
+
     const now = new Date();
     const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const rolling30DayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 29));
@@ -42,44 +40,28 @@ exports.handler = async (event = {}) => {
     monthlyWindowStart.setUTCMonth(monthlyWindowStart.getUTCMonth() - 5);
     const monthlyWindowStartStr = monthlyWindowStart.toISOString().slice(0, 10);
 
+    const statsAsc = [...dailyStats].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
     // Elmúlt 30 nap adatai
-    const { rows: monthRows } = await client.query(
-      `SELECT date, total_jobs, intern_jobs
-       FROM job_daily_stats
-       WHERE date >= $1
-       ORDER BY date ASC`,
-      [rolling30DayStartStr]
-    );
+    const monthRows = statsAsc.filter((r) => r.date >= rolling30DayStartStr);
 
-    // Utolsó 10 napi adatok
-    const { rows: last10Rows } = await client.query(
-      `SELECT date, total_jobs, intern_jobs
-       FROM job_daily_stats
-       ORDER BY date DESC
-       LIMIT 10`
-    );
+    // Utolsó 10 napi adatok (dátum szerint csökkenő, majd visszafordítva —
+    // ugyanaz a sorrend, mint a régi SQL ORDER BY date DESC LIMIT 10 .reverse())
+    const last10Rows = [...statsAsc].slice(-10);
 
-    // Összes adat (teljes DB)
-    const { rows: allDaysRows } = await client.query(
-      `SELECT date, total_jobs, intern_jobs
-       FROM job_daily_stats
-       ORDER BY date ASC`
-    );
+    // Összes adat
+    const allDaysRows = statsAsc;
 
-    const { rows: monthlyRows } = await client.query(
-      `SELECT TO_CHAR(DATE_TRUNC('month', date), 'YYYY-MM') AS month,
-              SUM(total_jobs)::int AS total_jobs,
-              SUM(intern_jobs)::int AS intern_jobs
-       FROM job_daily_stats
-       WHERE date >= $1
-       GROUP BY 1
-       ORDER BY 1 ASC`,
-      [monthlyWindowStartStr]
-    );
-
-    const monthlyMap = new Map(
-      monthlyRows.map((row) => [row.month, row])
-    );
+    // Havi összesítés (utolsó 6 hónap)
+    const monthlyMap = new Map();
+    for (const row of statsAsc) {
+      if (row.date < monthlyWindowStartStr) continue;
+      const month = row.date.slice(0, 7);
+      const existing = monthlyMap.get(month) || { total_jobs: 0, intern_jobs: 0 };
+      existing.total_jobs += row.total_jobs;
+      existing.intern_jobs += row.intern_jobs;
+      monthlyMap.set(month, existing);
+    }
 
     const monthlyTotals = Array.from({ length: 6 }, (_, index) => {
       const monthDate = new Date(Date.UTC(
@@ -97,45 +79,32 @@ exports.handler = async (event = {}) => {
       };
     });
 
-    // Elmúlt 30 nap kategória bontás (mentett adatból)
-    const { rows: monthCatRows } = await client.query(
-      `SELECT category, SUM(count)::int AS count
-       FROM job_daily_categories
-       WHERE date >= $1
-         AND category NOT LIKE 'intern:%'
-       GROUP BY category
-       ORDER BY count DESC`,
-      [rolling30DayStartStr]
-    );
-    const monthCategories = monthCatRows.map((r) => ({ category: r.category, count: r.count }));
+    const sumCategories = (dateFrom, { internOnly = false } = {}) => {
+      const totals = new Map();
+      for (const row of dailyCategories) {
+        if (row.date < dateFrom) continue;
+        const isIntern = row.category.startsWith("intern:");
+        if (internOnly !== isIntern) continue;
+        const key = internOnly ? row.category.slice(7) : row.category;
+        totals.set(key, (totals.get(key) || 0) + row.count);
+      }
+      return [...totals.entries()]
+        .map(([category, count]) => ({ category, count }))
+        .sort((a, b) => b.count - a.count);
+    };
 
-    // 6 havi kategória bontás (mentett adatból)
-    const { rows: weeklyCatRows } = await client.query(
-      `SELECT category, SUM(count)::int AS count
-       FROM job_daily_categories
-       WHERE date >= $1
-         AND category NOT LIKE 'intern:%'
-       GROUP BY category
-       ORDER BY count DESC`,
-      [monthlyWindowStartStr]
-    );
-    const weekCategories = weeklyCatRows.map((r) => ({ category: r.category, count: r.count }));
+    // Elmúlt 30 nap kategória bontás
+    const monthCategories = sumCategories(rolling30DayStartStr);
 
-    // 6 havi intern/diák kategória bontás (mentett adatból, "intern:" prefix)
-    const { rows: internCatRows } = await client.query(
-      `SELECT SUBSTRING(category FROM 8) AS category, SUM(count)::int AS count
-       FROM job_daily_categories
-       WHERE date >= $1
-         AND category LIKE 'intern:%'
-       GROUP BY 1
-       ORDER BY count DESC`,
-      [monthlyWindowStartStr]
-    );
-    const internCategories6m = internCatRows.map((r) => ({ category: r.category, count: r.count }));
+    // 6 havi kategória bontás
+    const weekCategories = sumCategories(monthlyWindowStartStr);
+
+    // 6 havi intern/diák kategória bontás ("intern:" prefix)
+    const internCategories6m = sumCategories(monthlyWindowStartStr, { internOnly: true });
 
     return jsonResponse(200, {
       month: monthRows,
-      last10: last10Rows.reverse(),
+      last10: last10Rows,
       allDays: allDaysRows,
       monthlyTotals,
       monthCategories,
@@ -145,7 +114,5 @@ exports.handler = async (event = {}) => {
   } catch (err) {
     console.error("[job-stats] Error:", err);
     return jsonResponse(500, { error: err.message });
-  } finally {
-    client.release();
   }
 };
