@@ -7,8 +7,6 @@
 // touches the DB at all; it reads the whole blob and reproduces the same
 // date-range/grouping logic in JS that used to be SQL.
 
-const { hasJobBoardAccess } = require("./_admin_identity_core");
-
 function jsonResponse(statusCode, body, extraHeaders = {}) {
   return {
     statusCode,
@@ -21,13 +19,13 @@ function jsonResponse(statusCode, body, extraHeaders = {}) {
   };
 }
 
-exports.handler = async (event = {}) => {
-  // /allasfigyelo/stats is admin-only (see _admin_identity_core.hasJobBoardAccess):
-  // ordinary visitors are redirected to pestidev.hu and never reach this page.
-  if (!hasJobBoardAccess(event)) {
-    return jsonResponse(401, { error: "Unauthorized" }, { "Cache-Control": "private, no-store" });
-  }
-
+// Public on purpose: these are the same aggregate daily counts pestidev.hu's
+// own stats page already shows to anyone (and, since the 2026-09-04 blob
+// migration, reads from the exact same "job-stats" blob) — gating this
+// repo's copy protected nothing, it was just caught in the 2026-08-25
+// /allasfigyelo blanket admin-only lockdown along with the actual admin
+// data (jobs.js's `hidden` rows, etc.), which stays gated.
+exports.handler = async () => {
   try {
     const { readDailyStats } = await import("./_daily_stats_store.mjs");
     const { dailyStats, dailyCategories } = await readDailyStats();
