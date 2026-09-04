@@ -299,47 +299,51 @@ export async function migrateVolatileUrl(client, source, newUrl, oldUrlPattern, 
  * case: a previously-seen posting for this exact title+company is gone, and
  * the fresh crawl just found what looks like its replacement.
  *
+ * 2026-09-04: also requires an EXACT technologies match (technologiesExactMatch,
+ * same rule isLikelySamePosting uses for same-source dedup) — title+company
+ * alone is too weak a key on its own (a generic title like "Project
+ * Controlling" at the same employer can recur as a genuinely different
+ * opening). Candidates are fetched and filtered in JS since an order-
+ * independent tag-set comparison isn't a plain SQL equality.
+ *
  * @param {import("pg").PoolClient} client
  * @param {string} source
  * @param {string} newUrl        url built from the current listing
  * @param {string} title
  * @param {string|null} company
+ * @param {string|null} technologies comma-separated tag list of the NEW posting
  * @param {string[]} currentUrls ALL urls seen on the source this run (a row
  *                                still listed must never be renamed away)
  * @returns {Promise<boolean>}   true if an old row was renamed to newUrl
  */
-export async function migrateByTitleCompany(client, source, newUrl, title, company, currentUrls) {
+export async function migrateByTitleCompany(client, source, newUrl, title, company, technologies, currentUrls) {
   await ensureActiveSchema(client);
-  const res = await client.query(
-    `WITH victim AS (
-        SELECT id, url FROM job_posts
-         WHERE source = $1
-           AND title = $2
-           AND company IS NOT DISTINCT FROM $3
-           AND active = false
-           AND url <> $4
-           AND url <> ALL($5::text[])
-           AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = $1 AND url = $4)
-         ORDER BY first_seen DESC
-         LIMIT 1)
-     UPDATE job_posts
-        SET url = $4, active = true, sweep_dead = false
-       FROM victim
-      WHERE job_posts.id = victim.id
-      RETURNING victim.url AS old_url`,
+  const { rows: candidates } = await client.query(
+    `SELECT id, url, technologies FROM job_posts
+      WHERE source = $1
+        AND title = $2
+        AND company IS NOT DISTINCT FROM $3
+        AND active = false
+        AND url <> $4
+        AND url <> ALL($5::text[])
+        AND NOT EXISTS (SELECT 1 FROM job_posts WHERE source = $1 AND url = $4)
+      ORDER BY first_seen DESC`,
     [source, title, company ?? null, newUrl, (currentUrls || []).filter(Boolean)]
   );
-  const migrated = (res.rowCount ?? 0) > 0;
-  if (migrated) {
-    logRecovery({
-      type: "url-migrated",
-      source,
-      from: res.rows[0].old_url,
-      to: newUrl,
-      reason: "title+company match",
-    });
-  }
-  return migrated;
+  const victim = candidates.find((c) => technologiesExactMatch(c.technologies, technologies));
+  if (!victim) return false;
+  await client.query(
+    `UPDATE job_posts SET url = $2, active = true, sweep_dead = false WHERE id = $1`,
+    [victim.id, newUrl]
+  );
+  logRecovery({
+    type: "url-migrated",
+    source,
+    from: victim.url,
+    to: newUrl,
+    reason: "title+company+technologies match",
+  });
+  return true;
 }
 
 /**
@@ -353,17 +357,19 @@ export async function migrateByTitleCompany(client, source, newUrl, title, compa
  * likely to be the same posting re-served under a fresh id than an actual
  * second opening — inserting would recreate the exact duplicate-row bug this
  * pair of functions exists to fix (2026-09-03 user correction).
+ *
+ * 2026-09-04: also requires an EXACT technologies match, same as
+ * migrateByTitleCompany — see that function's doc for why.
  */
-export async function hasActiveDuplicateByTitleCompany(client, source, newUrl, title, company) {
+export async function hasActiveDuplicateByTitleCompany(client, source, newUrl, title, company, technologies) {
   await ensureActiveSchema(client);
-  const { rowCount } = await client.query(
-    `SELECT 1 FROM job_posts
+  const { rows: candidates } = await client.query(
+    `SELECT technologies FROM job_posts
       WHERE source = $1 AND title = $2 AND company IS NOT DISTINCT FROM $3
-        AND active = true AND url <> $4
-      LIMIT 1`,
+        AND active = true AND url <> $4`,
     [source, title, company ?? null, newUrl]
   );
-  return rowCount > 0;
+  return candidates.some((c) => technologiesExactMatch(c.technologies, technologies));
 }
 
 /**

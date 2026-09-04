@@ -860,21 +860,6 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
             if (migrated) console.log(`${tag}   MIGRATED url → ${item.url}`);
           }
-          // wherewework (2026-09-04): unlike otp, the numeric id itself is not
-          // stable — a repost gets a brand-new slug AND id, so no url-pattern
-          // migration is possible. Same fix as talent's 2026-09-03 case: merge
-          // by title+company instead (inactive victim → rename in place; active
-          // match → skip insert), or every repost duplicates as a fresh row.
-          if (source === "wherewework" && !knownUrls.has(item.url)) {
-            if (await migrateByTitleCompany(client, source, item.url, item.title, item.company, currentUrls)) {
-              console.log(`${tag}   MERGED (title+company) → ${item.url}`);
-              continue;
-            }
-            if (await hasActiveDuplicateByTitleCompany(client, source, item.url, item.title, item.company)) {
-              console.log(`${tag}   SKIP active duplicate (title+company) "${item.title}"`);
-              continue;
-            }
-          }
           if (source === "otp") {
             // OTP itt már nem csak diákmunkát ad vissza: az IT / üzletfejlesztés
             // kategóriák minden szintet tartalmaznak. Ezért — ahogy a professionnél —
@@ -901,6 +886,23 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             if (exp) item.experience = exp;
             item.technologies = technologies;
             await sleep(400);
+          }
+          // wherewework (2026-09-04): unlike otp, the numeric id itself is not
+          // stable — a repost gets a brand-new slug AND id, so no url-pattern
+          // migration is possible. Same fix as talent's 2026-09-03 case: merge
+          // by title+company+technologies instead (inactive victim → rename in
+          // place; active match → skip insert), or every repost duplicates as
+          // a fresh row. Must run AFTER the fetch above so item.technologies
+          // is populated for the comparison.
+          if (source === "wherewework" && !knownUrls.has(item.url)) {
+            if (await migrateByTitleCompany(client, source, item.url, item.title, item.company, item.technologies, currentUrls)) {
+              console.log(`${tag}   MERGED (title+company+tech) → ${item.url}`);
+              continue;
+            }
+            if (await hasActiveDuplicateByTitleCompany(client, source, item.url, item.title, item.company, item.technologies)) {
+              console.log(`${tag}   SKIP active duplicate (title+company+tech) "${item.title}"`);
+              continue;
+            }
           }
           // A cím-alapú gyorsítóágak (otp junior/medior/gyakornok, wherewework
           // gyakornok) és a fix-"diákmunka" ág (vizmuvek/miszisz/onejob) fent

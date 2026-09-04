@@ -388,14 +388,6 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     let skippedCrossSourceDupe = 0;
     for (const job of talentJobs) {
       if (!known.has(job.url)) {
-        if (await migrateByTitleCompany(client, "talent", job.url, job.title, job.company, allUrls)) {
-          contentMerged += 1;
-          continue;
-        }
-        if (await hasActiveDuplicateByTitleCompany(client, "talent", job.url, job.title, job.company)) {
-          contentSkippedActive += 1;
-          continue;
-        }
         if (isCrossSourceDupe(crossDupeIndex, job.company, job.title)) {
           skippedCrossSourceDupe += 1;
           console.log(`[talent] SKIP cross-source dupe "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);
@@ -409,6 +401,16 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
           job.technologies = extractTechnologies(normalizedHtml);
         } catch (err) {
           console.warn(`[talent] detail fetch failed: ${job.url} — ${err.message}`);
+        }
+        // title+company+technologies dedup needs job.technologies, so this
+        // check must run AFTER the detail fetch above (2026-09-04).
+        if (await migrateByTitleCompany(client, "talent", job.url, job.title, job.company, job.technologies, allUrls)) {
+          contentMerged += 1;
+          continue;
+        }
+        if (await hasActiveDuplicateByTitleCompany(client, "talent", job.url, job.title, job.company, job.technologies)) {
+          contentSkippedActive += 1;
+          continue;
         }
       }
       if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
