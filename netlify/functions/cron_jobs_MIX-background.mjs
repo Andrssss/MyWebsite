@@ -12,7 +12,9 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 import {
   extractBodyExperience,
   extractKukaExperience,
@@ -680,19 +682,55 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       });
       console.log(`dreamjobs: ${dreamJobs.length} IT jobs found (of ${currentUrls.length} listed)`);
 
+      // Cross-source duplicate guard (2026-09-04, same pattern as
+      // startupjobs/ats-crawl/workable/talent): scoped to the shared
+      // CROSS_SOURCE_DUPE_SOURCES list — see _cross_source_dupe.mjs. Checked
+      // before enrichIfNew so a confirmed dupe never costs a detail-page fetch.
+      const dreamCrossDupeIndex = await loadCrossSourceDupeIndex(client, "dreamjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+      console.log(`[dreamjobs] cross-source dupe index: ${dreamCrossDupeIndex.size} keys`);
+
+      // Same-source duplicate guard (2026-09-04, same pattern as nofluffjobs/
+      // startupjobs/LinkedIn/profession-intern): the trailing repost counter
+      // in dreamjobs' own url (see dreamjobsVolatileUrlPattern's doc) means a
+      // genuinely re-listed ad can still land under a url the volatile-url
+      // migration above doesn't catch (e.g. a slug edit alongside the repost).
+      const dreamSameSourceDupeIndex = await loadSameSourceDupeIndex(client, "dreamjobs");
+
+      let skippedCrossSourceDupe = 0;
+      let skippedSameSourceDupe = 0;
       for (const job of dreamJobs) {
         const pattern = dreamjobsVolatileUrlPattern(job.url);
         if (pattern) {
           const migrated = await migrateVolatileUrl(client, "dreamjobs", job.url, pattern, currentUrls);
           if (migrated) console.log(`[dreamjobs] MIGRATED url → ${job.url}`);
         }
+
+        if (isCrossSourceDupe(dreamCrossDupeIndex, job.company, job.title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[dreamjobs] SKIP cross-source dupe "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);
+          continue;
+        }
+
         await enrichIfNew(job, known.get("dreamjobs"), extractBodyExperience, "cron_jobs_MIX");
         // Ideiglenes döntés (2026-08-01): a senior-flag pontos, de a nem-LinkedIn
         // forrásoknál insert előtt is kizárjuk — ne is kerüljön be a DB-be.
         if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
+
+        const sameSourceDupe = findSameSourceDuplicate(dreamSameSourceDupeIndex, job.url, job.company, job.title, job.technologies);
+        if (sameSourceDupe) {
+          skippedSameSourceDupe++;
+          console.log(`[dreamjobs] SKIP same-source dupe "${job.title}" @ ${job.company ?? "-"} — already active at ${sameSourceDupe.url}`);
+          continue;
+        }
+
         await upsertJob(client, "dreamjobs", job);
+        const key = dupeKey(job.company, job.title);
+        if (key) {
+          if (!dreamSameSourceDupeIndex.has(key)) dreamSameSourceDupeIndex.set(key, []);
+          dreamSameSourceDupeIndex.get(key).push({ url: job.url, technologies: job.technologies });
+        }
       }
-      console.log(`dreamjobs: ${dreamJobs.length} jobs processed`);
+      console.log(`dreamjobs: ${dreamJobs.length} jobs processed (cross-source skipped=${skippedCrossSourceDupe}, same-source skipped=${skippedSameSourceDupe})`);
       // Reconcile a TELJES élő listával (kategória/senior szűrés előtt): ami még kint
       // van a forráson, az él — ne kapcsoljuk le csak azért, mert a saját szűrőnk
       // kiejtette. (kuka/melonjobs-minta.)

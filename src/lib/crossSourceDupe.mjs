@@ -110,6 +110,9 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   // was in place to guard against that. See cross-source-dupe-coverage memory.
   "wherewework",
   "nofluffjobs",
+  // 2026-09-04: dreamjobs added on request, no separate live-audit run first —
+  // if it turns out to have negligible overlap, this is a one-line revert.
+  "dreamjobs",
 ];
 
 function splitTechList(technologies) {

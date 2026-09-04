@@ -26,6 +26,7 @@
 import { logRecovery } from "./_error-logger.mjs";
 import { aiScrapedProbe, aiScrapedIsDead } from "./_ai_liveness.mjs";
 import { dupeKey, technologiesExactMatch } from "../../src/lib/crossSourceDupe.mjs";
+import { readDupeSnapshot, snapshotCovers } from "./_dupe_snapshot.mjs";
 
 // How long after first_seen a job is unconditionally active before it becomes
 // eligible for "is it still on the source?" checking.
@@ -382,15 +383,7 @@ export async function hasActiveDuplicateByTitleCompany(client, source, newUrl, t
  * (technologiesExactMatch) before being trusted, same "same-source
  * extraction is internally consistent" reasoning as isLikelySamePosting.
  */
-export async function loadSameSourceDupeIndex(client, source) {
-  await ensureActiveSchema(client);
-  const { rows } = await client.query(
-    `SELECT url, company, title, technologies FROM job_posts
-      WHERE source = $1 AND active = true
-        AND company IS NOT NULL AND company <> ''
-        AND title IS NOT NULL AND title <> ''`,
-    [source]
-  );
+function buildSameSourceDupeIndex(rows) {
   const index = new Map();
   for (const r of rows) {
     const key = dupeKey(r.company, r.title);
@@ -399,6 +392,36 @@ export async function loadSameSourceDupeIndex(client, source) {
     index.get(key).push(r);
   }
   return index;
+}
+
+// Reads yesterday-and-before from the daily Blob snapshot (_dupe_snapshot.mjs)
+// instead of scanning job_posts every run, then tops up with a small
+// first_seen-indexed query for whatever this source got today (since the
+// snapshot was written) — see that file's header for the full rationale.
+export async function loadSameSourceDupeIndex(client, source) {
+  await ensureActiveSchema(client);
+
+  const snapshot = await readDupeSnapshot();
+  if (!snapshotCovers(snapshot, [source])) {
+    const { rows } = await client.query(
+      `SELECT url, company, title, technologies FROM job_posts
+        WHERE source = $1 AND active = true
+          AND company IS NOT NULL AND company <> ''
+          AND title IS NOT NULL AND title <> ''`,
+      [source]
+    );
+    return buildSameSourceDupeIndex(rows);
+  }
+
+  const snapshotRows = snapshot.rows.filter((r) => r.source === source && r.active);
+  const { rows: freshRows } = await client.query(
+    `SELECT url, company, title, technologies FROM job_posts
+      WHERE source = $1 AND active = true AND first_seen > $2
+        AND company IS NOT NULL AND company <> ''
+        AND title IS NOT NULL AND title <> ''`,
+    [source, snapshot.generatedAt]
+  );
+  return buildSameSourceDupeIndex([...snapshotRows, ...freshRows]);
 }
 
 // Returns the matching existing row ({url, technologies}) or null. Caller

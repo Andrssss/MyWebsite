@@ -29,6 +29,7 @@ export {
 } from "../../src/lib/crossSourceDupe.mjs";
 
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
+import { readDupeSnapshot, snapshotCovers } from "./_dupe_snapshot.mjs";
 
 /*
   Build the lookup set from every row of every OTHER source (or, with
@@ -43,7 +44,40 @@ import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
   archived out of the table by cron_jobposts_cleanup.mjs, so this stays bounded
   on its own.
 */
+// When `onlySources` is the shared whitelist (every current caller passes it),
+// reads yesterday-and-before from the daily Blob snapshot (_dupe_snapshot.mjs)
+// instead of scanning job_posts every run, then tops up with a small
+// first_seen-indexed query for whatever arrived today — see that file's
+// header. Falls back to the original full query whenever the snapshot is
+// missing or doesn't cover the requested sources (e.g. no `onlySources`, or a
+// source not yet in CROSS_SOURCE_DUPE_SOURCES when the snapshot was written).
 export async function loadCrossSourceDupeIndex(client, ownSource, { onlySources } = {}) {
+  if (onlySources) {
+    const snapshot = await readDupeSnapshot();
+    if (snapshotCovers(snapshot, onlySources)) {
+      const wanted = new Set(onlySources);
+      const index = new Set();
+      for (const r of snapshot.rows) {
+        if (r.source === ownSource || !wanted.has(r.source)) continue;
+        const k = dupeKey(r.company, r.title);
+        if (k) index.add(k);
+      }
+      const { rows: freshRows } = await client.query(
+        `SELECT company, title
+           FROM job_posts
+          WHERE source = ANY($1::text[]) AND source <> $2 AND first_seen > $3
+            AND company IS NOT NULL AND company <> ''
+            AND title IS NOT NULL AND title <> ''`,
+        [onlySources, ownSource, snapshot.generatedAt]
+      );
+      for (const r of freshRows) {
+        const k = dupeKey(r.company, r.title);
+        if (k) index.add(k);
+      }
+      return index;
+    }
+  }
+
   const { rows } = onlySources
     ? await client.query(
         `SELECT company, title

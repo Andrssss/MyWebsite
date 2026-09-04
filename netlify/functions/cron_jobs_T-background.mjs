@@ -12,6 +12,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -373,8 +374,18 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     // doc), it must still NOT be inserted as a fresh row: an active row for
     // the identical title+company is already on the board, so a plain insert
     // here would just recreate the duplicate-row bug under a different name.
+    // Cross-source duplicate guard (2026-09-04, same pattern as
+    // startupjobs/ats-crawl/workable): talent is an aggregator, so a listed
+    // posting is often already on the board under its employer-side source.
+    // Scoped to the shared CROSS_SOURCE_DUPE_SOURCES list — see
+    // _cross_source_dupe.mjs. Checked before the detail-page fetch so a
+    // confirmed dupe never costs a request.
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "talent", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[talent] cross-source dupe index: ${crossDupeIndex.size} keys`);
+
     let contentMerged = 0;
     let contentSkippedActive = 0;
+    let skippedCrossSourceDupe = 0;
     for (const job of talentJobs) {
       if (!known.has(job.url)) {
         if (await migrateByTitleCompany(client, "talent", job.url, job.title, job.company, allUrls)) {
@@ -383,6 +394,11 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
         }
         if (await hasActiveDuplicateByTitleCompany(client, "talent", job.url, job.title, job.company)) {
           contentSkippedActive += 1;
+          continue;
+        }
+        if (isCrossSourceDupe(crossDupeIndex, job.company, job.title)) {
+          skippedCrossSourceDupe += 1;
+          console.log(`[talent] SKIP cross-source dupe "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);
           continue;
         }
         try {
@@ -398,7 +414,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
       if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
       await upsertJob(client, "talent", job);
     }
-    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged, ${contentSkippedActive} skipped as active duplicates)`);
+    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged, ${contentSkippedActive} skipped as active duplicates, ${skippedCrossSourceDupe} skipped as cross-source duplicates)`);
 
     // complete:false → reactivate-only, NEVER listing-diff deactivation.
     // talent's search results are a rotating nondeterministic SUBSET of the
