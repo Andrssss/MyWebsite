@@ -18,11 +18,18 @@ export default async (req) => {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(
-      `SELECT id, url, company, title, technologies, experience, level, first_seen
+      `SELECT id, url, canonical_url, company, title, technologies, experience, level, first_seen
        FROM job_posts
        WHERE source = 'LinkedIn' AND active = true
          AND company IS NOT NULL AND company <> ''
          AND title IS NOT NULL AND title <> ''`
+    );
+
+    const { rows: canonStats } = await client.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE canonical_url IS NULL)::int AS null_canonical
+       FROM job_posts WHERE source = 'LinkedIn' AND active = true`
     );
 
     // Applied-jobs linkage, so we never propose deleting an APPLIED row.
@@ -45,8 +52,15 @@ export default async (req) => {
       .filter((g) => g.length > 1)
       .map((g) => ({
         key: dupeKey(g[0].company, g[0].title),
+        sameJobId: (() => {
+          const ids = g.map((r) => {
+            const m = r.url.match(/-(\d+)(?:\?|$)/);
+            return m ? m[1] : null;
+          });
+          return ids.every((id) => id && id === ids[0]);
+        })(),
         rows: g.map((r) => ({
-          id: r.id, url: r.url, company: r.company, title: r.title,
+          id: r.id, url: r.url, canonical_url: r.canonical_url, company: r.company, title: r.title,
           technologies: r.technologies, experience: r.experience,
           first_seen: r.first_seen, applied: appliedUrls.has(r.url),
         })),
@@ -80,7 +94,9 @@ export default async (req) => {
       JSON.stringify(
         {
           totalActiveLinkedIn: rows.length,
+          canonStats: canonStats[0],
           sameKeyDupeGroups: sameKeyDupes.length,
+          sameJobIdDupeGroups: sameKeyDupes.filter((g) => g.sameJobId).length,
           sameKeyDupes,
           langVariantDupeGroups: langVariantDupes.length,
           langVariantDupes,
