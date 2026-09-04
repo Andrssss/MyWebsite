@@ -16,11 +16,25 @@ export default async (req) => {
     return new Response("unauthorized", { status: 401 });
   }
 
-  const write = new URL(req.url).searchParams.get("action") === "write";
+  const action = new URL(req.url).searchParams.get("action");
+  const write = action === "write";
 
   const client = await pool.connect();
   try {
     await client.query(`ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS level text`);
+
+    if (action === "verify") {
+      const stored = await client.query(
+        `SELECT level, COUNT(*)::int AS c
+         FROM job_posts
+         WHERE first_seen >= NOW() - INTERVAL '30 days'
+         GROUP BY level
+         ORDER BY level NULLS FIRST`
+      );
+      return new Response(JSON.stringify({ mode: "verify", storedCounts: stored.rows }, null, 2), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     const { rows } = await client.query(
       `SELECT id, title, experience, source
