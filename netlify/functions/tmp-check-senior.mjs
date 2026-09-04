@@ -46,6 +46,19 @@ export default async (req) => {
       `SELECT word FROM job_filters WHERE word ~* '(^|[^a-z0-9])(senior|szenior|\\ssr\\s|sr\\.)' ORDER BY word`
     );
 
+    const seniorityWordFilters = await client.query(
+      `SELECT word FROM job_filters WHERE word ~* '(^|[^a-z0-9])(staff|lead|head|principal|chief|director|vp|vice president|manager|vezeto|architect|expert)([^a-z0-9]|$)' ORDER BY word`
+    );
+
+    const staffTitledActive = await client.query(
+      `SELECT title, source, experience, first_seen
+       FROM job_posts
+       WHERE active = true
+         AND title ~* '(^|[^a-z0-9])(staff|lead|principal|head of|chief|director|vp )([^a-z0-9]|$)'
+       ORDER BY first_seen DESC
+       LIMIT 60`
+    );
+
     const seniorRows = await client.query(
       `SELECT title, source, active, experience, first_seen
        FROM job_posts
@@ -80,6 +93,9 @@ export default async (req) => {
       JSON.stringify(
         {
           filterWordsMatchingSenior: filters.rows,
+          seniorityWordFilters: seniorityWordFilters.rows,
+          staffTitledActiveCount: staffTitledActive.rowCount,
+          staffTitledActiveSample: staffTitledActive.rows,
           totalLinkedInActive: totalLinkedInActive.rows[0].c,
           seniorLookingLinkedInCount: seniorRows.rowCount,
           sample: seniorRows.rows,
