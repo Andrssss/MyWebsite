@@ -94,8 +94,6 @@ const getOrCreateVisitorId = () => {
   return id;
 };
 
-const VISITOR_CLICK_API = "/.netlify/functions/visitor-click";
-
 const CLICKED_KEYS_STORAGE = "jobWatcherClickedKeys";
 const APPLIED_KEYS_STORAGE = "jobWatcherAppliedKeys";
 const INTERVIEW_KEYS_STORAGE = "jobWatcherInterviewKeys";
@@ -1005,31 +1003,21 @@ const JobWatcher = () => {
   };
 
   const longPressTimerRef = useRef(null);
-  const startLongPress = (target, localKey = target, clickedDate = getTodayLocalDateString()) => {
+  const startLongPress = (target, localKey = target) => {
     clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey, clickedDate), 400);
+    longPressTimerRef.current = setTimeout(() => trackClick(target, localKey), 400);
   };
   const cancelLongPress = () => {
     clearTimeout(longPressTimerRef.current);
   };
 
-  const trackClick = (target, localKey = target, clickedDate = getTodayLocalDateString()) => {
+  const trackClick = (target, localKey = target) => {
     setClickedKeys((prev) => {
       const next = new Set(prev);
       next.add(localKey);
       return next;
     });
     saveClickedKey(localKey);
-    try {
-      const visitorId = getOrCreateVisitorId();
-      fetch(VISITOR_CLICK_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visitorId, target, clickedDate }),
-      }).catch(() => {});
-    } catch {
-      // silent
-    }
   };
 
   const [lastUpdates, setLastUpdates] = useState([]);
@@ -2009,11 +1997,10 @@ const JobWatcher = () => {
     ) {
       return;
     }
-    const clickedDate = getTodayLocalDateString();
     for (const job of openableJobs) {
       const key = `job:${job.source}:${job.title}`;
       window.open(job.url, "_blank", "noopener,noreferrer");
-      trackClick(key, key, clickedDate);
+      trackClick(key, key);
     }
   };
 
@@ -2550,7 +2537,6 @@ const JobWatcher = () => {
           const rowKey = `${job.source || "src"}-${job.url || job.title}-${job.firstSeen || "ts"}`;
           const clickKeyBase = `job:${job.source}:${job.title}`;
           const clickTarget = clickKeyBase;
-          const clickDate = getTodayLocalDateString();
           // Applied/interview marks are url-keyed (title alone collides when
           // two companies post the same position); visited stays title-keyed
           // because the analytics targets already use that format.
@@ -2575,10 +2561,10 @@ const JobWatcher = () => {
                     href={job.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => trackClick(clickTarget, clickKeyBase, clickDate)}
-                    onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase, clickDate); }}
-                    onContextMenu={() => trackClick(clickTarget, clickKeyBase, clickDate)}
-                    onTouchStart={() => startLongPress(clickTarget, clickKeyBase, clickDate)}
+                    onClick={() => trackClick(clickTarget, clickKeyBase)}
+                    onAuxClick={(e) => { if (e.button === 1) trackClick(clickTarget, clickKeyBase); }}
+                    onContextMenu={() => trackClick(clickTarget, clickKeyBase)}
+                    onTouchStart={() => startLongPress(clickTarget, clickKeyBase)}
                     onTouchEnd={cancelLongPress}
                     onTouchMove={cancelLongPress}
                     onTouchCancel={cancelLongPress}

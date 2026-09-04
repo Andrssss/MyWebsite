@@ -95,20 +95,11 @@ const PieChart = ({ data, title }) => {
 };
 
 const API = "/.netlify/functions/job-stats";
-const CLICK_API = "/.netlify/functions/visitor-click";
 
 const JobStats = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lineRange, setLineRange] = useState(30);
-  const [clickData, setClickData] = useState([]);
-
-  useEffect(() => {
-    fetch(CLICK_API)
-      .then((r) => r.json())
-      .then((d) => setClickData(d.clicks || []))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     fetch(API)
@@ -361,33 +352,6 @@ const JobStats = () => {
           <span className="stats-legend-item"><span className="stats-dot intern" /> Diák/Intern</span>
         </div>
       </div>
-
-      {/* ===== CLICK STATS (ideiglenesen kikommentezve, visszaállítható) ===== */}
-      {/*
-      {clickData.length > 0 && (
-        <div className="stats-section">
-          <h2>Top kattintások (egyedi userek)</h2>
-          <table className="stats-click-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Kattintott</th>
-                <th>Egyedi user</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clickData.slice(0, 50).map((row, i) => (
-                <tr key={i}>
-                  <td>{i + 1}</td>
-                  <td className="stats-click-target">{row.clicked_on}</td>
-                  <td>{row.count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      */}
 
       <div className="stats-section">
         <h2>További 2026-os statisztikák és bértábla</h2>
