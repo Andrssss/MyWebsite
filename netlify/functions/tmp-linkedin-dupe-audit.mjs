@@ -32,10 +32,10 @@ export default async (req) => {
        FROM job_posts WHERE source = 'LinkedIn' AND active = true`
     );
 
-    // Applied-jobs linkage, so we never propose deleting an APPLIED row.
-    // job_key format is "job:<source>:<url>" (see jobKeyFor in JobWatcher.jsx).
+    // Applied/interview-jobs linkage, so we never propose deleting a row the
+    // admin has marked either way. job_key format is "job:<source>:<url>".
     const { rows: applied } = await client
-      .query(`SELECT job_key FROM admin_applied_jobs WHERE applied = true AND job_key LIKE 'job:LinkedIn:%'`)
+      .query(`SELECT job_key, applied, interview FROM admin_applied_jobs WHERE job_key LIKE 'job:LinkedIn:%' AND (applied = true OR interview = true)`)
       .catch(() => ({ rows: [] }));
     const appliedUrls = new Set(applied.map((r) => r.job_key.replace(/^job:LinkedIn:/, "")));
 
@@ -90,9 +90,15 @@ export default async (req) => {
         })),
       }));
 
+    const { rows: eonRows } = await client.query(
+      `SELECT id, url, active, company, title, technologies, first_seen
+       FROM job_posts WHERE source = 'LinkedIn' AND company ILIKE '%e.on%'`
+    );
+
     return new Response(
       JSON.stringify(
         {
+          eonRows,
           totalActiveLinkedIn: rows.length,
           canonStats: canonStats[0],
           sameKeyDupeGroups: sameKeyDupes.length,
