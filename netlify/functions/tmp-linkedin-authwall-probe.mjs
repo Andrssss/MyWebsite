@@ -11,6 +11,7 @@ import https from "https";
 import http from "http";
 import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
+import { extractTechnologies, extractLinkedInExperience } from "./_experience_core.mjs";
 
 const TOKEN = "b7f2c9e14a6d8031f5e7c2a90b4d6f18c3a5e7b9";
 
@@ -80,6 +81,8 @@ export default async (request) => {
     scriptCount: $("script").length,
     hasJoinFormClass: $(".join-form, .authwall-join-form, .sign-in-form").length,
     hasTopCardClass: $(".top-card-layout, .topcard, [class*='top-card']").length,
+    realExtractTechnologies: extractTechnologies(html),
+    realExtractLinkedInExperience: extractLinkedInExperience(html),
   };
 
   return new Response(JSON.stringify(report, null, 2), { headers: { "content-type": "application/json" } });
