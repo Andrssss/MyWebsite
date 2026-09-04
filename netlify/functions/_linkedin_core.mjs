@@ -444,6 +444,32 @@ export async function processLinkedInSources(sources, jobName) {
           knownCanonicalUrls.add(canonical);
         }
 
+        // A detail fetch that comes back with NEITHER experience NOR
+        // technologies means something went wrong getting the real page —
+        // confirmed live 2026-09-04 (Tesco "Software Development Engineer
+        // III"): NOT a LinkedIn login-wall (re-fetching the identical url
+        // moments later returned the full 5.7k-char description and a
+        // complete tech list — same one the sibling posting already had
+        // stored), so most likely a one-off network hiccup/timeout on that
+        // specific request. The block-detector (LinkedInBlockedError above)
+        // only watches for 429/999/403, so a plain transient failure — or a
+        // technically-200 response that's short/incomplete for some other
+        // reason — sails right through uncaught. Previously this got
+        // inserted anyway, permanently incomplete — there is no backfill
+        // pass to fix it later (experience-write-policy memory). Skip it
+        // instead; it's simply re-attempted whenever the listing surfaces it
+        // again on a later run. Re-evaluated per item, so a duplicate
+        // canonical url seen again via another search shard in this SAME run
+        // is caught too, without needing separate tracking. Accepted
+        // tradeoff: a genuinely real posting whose body names zero
+        // recognizable tech AND zero experience language also gets skipped —
+        // user decision 2026-09-04, prefers that over a permanently
+        // half-empty row.
+        if (!it.technologies && it.experience === "-") {
+          console.log(`[LinkedIn] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${it.url}`);
+          continue;
+        }
+
         const dupe = findSameSourceDuplicate(sameSourceDupeIndex, it.url, it.company, it.title, it.technologies);
         if (dupe) {
           console.log(`[LinkedIn] SKIP same-source dupe "${it.title}" @ ${it.company || "-"} — already active at ${dupe.url}`);
