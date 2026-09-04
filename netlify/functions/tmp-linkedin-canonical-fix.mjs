@@ -107,11 +107,17 @@ export default async (req) => {
     if (commit) {
       await client.query("BEGIN");
       try {
-        for (const u of canonUpdates) {
-          await client.query(`UPDATE job_posts SET canonical_url = $1 WHERE id = $2`, [u.fresh, u.id]);
-        }
+        // Delete losing duplicates FIRST — a unique index on (source,
+        // canonical_url) already exists, so backfilling a stale row's
+        // canonical_url to the fresh (already-taken-by-the-winner) value
+        // would violate it while both rows still exist.
         for (const d of safeDeletes) {
           await client.query(`DELETE FROM job_posts WHERE id = $1`, [d.id]);
+        }
+        const deletedIds = new Set(safeDeletes.map((d) => d.id));
+        for (const u of canonUpdates) {
+          if (deletedIds.has(u.id)) continue;
+          await client.query(`UPDATE job_posts SET canonical_url = $1 WHERE id = $2`, [u.fresh, u.id]);
         }
         await client.query("COMMIT");
         result.committed = true;
