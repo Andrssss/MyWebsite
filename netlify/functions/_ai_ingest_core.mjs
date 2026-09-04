@@ -15,10 +15,11 @@
 import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
-  isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn,
+  isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn, ensureLevelColumn,
   extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { atsHandoff, registerAtsTenants } from "./_ats_handoff.mjs";
 import { findCrossSourceDuplicates } from "./_ai_dupe_guard.mjs";
 
@@ -238,9 +239,14 @@ async function upsertJob(client, source, job, resolvedExperience) {
   // never re-hide it or re-clobber an admin's un-hide decision — same
   // anti-clobber policy already used here for `experience`.
   const startsHidden = false;
+  // `level` is derived purely from experience/title/source (computeLevel), so
+  // it rides along with `experience` here: recomputed from the freshly-built
+  // EXCLUDED row whenever the UPDATE fires (i.e. whenever experience actually
+  // improves), never independently clobbered otherwise.
+  const level = computeLevel({ title: job.title, experience: resolvedExperience, source });
   await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen, hidden)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW(),$7)
+    `INSERT INTO job_posts (source, title, url, experience, company, technologies, level, first_seen, hidden)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),$8)
      ON CONFLICT (source, url) DO UPDATE SET
         experience = CASE
           WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
@@ -249,12 +255,16 @@ async function upsertJob(client, source, job, resolvedExperience) {
         technologies = COALESCE(job_posts.technologies, EXCLUDED.technologies),
         company = CASE
           WHEN job_posts.company IS NULL THEN EXCLUDED.company
-          ELSE job_posts.company END
+          ELSE job_posts.company END,
+        level = CASE
+          WHEN (job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
+           AND EXCLUDED.experience NOT IN ('-', '')
+          THEN EXCLUDED.level ELSE job_posts.level END
         WHERE ((job_posts.experience IS NULL OR job_posts.experience IN ('-', ''))
                AND EXCLUDED.experience NOT IN ('-', ''))
            OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
            OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL)`,
-    [source, job.title, job.url, resolvedExperience, job.company || null, job.technologies || null, startsHidden]
+    [source, job.title, job.url, resolvedExperience, job.company || null, job.technologies || null, level, startsHidden]
   );
 }
 
@@ -309,6 +319,7 @@ export async function ingestJobs(client, {
   skipCrossSourceDupes = false,
 }) {
   await ensureTechnologiesColumn(client);
+  await ensureLevelColumn(client);
   const ok = jobs.length > 0;
   const complete = ok && !!fullListing;
 

@@ -31,8 +31,10 @@ import {
   isMidLevelTitle,
   extractTechnologies,
   ensureTechnologiesColumn,
+  ensureLevelColumn,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -138,17 +140,19 @@ function algoliaSearch(page) {
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
     [
       source,
       item.title,
       item.url,
-      seniorAwareExperience(item.title, item.experience) ?? "-",
+      experience,
       item.technologies ?? null,
+      computeLevel({ title: item.title, experience, source }),
     ]
   );
   return res.rowCount > 0;
@@ -181,6 +185,7 @@ export default withTimeout("cron_jobs_TRENKWALDER-background", async () => {
 
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
     const foundUrls = [];
     for (let page = 0; page < 10; page++) {
       let result;

@@ -16,6 +16,7 @@ import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES 
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -174,12 +175,13 @@ async function upsertJob(client, sourceKey, item) {
   // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
   // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
   // esetén a meglévő sor változatlan marad.
+  const experience = seniorAwareExperience(item.title, item.experience);
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      (source, title, url, experience, company, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, seniorAwareExperience(item.title, item.experience), item.company || null, item.technologies ?? null]
+    [sourceKey, item.title, item.url, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source: sourceKey })]
   );
 }
 

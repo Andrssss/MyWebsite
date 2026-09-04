@@ -12,7 +12,8 @@ import { load as cheerioLoad } from "cheerio";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { seniorAwareExperience } from "./_seniority_policy.mjs";
-import { extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -146,17 +147,19 @@ async function upsertJob(client, sourceKey, item) {
   // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
   // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
   // esetén a meglévő sor változatlan marad.
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+      (source, title, url, experience, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
     [
       sourceKey,
       item.title,
       item.url,
-      seniorAwareExperience(item.title, item.experience) ?? "-",
+      experience,
       item.technologies ?? null,
+      computeLevel({ title: item.title, experience, source: sourceKey }),
     ]
   );
 }
@@ -250,6 +253,7 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
 
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
     /* Y Diák — sitemap-alapú ingest (2026-07-08). Detail-oldalt (cím: <h1>)
        csak ÚJ url-nél fetchelünk — meglévő sort az upsert úgysem írna felül. */
     const ydiak = await fetchYdiakItUrls();

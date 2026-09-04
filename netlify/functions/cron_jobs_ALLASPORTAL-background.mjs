@@ -52,10 +52,11 @@ import { reconcileActive } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle,
-  extractBodyExperience, extractTechnologies, ensureTechnologiesColumn,
+  extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn,
   isSeniorExperience,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -219,12 +220,13 @@ function isExpiredDetail(body) {
 // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus esetén
 // a meglévő sor változatlan marad.
 async function upsertJob(client, item) {
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      (source, title, url, experience, company, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    ["allasportal", item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
+    ["allasportal", item.title, item.url, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source: "allasportal" })]
   );
 }
 
@@ -384,6 +386,7 @@ const _runJob = withTimeout("cron_jobs_ALLASPORTAL-background", async () => {
   const client = await pool.connect();
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
     await scrapeAllasportal(client);
   } finally {
     client.release();

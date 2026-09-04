@@ -7,12 +7,13 @@ import { loadFilters } from "./load_filters.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle,
-  extractLinkedInExperience, extractTechnologies, ensureTechnologiesColumn,
+  extractLinkedInExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn,
   isSeniorExperience,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -286,15 +287,15 @@ async function upsertJob(client, source, item) {
 
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, company, technologies, first_seen)
-     SELECT $1,$2,$3,$4,$5,$6,$7,NOW()
+      (source, title, url, canonical_url, experience, company, technologies, level, first_seen)
+     SELECT $1,$2,$3,$4,$5,$6,$7,$8,NOW()
      WHERE NOT EXISTS (
        SELECT 1 FROM job_posts WHERE source = $1 AND canonical_url = $4
      )
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl, experience, item.company || null, item.technologies ?? null]
+    [source, item.title, item.url, canonicalUrl, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
   );
 }
 
@@ -380,6 +381,7 @@ export async function processLinkedInSources(sources, jobName) {
 
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
 
     // Known canonical urls for the whole run — a genuinely new posting gets
     // its detail page fetched once, right here, before it's ever inserted;

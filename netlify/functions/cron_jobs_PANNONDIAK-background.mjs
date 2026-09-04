@@ -22,7 +22,8 @@ import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
-import { extractTechnologies, ensureTechnologiesColumn, fetchText } from "./_experience_core.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -152,12 +153,13 @@ function parseCards(viewHtml) {
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
+  const experience = seniorAwareExperience(item.title, "diákmunka");
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, "diákmunka"), item.technologies ?? null]
+    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
   );
   return res.rowCount > 0;
 }
@@ -177,6 +179,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
 
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
 
     // Az ajaxSearch `view` HTML-je csak kártya (cím + link) — hirdetés-törzs
     // nincs benne, ezért maradt a technologies 2026-09-01-ig NULL. Az /allas/…

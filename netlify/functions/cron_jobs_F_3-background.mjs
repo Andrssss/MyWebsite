@@ -12,9 +12,11 @@ import {
   isSeniorExperience,
   extractTechnologies,
   ensureTechnologiesColumn,
+  ensureLevelColumn,
 } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 const JOB_NAME = "cron_jobs_F_3-background";
 const SOURCE = "workly";
@@ -202,6 +204,7 @@ export default withTimeout(JOB_NAME, async (request) => {
   _filters = await loadFilters();
   const client = await pool.connect();
   await ensureTechnologiesColumn(client);
+  await ensureLevelColumn(client);
   const knownUrls = new Set(
     (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [SOURCE])).rows.map((r) => r.url)
   );
@@ -274,12 +277,13 @@ export default withTimeout(JOB_NAME, async (request) => {
           }
         }
 
+        const finalExperience = seniorAwareExperience(entry.title, experience);
         const res = await client.query(
-          `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen)
-           VALUES ($1,$2,$3,$4,$5,$6,NOW())
+          `INSERT INTO job_posts (source, title, url, experience, company, technologies, level, first_seen)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
            ON CONFLICT (source, url) DO NOTHING
            RETURNING id;`,
-          [SOURCE, entry.title, entry.url, seniorAwareExperience(entry.title, experience), company, technologies]
+          [SOURCE, entry.title, entry.url, finalExperience, company, technologies, computeLevel({ title: entry.title, experience: finalExperience, source: SOURCE })]
         );
         if (res.rowCount > 0) {
           newlyInserted++;

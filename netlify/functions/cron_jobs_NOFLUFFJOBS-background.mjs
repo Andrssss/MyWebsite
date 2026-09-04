@@ -6,8 +6,9 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 
@@ -386,14 +387,15 @@ async function fetchNofluffDetail(url) {
  */
 async function upsertJob(client, item) {
   const canonicalUrl = normalizeUrl(item.url);
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, canonical_url, experience, company, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+      (source, title, url, canonical_url, experience, company, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
      ON CONFLICT (source, url) DO UPDATE SET
         technologies = EXCLUDED.technologies
       WHERE job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL;`,
-    ["nofluffjobs", item.title, item.url, canonicalUrl, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
+    ["nofluffjobs", item.title, item.url, canonicalUrl, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source: "nofluffjobs" })]
   );
 }
 
@@ -484,6 +486,7 @@ const _runJob = withTimeout("cron_jobs_NOFLUFFJOBS-background", async (request) 
 
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
     const total = await scrapeNofluffjobs(client);
     console.log(`[nofluffjobs] done — ${total} jobs upserted`);
   } finally {

@@ -51,6 +51,7 @@ import {
   isSeniorExperience,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -229,12 +230,13 @@ async function loadLevelSlugMap() {
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, company, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, company, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", "NIX", item.technologies ?? null]
+    [source, item.title, item.url, experience, "NIX", item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
   );
   return res.rowCount > 0;
 }

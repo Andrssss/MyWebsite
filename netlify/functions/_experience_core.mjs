@@ -527,4 +527,14 @@ export async function ensureTechnologiesColumn(client) {
   _techSchemaReady = true;
 }
 
+// job_posts.level — single junior/medior/senior/intern/ambiguous value per
+// posting, computed by computeLevel() in src/lib/experienceLevel.mjs (see
+// 2026-09-04 backfill). Same warm-container-once pattern as the two above.
+let _levelSchemaReady = false;
+export async function ensureLevelColumn(client) {
+  if (_levelSchemaReady) return;
+  await client.query(`ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS level text`);
+  _levelSchemaReady = true;
+}
+
 

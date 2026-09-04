@@ -66,6 +66,7 @@ import {
   isSeniorExperience,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 const SOURCE = "Hays";
 const COMPANY = "Hays Hungary Kft.";
@@ -234,12 +235,13 @@ async function scrapeListing(page) {
 
 // Returns true if this url was newly inserted (false = already existed).
 async function upsertJob(client, item) {
+  const experience = seniorAwareExperience(item.title, item.experience);
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, company, experience, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+    `INSERT INTO job_posts (source, title, url, company, experience, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id`,
-    [SOURCE, item.title, item.url, COMPANY, seniorAwareExperience(item.title, item.experience), item.technologies ?? null]
+    [SOURCE, item.title, item.url, COMPANY, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source: SOURCE })]
   );
   return res.rowCount > 0;
 }

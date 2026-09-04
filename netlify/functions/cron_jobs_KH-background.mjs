@@ -26,8 +26,9 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -191,12 +192,13 @@ async function fetchPage(page) {
 /* ── db ──────────────────────────────────────────────────────── */
 
 async function upsertJob(client, source, item) {
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.technologies ?? null]
+    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
   );
   return res.rowCount > 0;
 }
@@ -208,6 +210,7 @@ export default withTimeout("cron_jobs_KH-background", async () => {
   const client = await pool.connect();
   try {
     await ensureTechnologiesColumn(client);
+    await ensureLevelColumn(client);
     let crawlError = false;
     const foundUrls = [];
     const allRows = [];

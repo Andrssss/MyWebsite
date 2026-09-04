@@ -28,8 +28,9 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
 
@@ -522,12 +523,13 @@ async function upsertJob(client, source, item) {
   // Insert-only, kivétel nélkül (user-szabály, LinkedInen kívül sehol nincs
   // utólagos UPDATE): a sor insert előtt épül fel teljesen, a konfliktus
   // esetén a meglévő sor változatlan marad.
+  const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   await client.query(
     `INSERT INTO job_posts
-      (source, title, url, experience, company, technologies, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      (source, title, url, experience, company, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [source, item.title, item.url, seniorAwareExperience(item.title, item.experience) ?? "-", item.company || null, item.technologies ?? null]
+    [source, item.title, item.url, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
   );
 }
 
@@ -605,6 +607,7 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
 
   const client = write ? await pool.connect() : null;
   if (client) await ensureTechnologiesColumn(client);
+  if (client) await ensureLevelColumn(client);
 
   const stats = {
     ok: true,
