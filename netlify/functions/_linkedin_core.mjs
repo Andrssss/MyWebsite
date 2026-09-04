@@ -216,11 +216,28 @@ function extractLinkedInJobs(html) {
   return dedupeByUrl(jobs);
 }
 
+// The trailing numeric segment in /jobs/view/{slug}-{id} is LinkedIn's own
+// stable job posting id; the slug text ahead of it is editable SEO copy the
+// poster can change without the id changing. This used to canonicalize on
+// the SLUG (stripping the id) — backwards: confirmed live 2026-09-04, 12
+// duplicate pairs where the SAME numeric id got a different slug on a title
+// edit (gammaorg "ot cybersecurity engineer" -> "it/ot cybersecurity
+// engineer", both id 4460343194; cushman, waterbear, betsson, bluebird, smp,
+// mbh, noventiq and others) — the old canonical differed even though it was
+// the identical posting, so both the canonical_url check AND the title-keyed
+// sameSourceDupeIndex (title also changed) missed it. Canonicalize on the id
+// instead. Falls back to the old slug-based value when there's no trailing
+// numeric id to anchor on (keeps existing behavior for any URL shape that
+// doesn't match).
 function canonicalizeLinkedInJobUrl(raw) {
   try {
     const u = new URL(raw);
     if (u.hostname.includes("linkedin.com") && u.pathname.startsWith("/jobs/view/")) {
       const lastPart = u.pathname.split("/jobs/view/")[1];
+      const idMatch = lastPart.match(/-(\d+)\/?$/);
+      if (idMatch) {
+        return `https://www.linkedin.com/jobs/view/${idMatch[1]}`;
+      }
       const canonicalSlug = lastPart.replace(/-\d+$/, "");
       return `https://www.linkedin.com/jobs/view/${canonicalSlug}`;
     }
