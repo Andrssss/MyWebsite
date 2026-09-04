@@ -113,6 +113,11 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   // 2026-09-04: dreamjobs added on request, no separate live-audit run first —
   // if it turns out to have negligible overlap, this is a one-line revert.
   "dreamjobs",
+  // 2026-09-05: added after a full-table (all 37 sources, any-pair) audit
+  // found 7 real dupeKey collisions with profession-intern — a real, if
+  // modest, overlap the whitelist was silently missing. Every other
+  // non-whitelisted pair the same audit found was 1-2 rows (noise).
+  "nix",
 ];
 
 function splitTechList(technologies) {
