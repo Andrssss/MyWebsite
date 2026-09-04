@@ -27,7 +27,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 
@@ -859,6 +859,21 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           if (pattern) {
             const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);
             if (migrated) console.log(`${tag}   MIGRATED url → ${item.url}`);
+          }
+          // wherewework (2026-09-04): unlike otp, the numeric id itself is not
+          // stable — a repost gets a brand-new slug AND id, so no url-pattern
+          // migration is possible. Same fix as talent's 2026-09-03 case: merge
+          // by title+company instead (inactive victim → rename in place; active
+          // match → skip insert), or every repost duplicates as a fresh row.
+          if (source === "wherewework" && !knownUrls.has(item.url)) {
+            if (await migrateByTitleCompany(client, source, item.url, item.title, item.company, currentUrls)) {
+              console.log(`${tag}   MERGED (title+company) → ${item.url}`);
+              continue;
+            }
+            if (await hasActiveDuplicateByTitleCompany(client, source, item.url, item.title, item.company)) {
+              console.log(`${tag}   SKIP active duplicate (title+company) "${item.title}"`);
+              continue;
+            }
           }
           if (source === "otp") {
             // OTP itt már nem csak diákmunkát ad vissza: az IT / üzletfejlesztés
