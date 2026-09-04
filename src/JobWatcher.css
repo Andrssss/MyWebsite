@@ -1444,6 +1444,49 @@ html, body {
   color: #f97316;
 }
 
+/* job_posts.level badge — a backend computeLevel() eredménye, csak
+   megjelenítés (2026-09-04), egyelőre nem szűrünk vele. */
+.job-level-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.job-level-badge--intern {
+  background: rgba(124, 58, 237, 0.16);
+  color: #c4b5fd;
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+.job-level-badge--junior {
+  background: rgba(46, 204, 113, 0.16);
+  color: #6ee7a8;
+  border-color: rgba(46, 204, 113, 0.4);
+}
+
+.job-level-badge--medior {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.job-level-badge--senior {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.job-level-badge--ambiguous {
+  background: rgba(107, 114, 128, 0.16);
+  color: #9ca3af;
+  border-color: rgba(107, 114, 128, 0.4);
+}
+
 .job-tech-tags {
   display: inline-flex;
   flex-wrap: wrap;

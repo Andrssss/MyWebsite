@@ -457,6 +457,18 @@ const isSeniorExperience = (experience, title = "") => {
   return Math.min(...nums.map((x) => parseInt(x, 10))) >= SENIOR_MIN_YEARS;
 };
 
+// job_posts.level — a backend computeLevel()-je (src/lib/experienceLevel.mjs)
+// már beszúráskor kiszámolja ezt, DB-oszlopként (2026-09-04). Ez itt csak
+// megjelenítés — nem szűrünk vele még, és szándékosan nem váltja ki a fenti
+// isSeniorExperience-alapú ⚠ Senior badge-et (az egy külön, tisztázandó kérdés).
+const LEVEL_LABELS = {
+  intern: "Gyakornok",
+  junior: "Junior",
+  medior: "Medior",
+  senior: "Senior",
+  ambiguous: "Nincs infó",
+};
+
 const getKeywordNotesForJob = (job) => {
   if (!job.title) return [];
   const title = job.title.toLowerCase();
@@ -2650,6 +2662,14 @@ const JobWatcher = () => {
                     }
                   >
                     {job.experience}
+                  </span>
+                )}
+                {job.level && LEVEL_LABELS[job.level] && (
+                  <span
+                    className={`job-level-badge job-level-badge--${job.level}`}
+                    title="Szint (job_posts.level, a backend számolja beszúráskor)"
+                  >
+                    {LEVEL_LABELS[job.level]}
                   </span>
                 )}
                 {job.technologies && (

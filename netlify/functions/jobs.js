@@ -33,6 +33,9 @@ async function ensureSchema() {
     await sqlQuery.query(
       `ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS technologies text`
     );
+    await sqlQuery.query(
+      `ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS level text`
+    );
   } catch (err) {
     console.error("ensureSchema failed:", err.message);
   }
@@ -330,7 +333,7 @@ exports.handler = async (event) => {
         const rows = await query(
           `SELECT source, title, url, company,
                   first_seen AS "firstSeen",
-                  experience, technologies, active${HIDCOL}
+                  experience, technologies, level, active${HIDCOL}
            FROM job_posts
            WHERE id = $1 AND ${HID}`,
           [id]
@@ -349,7 +352,7 @@ exports.handler = async (event) => {
           timeRange === "24h"
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active${HIDCOL}
+                      experience, technologies, level, active${HIDCOL}
                FROM job_posts
                WHERE ${HID} AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '24 hours'
@@ -358,7 +361,7 @@ exports.handler = async (event) => {
             : timeRange === "7d"
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active${HIDCOL}
+                      experience, technologies, level, active${HIDCOL}
                FROM job_posts
                WHERE ${HID} AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '7 days'
@@ -367,7 +370,7 @@ exports.handler = async (event) => {
             : isTimeBased
             ? `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active${HIDCOL}
+                      experience, technologies, level, active${HIDCOL}
                FROM job_posts
                WHERE ${HID} AND source = ANY($1)
                  AND first_seen >= NOW() - INTERVAL '30 days'
@@ -375,7 +378,7 @@ exports.handler = async (event) => {
                LIMIT $2`
             : `SELECT source, title, url, company,
                       first_seen AS "firstSeen",
-                      experience, technologies, active${HIDCOL}
+                      experience, technologies, level, active${HIDCOL}
                FROM job_posts
                WHERE ${HID} AND source = ANY($1)
                  AND (active = true OR first_seen >= NOW() - INTERVAL '30 days')
@@ -392,7 +395,7 @@ exports.handler = async (event) => {
         timeRange === "24h"
           ? `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active${HIDCOL}
+                    experience, technologies, level, active${HIDCOL}
              FROM job_posts
              WHERE ${HID} AND first_seen >= NOW() - INTERVAL '24 hours'
              ORDER BY first_seen DESC, id DESC
@@ -400,7 +403,7 @@ exports.handler = async (event) => {
           : timeRange === "7d"
           ? `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active${HIDCOL}
+                    experience, technologies, level, active${HIDCOL}
              FROM job_posts
              WHERE ${HID} AND first_seen >= NOW() - INTERVAL '7 days'
              ORDER BY first_seen DESC, id DESC
@@ -412,14 +415,14 @@ exports.handler = async (event) => {
             // is what the UI sends with the 24h+7d filters both on (JobWatcher.jsx).
             `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active${HIDCOL}
+                    experience, technologies, level, active${HIDCOL}
              FROM job_posts
              WHERE ${HID} AND first_seen >= NOW() - INTERVAL '30 days'
              ORDER BY first_seen DESC, id DESC
              LIMIT $1`
           : `SELECT source, title, url, company,
                     first_seen AS "firstSeen",
-                    experience, technologies, active${HIDCOL}
+                    experience, technologies, level, active${HIDCOL}
              FROM job_posts
              WHERE ${HID}
                AND ((source = ANY($2) AND first_seen >= NOW() - INTERVAL '30 days')
