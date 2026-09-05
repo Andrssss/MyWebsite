@@ -624,9 +624,10 @@ export const BANNER_DEAD_SOURCES = {
   // lives in its own module; the original atj.graphisoft.com phrase from
   // 2026-07-30 is now one entry in its DEAD_PHRASES list.
   "AI-scraped": (row, body, res) => aiScrapedIsDead(row, body, res),
-  // ats-crawl runs on the SAME platforms the AI bucket's rules were written for
-  // (greenhouse / lever / ashby / smartrecruiters boards), so it reuses them
-  // verbatim rather than growing a second, drifting copy.
+  // ats-crawl reuses the SAME per-platform rule set the AI bucket's rules were
+  // written for (greenhouse / lever / ashby / smartrecruiters boards, plus
+  // recruitee since 2026-09-05 — see _ai_liveness.mjs) rather than growing a
+  // second, drifting copy.
   //
   // Why it needs the sweep at all, when it has a scoped reconcileActive
   // (2026-09-01): reconcile only deactivates when deriveScopePrefix resolves,
@@ -643,6 +644,17 @@ export const BANNER_DEAD_SOURCES = {
   // Safe to enable wholesale: replaying this exact rule set over all 150 active
   // rows on 2026-09-01 produced 4 death verdicts, every one of them confirmed
   // absent from its board's own API, and 0 on the other 146.
+  //
+  // Recruitee coverage added 2026-09-05 (3 user-reported "still shows active"
+  // postings — MailerLite, TransPerfect, ScholarshipOwl): the one confirmed-
+  // dead case among them (a renamed MailerLite posting whose old slug 404s
+  // outright) was already caught by the plain-404 rule above with no change
+  // needed; the other two turned out to still be published on their boards.
+  // Still, unlike every platform already covered here, a closed Recruitee
+  // posting's own page carries no OTHER removal signal (no banner, no status
+  // field) if it is ever unpublished without its url 404ing, so
+  // _ai_liveness.mjs now also probes the tenant's own /api/offers/ feed for
+  // recruitee.com hosts as a precaution — see its header for detail.
   "ats-crawl": (row, body, res) => aiScrapedIsDead(row, body, res),
 
   // Added 2026-07-22, each validated by fetching a currently-active listed job

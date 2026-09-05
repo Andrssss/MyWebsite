@@ -81,6 +81,27 @@ export function aiScrapedProbe(row) {
     };
   }
 
+  // Recruitee — <slug>.recruitee.com/o/<job-slug>. ats-crawl always stores the
+  // canonical `<slug>.recruitee.com` form, never a company's custom domain
+  // (see _ats_providers.mjs's recruitee header), so the tenant is always the
+  // host's own first label.
+  //
+  // 2026-09-05 (3 user-reported "still shows active" postings — MailerLite,
+  // TransPerfect, ScholarshipOwl): only one was confirmed genuinely gone — a
+  // renamed MailerLite posting whose OLD slug 404s outright (already caught by
+  // the sweep's plain-404 rule with no change needed here); the other two
+  // turned out to still be published, live checks against the tenant's own
+  // /api/offers/ feed. So this probe is precautionary, not a confirmed-bug fix:
+  // Recruitee gives no *other* removal signal on the posting's own page (no
+  // banner, no status field), so if a posting is ever unpublished WITHOUT its
+  // url 404ing — the nofluffjobs/dreamjobs "evergreen SEO page" pattern, not
+  // yet actually observed here — the plain-404 rule alone would miss it. This
+  // asks the tenant's own offers feed (the exact endpoint _ats_providers.mjs
+  // already reads to build the row) instead of trusting the posting page.
+  if (host.endsWith(".recruitee.com") && (m = path.match(/^\/o\/([^/]+)\/?$/))) {
+    return { url: `https://${host.split(".")[0]}.recruitee.com/api/offers/` };
+  }
+
   return null;
 }
 
@@ -136,8 +157,22 @@ export function aiScrapedIsDead(row, body, res) {
   // it — a job description that happens to quote one of the DEAD_PHRASES, or a
   // finalUrl that is simply the API url, would otherwise read as a death.
   // Greenhouse / Lever / Workday are decided by status code alone (404, plus
-  // Workday's opted-in 403); SmartRecruiters is the one that needs its body.
+  // Workday's opted-in 403); SmartRecruiters and Recruitee are the ones that
+  // need their body.
   if (aiScrapedProbe(row)) {
+    if (host.endsWith(".recruitee.com")) {
+      const slug = (u.pathname.match(/^\/o\/([^/]+)\/?$/) || [])[1];
+      if (!slug) return false;
+      let j;
+      try { j = JSON.parse(body); } catch { return false; } // truncated/HTML -> no verdict
+      const offers = Array.isArray(j?.offers) ? j.offers : [];
+      const offer = offers.find((o) => o && o.slug === slug);
+      // Absent entirely, or present with a non-published status (draft,
+      // internal, archived, …) — mirrors the exact filter _ats_providers.mjs
+      // uses to decide which offers are worth ingesting in the first place.
+      if (!offer) return true;
+      return !(!offer.status || offer.status === "published");
+    }
     if (host !== "jobs.smartrecruiters.com") return false;
     let j;
     try { j = JSON.parse(body); } catch { return false; } // truncated/HTML -> no verdict
