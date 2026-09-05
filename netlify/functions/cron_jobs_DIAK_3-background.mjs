@@ -896,8 +896,20 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           // by title+company+technologies instead (inactive victim → rename in
           // place; active match → skip insert), or every repost duplicates as
           // a fresh row. Must run AFTER the fetch above so item.technologies
-          // is populated for the comparison.
+          // is populated for the comparison — EXCEPT the internship-title fast
+          // path above (DIAKMUNKA_SOURCES / isInternshipTitle, e.g. "HW
+          // Analysis Trainee") never sets item.technologies at all, which
+          // silently defeated this whole check: technologiesExactMatch(undefined,
+          // [real tags]) never matches, so every repost of an internship-titled
+          // wherewework posting kept inserting as a fresh duplicate (live
+          // 2026-09-05 case: "HW Analysis Trainee" @ Bosch Magyarország).
+          // Fetch it here first when the fast path left it unset.
           if (source === "wherewework" && !knownUrls.has(item.url)) {
+            if (item.technologies === undefined) {
+              const { technologies } = await fetchDetailExperience(item.url);
+              item.technologies = technologies;
+              await sleep(400);
+            }
             if (await migrateByTitleCompany(client, source, item.url, item.title, item.company, item.technologies, currentUrls)) {
               console.log(`${tag}   MERGED (title+company+tech) → ${item.url}`);
               continue;
