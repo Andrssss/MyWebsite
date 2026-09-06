@@ -557,21 +557,6 @@
   cursor: not-allowed;
 }
 
-/* Navigációs (nem "csinálj valamit most") gomb, ezért ugyanolyan visszafogott
-   megjelenés, mint a Jelentkezések togglé — a Frissítés/Mind megnyitása
-   marad az egyetlen két kiemelt (élénk színű) elsődleges akció a sorban. */
-.job-btn-stats {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #e5e5e5;
-}
-
-.job-btn-stats:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.19);
-  box-shadow: none;
-  transform: translateY(-1px);
-}
-
 .job-btn--toggle {
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.28);

@@ -18,7 +18,6 @@ import User_pages from './User_pages.tsx';
 import JobWatcher from "./JobWatcher.jsx";
 import Filters from "./Filters.jsx";
 import Categories from "./Categories.jsx";
-import JobStats from "./JobStats.jsx";
 import JobAccessGate from "./JobAccessGate.jsx";
 
 const AppContent = () => {
@@ -183,20 +182,6 @@ const AppContent = () => {
               </JobAccessGate>
             }
           />
-
-          {/* Statisztikák */}
-          <Route
-            path="/allasfigyelo/stats"
-            element={
-              <JobAccessGate>
-                <div className="re-page">
-                  <JobStats />
-                </div>
-              </JobAccessGate>
-            }
-          />
-
-       
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

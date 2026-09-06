@@ -2159,9 +2159,6 @@ const JobWatcher = () => {
               ? `✓ Duplikátumok (${crossSourceDuplicates.size})`
               : `⧉ Duplikátumok (${crossSourceDuplicates.size})`}
           </button>
-          <button className="job-btn job-btn-stats" onClick={() => navigate("/allasfigyelo/stats")}>
-           📊 Statisztikák
-          </button>
           <button className="job-btn" onClick={() => fetchJobs(time24h, time7d, true)}>
             Frissítés
           </button>
