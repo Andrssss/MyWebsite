@@ -91,7 +91,7 @@ const cachedRegex = (kw) => {
 };
 
 /** `lower` már kisbetűs — ez kulcsszavanként fut le címenként. */
-const matchesKeyword = (kw, lower) => {
+export const matchesKeyword = (kw, lower) => {
   const k = String(kw).toLowerCase();
   return k.startsWith(STEM_PREFIX) ? lower.includes(k.slice(1)) : cachedRegex(k).test(lower);
 };

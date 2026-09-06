@@ -20,6 +20,7 @@ import {
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
+import { matchesKeyword } from "../../src/lib/categorize.mjs";
 import { atsHandoff, registerAtsTenants } from "./_ats_handoff.mjs";
 import { findCrossSourceDuplicates } from "./_ai_dupe_guard.mjs";
 
@@ -105,17 +106,16 @@ export function sanitizeJobs(rawJobs) {
    files use afterward to pick ONE category — we don't need to pick one here,
    only to decide IT vs not. */
 
-function kwRegex(kw) {
-  const escaped = String(kw).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
-}
-
 export function isItJob(title, categories) {
   const t = String(title || "").toLowerCase();
   if (!t) return false;
   if (t.includes("analyst") || t.includes("elemző")) return true;
   if (/(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(title || "")) return true;
-  return (categories || []).some(([, kws]) => (kws || []).some((kw) => kwRegex(kw.toLowerCase()).test(t)));
+  // matchesKeyword (categorize.mjs) — ugyanaz a szóhatáros/tő-alapú (`~`)
+  // illesztés, mint a kategorizálásnál, hogy a magyar ragozás (pl.
+  // "Programozót, webfejlesztőt keresünk!") ne essen ki csak azért, mert a
+  // cím nem a kulcsszó szótári alakját tartalmazza.
+  return (categories || []).some(([, kws]) => (kws || []).some((kw) => matchesKeyword(kw, t)));
 }
 
 /* ── "erős" IT-cím jel (a kategória-taxonómia MELLÉ, nem helyette) ──
