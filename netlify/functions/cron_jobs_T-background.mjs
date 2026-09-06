@@ -11,7 +11,7 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
+import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany, BANNER_DEAD_SOURCES } from "./_active_core.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
@@ -388,6 +388,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     let contentMerged = 0;
     let contentSkippedActive = 0;
     let skippedCrossSourceDupe = 0;
+    let skippedDeadOnArrival = 0;
     for (const job of talentJobs) {
       if (!known.has(job.url)) {
         if (isCrossSourceDupe(crossDupeIndex, job.company, job.title)) {
@@ -395,14 +396,30 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
           console.log(`[talent] SKIP cross-source dupe "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);
           continue;
         }
+        let html = null;
         try {
           await sleep(400);
-          const html = await fetchText(job.url);
+          html = await fetchText(job.url);
           const normalizedHtml = html.replace(/–/g, "-").replace(/—/g, "-");
           if (job.experience === "-") job.experience = extractTalentExperience(normalizedHtml) || "-";
           job.technologies = extractTechnologies(normalizedHtml);
         } catch (err) {
           console.warn(`[talent] detail fetch failed: ${job.url} — ${err.message}`);
+        }
+        // talent.com's own search listing keeps showing postings that are
+        // already closed on the source (documented below at the reconcile
+        // call — same reason "talent" is reactivate-only there and sticky in
+        // the daily sweep). Without this check a dead-on-arrival card gets
+        // inserted as a fresh active row and sits that way until the NEXT
+        // day's 404-sweep catches it (2026-09-06, user-reported: MailerLite/
+        // TransPerfect/ScholarshipOwl cards showing up on pestidev.hu's
+        // fresh=7d view already closed). Reuses the sweep's own trusted
+        // talent rule on the SAME detail fetch already made above — no extra
+        // request, no separate copy of the banner/system_status logic.
+        if (html && BANNER_DEAD_SOURCES.talent(job, html)) {
+          skippedDeadOnArrival += 1;
+          console.log(`[talent] SKIP dead-on-arrival "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);
+          continue;
         }
         // title+company+technologies dedup needs job.technologies, so this
         // check must run AFTER the detail fetch above (2026-09-04).
@@ -418,7 +435,7 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
       if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
       await upsertJob(client, "talent", job);
     }
-    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged, ${contentSkippedActive} skipped as active duplicates, ${skippedCrossSourceDupe} skipped as cross-source duplicates)`);
+    console.log(`talent: ${talentJobs.length} jobs processed (${contentMerged} title+company url rotations merged, ${contentSkippedActive} skipped as active duplicates, ${skippedCrossSourceDupe} skipped as cross-source duplicates, ${skippedDeadOnArrival} skipped as dead-on-arrival)`);
 
     // complete:false → reactivate-only, NEVER listing-diff deactivation.
     // talent's search results are a rotating nondeterministic SUBSET of the
