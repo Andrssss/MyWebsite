@@ -11,7 +11,13 @@
 // ez az OLVASÁSI oldal (a beírt értéket hogyan soroljuk szintbe). A kettőnek
 // szándékosan más a szabálya, és a scraper-oldalhoz itt nem szabad hozzányúlni.
 
-export const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka", "talent"];
+// "talent" REMOVED 2026-09-08 (ported from pestidev.hu's app/lib/experience.ts
+// fix): matched as a bare substring, so any "Talent Pool" title — a
+// recruiting-pipeline bucket, not a level signal (see TALENT_POOL in
+// categorize.mjs, a SEPARATE concept) — got misclassified "intern" even for
+// clearly non-intern postings ("Specialist, Contingent Workforce (talent
+// pool)", "medior tester (talent pool)").
+export const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
 
 /** Diákszövetkezeti források: definíció szerint gyakornoki, sosem junior/medior. */
 export const INTERN_ONLY_SOURCES = [

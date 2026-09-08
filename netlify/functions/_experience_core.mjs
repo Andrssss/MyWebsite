@@ -26,10 +26,17 @@ function normalizeText(s) {
     .toLowerCase();
 }
 
+// "talent" was REMOVED 2026-09-08: it matched as a bare substring, so any
+// "Talent Pool" title (a recruiting-pipeline bucket, not a level signal — see
+// TALENT_POOL in src/lib/categorize.mjs, a SEPARATE concept) got force-stamped
+// diákmunka even for postings like "Specialist, Contingent Workforce (talent
+// pool)" or "medior tester (talent pool)". A talent-pool posting with no other
+// intern signal now falls through to whatever real experience text is
+// extracted (or "-" if none) instead of being guessed as an internship.
 export const INTERNSHIP_KEYWORDS = [
   "gyakornok", "intern", "internship", "trainee",
   "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetsegprogram", "tehetségprogram", "talent", "student", "students", "early career",
+  "tehetsegprogram", "tehetségprogram", "student", "students", "early career",
 ];
 
 // "graduate" (e.g. "New College Graduate", "Graduate Software Engineer") means

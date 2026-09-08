@@ -312,7 +312,9 @@ const hoursSince = (iso) => {
 /* =======================
    INTERN / JUNIOR LOGIKA
 ======================= */
-const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka", "talent"];
+// "talent" REMOVED 2026-09-08 — see src/lib/experienceLevel.mjs's INTERN_KEYWORDS
+// comment (this is the client-side filter-mode duplicate of that list).
+const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
 const JUNIOR_KEYWORD = "junior";
 
 // The "AI-scraped" button is a bucket, not a plain source: rows use the flat
