@@ -66,11 +66,11 @@ async function fetchMuiszTech(url) {
   return extractTechnologies(html);
 }
 
-async function fetchZynternTech(url, description) {
-  if (description) {
-    const fromDesc = extractTechnologies(`<body>${description}</body>`);
-    if (fromDesc) return fromDesc;
-  }
+async function fetchZynternTech(url) {
+  // job_posts nem tárolja a leírást (az csak a scraper in-memory item-jén él
+  // insertkor) — a backfillhez nincs mit "elsődlegesen" próbálni, egyenesen a
+  // detail-oldalra megyünk (a Vue SPA job-profile ágát extractTechnologies
+  // már ismeri).
   const html = await withDeadline(fetchText(url), FETCH_TIMEOUT_MS, url);
   return extractTechnologies(html);
 }
@@ -101,7 +101,7 @@ async function fetchWorkcenterTech(url) {
 
 async function fetchTechFor(source, row) {
   if (source === "muisz") return fetchMuiszTech(row.url);
-  if (source === "zyntern") return fetchZynternTech(row.url, row.description);
+  if (source === "zyntern") return fetchZynternTech(row.url);
   if (source === "tudasdiak") return fetchTudasdiakTech(row.url);
   if (source === "workcenter") return fetchWorkcenterTech(row.url);
   return null;
@@ -121,9 +121,8 @@ async function scan(client) {
 async function heal(client, source, limit, offset) {
   if (!SOURCES.includes(source)) throw new Error(`unknown source: ${source}`);
 
-  // zyntern esetén description is kell (elsődleges, hálózat nélküli próba).
   const { rows: work } = await client.query(
-    `SELECT id, url, description
+    `SELECT id, url
        FROM job_posts
       WHERE active = true AND technologies IS NULL AND source = $1
       ORDER BY id
