@@ -20,7 +20,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { reconcileActive, migrateVolatileUrl, escapeRegex, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
 import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
 import { hasStrongItTitle } from "./_ai_ingest_core.mjs";
@@ -1782,6 +1782,22 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
                 item.technologies = extractTechnologies(detailHtml);
               } catch (err) {
                 console.warn(`[schonherz] technologies fetch failed: ${item.url} — ${err.message}`);
+              }
+            }
+            // zyntern/minddiak: neither has a stable URL-pattern (each "repost"
+            // gets a fresh site-side id, no separable stable component like
+            // talent — see migrateByTitleCompany's doc), so migrateVolatileUrl
+            // above never fires for them. Same content-based guard as talent:
+            // merge into a matching INACTIVE row (url rotation) or skip if an
+            // ACTIVE row already covers this exact title+company+technologies.
+            if (!migrated && (source === "zyntern" || source === "minddiak")) {
+              if (await migrateByTitleCompany(client, source, item.url, item.title, item.company, item.technologies, currentUrls)) {
+                console.log(`[${source}] title+company+tech MERGED → ${item.url}`);
+                continue;
+              }
+              if (await hasActiveDuplicateByTitleCompany(client, source, item.url, item.title, item.company, item.technologies)) {
+                console.log(`[${source}] SKIP active title+company+tech duplicate: "${item.title}" → ${item.url}`);
+                continue;
               }
             }
             await upsertJob(client, source, item);
