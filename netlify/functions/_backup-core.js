@@ -1,16 +1,16 @@
 import { getStore } from "@netlify/blobs";
-import { Pool } from "pg";
+import { readReviewsWithEtag } from "./_subject_reviews_store.js";
 
 const STORE_NAME = "weekly-backups";
 
+// subject_reviews moved to the "subject-reviews" Blob 2026-09-08 (see
+// _subject_reviews_store.js) — this snapshot now protects against an
+// accidental bad write/deploy to THAT blob, not against Postgres going away.
+// A live blob being "always current" doesn't remove the need for a
+// point-in-time copy; it just changes what the copy is a copy of.
 export async function runBackup(key, { returnContent = false } = {}) {
-  const pool = new Pool({
-    connectionString: process.env.NETLIFY_DATABASE_URL_UNPOOLED,
-    ssl: { rejectUnauthorized: false },
-  });
-
-  const { rows } = await pool.query("SELECT * FROM subject_reviews");
-  await pool.end();
+  const { data } = await readReviewsWithEtag();
+  const rows = data.reviews;
 
   const store = getStore(STORE_NAME);
 

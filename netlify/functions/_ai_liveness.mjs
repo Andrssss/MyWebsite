@@ -22,7 +22,20 @@
 //     8  banner phrase    thyssenkrupp / ALDI-SuccessFactors / sonrisa
 //     5  Greenhouse       per-job API 404
 //     3  Lever            per-job API 404
-//     4  one-offs         (join.com repost, listing-only, soft-404) — NOT covered here
+//     4  one-offs         (join.com repost, listing-only) — NOT covered here
+//
+// 2026-09-08 additions (a fresh external audit surfaced these, each confirmed
+// live against the posting's own url before being added, same rule as above):
+// Workable's `not_found=true` redirect marker, cigpannonia.hu's soft-404
+// (closes what used to be the one open "soft-404" gap above), a third
+// karrierportal-style vanity host (alfa.hu), two single-tenant careers-root
+// redirects (sagemcom.com, bca.hu), and one cross-domain banner phrase
+// (swicon-jobs.com -> swicon.com "this job offer is no longer available").
+// Still NOT covered: hrmaster.hu tenants and bankmonitor.hu (no distinguishing
+// signal found yet — a dead posting there answers 200 with no title/banner/
+// redirect difference from a live one) and eightfold (ericsson/vodafone/
+// morganstanley job + apply APIs still carry no status/active/expiry field,
+// confirmed again this pass).
 //
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
@@ -94,10 +107,19 @@ const DEAD_LANDINGS = [
   // and Magyar Posta on its own vanity host, same product.
   { host: /(^|\.)karrierportal\.hu$/, path: /^\/lejart-allashirdetes\/?$/i },
   { host: /^karrier\.posta\.hu$/, path: /^\/lejart-allashirdetes\/?$/i },
+  // alfa.hu (2026-09-08): same product/path as the karrierportal.hu tenants
+  // above, just on its own vanity host — confirmed live (karrier.alfa.hu
+  // redirects a closed posting to this exact path).
+  { host: /^karrier\.alfa\.hu$/, path: /^\/lejart-allashirdetes\/?$/i },
   { host: /(^|\.)kuka\.com$/, path: /\/company\/careers\/vacancies\/?$/i },
   { host: /(^|\.)accenture\.com$/, path: /\/careers\/jobsearch\/?$/i },
   { host: /(^|\.)bamboohr\.com$/, path: /^\/careers\/?$/i },
   { host: /(^|\.)zenitech\.co\.uk$/, path: /^\/careers\/life-at-zenitech\/?$/i },
+  // sagemcom.com / bca.hu (2026-09-08): each confirmed live on a single closed
+  // posting — a closed job's own link 302s to the tenant's generic careers
+  // home instead of 404ing, same shape as kuka/accenture above.
+  { host: /(^|\.)sagemcom\.com$/, path: /^\/accueil\.aspx$/i },
+  { host: /(^|\.)bca\.hu$/, path: /^\/career\/index\/?$/i },
 ];
 
 /** Closed-posting banners, matched on the body with <script>/<style> stripped.
@@ -109,6 +131,10 @@ const DEAD_PHRASES = [
   "this position is no longer available", // thyssenkrupp
   "this position is no longer active", // sonrisa (Teamtailor)
   "this job has expired", // SmartRecruiters html (the API rule already covers it)
+  // swicon (2026-09-08): the stored url is swicon-jobs.com, which now 30x's to
+  // a swicon.com page bearing this exact banner — the redirect chain already
+  // lands us on that final body, so no host-scoping is needed.
+  "this job offer is no longer available",
 ];
 
 function stripScripts(body) {
@@ -154,6 +180,25 @@ export function aiScrapedIsDead(row, body, res) {
     if (!id || typeof body !== "string") return false;
     const title = (body.match(/<title[^>]*>([\s\S]{0,200}?)<\/title>/i) || [])[1];
     return title !== undefined && title.trim() === "Jobs" && !body.includes(id);
+  }
+
+  // --- Workable (2026-09-08): a removed posting's own /j/{code} link 30x's to
+  // the account's board root with a `not_found=true` marker — confirmed live
+  // on two different accounts (mpsolutions, spate). Not expressible as a
+  // DEAD_LANDINGS path rule since the signal is a query param, not a path,
+  // and the account segment varies. A live redirect (account rename) keeps
+  // the /j/{code} suffix instead, so this can't false-positive on that case.
+  if (host === "apply.workable.com" && res && res.finalUrl && /[?&]not_found=true(?:&|$)/.test(res.finalUrl)) {
+    return true;
+  }
+
+  // --- cigpannonia.hu (2026-09-08): the site's job pages soft-404 — HTTP 200,
+  // but the body IS the site's own 404 template, only visible via <title>
+  // (confirmed live). Closes the gap this file's header used to list as
+  // uncovered.
+  if (host === "cigpannonia.hu" && typeof body === "string") {
+    const title = (body.match(/<title[^>]*>([\s\S]{0,200}?)<\/title>/i) || [])[1] || "";
+    if (title.trim().startsWith("404")) return true;
   }
 
   // --- redirect-to-careers-root landings

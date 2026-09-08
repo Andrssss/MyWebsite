@@ -375,11 +375,38 @@ button[type="button"].close-modal-button:hover {
   position: relative;
 }
 
+.feedback-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .feedback-buttons {
   display: flex;
   flex-direction: column; /* Gombok egymás alá */
   align-items: flex-end; /* Igazítás a jobb oldalra */
   gap: 8px; /* Térköz a gombok között */
+}
+
+.like-button {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #888;
+  white-space: nowrap;
+}
+
+.like-button:hover {
+  border-color: #ff8fa3;
+  color: #ff4d6d;
+}
+
+.like-button.liked {
+  border-color: #ff4d6d;
+  color: #ff4d6d;
 }
 
 .edit-button {

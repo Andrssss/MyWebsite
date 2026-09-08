@@ -1,18 +1,19 @@
 // netlify/functions/reviews.js
-const { Pool } = require("pg");
-const { withDbAuditFlush } = require("./_db_audit.js");
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-
-if (!connectionString) {
-  console.error("❌ NETLIFY_DATABASE_URL nincs beállítva.");
-  throw new Error("NETLIFY_DATABASE_URL environment variable is not set.");
-}
-
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
+//
+// subject_reviews lives in the "subject-reviews" Netlify Blob now, not
+// Postgres (2026-09-08) — see _subject_reviews_store.js for the concurrency-
+// safe read-modify-write helpers this file is built on, and CLAUDE.md's
+// "Where data lives" for why (not derived data, not low-concurrency, unlike
+// the earlier job-stats/ats-state blob migrations).
+const {
+  toPublicRow,
+  listReviews,
+  getReviewById,
+  createReview,
+  updateReview,
+  deleteReview,
+  toggleLike,
+} = require("./_subject_reviews_store.js");
 
 function jsonResponse(statusCode, body) {
   return {
@@ -24,15 +25,22 @@ function jsonResponse(statusCode, body) {
   };
 }
 
-exports.handler = withDbAuditFlush("reviews", async (event, context) => {
-  const client = await pool.connect();
+exports.handler = async (event) => {
   try {
     const method = event.httpMethod;
     const path = event.path || "";
-    // pl. "/.netlify/functions/reviews/123"
+    // pl. "/.netlify/functions/reviews/123" vagy ".../reviews/123/like"
     const parts = path.split("/");
-    const maybeId = parts[parts.length - 1];
-    const id = /^\d+$/.test(maybeId) ? parseInt(maybeId, 10) : null;
+    const last = parts[parts.length - 1];
+    const secondLast = parts[parts.length - 2];
+    const isLikeRoute = last === "like" && /^\d+$/.test(secondLast || "");
+    const id = isLikeRoute
+      ? parseInt(secondLast, 10)
+      : /^\d+$/.test(last || "")
+      ? parseInt(last, 10)
+      : null;
+
+    const viewerId = event.queryStringParameters?.viewer_id || null;
 
     if (method === "OPTIONS") {
       return {
@@ -42,79 +50,48 @@ exports.handler = withDbAuditFlush("reviews", async (event, context) => {
       };
     }
 
+    // ───────────────── POST /reviews/:id/like ─────────────────
+    if (method === "POST" && isLikeRoute && id) {
+      const MAX_BODY_BYTES = 2048;
+      const rawBody = event.body || "";
+      if (Buffer.byteLength(rawBody, "utf8") > MAX_BODY_BYTES) {
+        return jsonResponse(413, { error: "Payload too large" });
+      }
+
+      let body;
+      try {
+        body = JSON.parse(rawBody || "{}");
+      } catch {
+        return jsonResponse(400, { error: "Invalid JSON body" });
+      }
+
+      const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
+      if (!userId || userId.length > 128) {
+        return jsonResponse(400, { error: "user_id kötelező mező." });
+      }
+
+      const result = await toggleLike(id, userId);
+      if (!result) {
+        return jsonResponse(404, { error: "Nem található ilyen vélemény." });
+      }
+      return jsonResponse(200, result);
+    }
+
     // ───────────────── GET ─────────────────
     if (method === "GET") {
       if (id) {
-        const { rows } = await client.query(
-          `SELECT
-             id,
-             name,
-             user_name AS "user",
-             difficulty,
-             usefulness,
-             general,
-             during_semester AS "duringSemester",
-             exam,
-             year,
-             semester,
-             user_id,
-             kepzes_fajtaja
-           FROM subject_reviews
-           WHERE id = $1`,
-          [id]
-        );
-        if (rows.length === 0) {
+        const review = await getReviewById(id);
+        if (!review) {
           return jsonResponse(404, { error: "Nem található ilyen vélemény." });
         }
-        return jsonResponse(200, rows[0]);
-      } else {
-        // Opcionális ?limit=N → csak az első N tárgy összes véleménye.
-        // Tárgyanként (név szerint) limitálunk, nem soronként, hogy a
-        // kártyák csoportosítása ne törjön ketté a határon.
-        const limitRaw = event.queryStringParameters?.limit;
-        const limit = /^\d+$/.test(limitRaw || "") ? parseInt(limitRaw, 10) : null;
-
-        const selectCols = `
-             id,
-             name,
-             user_name AS "user",
-             difficulty,
-             usefulness,
-             general,
-             during_semester AS "duringSemester",
-             exam,
-             year,
-             semester,
-             user_id,
-             kepzes_fajtaja`;
-
-        if (limit) {
-          // Az "Általános információ" mindig kerüljön be (és legyen elöl),
-          // a maradék helyet töltsük fel félév/név szerint.
-          const { rows } = await client.query(
-            `SELECT ${selectCols}
-               FROM subject_reviews
-              WHERE name IN (
-                SELECT name
-                  FROM subject_reviews
-                 GROUP BY name
-                 ORDER BY (lower(btrim(name)) = lower('Általános információ')) DESC,
-                          MIN(semester) NULLS LAST, name
-                 LIMIT $1
-              )
-              ORDER BY semester, name, id`,
-            [limit]
-          );
-          return jsonResponse(200, rows);
-        }
-
-        const { rows } = await client.query(
-          `SELECT ${selectCols}
-             FROM subject_reviews
-            ORDER BY semester, name, id`
-        );
-        return jsonResponse(200, rows);
+        return jsonResponse(200, toPublicRow(review, viewerId));
       }
+
+      const limitRaw = event.queryStringParameters?.limit;
+      const limit = /^\d+$/.test(limitRaw || "") ? parseInt(limitRaw, 10) : null;
+
+      const rows = await listReviews({ limit });
+      return jsonResponse(200, rows.map((r) => toPublicRow(r, viewerId)));
     }
 
     // ───────────────── POST ─────────────────
@@ -160,125 +137,72 @@ exports.handler = withDbAuditFlush("reviews", async (event, context) => {
         });
       }
 
-      const { rows } = await client.query(
-        `INSERT INTO subject_reviews
-          (name, user_name, difficulty, usefulness, general, during_semester, exam, year, semester, user_id, kepzes_fajtaja)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-        RETURNING
-          id,
-          name,
-          user_name AS "user",
-          difficulty,
-          usefulness,
-          general,
-          during_semester AS "duringSemester",
-          exam,
-          year,
-          semester,
-          user_id,
-          kepzes_fajtaja`,
-        [
-          name,
-          user,
-          difficulty,
-          usefulness,
-          general,
-          duringSemester,
-          exam,
-          year,
-          semester,
-          user_id,
-          kepzes_fajtaja,
-        ]
-      );
+      const created = await createReview({
+        name,
+        user,
+        difficulty,
+        usefulness,
+        general,
+        duringSemester,
+        exam,
+        year,
+        semester,
+        user_id,
+        kepzes_fajtaja,
+      });
 
-
-      return jsonResponse(201, rows[0]);
+      return jsonResponse(201, toPublicRow(created, viewerId));
     }
 
     // ───────────────── PUT ─────────────────
     if (method === "PUT" && id) {
       const body = JSON.parse(event.body || "{}");
-      const fields = [];
-      const values = [];
-      let idx = 1;
+      const patch = {};
 
-      const map = {
-        name: "name",
-        user: "user_name",
-        difficulty: "difficulty",
-        usefulness: "usefulness",
-        general: "general",
-        duringSemester: "during_semester",
-        exam: "exam",
-        year: "year",
-        semester: "semester",
-        user_id: "user_id",
-        kepzes_fajtaja: "kepzes_fajtaja",
-      };
+      const editableKeys = [
+        "name",
+        "user",
+        "difficulty",
+        "usefulness",
+        "general",
+        "duringSemester",
+        "exam",
+        "year",
+        "semester",
+        "user_id",
+        "kepzes_fajtaja",
+      ];
 
-      for (const [key, column] of Object.entries(map)) {
+      for (const key of editableKeys) {
         if (body[key] !== undefined && body[key] !== "N/A") {
-          let value = body[key];
-          if (key === "user") {
-            value = (typeof value === "string" ? value.trim() : "") || "anonim";
-          }
-          fields.push(`${column} = $${idx++}`);
-          values.push(value);
+          patch[key] =
+            key === "user"
+              ? (typeof body[key] === "string" ? body[key].trim() : "") || "anonim"
+              : body[key];
         }
       }
 
-      if (fields.length === 0) {
+      if (Object.keys(patch).length === 0) {
         return jsonResponse(400, {
           error: "Nincs frissítendő mező.",
         });
       }
 
-      values.push(id);
-      const query = `
-        UPDATE subject_reviews
-        SET ${fields.join(", ")}
-        WHERE id = $${idx}
-        RETURNING
-          id,
-          name,
-          user_name AS "user",
-          difficulty,
-          usefulness,
-          general,
-          during_semester AS "duringSemester",
-          exam,
-          year,
-          semester,
-          user_id,
-          kepzes_fajtaja
-        `;
-
-      const { rows } = await client.query(query, values);
-      if (rows.length === 0) {
+      const updated = await updateReview(id, patch);
+      if (!updated) {
         return jsonResponse(404, { error: "Nem található ilyen vélemény." });
       }
-      return jsonResponse(200, rows[0]);
+      return jsonResponse(200, toPublicRow(updated, viewerId));
     }
-
 
     // ───────────────── DELETE ─────────────────
     if (method === "DELETE" && id) {
-      console.log("🔥 DELETE called, id from path =", id);
-
-      const { rowCount } = await client.query(
-        `DELETE FROM subject_reviews WHERE id = $1`,
-        [id]
-      );
-
-      if (rowCount === 0) {
-        console.log("❌ Nincs sor ezzel az id-vel:", id);
+      const deleted = await deleteReview(id);
+      if (!deleted) {
         return jsonResponse(404, {
           error: "Nincs ilyen vélemény (id nem található).",
         });
       }
-
-      console.log("✅ Sikeres törlés, id =", id);
 
       return {
         statusCode: 204,
@@ -294,9 +218,5 @@ exports.handler = withDbAuditFlush("reviews", async (event, context) => {
   } catch (err) {
     console.error("Function error:", err);
     return jsonResponse(500, { error: "Szerver hiba", details: err.message });
-  } finally {
-    client.release();
   }
-});
-
-
+};

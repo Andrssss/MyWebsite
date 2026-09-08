@@ -18,6 +18,8 @@ const mapRow = (row) => ({
   user_id: row.user_id ?? "N/A",
   id: row.id ?? null,
   kepzes_fajtaja: row.kepzes_fajtaja ?? "MI",
+  likeCount: row.likeCount ?? 0,
+  likedByMe: row.likedByMe ?? false,
 });
 
 // Ékezetmentesítés
@@ -180,7 +182,9 @@ const SubjectInfo = () => {
 
     const fetchTable = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/reviews?limit=${INITIAL_LIMIT}`);
+        const response = await fetch(
+          `${API_BASE_URL}/reviews?limit=${INITIAL_LIMIT}&viewer_id=${encodeURIComponent(storedUserId)}`
+        );
         if (!response.ok) {
           throw new Error("Nem sikerült betölteni az adatokat");
         }
@@ -201,7 +205,9 @@ const SubjectInfo = () => {
     if (allLoaded || loadingAllRef.current) return;
     loadingAllRef.current = true;
     try {
-      const response = await fetch(`${API_BASE_URL}/reviews`);
+      const response = await fetch(
+        `${API_BASE_URL}/reviews?viewer_id=${encodeURIComponent(userId || "")}`
+      );
       if (!response.ok) throw new Error("Nem sikerült betölteni a teljes listát");
       const data = await response.json();
       setSubjects(data.map(mapRow));
@@ -210,7 +216,7 @@ const SubjectInfo = () => {
       console.error("Teljes lista betöltése sikertelen:", err);
       loadingAllRef.current = false; // hiba esetén újrapróbálható
     }
-  }, [allLoaded]);
+  }, [allLoaded, userId]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -399,6 +405,40 @@ const handleDelete = async (id) => {
   } catch (err) {
     console.error("DELETE ERROR:", err);
     alert(`Hiba történt: ${err.message}`);
+  }
+};
+
+const handleToggleLike = async (id) => {
+  // Optimista update, hiba esetén visszaállítjuk.
+  setSubjects((prev) =>
+    prev.map((s) =>
+      s.id === id
+        ? { ...s, likedByMe: !s.likedByMe, likeCount: s.likeCount + (s.likedByMe ? -1 : 1) }
+        : s
+    )
+  );
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/reviews/${id}/like`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!response.ok) throw new Error("Hiba történt a lájkolás során.");
+    const { likeCount, likedByMe } = await response.json();
+    setSubjects((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, likeCount, likedByMe } : s))
+    );
+  } catch (err) {
+    console.error("LIKE ERROR:", err);
+    // visszaállítás az optimista update előtti állapotra
+    setSubjects((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, likedByMe: !s.likedByMe, likeCount: s.likeCount + (s.likedByMe ? -1 : 1) }
+          : s
+      )
+    );
   }
 };
 
@@ -721,6 +761,8 @@ const handleDelete = async (id) => {
               duringSemester: s.duringSemester,
               exam: s.exam,
               id: s.id,
+              likeCount: s.likeCount,
+              likedByMe: s.likedByMe,
             };
 
             const isRealUser =
@@ -792,31 +834,45 @@ const handleDelete = async (id) => {
                       <>
                         <div className="feedback-header">
                           <h4>{u.user}</h4>
-                          {u.user_id === userId && (
-                            <div className="feedback-buttons">
-                              <button
-                                className="edit-button"
-                                onClick={() =>
-                                  openEditModal(u, group.name, group.semester, group.kepzes_fajtaja)
-                                }
-                              >
-                                Szerkesztés
-                              </button>
-                              <button
-                                type="button"
-                                className="delete-button"
-                                style={{ pointerEvents: "auto" }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  handleDelete(u.id);
-                                }}
-                              >
-                                Törlés
-                              </button>
+                          <div className="feedback-actions">
+                            <button
+                              type="button"
+                              className={`like-button ${u.likedByMe ? "liked" : ""}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleToggleLike(u.id);
+                              }}
+                              title={u.likedByMe ? "Lájk visszavonása" : "Hasznos vélemény"}
+                            >
+                              {u.likedByMe ? "♥" : "♡"} {u.likeCount}
+                            </button>
+                            {u.user_id === userId && (
+                              <div className="feedback-buttons">
+                                <button
+                                  className="edit-button"
+                                  onClick={() =>
+                                    openEditModal(u, group.name, group.semester, group.kepzes_fajtaja)
+                                  }
+                                >
+                                  Szerkesztés
+                                </button>
+                                <button
+                                  type="button"
+                                  className="delete-button"
+                                  style={{ pointerEvents: "auto" }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    handleDelete(u.id);
+                                  }}
+                                >
+                                  Törlés
+                                </button>
 
-                            </div>
-                          )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <p>
                           <strong>Év:</strong> {u.year}
