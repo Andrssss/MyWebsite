@@ -20,9 +20,9 @@ import { Pool } from "pg";
 import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE, isItJob, isSeniorLike } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
-import { normTitle, normCompany } from "./_ai_dupe_guard.mjs";
+import { normTitle, normCompany, findCrossSourceDuplicates } from "./_ai_dupe_guard.mjs";
 
 // Same module-level pool pattern as every other function here (ai-ingest.mjs,
 // the old ai-registry.mjs) — created once per warm container, connect/release
@@ -129,6 +129,60 @@ export async function getRegistrySnapshot() {
     },
     updatedAt: reg.updatedAt,
   };
+}
+
+/* ── pre-check: same title-level gates ingestJobs runs at submit time,
+   callable BEFORE the routine spends a detail-page fetch on a candidate ──
+
+   2026-09-06: two runs in a row submitted findings that then bounced
+   (skippedNonIt on genuinely-IT titles the routine had no way to check
+   against the live job_categories keywords, skippedDuplicate on postings
+   another source already carries) — wasted fetches AND wasted upload budget
+   on rows that were always going to be rejected. This exposes the EXACT same
+   isItJob / isSeniorLike / findCrossSourceDuplicates gates ingestJobs uses,
+   so a candidate can be dropped from a title alone, before any fetch.
+
+   Deliberately does NOT check location (isNonBudapestLocation) — location is
+   read off the detail page, not guessable from a bare title, so that gate
+   stays submit-time only. Deliberately does NOT check the literal word
+   "senior" as a separate step — isSeniorLike already covers that (and every
+   other denylist word); the routine is expected to reject an obvious
+   "Senior ..." title itself, for free, before even calling this, and only
+   batch the rest through here. */
+export async function checkTitles(candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  const [filters, categories] = await Promise.all([loadFilters(), loadCategories()]);
+
+  // findCrossSourceDuplicates needs a `url` per job purely as its map key —
+  // synthesized here, never written or returned anywhere.
+  const client = await pool.connect();
+  let dupes;
+  try {
+    const jobs = list.map((c, i) => ({ url: `precheck:${i}`, title: c?.title, company: c?.company }));
+    dupes = await findCrossSourceDuplicates(client, AI_SOURCE, jobs);
+  } finally {
+    client.release();
+  }
+
+  return list.map((c, i) => {
+    const title = c?.title || "";
+    const itRelevant = isItJob(title, categories);
+    const seniorLike = isSeniorLike(title, filters);
+    const dupe = dupes.get(`precheck:${i}`) || null;
+    const reasons = [];
+    if (!itRelevant) reasons.push("non_it_title");
+    if (seniorLike) reasons.push("senior_title");
+    if (dupe) reasons.push("duplicate_of_existing_source");
+    return {
+      title,
+      company: c?.company || null,
+      itRelevant,
+      seniorLike,
+      duplicate: dupe ? { source: dupe.source, existingUrl: dupe.url } : null,
+      verdict: reasons.length === 0 ? "keep" : "reject",
+      reasons,
+    };
+  });
 }
 
 /* ── POST: ingest findings + merge this run's bookkeeping ───────────── */

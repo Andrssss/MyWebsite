@@ -43,7 +43,7 @@
 
 import { randomUUID } from "node:crypto";
 import { withDbAuditFlush } from "./_db_audit.js";
-import { getRegistrySnapshot, submitFindings, RegistryRequestError } from "./_ai_registry_core.mjs";
+import { getRegistrySnapshot, submitFindings, checkTitles, RegistryRequestError } from "./_ai_registry_core.mjs";
 
 const PROTOCOL_VERSION_FALLBACK = "2025-06-18";
 
@@ -56,6 +56,39 @@ const TOOLS = [
       "already-submitted job URLs, and the remaining hourly upload budget. Call this " +
       "first, before any per-site work.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "check_titles",
+    description:
+      "Cheap, deterministic pre-check for a batch of candidate titles from a listing page — " +
+      "call this ONCE per site, BEFORE fetching any detail page. Runs the exact same gates " +
+      "submit_findings applies at insert time (live job_categories IT-relevance keywords, live " +
+      "job_filters senior denylist, cross-source duplicate lookup), so a title that would end up " +
+      "skippedNonIt/skippedSenior/skippedDuplicate later gets caught here first, before you spend " +
+      "a fetch and a reasoning pass on it. Call order: first reject, yourself, any title that " +
+      "obviously states seniority in the text (e.g. contains 'Senior', 'Vezető', 'Lead') — that " +
+      "costs nothing and needs no tool call. THEN batch everything else that's left through this " +
+      "tool in one call. Only fetch the detail page for candidates whose verdict comes back " +
+      "'keep' — a 'reject' verdict means don't bother, it will not survive submit_findings either.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        candidates: {
+          type: "array",
+          description: "Titles straight off the listing page, not yet detail-fetched.",
+          items: {
+            type: "object",
+            required: ["title"],
+            properties: {
+              title: { type: "string" },
+              company: { type: "string", description: "Optional, but required for the duplicate check to run." },
+            },
+          },
+        },
+      },
+      required: ["candidates"],
+      additionalProperties: false,
+    },
   },
   {
     name: "submit_findings",
@@ -137,6 +170,11 @@ async function callTool(name, args) {
   if (name === "get_registry") {
     const snapshot = await getRegistrySnapshot();
     return { content: [{ type: "text", text: JSON.stringify(snapshot) }] };
+  }
+
+  if (name === "check_titles") {
+    const results = await checkTitles(args?.candidates);
+    return { content: [{ type: "text", text: JSON.stringify({ results }) }] };
   }
 
   if (name === "submit_findings") {
