@@ -41,8 +41,9 @@ export default withDbAuditFlush("tmp-fix-talent-level", async (request) => {
   const url = new URL(request.url);
   const dryRun = url.searchParams.get("dryRun") === "1";
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     const { rows } = await client.query(
       `SELECT id, title, source, experience, level FROM job_posts WHERE title ILIKE '%talent%'`
     );
@@ -79,7 +80,9 @@ export default withDbAuditFlush("tmp-fix-talent-level", async (request) => {
     }
 
     return json(200, { dryRun, scanned: rows.length, changed: changes.length, changes });
+  } catch (err) {
+    return json(500, { error: err.message, stack: String(err.stack || "").slice(0, 2000) });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
