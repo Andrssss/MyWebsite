@@ -8,11 +8,14 @@
 //
 // Store: "job-events", egyetlen kulcs "latest.json":
 //   { generatedAt, events: [{ url, title, date, endDate, location, company,
-//                             source, firstSeenAt }] }
+//                             type, registrationDeadline, source, firstSeenAt }] }
 // `url` a sor identitása (mint job_posts-nál). `date` (és opcionális
 // `endDate`) ISO "YYYY-MM-DD". Egy esemény akkor "múltbeli", ha a záró
 // (vagy hiányában a kezdő) dátuma korábbi a mai UTC napnál — ilyeneket
 // minden futás kitöröl a blobból, ez a "múltban levőket kitörli" garancia.
+// `type`/`registrationDeadline` a _ai_events_extract_core.mjs-ből érkeznek
+// (2026-09-08) — ez a modul mezőagnosztikus, csak áthalad rajtuk, nincs itt
+// külön kezelésük.
 
 import { getStore } from "@netlify/blobs";
 

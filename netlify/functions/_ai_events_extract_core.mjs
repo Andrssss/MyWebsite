@@ -1,9 +1,12 @@
 // netlify/functions/_ai_events_extract_core.mjs
 //
-// AI boundary for the job-events pipeline (állásbörzék / céges eventek).
-// Mirrors _ai_extract_core.mjs (same model, same hallucination guard — a
-// link the model returns must literally appear in the source HTML) but the
-// extracted shape is an event (title + date), not a job posting. Reuses
+// AI boundary for the job-events pipeline (állásbörzék / előadások / céges
+// eventek — 2026-09-08 kibővítve túl a szűken vett állásbörze-fogalmon:
+// előadás/webinar/konferencia/meetup is idetartozik, és a `registrationDeadline`
+// kiemelt fontosságú mezőként kinyerendő, ha a forrás oldal közli). Mirrors
+// _ai_extract_core.mjs (same model, same hallucination guard — a link the
+// model returns must literally appear in the source HTML) but the extracted
+// shape is an event (title + date + type), not a job posting. Reuses
 // everything generic from that module (client, HTML stripping, url
 // normalization, field cleanup, response parsing) instead of duplicating it —
 // only the event-shaped schema/prompt/validation live here.
@@ -21,6 +24,8 @@ import {
 
 export { MODEL, estimateCost, fetchListingPage } from "./_ai_extract_core.mjs";
 
+const EVENT_TYPES = ["allasborze", "eloadas", "konferencia", "meetup", "egyeb"];
+
 const EVENT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -31,7 +36,7 @@ const EVENT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["title", "url", "date"],
+        required: ["title", "url", "date", "type"],
         properties: {
           title: { type: "string" },
           url: { type: "string" },
@@ -41,6 +46,13 @@ const EVENT_SCHEMA = {
           endDate: { type: ["string", "null"] },
           location: { type: ["string", "null"] },
           company: { type: ["string", "null"] },
+          // "allasborze" (job fair) | "eloadas" (talk/presentation/webinar) |
+          // "konferencia" | "meetup" | "egyeb" (anything else).
+          type: { type: "string", enum: EVENT_TYPES },
+          // ISO "YYYY-MM-DD" — the last day one can still register/sign up
+          // for the event, or null if the page states no registration or no
+          // deadline. High-priority field: extract whenever the page gives it.
+          registrationDeadline: { type: ["string", "null"] },
         },
       },
     },
@@ -48,16 +60,25 @@ const EVENT_SCHEMA = {
 };
 
 const EXTRACT_SYSTEM =
-  "You extract upcoming job fair / career day / company recruiting events from a listing " +
-  "page's HTML (in Hungarian or English). Return every DISTINCT event on the page — not job " +
-  "postings, not news articles. For each: `title` is the event name; `url` is the link to " +
-  "that event's own detail page and MUST be a link that literally appears as an href in the " +
-  "provided HTML (absolute, or relative to the given base URL) — never invent, guess, or " +
-  "complete a URL. `date` is the event's (first) day as an ISO YYYY-MM-DD date — resolve any " +
-  "relative or partial date (e.g. 'szeptember 15.', 'Sept 15') against the given reference " +
-  "date, inferring the year if it is omitted. `endDate` is the last day for a multi-day event, " +
-  "or null. Set `location` and `company` to the page's values or null if absent. Ignore " +
-  "navigation, ads, and past/archived events — only events that have not started yet.";
+  "You extract upcoming career events from a listing page's HTML (in Hungarian or English): " +
+  "job fairs / career days / company recruiting events, AND talks, presentations, webinars, " +
+  "conferences, and meetups aimed at students or job seekers. Return every DISTINCT event on " +
+  "the page — not job postings, not news articles. For each: `title` is the event name; `url` " +
+  "is the link to that event's own detail page and MUST be a link that literally appears as an " +
+  "href in the provided HTML (absolute, or relative to the given base URL) — never invent, " +
+  "guess, or complete a URL. `date` is the event's (first) day as an ISO YYYY-MM-DD date — " +
+  "resolve any relative or partial date (e.g. 'szeptember 15.', 'Sept 15') against the given " +
+  "reference date, inferring the year if it is omitted. `endDate` is the last day for a " +
+  "multi-day event, or null. `type` classifies the event: \"allasborze\" for a job " +
+  "fair/career day, \"eloadas\" for a talk/presentation/webinar, \"konferencia\" for a " +
+  "conference, \"meetup\" for a meetup, \"egyeb\" if none of those fit. " +
+  "`registrationDeadline` is HIGH PRIORITY: if the page states a deadline, cutoff date, or " +
+  "\"regisztrálj eddig\" / \"jelentkezési határidő\" / \"register by\" for the event, extract " +
+  "it as an ISO YYYY-MM-DD date — resolve relative dates the same way as `date`. Only use null " +
+  "if the page truly gives no such deadline (e.g. free walk-in event, or registration open " +
+  "until the event itself). Set `location` and `company` to the page's values or null if " +
+  "absent. Ignore navigation, ads, and past/archived events — only events that have not " +
+  "started yet.";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -95,6 +116,7 @@ function validateEvents(rawEvents, sourceHtml, baseUrl) {
     seen.add(url);
 
     const endDate = cleanDate(e.endDate);
+    const registrationDeadline = cleanDate(e.registrationDeadline);
     out.push({
       title: title.slice(0, 300),
       url,
@@ -102,6 +124,8 @@ function validateEvents(rawEvents, sourceHtml, baseUrl) {
       endDate: endDate && endDate >= date ? endDate : null,
       location: cleanField(e.location),
       company: cleanField(e.company),
+      type: EVENT_TYPES.includes(e.type) ? e.type : "egyeb",
+      registrationDeadline,
     });
   }
   return out;

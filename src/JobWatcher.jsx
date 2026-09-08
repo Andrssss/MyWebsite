@@ -2077,6 +2077,9 @@ const JobWatcher = () => {
                         {new Date(ev.date).toLocaleDateString("hu-HU")}
                         {ev.endDate ? `–${new Date(ev.endDate).toLocaleDateString("hu-HU")}` : ""}
                         {ev.location ? ` · ${ev.location}` : ""}
+                        {ev.registrationDeadline
+                          ? ` · Jelentkezési határidő: ${new Date(ev.registrationDeadline).toLocaleDateString("hu-HU")}`
+                          : ""}
                       </li>
                     ))}
                   </ul>
