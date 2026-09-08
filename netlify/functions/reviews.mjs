@@ -1,11 +1,23 @@
-// netlify/functions/reviews.js
+// netlify/functions/reviews.mjs
 //
 // subject_reviews lives in the "subject-reviews" Netlify Blob now, not
 // Postgres (2026-09-08) — see _subject_reviews_store.js for the concurrency-
 // safe read-modify-write helpers this file is built on, and CLAUDE.md's
 // "Where data lives" for why (not derived data, not low-concurrency, unlike
 // the earlier job-stats/ats-state blob migrations).
-const {
+//
+// Rewritten from a CommonJS `exports.handler` (.js) function to this ESM
+// `export default` (.mjs, Functions API v2) shape 2026-09-08: v1-style
+// `exports.handler` functions on this site do NOT get Netlify's automatic
+// Blobs context injected (confirmed live — job-stats.js/job-events.js, two
+// pre-existing v1 functions never touched in this change, fail with the
+// exact same MissingBlobsEnvironmentError right now). Every already-working
+// blob-using function in this repo (_daily_stats_store.mjs/_ats_state.mjs
+// callers, ats-tenants.mjs, etc.) is a v2 `.mjs` function — this is that
+// same shape, not a stylistic choice. See CLAUDE.md for the fuller note; if
+// you add another Blob-backed HTTP endpoint, it MUST be a v2 (.mjs,
+// `export default`) function or it will silently 500 on every request.
+import {
   toPublicRow,
   listReviews,
   getReviewById,
@@ -13,24 +25,21 @@ const {
   updateReview,
   deleteReview,
   toggleLike,
-} = require("./_subject_reviews_store.js");
+} from "./_subject_reviews_store.js";
 
 function jsonResponse(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify(body),
-  };
+  return new Response(JSON.stringify(body), {
+    status: statusCode,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+  });
 }
 
-exports.handler = async (event) => {
+export default async (request) => {
   try {
-    const method = event.httpMethod;
-    const path = event.path || "";
+    const method = request.method;
+    const url = new URL(request.url);
     // pl. "/.netlify/functions/reviews/123" vagy ".../reviews/123/like"
-    const parts = path.split("/");
+    const parts = url.pathname.split("/");
     const last = parts[parts.length - 1];
     const secondLast = parts[parts.length - 2];
     const isLikeRoute = last === "like" && /^\d+$/.test(secondLast || "");
@@ -40,20 +49,16 @@ exports.handler = async (event) => {
       ? parseInt(last, 10)
       : null;
 
-    const viewerId = event.queryStringParameters?.viewer_id || null;
+    const viewerId = url.searchParams.get("viewer_id") || null;
 
     if (method === "OPTIONS") {
-      return {
-        statusCode: 204,
-        headers: {},
-        body: "",
-      };
+      return new Response(null, { status: 204 });
     }
 
     // ───────────────── POST /reviews/:id/like ─────────────────
     if (method === "POST" && isLikeRoute && id) {
       const MAX_BODY_BYTES = 2048;
-      const rawBody = event.body || "";
+      const rawBody = await request.text();
       if (Buffer.byteLength(rawBody, "utf8") > MAX_BODY_BYTES) {
         return jsonResponse(413, { error: "Payload too large" });
       }
@@ -87,7 +92,7 @@ exports.handler = async (event) => {
         return jsonResponse(200, toPublicRow(review, viewerId));
       }
 
-      const limitRaw = event.queryStringParameters?.limit;
+      const limitRaw = url.searchParams.get("limit");
       const limit = /^\d+$/.test(limitRaw || "") ? parseInt(limitRaw, 10) : null;
 
       const rows = await listReviews({ limit });
@@ -96,7 +101,7 @@ exports.handler = async (event) => {
 
     // ───────────────── POST ─────────────────
     if (method === "POST") {
-      const body = JSON.parse(event.body || "{}");
+      const body = JSON.parse((await request.text()) || "{}");
 
       const {
         name,
@@ -156,7 +161,7 @@ exports.handler = async (event) => {
 
     // ───────────────── PUT ─────────────────
     if (method === "PUT" && id) {
-      const body = JSON.parse(event.body || "{}");
+      const body = JSON.parse((await request.text()) || "{}");
       const patch = {};
 
       const editableKeys = [
@@ -203,14 +208,7 @@ exports.handler = async (event) => {
           error: "Nincs ilyen vélemény (id nem található).",
         });
       }
-
-      return {
-        statusCode: 204,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-        },
-        body: "",
-      };
+      return new Response(null, { status: 204 });
     }
 
     // Ha egyik sem
