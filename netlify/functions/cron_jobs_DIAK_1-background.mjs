@@ -1749,11 +1749,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // source, so migrateVolatileUrl must never rename its row away.
         const currentUrls = merged.map((c) => c.url);
         const patternFor = VOLATILE_URL_PATTERNS[source];
-        // minddiak/schonherz: nincs detail-fetch az experience-hez (mindkettő
-        // eleve "diákmunka"), de a technológiákhoz kell adat. Csak ÚJ url-nél
-        // dolgozzuk fel, és az eredményt EGYSZER, a beszúrással együtt írjuk —
-        // az upsertJob ON CONFLICT-je úgysem frissítené utólag (lásd ott).
-        const TECH_DETAIL_SOURCES = ["minddiak", "schonherz"];
+        // minddiak/schonherz/zyntern/muisz/tudasdiak: nincs detail-fetch az
+        // experience-hez (mind eleve "diákmunka"), de a technológiákhoz kell
+        // adat. Csak ÚJ url-nél dolgozzuk fel, és az eredményt EGYSZER, a
+        // beszúrással együtt írjuk — az upsertJob ON CONFLICT-je úgysem
+        // frissítené utólag (lásd ott). A zyntern/muisz/tudasdiak 2026-09-01
+        // előtt kimaradt ebből — a DIAK_3-ban akkor bevezetett univerzális
+        // backstop-mintát sosem kapta meg ez a fájl (lásd GitHub #4).
+        const TECH_DETAIL_SOURCES = ["minddiak", "schonherz", "zyntern", "muisz", "tudasdiak"];
         const knownUrls = TECH_DETAIL_SOURCES.includes(source)
           ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
           : null;
@@ -1775,13 +1778,23 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
               // (item.techHtml) — no separate fetch (the SPA detail page has
               // no server-rendered content anyway, see fetchMinddiakJobsFromApi).
               if (item.techHtml) item.technologies = extractTechnologies(`<body>${item.techHtml}</body>`);
-            } else if (source === "schonherz" && !knownUrls.has(item.url)) {
+            } else if (source === "zyntern" && !knownUrls.has(item.url)) {
+              // A leírás már megvan a lista-API válaszból (extractZynternFromApiPayload,
+              // max 800 karakter) — nincs szükség külön fetchre. Ez MÁS mint a
+              // matchesKeywords-be feltáplálás (amit a description-pollution csapda
+              // miatt szándékosan kerülünk): a technológia-kulcsszavak (React, SQL, …)
+              // nem ugyanaz a fals-pozitív kockázat, mint a kategória-keywordök.
+              if (item.description) item.technologies = extractTechnologies(`<body>${item.description}</body>`);
+            } else if (["schonherz", "muisz", "tudasdiak"].includes(source) && !knownUrls.has(item.url)) {
+              // Egyiknél sincs törzsszöveg a lista-válaszban (muisz API-ja és a
+              // tudasdiak Inertia-válasza is description: null-t ad) — kell egy
+              // detail-fetch, mint a schonherznél.
               await sleep(500);
               try {
                 const detailHtml = await fetchText(item.url);
                 item.technologies = extractTechnologies(detailHtml);
               } catch (err) {
-                console.warn(`[schonherz] technologies fetch failed: ${item.url} — ${err.message}`);
+                console.warn(`[${source}] technologies fetch failed: ${item.url} — ${err.message}`);
               }
             }
             await upsertJob(client, source, item);

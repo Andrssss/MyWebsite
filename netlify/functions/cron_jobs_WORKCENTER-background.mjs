@@ -50,7 +50,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { isInternshipTitle, extractYearsFromText } from "./_experience_core.mjs";
+import { isInternshipTitle, extractYearsFromText, extractTechnologies, ensureTechnologiesColumn } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
@@ -224,11 +224,11 @@ function isBudapest(location, title, content) {
 async function upsertJob(client, source, item) {
   const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, level, first_seen)
-     VALUES ($1,$2,$3,$4,$5,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, level, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, experience, computeLevel({ title: item.title, experience, source })]
+    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
   );
   return res.rowCount > 0;
 }
@@ -238,6 +238,7 @@ async function upsertJob(client, source, item) {
 export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
   _filters = await loadFilters();
   const client = await pool.connect();
+  await ensureTechnologiesColumn(client);
 
   let newlyInserted = 0;
   let alreadyExisted = 0;
@@ -310,7 +311,13 @@ export default withTimeout("cron_jobs_WORKCENTER-background", async () => {
           ? "diákmunka"
           : detectExperienceFromText(title, content);
 
-        const wasNew = await upsertJob(client, "workcenter", { title, url, experience });
+        // Already have the full ad body from the listing endpoint (REST-ONLY
+        // stratégia, lásd a fájl fejlécét) — nincs szükség külön detail-fetchre.
+        const technologies = item?.content?.rendered
+          ? extractTechnologies(`<div class="description">${item.content.rendered}</div>`)
+          : null;
+
+        const wasNew = await upsertJob(client, "workcenter", { title, url, experience, technologies });
         foundUrls.push(url);
         if (wasNew) {
           newlyInserted++;
