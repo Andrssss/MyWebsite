@@ -4,23 +4,22 @@
 // Mirrors _ai_extract_core.mjs (same model, same hallucination guard — a
 // link the model returns must literally appear in the source HTML) but the
 // extracted shape is an event (title + date), not a job posting. Reuses
-// stripHtml/normalizeUrl from that module instead of duplicating them.
+// everything generic from that module (client, HTML stripping, url
+// normalization, field cleanup, response parsing) instead of duplicating it —
+// only the event-shaped schema/prompt/validation live here.
 
-import Anthropic from "@anthropic-ai/sdk";
-import { MODEL, stripHtml, normalizeUrl } from "./_ai_extract_core.mjs";
+import {
+  MODEL,
+  client,
+  stripHtml,
+  normalizeUrl,
+  cleanField,
+  textOf,
+  parseJson,
+  usageOf,
+} from "./_ai_extract_core.mjs";
 
-export { MODEL, estimateCost } from "./_ai_extract_core.mjs";
-
-let _client = null;
-function client() {
-  if (!_client) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY is not set");
-    }
-    _client = new Anthropic();
-  }
-  return _client;
-}
+export { MODEL, estimateCost, fetchListingPage } from "./_ai_extract_core.mjs";
 
 const EVENT_SCHEMA = {
   type: "object",
@@ -61,12 +60,6 @@ const EXTRACT_SYSTEM =
   "navigation, ads, and past/archived events — only events that have not started yet.";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function cleanField(v) {
-  if (v == null) return null;
-  const s = String(v).replace(/\s+/g, " ").trim();
-  return s ? s.slice(0, 200) : null;
-}
 
 function cleanDate(v) {
   return typeof v === "string" && DATE_RE.test(v) ? v : null;
@@ -112,31 +105,6 @@ function validateEvents(rawEvents, sourceHtml, baseUrl) {
     });
   }
   return out;
-}
-
-function textOf(res) {
-  return (res.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-}
-
-function parseJson(res) {
-  try {
-    return JSON.parse(textOf(res));
-  } catch {
-    return null;
-  }
-}
-
-function usageOf(res) {
-  const u = res.usage || {};
-  return {
-    input_tokens: u.input_tokens || 0,
-    output_tokens: u.output_tokens || 0,
-    cache_read_input_tokens: u.cache_read_input_tokens || 0,
-    cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
-  };
 }
 
 /**

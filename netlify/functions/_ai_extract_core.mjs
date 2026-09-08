@@ -28,8 +28,10 @@ export const MODEL = process.env.AI_SCRAPER_MODEL || "claude-opus-4-8";
 const MAX_HTML_CHARS = 120_000;
 
 // Lazily constructed so a missing key only breaks the AI worker, never import.
+// Exported so other AI-extraction cores (e.g. _ai_events_extract_core.mjs)
+// share the same client instance instead of constructing their own.
 let _client = null;
-function client() {
+export function client() {
   if (!_client) {
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error("ANTHROPIC_API_KEY is not set");
@@ -37,6 +39,27 @@ function client() {
     _client = new Anthropic();
   }
   return _client;
+}
+
+const FETCH_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+
+/**
+ * Fetch a listing page's HTML with the shared scraper UA/headers/timeout —
+ * shared by every AI-extraction cron worker (job sites, event sites, …) so
+ * the fetch behavior can't quietly drift between them.
+ */
+export async function fetchListingPage(url) {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": FETCH_UA,
+      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+    },
+    signal: AbortSignal.timeout(25000),
+  });
+  if (res.status < 200 || res.status >= 300) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.text();
 }
 
 /* ── html reduction ─────────────────────────────────────────────── */
@@ -256,7 +279,7 @@ export function validateJobs(rawJobs, sourceHtml, baseUrl) {
   return out;
 }
 
-function cleanField(v) {
+export function cleanField(v) {
   if (v == null) return null;
   const s = String(v).replace(/\s+/g, " ").trim();
   return s ? s.slice(0, 200) : null;
@@ -264,14 +287,14 @@ function cleanField(v) {
 
 /* ── response helpers ────────────────────────────────────────────── */
 
-function textOf(res) {
+export function textOf(res) {
   return (res.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
 }
 
-function parseJson(res) {
+export function parseJson(res) {
   try {
     return JSON.parse(textOf(res));
   } catch {
@@ -279,7 +302,7 @@ function parseJson(res) {
   }
 }
 
-function usageOf(res) {
+export function usageOf(res) {
   const u = res.usage || {};
   return {
     input_tokens: u.input_tokens || 0,
