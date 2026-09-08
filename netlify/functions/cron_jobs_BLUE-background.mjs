@@ -15,6 +15,7 @@ import { XMLParser } from "fast-xml-parser";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractBluebirdExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -237,6 +238,15 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
     );
     const known = new Set(knownRows.map((r) => r.url));
 
+    // Cross-source duplicate guard (2026-09-08, same pattern as
+    // startupjobs/ats-crawl/workable/talent/dreamjobs): scoped to the shared
+    // CROSS_SOURCE_DUPE_SOURCES list, which now includes LinkedIn and
+    // bluebird itself — see src/lib/crossSourceDupe.mjs. Checked before the
+    // detail-page fetch so a confirmed dupe never costs one.
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "bluebird", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[bluebird] cross-source dupe index: ${crossDupeIndex.size} keys`);
+    let skippedCrossSourceDupe = 0;
+
     const foundUrls = [];
     let crawlError = false;
     for (const p of SOURCES) {
@@ -282,6 +292,11 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
           : isJuniorTitle(it.title) ? "junior"
           : isMidLevelTitle(it.title) ? "medior"
           : "-";
+        if (!known.has(it.url) && isCrossSourceDupe(crossDupeIndex, it.company, it.title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[bluebird] SKIP cross-source dupe "${it.title}" @ ${it.company || "-"} → ${it.url}`);
+          continue;
+        }
         if (!known.has(it.url)) {
           try {
             await sleep(500);
@@ -303,7 +318,7 @@ const _runJob = withTimeout("cron_jobs_BLUE-background", async (request) => {
         }
         foundUrls.push(it.url);
       }
-      console.log(`${p.key}: ${items.length} items processed.`);
+      console.log(`${p.key}: ${items.length} items processed (cross-source skipped=${skippedCrossSourceDupe}).`);
     }
 
     // RSS feed only returns latest N items — absence proves nothing, so

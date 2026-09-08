@@ -118,6 +118,13 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   // modest, overlap the whitelist was silently missing. Every other
   // non-whitelisted pair the same audit found was 1-2 rows (noise).
   "nix",
+  // 2026-09-08: bluebird added on request (site owner: "Bluebird és linkedin
+  // keresztbe"). bluebird's RSS feed reports every posting's company as
+  // "Bluebird" itself (recruitment agency, client anonymous — see
+  // netlify/functions/cron_jobs_BLUE-background.mjs), and the agency posts
+  // the identical req under its own name on LinkedIn too, so company|title
+  // is expected to actually collide there (e.g. "Frontend Developer").
+  "bluebird",
 ];
 
 function splitTechList(technologies) {
