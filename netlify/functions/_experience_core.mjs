@@ -421,8 +421,12 @@ export function extractTechnologies(html) {
   // talent.com (current markup): [class*="jobDescriptionColumn"] (CSS-modules
   // hash suffix, hence substring match) — neither JSON-LD nor __NEXT_DATA__
   // below are emitted by the site anymore, they're kept as legacy fallbacks.
+  // muisz.hu (Angular): .ContentColumn wraps the title+description+
+  // feladatok/elvárások block and stops before the "Alapadatok" sidebar
+  // (helyszín/bérezés/stb.) — no related-postings widget on the page to
+  // pollute (verified live 2026-09-08, issue #4).
   let text = normalizeWhitespace(
-    $('.description, .job-description, #job-details, .show-more-less-html__markup, [class*="jobDescriptionColumn"]').first().text()
+    $('.description, .job-description, #job-details, .show-more-less-html__markup, [class*="jobDescriptionColumn"], .ContentColumn').first().text()
   );
 
   if (!text) {

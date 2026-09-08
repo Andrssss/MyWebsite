@@ -1444,6 +1444,30 @@ async function fetchAllTudasdiakJobs(html, listUrl, { maxPages = 20 } = {}) {
   return deduped;
 }
 
+// Tudasdiak listája `description: null`-t ad minden itemre (Inertia lista-API
+// nem hordoz törzsszöveget) — a technologies-hez a detail-oldalt kell hívni.
+// A detail-oldal is Inertia-renderelt: első betöltéskor a teljes props (incl.
+// a hirdetés HTML mezői) ott ül a data-page attribútumban, ugyanúgy, mint a
+// lista-oldalon (lásd fetchAllTudasdiakJobs) — plain GET elég, nincs SPA-vakság.
+// (2026-09-08, issue #4.)
+async function fetchTudasdiakTechnologies(url) {
+  try {
+    const html = await fetchText(url);
+    const raw = html.match(/data-page="([^"]+)"/)?.[1];
+    if (!raw) return null;
+    const data = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&amp;/g, '&'));
+    const lc = data?.props?.jobPosting?.language_content;
+    if (!lc) return null;
+    const parts = [lc.description, lc.tasks, lc.expectations, lc.offerings, lc.is_an_advantage]
+      .filter((s) => typeof s === "string" && s);
+    if (!parts.length) return null;
+    return extractTechnologies(`<body>${parts.join(" ")}</body>`);
+  } catch (err) {
+    console.warn(`[tudasdiak] technologies fetch failed: ${url} — ${err.message}`);
+    return null;
+  }
+}
+
 
 // A szerveroldali locations[]=10 kiváltása. Csak a `location` mezőre nézünk: egyértékű és
 // mindig kitöltött, a "Budapest 11. ker." / "Debrecen" / "Home office" formákkal — nincs
@@ -1749,11 +1773,13 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         // source, so migrateVolatileUrl must never rename its row away.
         const currentUrls = merged.map((c) => c.url);
         const patternFor = VOLATILE_URL_PATTERNS[source];
-        // minddiak/schonherz: nincs detail-fetch az experience-hez (mindkettő
-        // eleve "diákmunka"), de a technológiákhoz kell adat. Csak ÚJ url-nél
+        // Egyik forrás sem fetchel detail-oldalt az experience-hez (mind eleve
+        // "diákmunka"), de a technológiákhoz kell adat. Csak ÚJ url-nél
         // dolgozzuk fel, és az eredményt EGYSZER, a beszúrással együtt írjuk —
         // az upsertJob ON CONFLICT-je úgysem frissítené utólag (lásd ott).
-        const TECH_DETAIL_SOURCES = ["minddiak", "schonherz"];
+        // muisz/tudasdiak/zyntern 2026-09-08 óta itt (issue #4 — korábban a
+        // fájl csak minddiak/schonherz-re kapott ilyen backstopot).
+        const TECH_DETAIL_SOURCES = ["minddiak", "schonherz", "muisz", "tudasdiak", "zyntern"];
         const knownUrls = TECH_DETAIL_SOURCES.includes(source)
           ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
           : null;
@@ -1782,6 +1808,39 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
                 item.technologies = extractTechnologies(detailHtml);
               } catch (err) {
                 console.warn(`[schonherz] technologies fetch failed: ${item.url} — ${err.message}`);
+              }
+            } else if (source === "muisz" && !knownUrls.has(item.url)) {
+              // A MÜISZ API válasz description nélkül jön (item.description
+              // mindig null) — a detail-oldal viszont szerver-renderelt (élőben
+              // igazolva, .ContentColumn a cím+feladatok+elvárások konténere).
+              await sleep(500);
+              try {
+                const detailHtml = await fetchText(item.url);
+                item.technologies = extractTechnologies(detailHtml);
+              } catch (err) {
+                console.warn(`[muisz] technologies fetch failed: ${item.url} — ${err.message}`);
+              }
+            } else if (source === "tudasdiak" && !knownUrls.has(item.url)) {
+              await sleep(500);
+              item.technologies = await fetchTudasdiakTechnologies(item.url);
+            } else if (source === "zyntern") {
+              // A description MÁR MEGVAN a listából (extractZynternFromApiPayload,
+              // max 800 karakter sima szöveg) — ELSŐDLEGESEN ezt próbáljuk
+              // (nulla extra hálózati hívás). Csak ha ez nem ad találatot ÉS az
+              // url tényleg új, megyünk detail-fetchre — a Vue SPA saját
+              // <job-profile :data="..."> ágát az extractTechnologies már
+              // ismeri (2026-07-08 fix), úgyhogy a teljes detail HTML is jó bemenet.
+              if (item.description) {
+                item.technologies = extractTechnologies(`<body>${item.description}</body>`);
+              }
+              if (!item.technologies && !knownUrls.has(item.url)) {
+                await sleep(500);
+                try {
+                  const detailHtml = await fetchText(item.url);
+                  item.technologies = extractTechnologies(detailHtml);
+                } catch (err) {
+                  console.warn(`[zyntern] technologies fetch failed: ${item.url} — ${err.message}`);
+                }
               }
             }
             // zyntern/minddiak: neither has a stable URL-pattern (each "repost"
