@@ -249,6 +249,50 @@ const TECH_KEYWORDS = [
      lista eddigi angol-only volta önmagában is lefedettségi hiba volt. */
   ["k8s", "Kubernetes"], ["plsql", "PL/SQL"], ["dotnet", ".NET"], ["restful", "REST API"],
   ["agilis", "Agile"], ["adattárház", "Data Warehouse"],
+
+  /* ── spoken/written language requirements (2026-09-08) ──────────────────
+     Not a technology, but ads list these the same way ("Hungarian, German,
+     English" as plain tags — see e.g. a Qualysoft Lever posting) and they
+     get scanned by the same matchTechKeywords() as everything else here, so
+     for now they land in the same `technologies` field. Both the English
+     word and the Hungarian adjective are listed since source postings are
+     mixed-language; they map to the same canonical label so duplicates
+     collapse. A later pass on the pestidev.hu side is expected to split
+     these out of `technologies` into their own filterable/colored facet —
+     this list only makes sure the raw signal gets captured at scrape time.
+     `polish` deliberately omitted: case-insensitive match collides with the
+     common verb ("polish your CV/skills") — same false-positive class as
+     the removed `solid` keyword above, so left out rather than risk noise;
+     the Hungarian form doesn't have a case-collision but keeping only one
+     direction would just be inconsistent, so it's left out entirely. */
+  ["hungarian", "Hungarian"], ["magyar", "Hungarian"],
+  ["english", "English"], ["angol", "English"],
+  ["german", "German"], ["német", "German"],
+  ["french", "French"], ["francia", "French"],
+  ["italian", "Italian"], ["olasz", "Italian"],
+  ["spanish", "Spanish"], ["spanyol", "Spanish"],
+  ["dutch", "Dutch"], ["holland", "Dutch"],
+  ["russian", "Russian"], ["orosz", "Russian"],
+  ["romanian", "Romanian"], ["román", "Romanian"],
+  ["slovak", "Slovak"], ["szlovák", "Slovak"],
+  ["czech", "Czech"], ["cseh", "Czech"],
+  ["serbian", "Serbian"], ["szerb", "Serbian"],
+  ["croatian", "Croatian"], ["horvát", "Croatian"],
+  ["slovenian", "Slovenian"], ["szlovén", "Slovenian"],
+  ["bulgarian", "Bulgarian"], ["bolgár", "Bulgarian"],
+  ["ukrainian", "Ukrainian"], ["ukrán", "Ukrainian"],
+  ["portuguese", "Portuguese"], ["portugál", "Portuguese"],
+  ["swedish", "Swedish"], ["svéd", "Swedish"],
+  ["norwegian", "Norwegian"], ["norvég", "Norwegian"],
+  ["danish", "Danish"], ["dán", "Danish"],
+  ["finnish", "Finnish"], ["finn", "Finnish"],
+  ["greek", "Greek"], ["görög", "Greek"],
+  ["turkish", "Turkish"], ["török", "Turkish"],
+  ["arabic", "Arabic"], ["arab", "Arabic"],
+  ["chinese", "Chinese"], ["kínai", "Chinese"],
+  ["japanese", "Japanese"], ["japán", "Japanese"],
+  ["korean", "Korean"], ["koreai", "Korean"],
+  ["hebrew", "Hebrew"], ["héber", "Hebrew"],
 ];
 
 module.exports = { TECH_KEYWORDS };
