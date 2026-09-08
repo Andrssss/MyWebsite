@@ -1052,6 +1052,7 @@ const JobWatcher = () => {
 
   const [lastUpdates, setLastUpdates] = useState([]);
   const [showEmail, setShowEmail] = useState(false);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -1067,6 +1068,16 @@ const JobWatcher = () => {
       })
       .catch(() => {});
   }, [isAdmin]);
+
+  useEffect(() => {
+    fetch("/.netlify/functions/job-events")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data?.events)) return;
+        setUpcomingEvents(data.events);
+      })
+      .catch(() => {});
+  }, []);
 
   /* =======================
      FETCH
@@ -2052,6 +2063,25 @@ const JobWatcher = () => {
                   megjeleníteni, mert a publikus API-k erősen korlátozottak.
                 </p>
               </div>
+
+              {upcomingEvents.length > 0 && (
+                <div className="job-events-notice">
+                  <span className="job-events-notice__title">📅 Közelgő állásbörzék</span>
+                  <ul className="job-events-notice__list">
+                    {upcomingEvents.slice(0, 5).map((ev) => (
+                      <li key={ev.url}>
+                        <a href={ev.url} target="_blank" rel="noopener noreferrer">
+                          {ev.title}
+                        </a>
+                        {" — "}
+                        {new Date(ev.date).toLocaleDateString("hu-HU")}
+                        {ev.endDate ? `–${new Date(ev.endDate).toLocaleDateString("hu-HU")}` : ""}
+                        {ev.location ? ` · ${ev.location}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="job-last-deploy">
                 {lastUpdates.length > 0 ? (
                   <span>
