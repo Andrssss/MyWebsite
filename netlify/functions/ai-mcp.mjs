@@ -44,6 +44,7 @@
 import { randomUUID } from "node:crypto";
 import { withDbAuditFlush } from "./_db_audit.js";
 import { getRegistrySnapshot, submitFindings, RegistryRequestError } from "./_ai_registry_core.mjs";
+import { listReviveCandidates, applyReviveVerdicts, ReviveRequestError } from "./_ai_revive_core.mjs";
 
 const PROTOCOL_VERSION_FALLBACK = "2025-06-18";
 
@@ -99,6 +100,48 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "list_revive_candidates",
+    description:
+      "Fetch job_posts rows the mechanical dead-sweep killed (active=false, sweep_dead=true) on the " +
+      "AI-scraped and ats-crawl sources, that no AI review has confirmed yet. Call this first. Each " +
+      "candidate has {url, source, title, company, location, first_seen} — fetch each url yourself " +
+      "(or, for ats-crawl rows, the posting's own Greenhouse/Lever/Ashby/SmartRecruiters job API where " +
+      "you can tell) and judge from the real page/response whether it is still an open posting or " +
+      "genuinely closed/filled/expired. The mechanical rule that killed it can be wrong — that's the " +
+      "whole point of this check, so don't defer to it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max candidates to return (server caps this regardless)." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "submit_revive_verdicts",
+    description:
+      "Report this run's verdicts on the candidates from list_revive_candidates. `alive` urls are " +
+      "reactivated immediately (active=true again). `stillDead` urls are marked reviewed so they are " +
+      "not offered again. Only include a url in one list or the other, only for urls you actually " +
+      "checked this run — never guess on a url you didn't fetch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        alive: {
+          type: "array",
+          description: "URLs confirmed to still be a genuinely open posting — reactivated.",
+          items: { type: "string" },
+        },
+        stillDead: {
+          type: "array",
+          description: "URLs confirmed genuinely closed/filled/expired/gone — marked reviewed, stay inactive.",
+          items: { type: "string" },
+        },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 function jsonResponse(status, body, extraHeaders) {
@@ -145,6 +188,26 @@ async function callTool(name, args) {
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     } catch (err) {
       if (err instanceof RegistryRequestError) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: err.message, ...err.details }) }],
+          isError: true,
+        };
+      }
+      throw err;
+    }
+  }
+
+  if (name === "list_revive_candidates") {
+    const result = await listReviveCandidates(args || {});
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  }
+
+  if (name === "submit_revive_verdicts") {
+    try {
+      const result = await applyReviveVerdicts(args || {});
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      if (err instanceof ReviveRequestError) {
         return {
           content: [{ type: "text", text: JSON.stringify({ error: err.message, ...err.details }) }],
           isError: true,
