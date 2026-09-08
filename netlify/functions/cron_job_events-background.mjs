@@ -19,16 +19,13 @@ export const config = {
 
 import { Pool } from "pg";
 import { withTimeout } from "./_error-logger.mjs";
-import { extractEventsLLM, estimateCost } from "./_ai_events_extract_core.mjs";
+import { extractEventsLLM, estimateCost, fetchListingPage } from "./_ai_events_extract_core.mjs";
 import { mergeAndPurgeEvents } from "./_job_events_store.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
-
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 async function ensureTable(client) {
   await client.query(`
@@ -57,23 +54,10 @@ async function ensureTable(client) {
   );
 }
 
-async function fetchPage(url) {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-    },
-    signal: AbortSignal.timeout(25000),
-  });
-  if (res.status < 200 || res.status >= 300) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.text();
-}
-
 async function runSite(client, site) {
   let html;
   try {
-    html = await fetchPage(site.list_url);
+    html = await fetchListingPage(site.list_url);
   } catch (err) {
     await client.query(`UPDATE event_sources SET fail_streak = fail_streak + 1 WHERE site = $1`, [site.site]);
     console.error(`[job-events] ${site.site}: fetch failed — ${err.message}`);

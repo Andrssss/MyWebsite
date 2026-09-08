@@ -27,6 +27,7 @@ import {
   authorRecipe,
   runRecipe,
   estimateCost,
+  fetchListingPage,
   MODEL,
 } from "./_ai_extract_core.mjs";
 
@@ -34,9 +35,6 @@ const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
-
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 let _filters = [];
 let _categories = [];
@@ -81,21 +79,6 @@ async function ensureAiExtractorsTable(client) {
       false,
     ]
   );
-}
-
-/* ── fetch ───────────────────────────────────────────────────────── */
-
-async function fetchPage(url) {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-    },
-    signal: AbortSignal.timeout(25000),
-  });
-  if (res.status < 200 || res.status >= 300) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.text();
 }
 
 /* ── per-site extraction (mode decides whether the LLM is called) ── */
@@ -143,7 +126,7 @@ async function runSite(client, site) {
 
   let html;
   try {
-    html = await fetchPage(site.list_url);
+    html = await fetchListingPage(site.list_url);
   } catch (err) {
     await bumpFailure(client, site);
     return;
