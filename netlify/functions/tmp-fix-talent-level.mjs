@@ -15,7 +15,6 @@
 // Drop ?dryRun=1 to actually apply. DELETE THIS FILE once the fix has run.
 
 import { Pool } from "pg";
-import { withDbAuditFlush } from "./_db_audit.js";
 import { isInternshipTitle, INTERN_SOURCES } from "./_experience_core.mjs";
 import { computeLevel, isInternSource } from "../../src/lib/experienceLevel.mjs";
 
@@ -34,7 +33,7 @@ function json(status, body) {
 
 const hasTalentWord = (title) => /(^|[^a-z0-9])talent([^a-z0-9]|$)/i.test(String(title || ""));
 
-export default withDbAuditFlush("tmp-fix-talent-level", async (request) => {
+export default async (request) => {
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (token !== TOKEN) return json(401, { error: "Unauthorized" });
 
@@ -85,4 +84,4 @@ export default withDbAuditFlush("tmp-fix-talent-level", async (request) => {
   } finally {
     if (client) client.release();
   }
-});
+};
