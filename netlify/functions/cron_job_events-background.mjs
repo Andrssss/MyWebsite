@@ -7,6 +7,15 @@
 // eseményeket tárolja, a lejárt (mai nap előtti) sorokat minden futás
 // eldobja, forrás nélkül is (ld. mergeAndPurgeEvents).
 //
+// `registrationDeadline` (2026-09-08 kibővítve): a listázó oldal HTML-je
+// gyakran nem közli a jelentkezési határidőt, csak az esemény saját
+// aloldala — ezért minden olyan eseményre, aminek a listázó-extrakcióból
+// null jött, egy külön (olcsó, haiku-modelles) follow-up lekéri és
+// átvizsgálja a saját `url`-jét (ld. enrichDeadline). Ezt csak EGYSZER teszi
+// meg eseményenként: a tárolt sor `deadlineChecked` mezője jelzi, hogy már
+// megnéztük, így egy örökre határidő nélküli esemény nem fizet rá minden
+// napra újra a lekérésre/AI-hívásra.
+//
 // Direkt ütemezve `config.schedule`-lel, mint a cron_daily_stats.mjs — nem a
 // cron_scheduler dispatcheren keresztül, mert ez alacsony gyakoriságú (napi)
 // és nem kell staggerelni. Netlify saját ütemezett hívása nem küld
@@ -19,8 +28,13 @@ export const config = {
 
 import { Pool } from "pg";
 import { withTimeout } from "./_error-logger.mjs";
-import { extractEventsLLM, estimateCost, fetchListingPage } from "./_ai_events_extract_core.mjs";
-import { mergeAndPurgeEvents } from "./_job_events_store.mjs";
+import {
+  extractEventsLLM,
+  extractRegistrationDeadline,
+  estimateCost,
+  fetchListingPage,
+} from "./_ai_events_extract_core.mjs";
+import { readEvents, mergeAndPurgeEvents } from "./_job_events_store.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -54,7 +68,54 @@ async function ensureTable(client) {
   );
 }
 
-async function runSite(client, site) {
+// Deadline model (see _ai_events_extract_core.mjs) is cheap per call, but an
+// unbounded number of new events in one run would still be an unbounded
+// number of extra fetches+LLM calls. This caps it per site per run; anything
+// past the cap just stays unchecked and gets picked up on a later run (the
+// `deadlineChecked` skip below means it costs nothing to leave for next time).
+const MAX_DEADLINE_LOOKUPS_PER_SITE = 15;
+
+/**
+ * One event's own detail page rarely repeats across days, so the listing
+ * extraction alone is cheap and safe to redo daily — but following every
+ * event's `url` to look for a deadline is real, recurring cost. `known` is
+ * this event's PREVIOUSLY stored row (if any): once `deadlineChecked` is true
+ * there, the page has already been read once and stated no deadline (or
+ * genuinely has none), so this never re-fetches it — only a brand-new event,
+ * or one from before this feature shipped, gets the one-time follow-up.
+ */
+async function enrichDeadline(event, known, budget) {
+  if (event.registrationDeadline) return { ...event, deadlineChecked: true };
+  if (known?.deadlineChecked) {
+    // The listing page never states a deadline for this event (that's WHY it
+    // was already checked), so today's listing extraction will always come
+    // back null here again — carrying `known`'s value forward is what stops
+    // a deadline the one-time detail-page check actually found from being
+    // silently overwritten back to null on every later run.
+    return { ...event, registrationDeadline: known.registrationDeadline ?? null, deadlineChecked: true };
+  }
+  if (budget.used >= MAX_DEADLINE_LOOKUPS_PER_SITE) return event;
+
+  budget.used += 1;
+  try {
+    const detailHtml = await fetchListingPage(event.url);
+    const referenceDate = new Date().toISOString().slice(0, 10);
+    const { registrationDeadline, usage } = await extractRegistrationDeadline(detailHtml, {
+      referenceDate,
+    });
+    budget.cost += estimateCost(usage, "claude-haiku-4-5");
+    return { ...event, registrationDeadline, deadlineChecked: true };
+  } catch (err) {
+    console.error(`[job-events] deadline lookup failed for ${event.url} — ${err.message}`);
+    // Marked checked anyway: a page that 404s or times out today will most
+    // likely do the same tomorrow, and retrying it daily forever is exactly
+    // the recurring cost this bookkeeping exists to avoid. Worst case, a
+    // transient failure just means this one event never gets a deadline.
+    return { ...event, deadlineChecked: true };
+  }
+}
+
+async function runSite(client, site, knownByUrl) {
   let html;
   try {
     html = await fetchListingPage(site.list_url);
@@ -67,10 +128,17 @@ async function runSite(client, site) {
   try {
     const { events, usage } = await extractEventsLLM(html, { baseUrl: site.list_url });
     await client.query(`UPDATE event_sources SET last_ok = NOW(), fail_streak = 0 WHERE site = $1`, [site.site]);
-    console.log(
-      `[job-events] ${site.site}: found=${events.length} cost=$${estimateCost(usage).toFixed(4)}`
+
+    const budget = { used: 0, cost: 0 };
+    const enriched = await Promise.all(
+      events.map((e) => enrichDeadline(e, knownByUrl.get(e.url), budget)),
     );
-    return events.map((e) => ({ ...e, source: site.site }));
+
+    console.log(
+      `[job-events] ${site.site}: found=${events.length} deadlineLookups=${budget.used} ` +
+        `cost=$${(estimateCost(usage) + budget.cost).toFixed(4)}`
+    );
+    return enriched.map((e) => ({ ...e, source: site.site }));
   } catch (err) {
     await client.query(`UPDATE event_sources SET fail_streak = fail_streak + 1 WHERE site = $1`, [site.site]);
     console.error(`[job-events] ${site.site}: extraction failed — ${err.message}`);
@@ -87,10 +155,13 @@ export default withTimeout("cron_job_events-background", async () => {
       `SELECT site, list_url FROM event_sources WHERE mode <> 'disabled' ORDER BY site`
     ));
 
+    const { events: storedEvents } = await readEvents();
+    const knownByUrl = new Map(storedEvents.map((e) => [e.url, e]));
+
     const collected = [];
     for (const site of sites) {
       try {
-        collected.push(...(await runSite(client, site)));
+        collected.push(...(await runSite(client, site, knownByUrl)));
       } catch (err) {
         // Egy forrás hibája sosem állíthatja meg a többit.
         console.error(`[job-events] ${site.site}: unexpected error — ${err.message}`);

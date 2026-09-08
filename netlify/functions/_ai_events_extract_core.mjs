@@ -10,6 +10,13 @@
 // everything generic from that module (client, HTML stripping, url
 // normalization, field cleanup, response parsing) instead of duplicating it —
 // only the event-shaped schema/prompt/validation live here.
+//
+// extractRegistrationDeadline (2026-09-08): a listing page's HTML is usually
+// enough for title/date/location but rarely states a deadline — that, when a
+// source gives one at all, is on the event's OWN detail page. This is the
+// one-field, single-page follow-up for that; see cron_job_events-background's
+// enrichDeadline for when/how often it actually gets called (not every run,
+// and not for events already known to have none).
 
 import {
   MODEL,
@@ -129,6 +136,59 @@ function validateEvents(rawEvents, sourceHtml, baseUrl) {
     });
   }
   return out;
+}
+
+// Cheaper model for the deadline follow-up (§ below): one small yes/no-ish
+// date lookup per event detail page, not a full-page listing extraction — a
+// haiku-class model is plenty, and this call recurs once per event that
+// lacked a deadline on its listing page (see DEADLINE_SCHEMA usage in
+// cron_job_events-background.mjs), so keeping it cheap matters more here
+// than for the main per-source EXTRACT_SYSTEM call above.
+const DEADLINE_MODEL = process.env.AI_EVENTS_DEADLINE_MODEL || "claude-haiku-4-5";
+
+const DEADLINE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["registrationDeadline"],
+  properties: {
+    registrationDeadline: { type: ["string", "null"] },
+  },
+};
+
+const DEADLINE_SYSTEM =
+  "You are given one event's own detail page (Hungarian or English). Find whether it states a " +
+  "registration deadline, sign-up cutoff, \"regisztrálj eddig\", \"jelentkezési határidő\", or " +
+  "\"register by\" date for THIS event. Return it as an ISO YYYY-MM-DD date, resolving any " +
+  "relative or partial date against the given reference date. Return null if the page states no " +
+  "such deadline — a free walk-in event, registration open until the event itself, or you " +
+  "simply cannot find one. Never guess a date that isn't actually stated on the page.";
+
+/**
+ * Listing pages often give title/date/location but not a deadline — that,
+ * when a source states one at all, usually lives on the event's own detail
+ * page. This is the one-field follow-up fetch+extract for that page, kept on
+ * a separate (cheap) model since it does far less work than the main
+ * extraction. Caller decides WHEN to call this (see the `deadlineChecked`
+ * bookkeeping in cron_job_events-background.mjs) — this function itself
+ * makes no caching decision, it just answers "what does this page say".
+ * @returns {Promise<{registrationDeadline: string|null, usage: object}>}
+ */
+export async function extractRegistrationDeadline(detailHtml, { referenceDate }) {
+  const stripped = stripHtml(detailHtml);
+  const res = await client().messages.create({
+    model: DEADLINE_MODEL,
+    max_tokens: 200,
+    output_config: { format: { type: "json_schema", schema: DEADLINE_SCHEMA } },
+    system: [{ type: "text", text: DEADLINE_SYSTEM }],
+    messages: [
+      {
+        role: "user",
+        content: `Reference date (today): ${referenceDate}\n\n<html>\n${stripped}\n</html>`,
+      },
+    ],
+  });
+  const parsed = parseJson(res);
+  return { registrationDeadline: cleanDate(parsed?.registrationDeadline), usage: usageOf(res) };
 }
 
 /**

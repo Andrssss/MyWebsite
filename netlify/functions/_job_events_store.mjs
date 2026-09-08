@@ -8,14 +8,19 @@
 //
 // Store: "job-events", egyetlen kulcs "latest.json":
 //   { generatedAt, events: [{ url, title, date, endDate, location, company,
-//                             type, registrationDeadline, source, firstSeenAt }] }
+//                             type, registrationDeadline, deadlineChecked,
+//                             source, firstSeenAt }] }
 // `url` a sor identitása (mint job_posts-nál). `date` (és opcionális
 // `endDate`) ISO "YYYY-MM-DD". Egy esemény akkor "múltbeli", ha a záró
 // (vagy hiányában a kezdő) dátuma korábbi a mai UTC napnál — ilyeneket
 // minden futás kitöröl a blobból, ez a "múltban levőket kitörli" garancia.
-// `type`/`registrationDeadline` a _ai_events_extract_core.mjs-ből érkeznek
-// (2026-09-08) — ez a modul mezőagnosztikus, csak áthalad rajtuk, nincs itt
-// külön kezelésük.
+// `type`/`registrationDeadline`/`deadlineChecked` a
+// cron_job_events-background.mjs+_ai_events_extract_core.mjs párosból
+// érkeznek (2026-09-08) — ez a modul mezőagnosztikus, csak áthalad rajtuk,
+// nincs itt külön kezelésük. `deadlineChecked` belső bookkeeping — az
+// allasfigyelo /events oldala (a blob egyetlen olvasója) nem használja,
+// csak azt jelzi ennek a modulnak, hogy a határidő-follow-up már lefutott
+// erre a sorra, ne fizessen rá újra egy örökre üres mezőre.
 
 import { getStore } from "@netlify/blobs";
 
