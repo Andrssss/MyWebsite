@@ -396,12 +396,25 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
     ? provider.scopePrefix(tenant.slug, scopeCandidates)
     : deriveScopePrefix(tenant.slug, scopeCandidates);
 
-  // Teljes listázásnak CSAK akkor tekintjük, ha van egységes url-előtag ÉS a
-  // board nem üres. Bármelyik hiánya → reactivate-only, a deaktiválást a napi
-  // 404-sweep végzi el helyette.
-  const fullListing = Boolean(scopePrefix) && boardJobs.length > 0;
+  // Teljes listázásnak CSAK akkor tekintjük, ha van egységes url-előtag, a
+  // board nem üres, ÉS ezen a körön a cross-source dupe-szűrő nem vett ki
+  // egyetlen sort sem. Az utóbbi (2026-09-08 fix) azért kell, mert a `built`
+  // (=`jobs`, a reconcile foundUrls-ének alapja) a dupe-szűrés UTÁNI állapot:
+  // egy korábban beszúrt, de EZEN a futáson más forráson is felbukkanó
+  // hirdetés kiesik `built`-ből, holott a boardon még ott van — a reconcile-nak
+  // ilyenkor nincs megbízható "eltűnt-e valóban" válasza. Ilyenkor
+  // reactivate-only-ra esünk vissza: a tényleges halált a napi 404-sweep dönti
+  // el (BANNER_DEAD_SOURCES/SWEEP_PROBE_OVERRIDES "ats-crawl" bejegyzése,
+  // _active_core.mjs — ugyanaz az aiScrapedProbe/aiScrapedIsDead pár, ami a
+  // greenhouse/lever/ashby/smartrecruiters job-API-kat kérdezi meg soronként),
+  // nem a puszta listahiány.
+  const dupesSkipped = dedupedHuJobs.length !== huJobs.length;
+  const fullListing = Boolean(scopePrefix) && boardJobs.length > 0 && !dupesSkipped;
   if (!fullListing) {
-    console.log(`[atscrawl] ${label} reconcile: reactivate-only (scope=${scopePrefix ?? "n/a"}, board=${boardJobs.length})`);
+    console.log(
+      `[atscrawl] ${label} reconcile: reactivate-only (scope=${scopePrefix ?? "n/a"}, ` +
+      `board=${boardJobs.length}, dupesSkipped=${dupesSkipped})`
+    );
   }
 
   const result = await ingestJobs(client, {
