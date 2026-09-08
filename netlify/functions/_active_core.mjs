@@ -1005,6 +1005,10 @@ export const isAliveResult = _isAliveResult;
  * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
  * @param {object} [opts]
  * @param {number} [opts.concurrency=12]
+ * @param {string[]} [opts.onlySources]  restrict the sweep to just these `source` values
+ *   (still minus SWEEP_EXCLUDED_SOURCES). Lets a caller run this exact sweep — same
+ *   probes, same double-check, same sweep_dead bookkeeping — on a subset of sources
+ *   without touching the rest of job_posts. Omit for the original all-sources sweep.
  * @returns {Promise<{checked:number, suspects:number, deactivated:number}>}
  */
 /** One probe, routed through SWEEP_PROBE_OVERRIDES and asking for a body only
@@ -1067,12 +1071,16 @@ async function _probeAll(rows, checkFinal, concurrency) {
 
 export async function sweepActive404(client, checkFinal, opts = {}) {
   const concurrency = Math.max(1, opts.concurrency ?? 12);
+  const onlySources = Array.isArray(opts.onlySources) && opts.onlySources.length > 0 ? opts.onlySources : null;
 
   await ensureActiveSchema(client);
 
   const { rows } = await client.query(
-    `SELECT url, source FROM job_posts WHERE active = true AND NOT (source = ANY($1::text[]))`,
-    [[...SWEEP_EXCLUDED_SOURCES]]
+    onlySources
+      ? `SELECT url, source FROM job_posts
+          WHERE active = true AND NOT (source = ANY($1::text[])) AND source = ANY($2::text[])`
+      : `SELECT url, source FROM job_posts WHERE active = true AND NOT (source = ANY($1::text[]))`,
+    onlySources ? [[...SWEEP_EXCLUDED_SOURCES], onlySources] : [[...SWEEP_EXCLUDED_SOURCES]]
   );
   if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0 };
 
