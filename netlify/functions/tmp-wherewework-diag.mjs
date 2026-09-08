@@ -6,12 +6,23 @@
 // ("Validation Engineer, API" — Debrecen, Healthcare & Pharmaceuticals
 // Employers in Hungary, feladva 2026.08.02.; "3D labor gyakornok" — Bosch,
 // Hatvan, feladva 2026.06.17.) nincs bent a `job_posts`-ban / a pestidev.hu
-// frontendjén. A `cron_jobs_DIAK_3-background.mjs` wherewework-lapozását
-// időközben self-scaling cap-re állítottuk (ld. a fájl "Self-scaling cap"
-// kommentjét), de ez csak az EGYIK gyanús ok (a lapozási cap korábban majdnem
-// kifutott: 90 oldal / jelenleg 892 találat). A MÁSIK gyanús ok a `job_filters`
-// cím-denylist — ezt innen, éles DB-kapcsolattal lehet csak ellenőrizni (ez a
-// session, ahonnan a scrapert vizsgáltuk, nem lát DB-t).
+// frontendjén. Három gyanús ok, ebből egyiket sem lehet DB-kapcsolat nélkül
+// eldönteni (ez a session, ahonnan a scrapert vizsgáltuk, nem lát DB-t):
+//   1) A lapozási cap (a `cron_jobs_DIAK_3-background.mjs` wherewework-ágát
+//      időközben self-scaling cap-re állítottuk, ld. a fájl "Self-scaling cap"
+//      kommentjét — korábban 90 oldal / élőben már 892 találat, nulla tartalék).
+//   2) A `job_filters` cím-denylist szűri ki insert előtt.
+//   3) user-felvetés (2026-09-08): kereszt-forrás duplikáció — a
+//      `src/lib/crossSourceDupe.mjs` whitelistje (CROSS_SOURCE_DUPE_SOURCES)
+//      SZERINT wherewework és "AI-scraped" között MÁR VOLT megerősített,
+//      1:1-es Bosch-cím-átfedés. Ez az ingest-oldalon (DIAK_3 forrás-fájl) NEM
+//      blokkol semmit — a wherewework-scraper maga sosem hívja az
+//      `isCrossSourceDupe`/`loadCrossSourceDupeIndex` guard-ot (csak
+//      ATSCRAWL/STARTUPJOBS/T/WORKABLE/MIX teszi) —, de ha a sor MÁR bent van
+//      a DB-ben más forrás alatt (pl. "AI-scraped"), a pestidev.hu (külön
+//      repo, itt nem látható) saját megjelenítési logikája dönthet úgy, hogy a
+//      "duplikátumot" nem mutatja — ez esetben a wherewework-sor létezhet, csak
+//      nem az látszik a publikus oldalon.
 //
 // Ez az endpoint NEM ír semmit, csak olvas — biztonságos többször futtatni.
 // Használat után `git rm netlify/functions/tmp-wherewework-diag.mjs`.
@@ -22,6 +33,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 import { shouldSkipTitleFilter, getBlockingFilterWord } from "./_seniority_policy.mjs";
+import { dupeKey, normalizeDupeCompany, CROSS_SOURCE_DUPE_SOURCES } from "../../src/lib/crossSourceDupe.mjs";
 
 const TOKEN = "tmp-ww-diag-6f3c1a9e";
 
@@ -32,10 +44,19 @@ const pool = new Pool({
 
 // A két élőben megerősített, hiányzó hirdetés — a wherewework kártyáján
 // pontosan ilyen (dátum-utótag nélküli, cleanWhereweworkTitle utáni) címmel
-// jelennek meg.
+// jelennek meg. A company mező a cross-source dupeKey számításához kell —
+// a wherewework kártyán ténylegesen ilyen (display-formájú) cégnév szerepel.
 const KNOWN_MISSING = [
-  { title: "Validation Engineer, API", url: "https://www.wherewework.hu/en/jobs/validation-engineer-api/174892" },
-  { title: "3D labor gyakornok", url: "https://www.wherewework.hu/en/jobs/3d-labor-gyakornok/172546" },
+  {
+    title: "Validation Engineer, API",
+    company: "Healthcare & Pharmaceuticals Employers in Hungary",
+    url: "https://www.wherewework.hu/en/jobs/validation-engineer-api/174892",
+  },
+  {
+    title: "3D labor gyakornok",
+    company: "Bosch Magyarország",
+    url: "https://www.wherewework.hu/en/jobs/3d-labor-gyakornok/172546",
+  },
 ];
 
 // A pharma/gyártás-jellegű címek gyanús, esetlegesen túl széles denylist-szavai
@@ -110,16 +131,42 @@ export default async (req) => {
       liveCapCheck = { error: err.message };
     }
 
+    // 5) Kereszt-forrás duplikáció (user-felvetés): a két cím dupeKey-je
+    //    (első cégnév-szó + normalizált cím) egyezik-e bármelyik MÁS,
+    //    CROSS_SOURCE_DUPE_SOURCES-beli forrás valamelyik sorával. Ha igen, ez
+    //    megmagyarázná, miért nincs "wherewework" forrású sor a DB-ben — VAGY
+    //    (ha a #3-as dbRows check mégis talál wherewework sort) miért nem azt
+    //    mutatja a pestidev.hu, ha ott is fut hasonló dedup-logika.
+    //    A query a company első szavára ILIKE-szűr, hogy ne kelljen a teljes
+    //    (több tízezer soros) whitelist-forrás-halmazt behúzni.
+    const crossSourceChecks = [];
+    for (const item of KNOWN_MISSING) {
+      const key = dupeKey(item.company, item.title);
+      const firstWord = normalizeDupeCompany(item.company);
+      const { rows: candidates } = await client.query(
+        `SELECT source, url, title, company, active, first_seen
+           FROM job_posts
+          WHERE source = ANY($1::text[])
+            AND source <> 'wherewework'
+            AND company ILIKE $2
+            AND company IS NOT NULL AND company <> ''`,
+        [CROSS_SOURCE_DUPE_SOURCES, `%${firstWord}%`]
+      );
+      const collidingRows = candidates.filter((r) => dupeKey(r.company, r.title) === key);
+      crossSourceChecks.push({ title: item.title, company: item.company, dupeKey: key, collidingRows });
+    }
+
     return new Response(
       JSON.stringify(
         {
           titleChecks,
           dbRows: dbRows.rows,
           dbRowsFound: dbRows.rowCount,
+          crossSourceChecks,
           note:
             dbRows.rowCount > 0
-              ? "A sor MÁR bent van a DB-ben — ha mégsem látszik a frontenden, az egy megjelenítési/szűrési kérdés (pl. active=false, vagy experience='senior' és a frontend elrejti), NEM ingest-hiány."
-              : "A sor NINCS bent a DB-ben — vagy a job_filters szűrte ki insert előtt (ld. titleChecks), vagy a lapozás sosem érte el (ld. liveCapCheck).",
+              ? "A sor MÁR bent van a DB-ben forrás='wherewework' alatt — ha a pestidev.hu mégsem mutatja, az egy megjelenítési/szűrési/dedup kérdés (pl. active=false, experience='senior' elrejtve, vagy a pestidev saját cross-source dedupe-ja a crossSourceChecks-ben látott másik forrású sort mutatja helyette), NEM ingest-hiány."
+              : "A sor NINCS bent a DB-ben forrás='wherewework' alatt — vagy a job_filters szűrte ki insert előtt (ld. titleChecks), vagy a lapozás sosem érte el (ld. liveCapCheck). A wherewework-scraper saját maga NEM hív cross-source dedupe guard-ot (ld. fájl fejléc), tehát ha a crossSourceChecks alatt van találat, az csak azt jelenti, hogy MÁS forrásból már bekerült ugyanaz a poszt — a wherewework sajátja emiatt még mindig hiányozhat, ez a #1/#2 okok valamelyike.",
           suspectFilterWords: suspectWords.rows,
           wherewworkDbStats: wwStats.rows[0],
           liveCapCheck,
