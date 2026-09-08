@@ -118,6 +118,15 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   // modest, overlap the whitelist was silently missing. Every other
   // non-whitelisted pair the same audit found was 1-2 rows (noise).
   "nix",
+  // 2026-09-08: added after the post-cleanup recheck found the only
+  // remaining non-whitelisted collisions were workable (6 pairs, mostly MP
+  // Solutions Ltd. re-listed on talent/LinkedIn/AI-scraped) and workly (2
+  // pairs). Both already-wired sources (LinkedIn, talent, profession-intern,
+  // nofluffjobs, nix, ats-crawl, startupjobs, dreamjobs, workable itself)
+  // pick these up automatically via CROSS_SOURCE_DUPE_SOURCES — no separate
+  // scraper wiring needed for workable/workly themselves.
+  "workable",
+  "workly",
 ];
 
 function splitTechList(technologies) {
