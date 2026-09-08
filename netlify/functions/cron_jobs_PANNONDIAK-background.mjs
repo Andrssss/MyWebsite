@@ -226,8 +226,12 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
           try {
             job.technologies = extractTechnologies(await fetchText(job.url));
           } catch (err) {
+            // Gated fetch — only runs once per url ever (knownUrls). A failure
+            // here can't self-heal on the next run, so skip the insert instead
+            // of writing technologies=null forever.
             detailFetchFailed++;
-            console.error(`[pannondiak] technologies fetch failed ${job.url}: ${err.message}`);
+            console.error(`[pannondiak] technologies fetch failed ${job.url}: ${err.message} — skipping insert this run, will retry`);
+            continue;
           }
         }
 

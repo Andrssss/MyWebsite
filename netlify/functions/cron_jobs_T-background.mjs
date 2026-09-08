@@ -402,7 +402,12 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
           if (job.experience === "-") job.experience = extractTalentExperience(normalizedHtml) || "-";
           job.technologies = extractTechnologies(normalizedHtml);
         } catch (err) {
-          console.warn(`[talent] detail fetch failed: ${job.url} — ${err.message}`);
+          // A sor kihagyása (nem beszúrás) itt, nem csak logolás: ez az EGYETLEN
+          // detail-fetch, amit ez az url valaha kap (a `known` set miatt a
+          // következő futáson már ismertnek számít) — ha mégis beszúrnánk
+          // experience/technologies nélkül, azok örökre üresek maradnának.
+          console.warn(`[talent] detail fetch failed: ${job.url} — ${err.message} — skipping insert this run, will retry`);
+          continue;
         }
         // title+company+technologies dedup needs job.technologies, so this
         // check must run AFTER the detail fetch above (2026-09-04).

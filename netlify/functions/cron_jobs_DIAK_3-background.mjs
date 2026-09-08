@@ -536,17 +536,18 @@ async function upsertJob(client, source, item) {
 
 // Let\u00f6lti a hirdet\u00e9s-oldalt \u00e9s kiolvassa, h\u00e1ny \u00e9vet v\u00e1rnak el a t\u00f6rzssz\u00f6vegb\u0151l.
 // (wherewework + otp "egy\u00e9b" \u00e1gon haszn\u00e1ljuk.)
+// THROWS on fetch failure (does not swallow it) \u2014 the wherewework/backstop call
+// sites below only ever call this ONCE per url (gated on !knownUrls.has(...)),
+// so a silently-swallowed failure used to mean a brand-new row got inserted
+// with technologies permanently null forever (no later pass ever retries it).
+// Callers must catch and skip the insert for this run instead.
 async function fetchDetailExperience(url) {
-  try {
-    const html = await fetchText(url);
-    const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
-    return {
-      experience: extractBodyExperience(normalizedHtml) || null,
-      technologies: extractTechnologies(normalizedHtml),
-    };
-  } catch (err) {
-    return { experience: null, technologies: null };
-  }
+  const html = await fetchText(url);
+  const normalizedHtml = html.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
+  return {
+    experience: extractBodyExperience(normalizedHtml) || null,
+    technologies: extractTechnologies(normalizedHtml),
+  };
 }
 
 // A wherewework kártyán a cím VÉGÉN ott a feladás dátuma ("Backend Engineer
@@ -877,17 +878,31 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             } else if (isInternshipTitle(item.title)) {
               item.experience = "diákmunka";
             } else {
-              const { experience: exp, technologies } = await fetchDetailExperience(item.url);
-              item.experience = exp || "-";
-              item.technologies = technologies;
+              try {
+                const { experience: exp, technologies } = await fetchDetailExperience(item.url);
+                item.experience = exp || "-";
+                item.technologies = technologies;
+              } catch (err) {
+                console.warn(`${tag}   otp detail fetch failed: ${item.url} — ${err.message}`);
+                item.experience = item.experience || "-";
+              }
               await sleep(400);
             }
           } else if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
           } else if (source === "wherewework" && !knownUrls.has(item.url)) {
-            const { experience: exp, technologies } = await fetchDetailExperience(item.url);
-            if (exp) item.experience = exp;
-            item.technologies = technologies;
+            try {
+              const { experience: exp, technologies } = await fetchDetailExperience(item.url);
+              if (exp) item.experience = exp;
+              item.technologies = technologies;
+            } catch (err) {
+              // Gated fetch — only runs once per url ever (knownUrls). A failure
+              // here can't self-heal on the next run, so skip the insert instead
+              // of writing technologies=null forever.
+              console.warn(`${tag}   wherewework detail fetch failed: ${item.url} — ${err.message} — skipping insert this run, will retry`);
+              await sleep(400);
+              continue;
+            }
             await sleep(400);
           }
           // wherewework (2026-09-04): unlike otp, the numeric id itself is not
@@ -915,8 +930,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           // ON CONFLICT-je úgysem írná felül. Csak a technologies-t vesszük át:
           // a diákmunka-ág experience-ét egy null-extrakt nem írhatja felül.
           if (item.technologies === undefined && !knownUrls.has(item.url)) {
-            const { technologies } = await fetchDetailExperience(item.url);
-            item.technologies = technologies;
+            try {
+              const { technologies } = await fetchDetailExperience(item.url);
+              item.technologies = technologies;
+            } catch (err) {
+              // Gated fetch — only runs once per url ever (knownUrls). A failure
+              // here can't self-heal on the next run, so skip the insert instead
+              // of writing technologies=null forever.
+              console.warn(`${tag}   backstop detail fetch failed: ${item.url} — ${err.message} — skipping insert this run, will retry`);
+              await sleep(400);
+              continue;
+            }
             await sleep(400);
           }
           if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {

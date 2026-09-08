@@ -281,7 +281,11 @@ const SOURCES = [
             if (it.experience === "-") it.experience = extractBodyExperience(detailHtml) || "-";
             it.technologies = extractTechnologies(detailHtml);
           } catch (err) {
-            console.warn(`[karrierhungaria] detail fetch failed: ${it.url} — ${err.message}`);
+            // Gated fetch — only runs once per url ever (`known`). A failure here
+            // can't self-heal on the next run, so skip the insert instead of
+            // writing experience/technologies=null forever.
+            console.warn(`[karrierhungaria] detail fetch failed: ${it.url} — ${err.message} — skipping insert this run, will retry`);
+            continue;
           }
         }
         if (shouldSkipSeniorExperience(isSeniorExperience(it.experience))) {

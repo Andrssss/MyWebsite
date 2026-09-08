@@ -283,8 +283,12 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           try {
             technologies = extractTechnologies(await fetchText(url));
           } catch (err) {
+            // Gated fetch — only runs once per url ever (knownUrls). A failure
+            // here can't self-heal on the next run, so skip the insert instead
+            // of writing technologies=null forever.
             detailFetchFailed++;
-            console.error(`[mfb] technologies fetch failed ${url}: ${err.message}`);
+            console.error(`[mfb] technologies fetch failed ${url}: ${err.message} — skipping insert this run, will retry`);
+            continue;
           }
         }
 

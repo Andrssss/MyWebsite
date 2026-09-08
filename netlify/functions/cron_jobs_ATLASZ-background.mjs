@@ -196,8 +196,12 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
         try {
           technologies = extractTechnologies(await fetchText(jobUrl));
         } catch (err) {
+          // Gated fetch — only runs once per url ever (knownUrls). A failure
+          // here can't self-heal on the next run, so skip the insert instead
+          // of writing technologies=null forever.
           detailFetchFailed++;
-          console.error(`[atlasz] technologies fetch failed ${jobUrl}: ${err.message}`);
+          console.error(`[atlasz] technologies fetch failed ${jobUrl}: ${err.message} — skipping insert this run, will retry`);
+          continue;
         }
       }
 

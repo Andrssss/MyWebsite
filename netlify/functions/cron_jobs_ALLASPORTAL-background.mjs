@@ -351,7 +351,11 @@ async function scrapeAllasportal(client) {
           item.technologies = extractTechnologies(body);
         }
       } catch (err) {
-        console.warn(`[allasportal] detail fetch failed: ${item.url} — ${err.message}`);
+        // Gated fetch — only runs once per url ever (`known`). A failure here
+        // can't self-heal on the next run, so skip the insert instead of
+        // writing experience/technologies=null forever.
+        console.warn(`[allasportal] detail fetch failed: ${item.url} — ${err.message} — skipping insert this run, will retry`);
+        continue;
       }
     }
 

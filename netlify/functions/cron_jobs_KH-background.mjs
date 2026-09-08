@@ -303,8 +303,13 @@ export default withTimeout("cron_jobs_KH-background", async () => {
               const detailHtml = await fetchText(url);
               technologies = extractTechnologies(detailHtml);
             } catch (err) {
+              // Unlike the non-intern branch below, this fetch is GATED — it only
+              // ever runs once per url (knownUrls), so a failure here can't
+              // self-heal on the next run. Skip the insert instead of writing
+              // technologies=null forever.
               detailFetchFailed++;
-              console.error(`[kh] technologies fetch failed ${url}: ${err.message}`);
+              console.error(`[kh] technologies fetch failed ${url}: ${err.message} — skipping insert this run, will retry`);
+              continue;
             }
           }
         } else {

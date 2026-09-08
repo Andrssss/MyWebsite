@@ -273,7 +273,11 @@ export default withTimeout(JOB_NAME, async (request) => {
             company = extractCompanyFromDetail(detailHtml);
             technologies = extractTechnologies(detailHtml);
           } catch (err) {
-            console.warn(`[workly] detail fetch failed: ${entry.url} — ${err.message}`);
+            // Gated fetch — only runs once per url ever (knownUrls). A failure
+            // here can't self-heal on the next run, so skip the insert instead
+            // of writing company/technologies=null forever.
+            console.warn(`[workly] detail fetch failed: ${entry.url} — ${err.message} — skipping insert this run, will retry`);
+            continue;
           }
         }
 

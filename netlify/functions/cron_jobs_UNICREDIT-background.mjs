@@ -264,8 +264,13 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
               const normalizedHtml = detailHtml.replace(/–/g, "-");
               technologies = extractTechnologies(normalizedHtml);
             } catch (err) {
+              // Unlike the non-intern branch below, this fetch is GATED — it only
+              // ever runs once per url (the `knownUrls` check above), so a failure
+              // here can't self-heal on the next run like the ungated branch does.
+              // Skip the insert instead of writing technologies=null forever.
               detailFetchFailed++;
-              console.error(`[unicredit] technologies fetch failed ${job.url}: ${err.message}`);
+              console.error(`[unicredit] technologies fetch failed ${job.url}: ${err.message} — skipping insert this run, will retry`);
+              continue;
             }
           }
         } else {

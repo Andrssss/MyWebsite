@@ -257,17 +257,26 @@ async function upsertJob(client, sourceKey, item) {
 // backfill its company (never experience/technologies). Builds the row
 // COMPLETE before it's ever inserted; no separate pass comes back later to
 // patch it in.
+// Returns false when a genuinely-new job's one-time detail fetch failed — the
+// caller MUST skip inserting in that case (continue), not insert anyway: this
+// fetch never runs again for this url once known.has(url) is true next run,
+// so a swallowed failure here used to mean experience/technologies stayed
+// null FOREVER for that posting (live case, profession.hu, 2026-09-07 — see
+// _profession_core.mjs fix). Returns true when there's nothing to enrich
+// (already known) or enrichment succeeded.
 async function enrichIfNew(job, known, extract, jobName) {
   // technologies KIZÁRÓLAG innen jön, ezért a fetch minden új url-nél lefut —
   // még akkor is, ha a job.experience-t már a tag/cím-alapú rövidzár feloldotta.
-  if (known.has(job.url)) return;
+  if (known.has(job.url)) return true;
   try {
     await sleep(400);
     const html = await fetchText(job.url);
     if (!job.experience || job.experience === "-") job.experience = extract(html) || "-";
     job.technologies = extractTechnologies(html);
+    return true;
   } catch (err) {
-    console.warn(`[${jobName}] detail fetch failed: ${job.url} — ${err.message}`);
+    console.warn(`[${jobName}] detail fetch failed: ${job.url} — ${err.message} — skipping insert this run, will retry`);
+    return false;
   }
 }
 
@@ -713,7 +722,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
           continue;
         }
 
-        await enrichIfNew(job, known.get("dreamjobs"), extractBodyExperience, "cron_jobs_MIX");
+        if (!(await enrichIfNew(job, known.get("dreamjobs"), extractBodyExperience, "cron_jobs_MIX"))) continue;
         // Ideiglenes döntés (2026-08-01): a senior-flag pontos, de a nem-LinkedIn
         // forrásoknál insert előtt is kizárjuk — ne is kerüljön be a DB-be.
         if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
@@ -748,7 +757,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       console.log(`melonjobs: ${melonJobs.length} IT jobs found (of ${melonAllUrls.length} listed)`);
 
       for (const job of melonJobs) {
-        await enrichIfNew(job, known.get("melonjobs"), extractBodyExperience, "cron_jobs_MIX");
+        if (!(await enrichIfNew(job, known.get("melonjobs"), extractBodyExperience, "cron_jobs_MIX"))) continue;
         if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
         await upsertJob(client, "melonjobs", job);
       }
@@ -774,7 +783,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       // listázott url-t soha nem nevezhetünk át alóla.
       const kukaCurrentUrls = allKukaJobs.map((j) => j.url);
       for (const job of kukaJobs) {
-        await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX");
+        if (!(await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX"))) continue;
         if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
         const idPattern = kukaIdOnlyPattern(job.url);
         if (idPattern) {

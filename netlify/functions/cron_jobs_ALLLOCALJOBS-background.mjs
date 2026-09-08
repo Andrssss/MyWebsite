@@ -583,7 +583,11 @@ async function scrapeAlllocaljobs(client) {
         if (item.experience === "-") item.experience = extractBodyExperience(detailBody) || "-";
         item.technologies = extractTechnologies(detailBody);
       } catch (err) {
-        console.warn(`[alllocaljobs] detail fetch failed: ${item.url} — ${err.message}`);
+        // Gated fetch — only runs once per url ever (`known`). A failure here
+        // can't self-heal on the next run, so skip the insert instead of
+        // writing experience/technologies=null forever.
+        console.warn(`[alllocaljobs] detail fetch failed: ${item.url} — ${err.message} — skipping insert this run, will retry`);
+        continue;
       }
     }
 

@@ -1781,7 +1781,11 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
                 const detailHtml = await fetchText(item.url);
                 item.technologies = extractTechnologies(detailHtml);
               } catch (err) {
-                console.warn(`[schonherz] technologies fetch failed: ${item.url} — ${err.message}`);
+                // Gated fetch — only runs once per url ever (knownUrls). A failure
+                // here can't self-heal on the next run, so skip the insert
+                // instead of writing technologies=null forever.
+                console.warn(`[schonherz] technologies fetch failed: ${item.url} — ${err.message} — skipping insert this run, will retry`);
+                continue;
               }
             }
             await upsertJob(client, source, item);
