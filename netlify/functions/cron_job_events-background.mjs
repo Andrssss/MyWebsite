@@ -40,6 +40,21 @@ async function ensureTable(client) {
       fail_streak int NOT NULL DEFAULT 0
     )
   `);
+
+  // Két explicit jóváhagyott forrás (2026-09-08, user-döntés) — ugyanaz a
+  // first-run seed minta, mint az ujbudaiallasok az ai_extractors táblában:
+  // ON CONFLICT DO NOTHING, hogy egy operátor később szabadon módosíthassa
+  // (mode/list_url) anélkül, hogy ez a seed visszaírná. Az eredeti URL-eken
+  // Facebook UTM/fbclid tracking paraméterek voltak, azokat itt levágtuk.
+  await client.query(
+    `INSERT INTO event_sources (site, list_url)
+     VALUES ($1, $2), ($3, $4)
+     ON CONFLICT (site) DO NOTHING`,
+    [
+      "epam", "https://campus.epam.com/en/event/188",
+      "progmasters", "https://www.progmasters.hu/esemenyek/nyilt-nap",
+    ]
+  );
 }
 
 async function fetchPage(url) {
