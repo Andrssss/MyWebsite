@@ -42,6 +42,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import {
   isInternshipTitle,
   isJuniorTitle,
@@ -263,6 +264,21 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
 
     console.log(`[nix] list: ${vacancies.length} vacancies`);
 
+    // Cross-source duplicate guard (2026-09-08): nix was ADDED to the shared
+    // whitelist the same day a full-table audit found 8 nix<->profession-intern
+    // collisions — wiring the check in here closes the loop the whitelist
+    // addition alone doesn't (the whitelist only drives the READ-side "Átfedés"
+    // badge; insert-time prevention is separate, per-source, opt-in).
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "nix", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    let skippedCrossSourceDupe = 0;
+    // Scoped to genuinely NEW urls only (see check below) — an already-
+    // existing nix row must never be excluded from foundUrls just because
+    // some OTHER source later happened to pick up the same posting, or
+    // reconcileActive would read that as "gone" and deactivate a row that's
+    // still live on nix's own site (the exact bug just fixed for ats-crawl).
+    const { rows: knownRows } = await client.query(`SELECT url FROM job_posts WHERE source = 'nix'`);
+    const known = new Set(knownRows.map((r) => r.url));
+
     const foundUrls = [];
     let newlyInserted = 0;
     let alreadyExisted = 0;
@@ -295,6 +311,12 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
         if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[nix] SKIP title-denylist "${title}" → ${url}`);
+          continue;
+        }
+
+        if (!known.has(url) && isCrossSourceDupe(crossDupeIndex, "NIX", title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[nix] SKIP cross-source dupe "${title}" → ${url}`);
           continue;
         }
 

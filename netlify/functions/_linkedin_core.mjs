@@ -13,6 +13,7 @@ import {
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
@@ -403,6 +404,13 @@ export async function processLinkedInSources(sources, jobName) {
     // Innoview lesson — see pestidev-job-scraper PR #14).
     const sameSourceDupeIndex = await loadSameSourceDupeIndex(client, "LinkedIn");
 
+    // Cross-source duplicate guard (2026-09-08): LinkedIn was by far the
+    // largest unprotected side of the whitelist — a full-table audit found
+    // 97 LinkedIn<->profession-intern and 70 LinkedIn<->ats-crawl collisions,
+    // none prevented at insert time. talent/ats-crawl/startupjobs/dreamjobs/
+    // workable already had this; LinkedIn never did.
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "LinkedIn", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+
     for (const p of sources) {
       if (blocked) {
         console.warn(`${jobName}: aborting remaining sources after LinkedIn block.`);
@@ -443,6 +451,13 @@ export async function processLinkedInSources(sources, jobName) {
       for (const it of items) {
         const canonical = canonicalizeLinkedInJobUrl(it.url);
         it.experience = inferTitleExperience(it.title);
+
+        // Checked before the detail-page fetch so a confirmed cross-source
+        // dupe never costs a request (same pattern as talent/profession-intern).
+        if (!knownCanonicalUrls.has(canonical) && isCrossSourceDupe(crossDupeIndex, it.company, it.title)) {
+          console.log(`[LinkedIn] SKIP cross-source dupe "${it.title}" @ ${it.company || "-"} → ${it.url}`);
+          continue;
+        }
 
         // New posting: fetch its detail page ONCE, right now, so experience
         // (if the title alone didn't already resolve it) and technologies

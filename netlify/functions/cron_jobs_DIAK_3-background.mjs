@@ -28,6 +28,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -608,6 +609,13 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
   const client = write ? await pool.connect() : null;
   if (client) await ensureTechnologiesColumn(client);
   if (client) await ensureLevelColumn(client);
+  // Cross-source guard for wherewework only (the sole SOURCES entry in this
+  // file that's in the shared whitelist) — 2026-09-08, a full-table audit
+  // found 11 wherewework<->AI-scraped and 2 wherewework<->profession-intern
+  // collisions never prevented at insert time.
+  const whereweworkCrossDupeIndex = client
+    ? await loadCrossSourceDupeIndex(client, "wherewework", { onlySources: CROSS_SOURCE_DUPE_SOURCES })
+    : null;
 
   const stats = {
     ok: true,
@@ -858,6 +866,15 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url)
         );
         for (const item of matchedList) {
+          if (
+            source === "wherewework" &&
+            !knownUrls.has(item.url) &&
+            whereweworkCrossDupeIndex &&
+            isCrossSourceDupe(whereweworkCrossDupeIndex, item.company, item.title)
+          ) {
+            console.log(`${tag}   SKIP cross-source dupe "${item.title}" @ ${item.company || "-"}`);
+            continue;
+          }
           const pattern = patternFor ? patternFor(item.url) : null;
           if (pattern) {
             const migrated = await migrateVolatileUrl(client, source, item.url, pattern, currentUrls);

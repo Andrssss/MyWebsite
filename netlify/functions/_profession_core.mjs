@@ -7,6 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -594,8 +595,19 @@ export async function processProfessionSources(sources, jobName, request, pageOp
         sameSourceDupeIndexes.set(key, await loadSameSourceDupeIndex(client, key));
       }
 
+      // Cross-source duplicate guard (2026-09-08): profession-intern was the
+      // single largest unprotected side of the whitelist — a full-table audit
+      // found 97 profession-intern<->LinkedIn and 26 profession-intern<->
+      // alllocaljobs collisions, none of it prevented at insert time (talent/
+      // ats-crawl/startupjobs/dreamjobs/workable already had this, profession-
+      // intern never did). One index per source key, same as sameSourceDupeIndexes.
+      const crossDupeIndexes = new Map();
+      for (const key of sourceKeys) {
+        crossDupeIndexes.set(key, await loadCrossSourceDupeIndex(client, key, { onlySources: CROSS_SOURCE_DUPE_SOURCES }));
+      }
+
       for (const p of sources) {
-        const result = await processOneSource(client, p, jobName, pageOptions, knownBySource, sameSourceDupeIndexes.get(p.key));
+        const result = await processOneSource(client, p, jobName, pageOptions, knownBySource, sameSourceDupeIndexes.get(p.key), crossDupeIndexes.get(p.key));
         const urls = foundBySource.get(result.source) || [];
         // Found urls still feed reconcile as reactivation signal (presence =
         // alive) even on a partial crawl — see the reactivate-only note below.
@@ -656,7 +668,7 @@ export async function processProfessionSources(sources, jobName, request, pageOp
   });
 }
 
-async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}, knownBySource = null, sameSourceDupeIndex = null) {
+async function processOneSource(client, p, jobName, { startPage = 1, maxPages = Infinity } = {}, knownBySource = null, sameSourceDupeIndex = null, crossDupeIndex = null) {
   const source = p.key;
 
   let merged = [];
@@ -752,6 +764,15 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
           console.log(`[dedupe] skipped "${item.title}" — duplicate of intern source`);
           continue;
         }
+      }
+
+      // Cross-source duplicate guard, checked before the detail-page fetch so
+      // a confirmed dupe never costs a request (same pattern as talent/
+      // ats-crawl/startupjobs). Only for a genuinely new url — an already-known
+      // row is already on the board either way.
+      if (crossDupeIndex && known && !known.has(item.url) && isCrossSourceDupe(crossDupeIndex, item.company, item.title)) {
+        console.log(`[${source}] SKIP cross-source dupe "${item.title}" @ ${item.company || "-"} → ${item.url}`);
+        continue;
       }
 
       // Fetch the detail page ONCE for a genuinely new posting (that survived

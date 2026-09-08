@@ -11,6 +11,7 @@ import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_polic
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -413,6 +414,11 @@ async function scrapeNofluffjobs(client) {
   // a duplicate found across two source URLs in the SAME run is also caught.
   const sameSourceDupeIndex = await loadSameSourceDupeIndex(client, "nofluffjobs");
 
+  // Cross-source duplicate guard (2026-09-08): nofluffjobs<->LinkedIn (9),
+  // <->profession-intern (12), <->talent (2) collisions found by a
+  // full-table audit, none prevented at insert time until now.
+  const crossDupeIndex = await loadCrossSourceDupeIndex(client, "nofluffjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+
   for (const sourceUrl of NOFLUFF_SOURCES) {
     console.log(`[nofluffjobs] Fetching: ${sourceUrl}`);
     let html;
@@ -450,6 +456,11 @@ async function scrapeNofluffjobs(client) {
     console.log(`[nofluffjobs]   after filters: ${merged.length}`);
 
     for (const item of merged) {
+      if (isCrossSourceDupe(crossDupeIndex, item.company, item.title)) {
+        console.log(`[nofluffjobs]   SKIP cross-source dupe "${item.title}" @ ${item.company || "-"} → ${item.url}`);
+        continue;
+      }
+
       const detail = await fetchNofluffDetail(item.url);
       if (detail.experience) item.experience = detail.experience;
       if (detail.technologies) item.technologies = detail.technologies;
