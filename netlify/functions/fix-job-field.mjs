@@ -23,6 +23,7 @@
 //     -H "Authorization: Bearer $ADMIN_SECRET" -H "Content-Type: application/json" \
 //     -d '{"url":"https://example.hu/allas/1","experience":"junior"}'
 //     -d '{"url":"https://example.hu/allas/1","active":false}'
+//     -d '{"url":"https://example.hu/allas/1","technologies":"Java, Spring Boot"}'
 
 import { Pool } from "pg";
 import { withDbAuditFlush } from "./_db_audit.js";
@@ -60,9 +61,10 @@ export default withDbAuditFlush("fix-job-field", async (request) => {
   const url = typeof payload.url === "string" ? payload.url.trim() : "";
   const source = typeof payload.source === "string" ? payload.source.trim() : "";
   const experience = typeof payload.experience === "string" ? payload.experience.trim() : "";
+  const technologies = typeof payload.technologies === "string" ? payload.technologies.trim() : "";
   const hasActive = typeof payload.active === "boolean";
-  if (!url || (!experience && !hasActive)) {
-    return json(400, { error: "'url' plus at least one of 'experience'/'active' are required" });
+  if (!url || (!experience && !technologies && !hasActive)) {
+    return json(400, { error: "'url' plus at least one of 'experience'/'technologies'/'active' are required" });
   }
 
   // `url` alone is NOT a unique row key — (source, url) is (ON CONFLICT
@@ -74,6 +76,7 @@ export default withDbAuditFlush("fix-job-field", async (request) => {
   const sets = [];
   const values = [url];
   if (experience) { values.push(experience); sets.push(`experience = $${values.length}`); }
+  if (technologies) { values.push(technologies); sets.push(`technologies = $${values.length}`); }
   if (hasActive) { values.push(payload.active); sets.push(`active = $${values.length}`); }
 
   const client = await pool.connect();
@@ -93,7 +96,7 @@ export default withDbAuditFlush("fix-job-field", async (request) => {
 
     const { rowCount, rows } = await client.query(
       `UPDATE job_posts SET ${sets.join(", ")} WHERE ${whereClause}
-       RETURNING id, source, title, experience, active`,
+       RETURNING id, source, title, experience, technologies, active`,
       values
     );
     if (!rowCount) return json(404, { error: "No job_posts row matches that url/source" });

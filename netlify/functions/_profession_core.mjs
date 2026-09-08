@@ -771,7 +771,17 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
           if (!item.experience) item.experience = extractProfessionExperience(detailHtml) || "-";
           item.technologies = extractTechnologies(detailHtml);
         } catch (err) {
-          console.warn(`[profession] detail fetch failed: ${item.url} — ${err.message}`);
+          // A fenti komment ígéretét ("fully populate the row before it's ever
+          // inserted — no separate pass comes back later to patch it in") a kód
+          // eddig megszegte: hiba esetén a sor MÉGIS bekerült experience/
+          // technologies nélkül, és mivel a következő futásnál az url már
+          // "known", soha többé nem próbálkozott újra — véglegesen üres maradt
+          // (élő eset: Erste "Alkalmazás üzemeltető (HPE NonStop)" és Richter
+          // "IT Solution Designer", 2026-09-07). Insert helyett most kihagyjuk —
+          // a következő futás még nem ismeri az url-t, tehát újra megpróbálja.
+          console.warn(`[profession] detail fetch failed: ${item.url} — ${err.message} — skipping insert this run, will retry`);
+          delete item.detailHtml;
+          continue;
         }
       }
       delete item.detailHtml;
