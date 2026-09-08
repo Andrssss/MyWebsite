@@ -312,23 +312,15 @@ async function upsertJob(client, source, job, resolvedExperience) {
  *                                    (_ats_handoff.mjs has the full reasoning). Deliberately
  *                                    opt-in: ats-crawl and workable post ATS urls themselves and
  *                                    must never hand their own rows away.
- * @param {string[]} [args.extraFoundUrls=[]]  URLs the caller has ALREADY confirmed are still on
- *                                    the source this run, but chose not to pass in `jobs` (so they
- *                                    are never inserted/updated). Folded into reconcile's foundUrls
- *                                    only, same "FULL pre-filter set" reasoning as the `jobs` loop
- *                                    below — a row a caller-side filter drops (e.g. ats-crawl's own
- *                                    cross-source dupe check) must still count as "seen", or the
- *                                    next scoped reconcile deactivates a posting that never actually
- *                                    left the board, just because this run chose not to re-insert it.
  */
 export async function ingestJobs(client, {
   source, jobs, fullListing = false, filters = [], categories = [],
   rejectLocation = isNonBudapestLocation, scopePrefix = null, handoffAtsUrls = false,
-  skipCrossSourceDupes = false, extraFoundUrls = [],
+  skipCrossSourceDupes = false,
 }) {
   await ensureTechnologiesColumn(client);
   await ensureLevelColumn(client);
-  const ok = jobs.length > 0 || extraFoundUrls.length > 0;
+  const ok = jobs.length > 0;
   const complete = ok && !!fullListing;
 
   const foundUrls = []; // FULL pre-filter set → a filter change can't deactivate a live job (F3).
@@ -406,8 +398,6 @@ export async function ingestJobs(client, {
       console.error(`[${source}] ats-tenant handoff FAILED for ${atsTenants.size} tenant(s): ${err.message}`);
     }
   }
-
-  if (extraFoundUrls.length) foundUrls.push(...extraFoundUrls);
 
   let reconcile = { skipped: true };
   if (ok) {

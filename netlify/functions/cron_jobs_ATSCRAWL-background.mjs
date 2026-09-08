@@ -313,14 +313,31 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
     }
   }
 
-  // 2) a HU-sorok teljes felépítése (insert ELŐTT, egyetlen detail-hívással).
-  // Mindig a TELJES huJobs-ból, a cross-source dupe-ellenőrzés (2.5) UTÁN dönt
-  // arról, mi kerül insertbe — soha nem előtte. Az url-t (SmartRecruitersnél
-  // csak a detail adja meg, ld. srPostingUrl) ITT kell felépíteni, mert a
-  // reconcile-nak a dupe-nak jelölt, de a boardon még ott lévő sorok url-je is
-  // kell (ld. a 2.5 lépés fejlécét).
+  // 1.5) cross-source dupe-szűrés — a helyszín-kapu UTÁN (kevesebb sor), de a
+  // detail-hívás ELŐTT (ld. a fájl fejlécét: DUPE_CHECK_SOURCES), hogy egy már
+  // profession/talent/LinkedIn/startupjobs alatt meglévő pozíció ne kössön le
+  // felesleges detail-kérést sem, ne csak insertet. Cím+cég alapján dönt —
+  // technológiát a cross-source guard szándékosan sosem néz (2026-09-03: ld.
+  // _cross_source_dupe.mjs fejléce).
+  let dedupedHuJobs = huJobs;
+  if (dupeIndex) {
+    dedupedHuJobs = [];
+    for (const job of huJobs) {
+      const company = job.company || tenant.company || null;
+      if (isCrossSourceDupe(dupeIndex, company, job.title)) {
+        console.log(`[atscrawl] ${label} SKIP cross-source dupe "${job.title}" @ ${company}`);
+        continue;
+      }
+      dedupedHuJobs.push(job);
+    }
+    if (dedupedHuJobs.length !== huJobs.length) {
+      console.log(`[atscrawl] ${label} cross-source dupes skipped: ${huJobs.length - dedupedHuJobs.length}`);
+    }
+  }
+
+  // 2) a HU-sorok teljes felépítése (insert ELŐTT, egyetlen detail-hívással)
   const built = [];
-  for (const job of huJobs) {
+  for (const job of dedupedHuJobs) {
     let html = job.descriptionHtml;
     let url = job.url;
     if (job.detailRef) {
@@ -348,39 +365,6 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
       experience: (html ? extractBodyExperience(html) : null) || "-",
       technologies: html ? extractTechnologies(html) : null,
     });
-  }
-
-  /* 2.5) cross-source dupe-szűrés — a detail-hívás UTÁN (2026-09-08 fix), NEM
-     előtte. Amíg ez a lépés a detail-hívás ELŐTT futott, egy dupe-nak jelölt
-     sor SOSEM jutott el a `built` tömbbe, tehát az url-je se a reconcile
-     foundUrls-ébe, se a SmartRecruiters-migrációba (3. lépés) — egy már
-     beszúrt, de EZEN a futáson más forráson is felbukkanó hirdetés a
-     scope-olt reconcile szemében "eltűnt a boardról" lett, holott a board
-     látta, csak nem inzertáltuk újra. Élesben ez azt jelentette, hogy egy
-     még nyitott ATS-hirdetés a puszta kereszt-forrás egyezés miatt
-     deaktiválódott, amint egy másik scraper is megtalálta ugyanazt az
-     állást — ez volt a "kegyetlenül rosszul deaktivál" hiba.
-     Most a dupe-nak jelölt sorok url-je a `built`-ben (és így a 3. lépés
-     migrációjában, a 4. lépés scope-számításában) is bent marad, csak az
-     insertből esnek ki — az ingestJobs `extraFoundUrls`-ébe kerülnek, hogy a
-     reconcile "látottnak" számolja őket anélkül, hogy újra beszúrnánk. Cím+cég
-     alapján dönt — technológiát a cross-source guard szándékosan sosem néz
-     (2026-09-03: ld. _cross_source_dupe.mjs fejléce). */
-  let insertRows = built;
-  const dupeUrls = [];
-  if (dupeIndex) {
-    insertRows = [];
-    for (const row of built) {
-      if (isCrossSourceDupe(dupeIndex, row.company, row.title)) {
-        console.log(`[atscrawl] ${label} SKIP cross-source dupe "${row.title}" @ ${row.company}`);
-        dupeUrls.push(row.url);
-        continue;
-      }
-      insertRows.push(row);
-    }
-    if (dupeUrls.length) {
-      console.log(`[atscrawl] ${label} cross-source dupes skipped: ${dupeUrls.length}`);
-    }
   }
 
   // 3) rotáló-id migráció (csak SmartRecruiters) — a sor URL-je változik, de a
@@ -412,23 +396,35 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
     ? provider.scopePrefix(tenant.slug, scopeCandidates)
     : deriveScopePrefix(tenant.slug, scopeCandidates);
 
-  // Teljes listázásnak CSAK akkor tekintjük, ha van egységes url-előtag ÉS a
-  // board nem üres. Bármelyik hiánya → reactivate-only, a deaktiválást a napi
-  // 404-sweep végzi el helyette.
-  const fullListing = Boolean(scopePrefix) && boardJobs.length > 0;
+  // Teljes listázásnak CSAK akkor tekintjük, ha van egységes url-előtag, a
+  // board nem üres, ÉS ezen a körön a cross-source dupe-szűrő nem vett ki
+  // egyetlen sort sem. Az utóbbi (2026-09-08 fix) azért kell, mert a `built`
+  // (=`jobs`, a reconcile foundUrls-ének alapja) a dupe-szűrés UTÁNI állapot:
+  // egy korábban beszúrt, de EZEN a futáson más forráson is felbukkanó
+  // hirdetés kiesik `built`-ből, holott a boardon még ott van — a reconcile-nak
+  // ilyenkor nincs megbízható "eltűnt-e valóban" válasza. Ilyenkor
+  // reactivate-only-ra esünk vissza: a tényleges halált a napi 404-sweep dönti
+  // el (BANNER_DEAD_SOURCES/SWEEP_PROBE_OVERRIDES "ats-crawl" bejegyzése,
+  // _active_core.mjs — ugyanaz az aiScrapedProbe/aiScrapedIsDead pár, ami a
+  // greenhouse/lever/ashby/smartrecruiters job-API-kat kérdezi meg soronként),
+  // nem a puszta listahiány.
+  const dupesSkipped = dedupedHuJobs.length !== huJobs.length;
+  const fullListing = Boolean(scopePrefix) && boardJobs.length > 0 && !dupesSkipped;
   if (!fullListing) {
-    console.log(`[atscrawl] ${label} reconcile: reactivate-only (scope=${scopePrefix ?? "n/a"}, board=${boardJobs.length})`);
+    console.log(
+      `[atscrawl] ${label} reconcile: reactivate-only (scope=${scopePrefix ?? "n/a"}, ` +
+      `board=${boardJobs.length}, dupesSkipped=${dupesSkipped})`
+    );
   }
 
   const result = await ingestJobs(client, {
     source: ATS_SOURCE,
-    jobs: insertRows,
+    jobs: built,
     fullListing,
     filters,
     categories,
     rejectLocation: rejectAtsLocation,
     scopePrefix,
-    extraFoundUrls: dupeUrls,
   });
 
   // A nem-IT sorok (ingestJobs úgyis eldobta volna őket, ld. skippedNonIt) a
@@ -439,9 +435,8 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
   );
 
   console.log(
-    `[atscrawl] ${label} → hu=${huJobs.length} built=${built.length} insertable=${insertRows.length} ` +
-    `dupes=${dupeUrls.length} inserted=${result.inserted} nonIt=${result.skippedNonIt} ` +
-    `filtered=${result.skippedSenior} marketing=${marketingCandidates.length} ` +
+    `[atscrawl] ${label} → hu=${huJobs.length} built=${built.length} inserted=${result.inserted} ` +
+    `nonIt=${result.skippedNonIt} filtered=${result.skippedSenior} marketing=${marketingCandidates.length} ` +
     `reconcile=${JSON.stringify(result.reconcile)}`
   );
 
