@@ -313,31 +313,14 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
     }
   }
 
-  // 1.5) cross-source dupe-szűrés — a helyszín-kapu UTÁN (kevesebb sor), de a
-  // detail-hívás ELŐTT (ld. a fájl fejlécét: DUPE_CHECK_SOURCES), hogy egy már
-  // profession/talent/LinkedIn/startupjobs alatt meglévő pozíció ne kössön le
-  // felesleges detail-kérést sem, ne csak insertet. Cím+cég alapján dönt —
-  // technológiát a cross-source guard szándékosan sosem néz (2026-09-03: ld.
-  // _cross_source_dupe.mjs fejléce).
-  let dedupedHuJobs = huJobs;
-  if (dupeIndex) {
-    dedupedHuJobs = [];
-    for (const job of huJobs) {
-      const company = job.company || tenant.company || null;
-      if (isCrossSourceDupe(dupeIndex, company, job.title)) {
-        console.log(`[atscrawl] ${label} SKIP cross-source dupe "${job.title}" @ ${company}`);
-        continue;
-      }
-      dedupedHuJobs.push(job);
-    }
-    if (dedupedHuJobs.length !== huJobs.length) {
-      console.log(`[atscrawl] ${label} cross-source dupes skipped: ${huJobs.length - dedupedHuJobs.length}`);
-    }
-  }
-
-  // 2) a HU-sorok teljes felépítése (insert ELŐTT, egyetlen detail-hívással)
+  // 2) a HU-sorok teljes felépítése (insert ELŐTT, egyetlen detail-hívással).
+  // Mindig a TELJES huJobs-ból, a cross-source dupe-ellenőrzés (2.5) UTÁN dönt
+  // arról, mi kerül insertbe — soha nem előtte. Az url-t (SmartRecruitersnél
+  // csak a detail adja meg, ld. srPostingUrl) ITT kell felépíteni, mert a
+  // reconcile-nak a dupe-nak jelölt, de a boardon még ott lévő sorok url-je is
+  // kell (ld. a 2.5 lépés fejlécét).
   const built = [];
-  for (const job of dedupedHuJobs) {
+  for (const job of huJobs) {
     let html = job.descriptionHtml;
     let url = job.url;
     if (job.detailRef) {
@@ -365,6 +348,39 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
       experience: (html ? extractBodyExperience(html) : null) || "-",
       technologies: html ? extractTechnologies(html) : null,
     });
+  }
+
+  /* 2.5) cross-source dupe-szűrés — a detail-hívás UTÁN (2026-09-08 fix), NEM
+     előtte. Amíg ez a lépés a detail-hívás ELŐTT futott, egy dupe-nak jelölt
+     sor SOSEM jutott el a `built` tömbbe, tehát az url-je se a reconcile
+     foundUrls-ébe, se a SmartRecruiters-migrációba (3. lépés) — egy már
+     beszúrt, de EZEN a futáson más forráson is felbukkanó hirdetés a
+     scope-olt reconcile szemében "eltűnt a boardról" lett, holott a board
+     látta, csak nem inzertáltuk újra. Élesben ez azt jelentette, hogy egy
+     még nyitott ATS-hirdetés a puszta kereszt-forrás egyezés miatt
+     deaktiválódott, amint egy másik scraper is megtalálta ugyanazt az
+     állást — ez volt a "kegyetlenül rosszul deaktivál" hiba.
+     Most a dupe-nak jelölt sorok url-je a `built`-ben (és így a 3. lépés
+     migrációjában, a 4. lépés scope-számításában) is bent marad, csak az
+     insertből esnek ki — az ingestJobs `extraFoundUrls`-ébe kerülnek, hogy a
+     reconcile "látottnak" számolja őket anélkül, hogy újra beszúrnánk. Cím+cég
+     alapján dönt — technológiát a cross-source guard szándékosan sosem néz
+     (2026-09-03: ld. _cross_source_dupe.mjs fejléce). */
+  let insertRows = built;
+  const dupeUrls = [];
+  if (dupeIndex) {
+    insertRows = [];
+    for (const row of built) {
+      if (isCrossSourceDupe(dupeIndex, row.company, row.title)) {
+        console.log(`[atscrawl] ${label} SKIP cross-source dupe "${row.title}" @ ${row.company}`);
+        dupeUrls.push(row.url);
+        continue;
+      }
+      insertRows.push(row);
+    }
+    if (dupeUrls.length) {
+      console.log(`[atscrawl] ${label} cross-source dupes skipped: ${dupeUrls.length}`);
+    }
   }
 
   // 3) rotáló-id migráció (csak SmartRecruiters) — a sor URL-je változik, de a
@@ -406,12 +422,13 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
 
   const result = await ingestJobs(client, {
     source: ATS_SOURCE,
-    jobs: built,
+    jobs: insertRows,
     fullListing,
     filters,
     categories,
     rejectLocation: rejectAtsLocation,
     scopePrefix,
+    extraFoundUrls: dupeUrls,
   });
 
   // A nem-IT sorok (ingestJobs úgyis eldobta volna őket, ld. skippedNonIt) a
@@ -422,8 +439,9 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
   );
 
   console.log(
-    `[atscrawl] ${label} → hu=${huJobs.length} built=${built.length} inserted=${result.inserted} ` +
-    `nonIt=${result.skippedNonIt} filtered=${result.skippedSenior} marketing=${marketingCandidates.length} ` +
+    `[atscrawl] ${label} → hu=${huJobs.length} built=${built.length} insertable=${insertRows.length} ` +
+    `dupes=${dupeUrls.length} inserted=${result.inserted} nonIt=${result.skippedNonIt} ` +
+    `filtered=${result.skippedSenior} marketing=${marketingCandidates.length} ` +
     `reconcile=${JSON.stringify(result.reconcile)}`
   );
 
