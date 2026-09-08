@@ -673,8 +673,31 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
       if (source === "wherewework") {
         let pageHtml = html;
         let pageUrl = p.url;
-        // 90 oldal ≈ 900 állás — a széles bucket-lista ma 75 oldal (748 állás).
-        let safetyPagesLeft = 90;
+        // Self-scaling cap (2026-09-08): a fix "90 oldal ≈ 900 állás" becslés
+        // 2026-07-11-én, 748 állásos listánál (75 oldal) született — mára a lista
+        // 892 állásra / 90 oldalra nőtt, azaz a fix 90-es cap gyakorlatilag
+        // NULLA tartalékkal futott (1 oldalnyi híján csonkolta volna a listát),
+        // és élő bizonyíték is van rá: a "Validation Engineer, API" (Debrecen,
+        // feladva 2026.08.02.) és a "3D labor gyakornok" (Hatvan, 2026.06.17.)
+        // hirdetések a wherewework.hu-n megvannak, de a job_posts-ban nincsenek
+        // — a lista tovább nőhetett, mire a cron lefutott, és kieshettek a cap
+        // alól. A wherewework listaoldal (`#jobs-total`, pl. "892 results")
+        // szerver-oldalon renderelt, cheerio-val simán kiolvasható — ebből
+        // számoljuk a valós szükséges oldalszámot, így a cap magától követi a
+        // lista növekedését ahelyett, hogy megint befagyna egy pillanatnyi
+        // értéken.
+        const $p1 = cheerioLoad(pageHtml);
+        const totalText = $p1("#jobs-total").first().text();
+        const totalMatch = totalText.match(/(\d[\d\s]*)/);
+        const totalResults = totalMatch ? parseInt(totalMatch[1].replace(/\s/g, ""), 10) : null;
+        const perPage = merged.length || 10; // az 1. oldalon ténylegesen talált job-url-ek száma
+        // +5 oldal tartalék (kerekítés/utolsó-oldal-részleges biztonság), 90 alsó
+        // padló (ha a #jobs-total valamiért nem olvasható), 300 felső korlát
+        // (parse-hiba esetén ne fusson el a végtelenségig).
+        let safetyPagesLeft = totalResults
+          ? Math.min(300, Math.max(90, Math.ceil(totalResults / perPage) + 5))
+          : 90;
+        console.log(`${tag}   wherewework: #jobs-total=${totalResults ?? "n/a"}, perPage=${perPage} → lapozási keret ${safetyPagesLeft + 1} oldal`);
         let pageNum = 1;
         let sawEnd = false;
         while (safetyPagesLeft-- > 0) {
