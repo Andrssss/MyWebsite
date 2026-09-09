@@ -14,7 +14,7 @@ export default async (request) => {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(
-      `SELECT id, url, source, title, company, active, experience, first_seen
+      `SELECT id, url, source, title, company, active, experience, technologies, first_seen
          FROM job_posts WHERE url LIKE $1 ORDER BY id`,
       [`%${urlParam}%`]
     );
