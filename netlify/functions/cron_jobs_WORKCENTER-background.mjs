@@ -185,23 +185,22 @@ async function fetchJson(url) {
 
 /* ── experience from listing text ────────────────────────────── */
 
-const INTERN_TEXT_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetségprogram", "tehetsegprogram",
-  "friss diplomás", "friss diplomas",
-  "nem szükséges tapasztalat", "tapasztalat nem szükséges",
-  "tapasztalat nélkül", "tapasztalat nelkul",
-  "belépő szintű", "belepo szintu",
-];
-
+// Used to carry its own INTERN_TEXT_KEYWORDS list, scanned over the combined
+// title+body with plain substring `.includes()` — no word boundary (so
+// "intern" also matched inside "internal"/"international" anywhere in a full
+// job description, not just the title) AND several entries that are junior/
+// entry-level signals, not internship signals ("friss diplomás" = fresh
+// graduate — already finished studies, see the "graduate" comment in
+// _experience_core.mjs; "nem szükséges tapasztalat"/"tapasztalat nélkül"/
+// "belépő szintű" = "no experience required"/"entry-level", both common
+// phrasing for full-time junior roles too). REMOVED 2026-09-09 in favor of
+// the shared, word-boundary-safe isInternshipTitle — same fix shape as the
+// "talent" bug, applied to a body-text scan instead of a title-only one.
 function detectExperienceFromText(title, descText) {
-  const t = normalizeText(title);
-  const d = normalizeText(descText ?? "");
-  const combined = t + " " + d;
-
-  // 1. Internship/entry markers take priority
-  if (INTERN_TEXT_KEYWORDS.some(k => combined.includes(normalizeText(k)))) return "diákmunka";
+  // 1. Internship/entry markers take priority (title already checked by the
+  // caller via isInternshipTitle — re-checking here is redundant but harmless
+  // and keeps this function correct if ever called on its own).
+  if (isInternshipTitle(`${title} ${descText ?? ""}`)) return "diákmunka";
 
   // 2. Extract year-based experience from description
   const years = extractYearsFromText(descText ?? "");

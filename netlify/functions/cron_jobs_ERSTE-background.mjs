@@ -8,7 +8,8 @@
     2. Parse row HTML — list contains experience field directly
     3. Senior: experience contains "5 év fölött" or "vezető" (without junior/medior values)
               OR isSeniorLike(title)
-    4. Intern: experience contains "Gyakornok" or "pályakezdő" OR isInternshipTitle(title)
+    4. Intern: experience contains "Gyakornok" OR isInternshipTitle(title)
+              ("pályakezdő" removed 2026-09-09 — means junior, not diákmunka)
     5. Detail-oldal fetch CSAK új url-re → technologies (a lista nem hordoz törzset)
 */
 
@@ -312,11 +313,16 @@ export default withTimeout("cron_jobs_ERSTE-background", async () => {
         // seniorOnly logika tartotta fenn), de az isIntern lentebb továbbra is
         // rá hivatkozott → ReferenceError MINDEN nem-senior sornál, azóta a
         // teljes forrás új sort nem tudott felvenni (2026-07-22 user-jelzés).
+        // "pályakezdő" ("career starter"/entry-level) REMOVED 2026-09-09 from
+        // this intern check — it means "early in one's career", not "still a
+        // student", same distinction _experience_core.mjs's JUNIOR_KEYWORDS
+        // comment makes for "graduate". Erste's own "Pályakezdő" tier now
+        // passes through as real experience text and reads as "junior" via
+        // computeLevel's JUNIOR_TOKENS match, instead of being force-stamped
+        // diákmunka. Erste's genuine "Gyakornok" tier is unaffected.
         const expLower = expCombined.toLowerCase();
         const isIntern =
           expLower.includes("gyakornok") ||
-          expLower.includes("pályakezdő") ||
-          expLower.includes("palyakezdo") ||
           isInternshipTitle(title);
 
         let source = "erste";

@@ -314,8 +314,25 @@ const hoursSince = (iso) => {
 ======================= */
 // "talent" REMOVED 2026-09-08 — see src/lib/experienceLevel.mjs's INTERN_KEYWORDS
 // comment (this is the client-side filter-mode duplicate of that list).
-const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
+// "internship"/"traineeship" ADDED 2026-09-09 — see the same file's comment:
+// the word-boundary check below needs them as separate whole words, since
+// "Internship" fails the boundary test for bare "intern" (continues with
+// "ship", a letter).
+const INTERN_KEYWORDS = [
+  "intern", "internship", "gyakornok", "trainee", "traineeship", "diák", "diákmunka",
+];
 const JUNIOR_KEYWORD = "junior";
+
+// Word-boundary version — a plain `.includes()` substring check also matches
+// "intern" inside "internal"/"international": confirmed live 2026-09-09 on
+// "IT internal audit analyst", "Internal Tools Developer" and "Manual Tester
+// (Internal Systems & Customer Journey)", none of them internships. Same
+// accent-safe boundary shape as experienceLevel.mjs's INTERN_KEYWORD_TOKENS.
+const INTERN_KEYWORDS_RE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(?:${INTERN_KEYWORDS.join("|")})(?![\\p{L}\\p{N}])`,
+  "u"
+);
+const hasInternKeyword = (text) => INTERN_KEYWORDS_RE.test((text || "").toLowerCase());
 
 // The "AI-scraped" button is a bucket, not a plain source: rows use the flat
 // source "AI-scraped", but any legacy `AI - <slug>` rows still around during the
@@ -1441,28 +1458,23 @@ const JobWatcher = () => {
     let list = jobs;
 
     const isJuniorTrackCandidate = (job) => {
-      const t = (job.title || "").toLowerCase();
-      const title = (job.title || "").toLowerCase();
       const source = (job.source || "").toLowerCase();
-      const exp = (job.experience || "").toLowerCase();
-
-      const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
 
       // Ha a forrás diákszövetkezet, akkor NE legyen junior/medior
       const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
 
       // Ha a cím tipikusan gyakornok/diák, akkor sem junior/medior
-      const isInternTitle = INTERN_KEYWORDS.some((k) => title.includes(k));
+      const isInternTitle = hasInternKeyword(job.title);
 
       // Ha az experience gyakornok/diák jellegű, akkor sem junior/medior
-      const isInternExp = INTERN_KEYWORDS.some((k) => exp.includes(k));
+      const isInternExp = hasInternKeyword(job.experience);
 
       // Ha az experience explicit junior, a cím-alapú intern szűrőket hagyjuk figyelmen kívül
       if (hasJuniorLevelToken(job.experience)) {
         return !isInternSource && !isInternExp;
       }
 
-      return !isInternSource && !isInternTitle && !internLike && !isInternExp;
+      return !isInternSource && !isInternTitle && !isInternExp;
     };
 
     if (timeToday) {
@@ -1498,10 +1510,9 @@ const JobWatcher = () => {
       list = list.filter((j) => {
         const source = (j.source || "").toLowerCase();
         const t = (j.title || "").toLowerCase();
-        const exp = (j.experience || "").toLowerCase();
         const isInternSource = JUNIOR_EXCLUDED_SOURCES.some((s) => source.includes(s));
-        const internLike = INTERN_KEYWORDS.some((k) => t.includes(k));
-        const internExp = INTERN_KEYWORDS.some((k) => exp.includes(k));
+        const internLike = hasInternKeyword(j.title);
+        const internExp = hasInternKeyword(j.experience);
         return (
           ((internLike || internExp) && !t.includes(JUNIOR_KEYWORD)) || isInternSource
         );

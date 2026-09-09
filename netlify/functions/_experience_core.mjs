@@ -33,10 +33,21 @@ function normalizeText(s) {
 // pool)" or "medior tester (talent pool)". A talent-pool posting with no other
 // intern signal now falls through to whatever real experience text is
 // extracted (or "-" if none) instead of being guessed as an internship.
+// "early career" was REMOVED 2026-09-09: its only genuine catches ("Early
+// Careers Hubs ... Trainee") are already caught by "trainee" anyway, while its
+// one distinct catch — "quantitative developer (graduates & early career
+// professionals)" — is a full-time entry-level trading role, not a student
+// internship. Same false-positive shape as "talent"/"pályakezdő" below: a
+// real phrase that just isn't a reliable "still enrolled" signal.
+// "traineeship" ADDED 2026-09-09 alongside "trainee": the word-boundary check
+// above needs it as its own whole word too, for the same reason "internship"
+// already sits next to "intern" — "traineeship" fails the boundary test for
+// bare "trainee" (continues with "ship", a letter). Live example: "global
+// traineeship gbds - hungary".
 export const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee",
-  "pályakezdő", "palyakezdo", "diákmunka", "diakmunka",
-  "tehetsegprogram", "tehetségprogram", "student", "students", "early career",
+  "gyakornok", "intern", "internship", "trainee", "traineeship",
+  "diákmunka", "diakmunka", "tehetsegprogram", "tehetségprogram",
+  "student", "students",
 ];
 
 // "graduate" (e.g. "New College Graduate", "Graduate Software Engineer") means
@@ -48,8 +59,15 @@ export const INTERNSHIP_KEYWORDS = [
 // "intern"/"trainee" keyword above — isInternshipTitle is checked first.
 // Fixed 2026-07-30 after NVIDIA's "Formal Verification Engineer - New College
 // Graduate" AI-scraped find got mislabeled diákmunka.
+//
+// "pályakezdő"/"palyakezdo" (Hungarian "career starter"/entry-level) MOVED
+// here from INTERNSHIP_KEYWORDS 2026-09-09 for the identical reason: it means
+// "early in one's career", not "still a student" — live evidence "Junior/
+// Pályakezdő Fejlesztő" (a full-time junior dev role) got wrongly stamped
+// diákmunka. Matches src/lib/experienceLevel.mjs's JUNIOR_TOKENS, which
+// already treats it as a junior signal on the read side.
 export const JUNIOR_KEYWORDS = [
-  "junior", "graduate",
+  "junior", "graduate", "pályakezdő", "palyakezdo",
 ];
 
 export const MID_KEYWORDS = [

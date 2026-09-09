@@ -19,7 +19,7 @@ import {
   extractBodyExperience,
   extractKukaExperience,
   extractTechnologies,
-  INTERNSHIP_KEYWORDS,
+  isInternshipTitle,
   isSeniorExperience,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, isSeniorTitleFilterMatch, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -437,14 +437,16 @@ function isBudapestLocation(location) {
   return normalized.includes("budapest") || /\b1\d{3}\b/.test(normalized);
 }
 
-// INTERNSHIP_KEYWORDS imported from _experience_core.mjs
-
+// isInternshipTitle imported from _experience_core.mjs — word-boundary safe
+// (a bare `INTERNSHIP_KEYWORDS.some(k => fullNorm.includes(k))` here used to
+// bypass that protection entirely, e.g. "intern" matching inside "internal"/
+// "international" anywhere in the description; fixed 2026-09-09, same failure
+// shape as the "talent" bug).
 
 function inferExperience(title, description) {
   const titleNorm = normalizeText(title ?? "");
-  const fullNorm = normalizeText(`${title ?? ""} ${description ?? ""}`);
 
-  if (INTERNSHIP_KEYWORDS.some(k => fullNorm.includes(k))) return "diákmunka";
+  if (isInternshipTitle(`${title ?? ""} ${description ?? ""}`)) return "diákmunka";
   if (isSeniorTitleFilterMatch(title, _filters)) return "senior";
   if (/\bmedior\b/.test(titleNorm)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry level\b/.test(titleNorm)) return "junior";

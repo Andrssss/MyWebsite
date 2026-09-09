@@ -14,7 +14,7 @@ import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
-import { extractTalentExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isSeniorExperience } from "./_experience_core.mjs";
+import { extractTalentExperience, extractTechnologies, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
@@ -196,11 +196,14 @@ function isSeniorLike(title) {
   return shouldSkipTitleFilter(title, _filters);
 }
 
-// INTERNSHIP_KEYWORDS / isInternshipTitle imported from _experience_core.mjs
+// isInternshipTitle imported from _experience_core.mjs — word-boundary safe
+// (a bare `INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))` here used to
+// bypass that protection entirely, e.g. "intern" matching inside "internal"/
+// "international"; fixed 2026-09-09, same failure shape as the "talent" bug).
 
 function inferTalentExperience(title) {
+  if (isInternshipTitle(title)) return "diákmunka";
   const normalized = normalizeText(title);
-  if (INTERNSHIP_KEYWORDS.some(k => normalized.includes(k))) return "diákmunka";
   if (/\bmedior\b|\bmid\b/.test(normalized)) return "medior";
   if (/\bjunior\b|\bpalyakezdo\b|\bentry.?level\b/.test(normalized))
     return "junior";

@@ -17,7 +17,16 @@
 // categorize.mjs, a SEPARATE concept) — got misclassified "intern" even for
 // clearly non-intern postings ("Specialist, Contingent Workforce (talent
 // pool)", "medior tester (talent pool)").
-export const INTERN_KEYWORDS = ["intern", "gyakornok", "trainee", "diák", "diákmunka"];
+// "internship"/"traineeship" listed separately from "intern"/"trainee" even
+// though one starts with the other: the word-boundary check added 2026-09-09
+// below requires a non-letter/digit character right after the match, so
+// "Internship" (continues with "ship") fails the boundary for bare "intern" —
+// confirmed via a regression check on "Internship Opportunities" while fixing
+// the "internal"/"international" false-positive. Same reasoning covers
+// "traineeship" ("global traineeship gbds - hungary", live 2026-09-09).
+export const INTERN_KEYWORDS = [
+  "intern", "internship", "gyakornok", "trainee", "traineeship", "diák", "diákmunka",
+];
 
 /** Diákszövetkezeti források: definíció szerint gyakornoki, sosem junior/medior. */
 export const INTERN_ONLY_SOURCES = [
@@ -48,6 +57,17 @@ const wordRe = (alternatives) =>
 const JUNIOR_TOKENS = wordRe("junior|palyakezdo|pályakezdő|entry\\s*level|trainee|intern");
 const MEDIOR_TOKENS = wordRe("medior|mid|middle");
 const SENIOR_TOKENS = wordRe("senior|szenior|lead");
+
+// Word-boundary version of INTERN_KEYWORDS — a plain `.includes()` substring
+// check (the original form of isInternLike/isJuniorTrackCandidate below) also
+// matches "intern" inside "internal"/"international": confirmed live
+// 2026-09-09 on "IT internal audit analyst", "Internal Tools Developer" and
+// "Manual Tester (Internal Systems & Customer Journey)" — none of them
+// internships, all silently forced into the intern bucket. Same fix shape as
+// the "talent" bug (see INTERN_KEYWORDS comment above), one boundary check
+// this time instead of a keyword removal.
+const INTERN_KEYWORD_TOKENS = wordRe(INTERN_KEYWORDS.join("|"));
+const hasInternKeyword = (text) => INTERN_KEYWORD_TOKENS.test(norm(text));
 
 const hasJuniorToken = (e) => JUNIOR_TOKENS.test(e);
 const hasMediorToken = (e) => MEDIOR_TOKENS.test(e);
@@ -99,9 +119,8 @@ export function isInternSource(source) {
 
 export function isInternLike(job) {
   const title = norm(job.title);
-  const exp = norm(job.experience);
-  const titleHit = INTERN_KEYWORDS.some((k) => title.includes(k));
-  const expHit = INTERN_KEYWORDS.some((k) => exp.includes(k));
+  const titleHit = hasInternKeyword(job.title);
+  const expHit = hasInternKeyword(job.experience);
   return isInternSource(job.source) || ((titleHit || expHit) && !title.includes("junior"));
 }
 
@@ -110,14 +129,13 @@ export function isInternLike(job) {
  * experience mező kifejezetten juniort mond, az felülírja a cím-heurisztikát.
  */
 export function isJuniorTrackCandidate(job) {
-  const title = norm(job.title);
   const exp = norm(job.experience);
   const internSource = isInternSource(job.source);
-  const internExp = INTERN_KEYWORDS.some((k) => exp.includes(k));
+  const internExp = hasInternKeyword(job.experience);
 
   if (hasJuniorToken(exp)) return !internSource && !internExp;
 
-  const internTitle = INTERN_KEYWORDS.some((k) => title.includes(k));
+  const internTitle = hasInternKeyword(job.title);
   return !internSource && !internTitle && !internExp;
 }
 
