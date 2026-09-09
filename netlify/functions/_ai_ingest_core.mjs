@@ -312,18 +312,34 @@ async function upsertJob(client, source, job, resolvedExperience) {
  *                                    (_ats_handoff.mjs has the full reasoning). Deliberately
  *                                    opt-in: ats-crawl and workable post ATS urls themselves and
  *                                    must never hand their own rows away.
+ * @param {string[]} [args.extraFoundUrls=[]]  Urls to fold into `foundUrls` in addition to `jobs`,
+ *                                    without going through any gate or insert. For a caller that
+ *                                    pre-filters `jobs` itself BEFORE calling in (ats-crawl drops
+ *                                    non-Budapest rows here to skip their detail-fetch entirely —
+ *                                    see cron_jobs_ATSCRAWL-background.mjs), those dropped rows can
+ *                                    never reach the `foundUrls.push` below no matter how early it
+ *                                    runs, so reconcile would read a merely-filtered-out row as
+ *                                    VANISHED and deactivate it — conflating "still listed but out
+ *                                    of scope" with "genuinely gone" (2026-09-09 fix). Pass the
+ *                                    caller's own full, unfiltered listing's urls here to keep that
+ *                                    distinction: a row still present anywhere in the raw listing is
+ *                                    never treated as dead by reconcile, no matter which of this
+ *                                    function's OWN gates (or the caller's pre-filter) reject it.
  */
 export async function ingestJobs(client, {
   source, jobs, fullListing = false, filters = [], categories = [],
   rejectLocation = isNonBudapestLocation, scopePrefix = null, handoffAtsUrls = false,
-  skipCrossSourceDupes = false,
+  skipCrossSourceDupes = false, extraFoundUrls = [],
 }) {
   await ensureTechnologiesColumn(client);
   await ensureLevelColumn(client);
   const ok = jobs.length > 0;
   const complete = ok && !!fullListing;
 
-  const foundUrls = []; // FULL pre-filter set → a filter change can't deactivate a live job (F3).
+  // FULL pre-filter set → a filter change can't deactivate a live job (F3). Seeded
+  // with extraFoundUrls for callers whose OWN pre-filtering already dropped rows
+  // before they ever reached `jobs` (see the extraFoundUrls doc comment above).
+  const foundUrls = [...extraFoundUrls];
   const insertedUrls = []; // Only rows that passed every gate — callers use this to record what
                            // actually reached the DB, rather than what they hoped to write.
   let skippedSenior = 0;

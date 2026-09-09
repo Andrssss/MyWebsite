@@ -425,6 +425,14 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
     categories,
     rejectLocation: rejectAtsLocation,
     scopePrefix,
+    // The helyszín-kapu (line ~284) already dropped non-HU rows out of `built`
+    // before this call, for performance (see that gate's own comment) — those
+    // rows never reach ingestJobs's own foundUrls collection no matter what.
+    // Pass the RAW board urls here so a row that's still genuinely listed but
+    // merely out of location-scope is never read as "vanished" by reconcile
+    // (2026-09-09: this is what made adding ats-crawl to
+    // SWEEP_SOLE_DEACTIVATOR_SOURCES safe — see that set's comment).
+    extraFoundUrls: boardJobs.map((j) => j.url).filter(Boolean),
   });
 
   // A nem-IT sorok (ingestJobs úgyis eldobta volna őket, ld. skippedNonIt) a

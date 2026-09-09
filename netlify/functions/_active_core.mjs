@@ -1118,23 +1118,29 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
 // need to be a guess, because an authoritative per-url rule can just ask.
 export const REVIVE_MAX_AGE_DAYS = 45;
 
-// Sources whose reconcileActive is hardcoded reactivate-only (`complete:false`),
-// i.e. their LISTING can never deactivate anything — the 404-sweep is their SOLE
-// deactivator. For these, an inactive row means "the sweep killed it" no matter what
-// `sweep_dead` says, so reviveSweepDead re-checks ALL their inactive rows, not just
-// the flagged ones. That is what heals rows killed by an OLDER, since-fixed reconcile:
-// they carry sweep_dead=false and are otherwise unreachable forever, because the ad has
-// long since aged out of the listing that would have reactivated it (2026-07-14: 7 live
-// profession-intern rows sat off exactly like this, invisible to every automatic path).
+// Sources whose reconcileActive can be trusted to deactivate ONLY on a genuine
+// death signal — either because it's hardcoded reactivate-only (`complete:false`,
+// so the 404-sweep is the SOLE deactivator: profession-intern, talent,
+// nofluffjobs, bluebird, startupjobs), or because its "listing absence" input is
+// now scoped to mean exactly that and nothing else (ats-crawl, see below). For
+// these, an inactive row is always reachable by "does its own url still say
+// alive?", so reviveSweepDead re-checks ALL their inactive rows, not just the
+// sweep_dead-flagged ones. That is what heals rows killed by an OLDER, since-fixed
+// reconcile: they carry sweep_dead=false and are otherwise unreachable forever,
+// because the ad has long since aged out of the listing that would have
+// reactivated it (2026-07-14: 7 live profession-intern rows sat off exactly like
+// this, invisible to every automatic path).
 //
-// Safe only because each of these five has an authoritative per-url death rule
-// (profession-intern → REDIRECT_DEAD_SOURCES; talent/nofluffjobs/bluebird/startupjobs →
-// BANNER_DEAD_SOURCES), so "no death signal on its own page" really does mean alive,
-// and because their reconcile cannot re-deactivate what this revives (no flip-flop).
+// Safe only because each of these six has an authoritative per-url death rule
+// (profession-intern → REDIRECT_DEAD_SOURCES; talent/nofluffjobs/bluebird/
+// startupjobs → BANNER_DEAD_SOURCES; ats-crawl → the same aiScrapedProbe/
+// aiScrapedIsDead pair AI-scraped uses), so "no death signal on its own page"
+// really does mean alive, and because their reconcile cannot re-deactivate what
+// this revives on grounds unrelated to liveness (no flip-flop).
 //
 // 2026-09-09: membership here ALSO exempts a source from REVIVE_MAX_AGE_DAYS (see
 // that constant's comment) — every inactive row gets re-asked, however old. Cheap
-// and safe for exactly this set (a few hundred rows total across all five), and
+// and safe for exactly this set (a few hundred rows total across all six), and
 // the same authoritative-rule property that rules out flip-flop above is exactly
 // what makes an unbounded daily re-ask harmless — which is why membership below
 // is deliberately narrow, not a default.
@@ -1152,12 +1158,28 @@ export const REVIVE_MAX_AGE_DAYS = 45;
 // plain 404, so the default rule never fired and rows sat stuck active past
 // closing. Now covered by a BANNER_DEAD_SOURCES entry instead (verified
 // absent on a live sample from the same run).
+// ats-crawl (2026-09-09): unlike the five above, its reconcile is NOT
+// hardcoded reactivate-only — `fullListing` can be true and it WILL deactivate
+// a row absent from that run's found set. That used to conflate two different
+// reasons a row could be missing: genuinely gone from the board, or merely
+// filtered out by the location gate (_ats_location.mjs) before ever reaching
+// the found set (a POLICY exclusion — the exact "alive at its own url" case the
+// warning above exists for, confirmed by a full audit finding 2 live-and-clearly-
+// Budapest rows, seon/Ashby and kpler/Lever, stuck wrongly inactive). Fixed at
+// the source rather than worked around here: cron_jobs_ATSCRAWL-background.mjs
+// now passes ingestJobs's new `extraFoundUrls` with the RAW, unfiltered board
+// listing, so a row still physically listed — regardless of what any gate
+// (location included) does with it — can never register as "vanished". That
+// makes ats-crawl's reconcile-driven deactivation mean exactly "gone from the
+// board", same ground truth the per-url rule independently confirms, which is
+// what makes adding it here safe.
 export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
   "profession-intern",
   "talent",
   "nofluffjobs",
   "bluebird",
   "startupjobs",
+  "ats-crawl",
 ]);
 
 /**
