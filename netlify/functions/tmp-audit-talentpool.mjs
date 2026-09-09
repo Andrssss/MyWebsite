@@ -40,6 +40,13 @@ const CANDIDATES = [
   "~open application",
   "~spontaneous application",
   "~future talent",
+  // round 2 — "stillMissedToday" showed "french/german speaking
+  // opportunities" (no "future" in the title at all), which the issue's own
+  // suggestion doesn't catch. Testing the sibling phrasing, plus a
+  // deliberately-too-broad bare "opportunit" as a control to see how much
+  // it would steal if someone were tempted to shorten to just that.
+  "~speaking opportunit",
+  "~opportunit",
 ];
 
 export default async (request) => {
