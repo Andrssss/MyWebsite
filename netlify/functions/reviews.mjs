@@ -26,6 +26,7 @@ import {
   deleteReview,
   toggleLike,
 } from "./_subject_reviews_store.mjs";
+import { checkAndConsumeLikeBudget, tooManyLikeRequests } from "./_like_rate_limit.mjs";
 
 function jsonResponse(statusCode, body) {
   return new Response(JSON.stringify(body), {
@@ -88,6 +89,11 @@ export default async (request) => {
       const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
       if (!userId || userId.length > 128) {
         return jsonResponse(400, { error: "user_id kötelező mező." });
+      }
+
+      const budget = await checkAndConsumeLikeBudget(userId);
+      if (!budget.allowed) {
+        return tooManyLikeRequests(budget.resetInSeconds);
       }
 
       const result = await toggleLike(id, userId);
