@@ -49,11 +49,14 @@ function normalizeForCompare(name) {
 }
 
 export async function readReviewsWithEtag() {
-  const { data, etag } = await store().getWithMetadata(BLOB_KEY, { type: "json" });
+  // getWithMetadata returns null (not {data: null}) when the key doesn't
+  // exist yet — the exact state before the one-time Postgres migration runs.
+  const result = await store().getWithMetadata(BLOB_KEY, { type: "json" });
+  const data = result?.data;
   if (!data || !Array.isArray(data.reviews)) {
     return { data: { nextId: 1, reviews: [] }, etag: null };
   }
-  return { data, etag };
+  return { data, etag: result.etag };
 }
 
 // Applies `mutateFn` to the current data and writes it back, retrying on a
