@@ -25,9 +25,17 @@
 // is for. Now any broad-interest IT/tech event counts — narrowed only to
 // exclude paid executive/manager-only corporate training and pure vendor
 // pitches. Same day, `kibernaptar.hu/esemenylista/` (a general Hungarian
-// IT/cybersecurity event calendar) was added to `event_sources` as the first
-// source that actually exercises this wider scope — epam/progmasters are
+// IT/cybersecurity event calendar) and `ivsz.hu/esemenyek/` (the Hungarian
+// ICT association's event calendar) were added to `event_sources` as
+// sources that actually exercise this wider scope — epam/progmasters are
 // single-company pages, narrow either way.
+//
+// `format`/`language` added 2026-09-09 (user request, for pestidev.hu/events
+// filter chips: online vs in-person, and event language). Both required in
+// the schema (like `type`) so the model always commits to a value, with the
+// same enum-or-fallback defensiveness as `type` in validateEvents below —
+// never leave a filterable field null/missing just because the source page
+// didn't say explicitly.
 
 import {
   MODEL,
@@ -43,6 +51,8 @@ import {
 export { MODEL, estimateCost, fetchListingPage } from "./_ai_extract_core.mjs";
 
 const EVENT_TYPES = ["allasborze", "eloadas", "konferencia", "meetup", "egyeb"];
+const EVENT_FORMATS = ["online", "inperson", "hybrid"];
+const EVENT_LANGUAGES = ["hu", "en"];
 
 const EVENT_SCHEMA = {
   type: "object",
@@ -54,7 +64,7 @@ const EVENT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["title", "url", "date", "type"],
+        required: ["title", "url", "date", "type", "format", "language"],
         properties: {
           title: { type: "string" },
           url: { type: "string" },
@@ -67,6 +77,13 @@ const EVENT_SCHEMA = {
           // "allasborze" (job fair) | "eloadas" (talk/presentation/webinar) |
           // "konferencia" | "meetup" | "egyeb" (anything else).
           type: { type: "string", enum: EVENT_TYPES },
+          // "online" | "inperson" | "hybrid" — best guess from the page's own
+          // wording (e.g. "helyszíni és online", "csak online", an address
+          // with no online mention). Never leave this ambiguous-null.
+          format: { type: "string", enum: EVENT_FORMATS },
+          // "hu" | "en" — the language the event itself is held/announced in
+          // (not the page's UI chrome). Judge from the title/description.
+          language: { type: "string", enum: EVENT_LANGUAGES },
           // ISO "YYYY-MM-DD" — the last day one can still register/sign up
           // for the event, or null if the page states no registration or no
           // deadline. High-priority field: extract whenever the page gives it.
@@ -94,7 +111,13 @@ const EXTRACT_SYSTEM =
   "reference date, inferring the year if it is omitted. `endDate` is the last day for a " +
   "multi-day event, or null. `type` classifies the event: \"allasborze\" for a job " +
   "fair/career day, \"eloadas\" for a talk/presentation/webinar, \"konferencia\" for a " +
-  "conference, \"meetup\" for a meetup, \"egyeb\" if none of those fit. " +
+  "conference, \"meetup\" for a meetup, \"egyeb\" if none of those fit. `format` is " +
+  "\"online\" if it's virtual-only, \"inperson\" if it's at a physical venue with no online " +
+  "option mentioned, or \"hybrid\" if the page offers both (e.g. \"helyszíni és online\") — " +
+  "always pick one, defaulting to \"inperson\" if the page gives a physical address and says " +
+  "nothing about an online option. `language` is \"hu\" or \"en\", whichever the event itself " +
+  "is conducted in (judge from the title/description, not the site's UI chrome) — default to " +
+  "\"hu\" for a Hungarian-language page with no explicit language statement. " +
   "`registrationDeadline` is HIGH PRIORITY: if the page states a deadline, cutoff date, or " +
   "\"regisztrálj eddig\" / \"jelentkezési határidő\" / \"register by\" for the event, extract " +
   "it as an ISO YYYY-MM-DD date — resolve relative dates the same way as `date`. Only use null " +
@@ -148,6 +171,8 @@ function validateEvents(rawEvents, sourceHtml, baseUrl) {
       location: cleanField(e.location),
       company: cleanField(e.company),
       type: EVENT_TYPES.includes(e.type) ? e.type : "egyeb",
+      format: EVENT_FORMATS.includes(e.format) ? e.format : "inperson",
+      language: EVENT_LANGUAGES.includes(e.language) ? e.language : "hu",
       registrationDeadline,
     });
   }
