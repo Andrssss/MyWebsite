@@ -31,7 +31,7 @@ export default async (req) => {
   const client = await pool.connect();
   try {
     const byReqId = await client.query(
-      `SELECT id, source, title, url, experience, active, company, first_seen, last_seen, sweep_dead
+      `SELECT id, source, title, url, experience, active, company, first_seen, last_seen
        FROM job_posts WHERE url LIKE '%1434343033%'`
     );
     const byTitle = await client.query(
@@ -66,6 +66,11 @@ export default async (req) => {
       ),
       { headers: { "Content-Type": "application/json" } }
     );
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message, stack: err.stack }, null, 2), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   } finally {
     client.release();
   }
