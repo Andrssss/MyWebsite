@@ -31,11 +31,21 @@
 // karrierportal-style vanity host (alfa.hu), two single-tenant careers-root
 // redirects (sagemcom.com, bca.hu), and one cross-domain banner phrase
 // (swicon-jobs.com -> swicon.com "this job offer is no longer available").
-// Still NOT covered: hrmaster.hu tenants and bankmonitor.hu (no distinguishing
-// signal found yet — a dead posting there answers 200 with no title/banner/
-// redirect difference from a live one) and eightfold (ericsson/vodafone/
-// morganstanley job + apply APIs still carry no status/active/expiry field,
-// confirmed again this pass).
+// Still NOT covered: eightfold (ericsson/vodafone/morganstanley job + apply
+// APIs still carry no status/active/expiry field, and the careers/search page
+// exposes no discoverable listing API either — confirmed again this pass).
+//
+// 2026-09-09 follow-up on the two other gaps from the pass above:
+// - bankmonitor.hu: now covered (see the DEAD_LANDINGS loop below) — a closed
+//   posting 301s to a DIFFERENT specific /karrier/{slug}/ posting, which a
+//   truly nonexistent slug does not do (plain 404 instead), so it's a
+//   deliberate site-side redirect, not generic not-found handling.
+// - hrmaster.hu: confirmed a genuine dead end, not just untried. Both known
+//   per-job url patterns (.../JobAdvertisement/{id}/{slug}/allasok and
+//   .../Position/{id}) render a byte-identical server-side shell for a real
+//   id, a real id with a wrong slug, AND a completely made-up id (999999) —
+//   the page is 100% client-rendered off cookies/session, and its bundled JS
+//   exposes no public read API. No plain-HTTP signal exists here at all.
 //
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
@@ -210,6 +220,18 @@ export function aiScrapedIsDead(row, body, res) {
     if (from !== null && to !== null && from !== to && finalHost) {
       for (const rule of DEAD_LANDINGS) {
         if (rule.host.test(finalHost) && rule.path.test(to)) return true;
+      }
+      // bankmonitor.hu (2026-09-09): unlike the DEAD_LANDINGS hosts above, a
+      // closed posting here doesn't land on one fixed path — it 301s to a
+      // DIFFERENT specific /karrier/{slug}/ posting (their own redirect
+      // mapping, confirmed live: a never-existed slug plain-404s instead, so
+      // this is a deliberate redirect, not generic not-found handling). Only
+      // a same-site jump between two distinct /karrier/ posting paths counts;
+      // this can't fire on a trailing-slash or query-only change (`from` and
+      // `to` are already slash-normalized above) or on a genuine slug rename
+      // that this site would instead serve as the same content.
+      if (finalHost === "bankmonitor.hu" && /^\/karrier\/[^/]+$/.test(from) && /^\/karrier\/[^/]+$/.test(to)) {
+        return true;
       }
     }
     // Greenhouse bounces a removed posting to the board with ?error=true.
