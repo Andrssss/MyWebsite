@@ -34,6 +34,21 @@ function jsonResponse(statusCode, body) {
   });
 }
 
+const INTEGER_FIELDS = new Set(["difficulty", "usefulness", "year", "semester"]);
+
+// Postgres' INTEGER columns used to coerce a string like "7" (what an HTML
+// form input always sends) on write — now that there's no DB doing that for
+// us, both POST and PUT need to do it themselves or numeric fields end up
+// stored as strings depending on which route last touched them.
+function toIntOrNull(v, fieldName) {
+  if (v === undefined || v === null || v === "") return null;
+  const n = parseInt(v, 10);
+  if (Number.isNaN(n)) {
+    throw new Error(`Invalid integer value for ${fieldName}: ${v}`);
+  }
+  return n;
+}
+
 export default async (request) => {
   try {
     const method = request.method;
@@ -122,15 +137,6 @@ export default async (request) => {
         });
       }
 
-      const toIntOrNull = (v, fieldName) => {
-        if (v === undefined || v === null || v === "") return null;
-        const n = parseInt(v, 10);
-        if (Number.isNaN(n)) {
-          throw new Error(`Invalid integer value for ${fieldName}: ${v}`);
-        }
-        return n;
-      };
-
       const difficulty = toIntOrNull(body.difficulty, "difficulty");
       const usefulness = toIntOrNull(body.usefulness, "usefulness");
       const year = toIntOrNull(body.year, "year");
@@ -183,6 +189,8 @@ export default async (request) => {
           patch[key] =
             key === "user"
               ? (typeof body[key] === "string" ? body[key].trim() : "") || "anonim"
+              : INTEGER_FIELDS.has(key)
+              ? toIntOrNull(body[key], key)
               : body[key];
         }
       }
