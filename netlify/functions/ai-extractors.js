@@ -1,7 +1,7 @@
 // netlify/functions/ai-extractors.js
 //
 // Admin CRUD for the AI-scraped site registry (`ai_extractors`), so new sites
-// can be added without DB creds — same pattern as categories.js / filters.js.
+// can be added without DB creds — same pattern as categories.js / filters.mjs.
 // See AI_SCRAPER_PLAN.md. Adding a site here is all it takes for
 // cron_jobs_AI-background.mjs to start ingesting it into source `AI - <site>`.
 //

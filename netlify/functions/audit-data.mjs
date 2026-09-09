@@ -36,6 +36,7 @@
 
 import { Pool } from "pg";
 import { SENIOR_TITLE_WORDS } from "./_seniority_policy.mjs";
+import { listFilterRows } from "./_job_filters_store.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -87,10 +88,10 @@ async function summary(client) {
 }
 
 // The title denylist the scrapers apply at insert (load_filters.mjs reads the
-// same table). Read-only: this endpoint has no write path, so handing it to a
+// same blob). Read-only: this endpoint has no write path, so handing it to a
 // cloud routine never puts the destructive filter-write tier in a prompt.
-async function filterWords(client) {
-  const { rows } = await client.query(`SELECT id, word FROM job_filters ORDER BY word`);
+async function filterWords() {
+  const rows = await listFilterRows();
   return {
     count: rows.length,
     // Whole-word match, accent-insensitive — see filterRegex in _seniority_policy.mjs.
@@ -158,9 +159,17 @@ export default async (request) => {
   const sample = Math.min(parseInt(url.searchParams.get("sample") || "15", 10) || 15, 100);
   const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
+  if (wantFilters) {
+    try {
+      return json(200, await filterWords());
+    } catch (err) {
+      console.error("[audit-data] error:", err);
+      return json(500, { error: err.message });
+    }
+  }
+
   const client = await pool.connect();
   try {
-    if (wantFilters) return json(200, await filterWords(client));
     if (source) return json(200, await sourceDetail(client, source, sample, offset));
     return json(200, { sources: await summary(client), generatedAt: new Date().toISOString() });
   } catch (err) {

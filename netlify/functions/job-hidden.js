@@ -31,7 +31,7 @@ const pool = new Pool({
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
 function authorized(event) {
-  // Trimmed: see filters.js — a pasted trailing newline would silently reject all.
+  // Trimmed: see filters.mjs — a pasted trailing newline would silently reject all.
   const expected = (process.env.ADMIN_SECRET || process.env.CRON_SECRET || "").trim();
   if (!expected) return false;
   const hdr =

@@ -13,7 +13,7 @@
 //
 // Auth: ADMIN_SECRET (2026-08-28 — eddig CRON_SECRET volt). Ez kézi job_posts
 // ÍRÁS, ami ráadásul megkerüli az anti-clobber guardot, tehát a write/destruktív
-// tierbe tartozik, oda, ahova a filters.js/categories.js írásai és a job-hidden.js.
+// tierbe tartozik, oda, ahova a filters.mjs/categories.js írásai és a job-hidden.js.
 // A CRON_SECRET a teljes cron-flottát vezérli (és a CLAUDE.md szerint egy Netlify
 // personal access token értéke) — nem az a helyes kulcs egy admin-korrekcióhoz.
 // Fallback CRON_SECRET-re, amíg az ADMIN_SECRET nincs beállítva, ugyanúgy, mint a

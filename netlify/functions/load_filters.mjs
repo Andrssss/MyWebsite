@@ -1,12 +1,6 @@
-import { Pool } from "pg";
-
-const connectionString = process.env.NETLIFY_DATABASE_URL;
-if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
-
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
+// job_filters moved to the "job-filters" Netlify Blob 2026-09-09 — see
+// _job_filters_store.mjs and CLAUDE.md's "Where data lives".
+import { listFilterWords } from "./_job_filters_store.mjs";
 
 let cache = null;
 let cacheTs = 0;
@@ -16,16 +10,8 @@ export async function loadFilters() {
   const now = Date.now();
   if (cache && now - cacheTs < TTL) return cache;
 
-  const client = await pool.connect();
-  try {
-    const { rows } = await client.query(
-      `SELECT word FROM job_filters ORDER BY word`
-    );
-    const result = rows.map(r => r.word);
-    cache = result;
-    cacheTs = now;
-    return result;
-  } finally {
-    client.release();
-  }
+  const words = await listFilterWords();
+  cache = words;
+  cacheTs = now;
+  return words;
 }
