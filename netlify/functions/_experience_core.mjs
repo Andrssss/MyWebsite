@@ -39,22 +39,23 @@ function normalizeText(s) {
 // professionals)" — is a full-time entry-level trading role, not a student
 // internship. Same false-positive shape as "talent"/"pályakezdő" below: a
 // real phrase that just isn't a reliable "still enrolled" signal.
-// "traineeship" ADDED 2026-09-09 alongside "trainee": the word-boundary check
-// above needs it as its own whole word too, for the same reason "internship"
-// already sits next to "intern" — "traineeship" fails the boundary test for
-// bare "trainee" (continues with "ship", a letter). Live example: "global
-// traineeship gbds - hungary".
-// "gyakornok" carries a `~` STEM prefix (see hasKeyword below): Hungarian
-// inflects it productively ("gyakornokként", "gyakornokot", "gyakornoki"),
-// and a strict word-boundary match (needed elsewhere to keep "intern" from
-// firing inside "internal"/"international") silently stopped matching any of
-// those forms — confirmed live 2026-09-09 backfill on "GYAKORNOKKÉNT",
-// "GYAKORNOKOT", "gyakornoki program" titles whose only signal was this word.
-// English "intern"/"trainee" stay strict (their few derived forms are already
-// listed explicitly as "internship"/"traineeship"); a right-open stem on a
-// short English root would resurrect the "internal" problem.
+// "internship"/"trainee" ALSO carry the `~` STEM prefix (see hasKeyword
+// below), added 2026-09-09 after "talent pool - internships" (plural) failed
+// to match plain "internship" — a strict right boundary breaks on ANY
+// suffix, English plurals included, not just Hungarian inflection. Safe to
+// open on the right here because "internship"/"trainee" are long/specific
+// enough that nothing else legitimately starts with them (unlike bare
+// "intern", which must stay STRICT — see hasKeyword's comment — or it
+// resurrects the "internal"/"international" problem). One stem covers every
+// inflected form (trainee/trainees/traineeship/traineeships), so a separate
+// "traineeship" entry is no longer needed.
+// "gyakornok" carries the same `~` STEM prefix: Hungarian inflects it
+// productively ("gyakornokként", "gyakornokot", "gyakornoki"), and a strict
+// word-boundary match silently stopped matching any of those forms —
+// confirmed live 2026-09-09 backfill on "GYAKORNOKKÉNT", "GYAKORNOKOT",
+// "gyakornoki program" titles whose only signal was this word.
 export const INTERNSHIP_KEYWORDS = [
-  "~gyakornok", "intern", "internship", "trainee", "traineeship",
+  "~gyakornok", "intern", "~internship", "~trainee",
   "diákmunka", "diakmunka", "tehetsegprogram", "tehetségprogram",
   "student", "students",
 ];

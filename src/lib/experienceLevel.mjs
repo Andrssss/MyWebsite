@@ -17,28 +17,29 @@
 // categorize.mjs, a SEPARATE concept) — got misclassified "intern" even for
 // clearly non-intern postings ("Specialist, Contingent Workforce (talent
 // pool)", "medior tester (talent pool)").
-// "internship"/"traineeship" listed separately from "intern"/"trainee" even
-// though one starts with the other: the word-boundary check added 2026-09-09
-// below requires a non-letter/digit character right after the match, so
-// "Internship" (continues with "ship") fails the boundary for bare "intern" —
-// confirmed via a regression check on "Internship Opportunities" while fixing
-// the "internal"/"international" false-positive. Same reasoning covers
-// "traineeship" ("global traineeship gbds - hungary", live 2026-09-09).
-export const INTERN_KEYWORDS = [
-  "intern", "internship", "gyakornok", "trainee", "traineeship", "diák", "diákmunka",
-];
+// "internship"/"trainee" listed separately from "intern" — see
+// INTERN_STEM_KEYWORDS below, they're right-open stems there. "intern" itself
+// stays strict: the word-boundary check requires a non-letter/digit right
+// after the match, and opening it would resurrect the "internal"/
+// "international" false-positive it exists to prevent.
+// "diákmunka" isn't listed separately — "diák" is a right-open stem below, so
+// it already matches "diákmunka" (and any inflected form of it) as its own
+// prefix.
+export const INTERN_KEYWORDS = ["intern", "internship", "gyakornok", "trainee", "diák"];
 
-// "gyakornok"/"diák" need a right-OPEN boundary (a "stem"): Hungarian inflects
-// them productively (gyakornokKÉNT, gyakornokOT, gyakornokI, diákKÉNT), and
-// the strict two-sided boundary that the English words above need (to keep
-// "intern" from firing inside "internal"/"international") silently stopped
-// matching almost every real-world form of these two — confirmed live
-// 2026-09-09 backfill on "GYAKORNOKKÉNT"/"GYAKORNOKOT"/"gyakornoki program"
-// titles that lost their only signal. Left boundary alone is still required,
-// so "médiák" (media, plural) does NOT false-positive on "diák" — the match
-// would have to start mid-word, which the left boundary forbids regardless of
-// how open the right side is.
-const INTERN_STEM_KEYWORDS = ["gyakornok", "diák"];
+// "internship"/"trainee"/"gyakornok"/"diák" need a right-OPEN boundary (a
+// "stem"): plurals ("internships": "talent pool - internships" briefly
+// regressed to non-intern 2026-09-09) and Hungarian's productive inflection
+// (gyakornokKÉNT, gyakornokOT, gyakornokI, diákKÉNT) both fail a strict
+// right boundary, which only tolerates a FIXED set of derived forms — fine
+// for "intern" (~"internship", an explicit second keyword) but not for an
+// open-ended suffix set. Safe to open here because none of these four are a
+// prefix of some unrelated word ("intern" is — "internal"/"international" —
+// which is exactly why it stays strict below). Left boundary alone is still
+// required, so "médiák" (media, plural) does NOT false-positive on "diák" —
+// the match would have to start mid-word, which the left boundary forbids
+// regardless of how open the right side is.
+const INTERN_STEM_KEYWORDS = ["internship", "trainee", "gyakornok", "diák"];
 const INTERN_STRICT_KEYWORDS = INTERN_KEYWORDS.filter((k) => !INTERN_STEM_KEYWORDS.includes(k));
 
 /** Diákszövetkezeti források: definíció szerint gyakornoki, sosem junior/medior. */

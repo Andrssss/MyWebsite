@@ -314,23 +314,22 @@ const hoursSince = (iso) => {
 ======================= */
 // "talent" REMOVED 2026-09-08 — see src/lib/experienceLevel.mjs's INTERN_KEYWORDS
 // comment (this is the client-side filter-mode duplicate of that list).
-// "internship"/"traineeship" ADDED 2026-09-09 — see the same file's comment:
-// the word-boundary check below needs them as separate whole words, since
-// "Internship" fails the boundary test for bare "intern" (continues with
-// "ship", a letter).
-const INTERN_KEYWORDS = [
-  "intern", "internship", "gyakornok", "trainee", "traineeship", "diák", "diákmunka",
-];
+// "diákmunka" isn't listed separately — "diák" is a right-open stem below, so
+// it already matches "diákmunka" (and any inflected form of it) as its own
+// prefix.
+const INTERN_KEYWORDS = ["intern", "internship", "gyakornok", "trainee", "diák"];
 const JUNIOR_KEYWORD = "junior";
 
-// "gyakornok"/"diák" need a right-OPEN boundary (a "stem"): Hungarian
-// inflects them productively (gyakornokKÉNT/-OT/-I, diákKÉNT), and a strict
-// two-sided boundary silently stopped matching almost every real-world form
-// of these two — confirmed live 2026-09-09 backfill on "GYAKORNOKKÉNT"/
-// "GYAKORNOKOT"/"gyakornoki program" titles. Left boundary alone is still
-// required, so "médiák" doesn't false-positive on "diák" (the match would
-// have to start mid-word). Mirrors experienceLevel.mjs's INTERN_KEYWORD_TOKENS.
-const INTERN_STEM_KEYWORDS = ["gyakornok", "diák"];
+// "internship"/"trainee"/"gyakornok"/"diák" need a right-OPEN boundary (a
+// "stem"): plurals ("internships": "talent pool - internships" briefly
+// regressed to non-intern 2026-09-09) and Hungarian's productive inflection
+// (gyakornokKÉNT/-OT/-I, diákKÉNT) both fail a strict right boundary. Safe to
+// open here because none of these four are a prefix of some unrelated word
+// ("intern" is — "internal"/"international" — which is why it stays strict).
+// Left boundary alone is still required, so "médiák" doesn't false-positive
+// on "diák" (the match would have to start mid-word). Mirrors
+// experienceLevel.mjs's INTERN_KEYWORD_TOKENS.
+const INTERN_STEM_KEYWORDS = ["internship", "trainee", "gyakornok", "diák"];
 const INTERN_STRICT_KEYWORDS = INTERN_KEYWORDS.filter((k) => !INTERN_STEM_KEYWORDS.includes(k));
 
 // Word-boundary version — a plain `.includes()` substring check also matches
