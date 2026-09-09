@@ -17,6 +17,17 @@
 // one-field, single-page follow-up for that; see cron_job_events-background's
 // enrichDeadline for when/how often it actually gets called (not every run,
 // and not for events already known to have none).
+//
+// EXTRACT_SYSTEM widened 2026-09-09 (user request): scope was "career events
+// aimed at students/job seekers" only, which meant free IT/tech talks and
+// conferences with no student framing (a cybersecurity meetup, a webinar)
+// never qualified even though they're exactly the kind of thing this feature
+// is for. Now any broad-interest IT/tech event counts — narrowed only to
+// exclude paid executive/manager-only corporate training and pure vendor
+// pitches. Same day, `kibernaptar.hu/esemenylista/` (a general Hungarian
+// IT/cybersecurity event calendar) was added to `event_sources` as the first
+// source that actually exercises this wider scope — epam/progmasters are
+// single-company pages, narrow either way.
 
 import {
   MODEL,
@@ -67,10 +78,15 @@ const EVENT_SCHEMA = {
 };
 
 const EXTRACT_SYSTEM =
-  "You extract upcoming career events from a listing page's HTML (in Hungarian or English): " +
-  "job fairs / career days / company recruiting events, AND talks, presentations, webinars, " +
-  "conferences, and meetups aimed at students or job seekers. Return every DISTINCT event on " +
-  "the page — not job postings, not news articles. For each: `title` is the event name; `url` " +
+  "You extract upcoming IT/tech-relevant events from a listing page's HTML (in Hungarian or " +
+  "English): job fairs / career days / company recruiting events, AND talks, presentations, " +
+  "webinars, conferences, and meetups of broad interest to the IT/tech community — NOT limited " +
+  "to student- or job-seeker-specific events. A general cybersecurity/dev/tech conference, a " +
+  "community meetup, or a free webinar all count, even with no student/career framing at all. " +
+  "Skip an event only if it is narrowly paid corporate training aimed at executives/managers " +
+  "(not the general IT audience) or reads as a pure vendor sales pitch with no real content. " +
+  "Return every DISTINCT event on the page — not job postings, not news articles. For each: " +
+  "`title` is the event name; `url` " +
   "is the link to that event's own detail page and MUST be a link that literally appears as an " +
   "href in the provided HTML (absolute, or relative to the given base URL) — never invent, " +
   "guess, or complete a URL. `date` is the event's (first) day as an ISO YYYY-MM-DD date — " +
