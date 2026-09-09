@@ -47,6 +47,25 @@
 //   the page is 100% client-rendered off cookies/session, and its bundled JS
 //   exposes no public read API. No plain-HTTP signal exists here at all.
 //
+// 2026-09-09, later same day: Eightfold is NOT actually a dead end — the user
+// caught a live-site false-negative (jobs.ericsson.com/careers/job/563121776360652,
+// rendering a client-side-only "Már nem fogadnak jelentkezéseket." banner that
+// no plain fetch of the page or the per-job API ever surfaces, confirming the
+// header comment above). The job+apply APIs still carry no status field, but
+// every Eightfold tenant checked (jobs.ericsson.com, jobs.vodafone.com) serves
+// an UNAUTHENTICATED `/careers/sitemap.xml` listing every currently-open
+// posting's own url (506 / 1143 entries respectively, single flat file, well
+// under the sweep's body cap) — the Ericsson job above is confirmed absent
+// from it. Unlike SmartRecruiters' listing (capped at 3000, explicitly not
+// used for this reason), neither sitemap showed any sign of truncation or
+// pagination (no `<sitemapindex>`), so presence/absence in it is trustworthy.
+// Eightfold has no self-describing domain (each tenant is a custom domain, or
+// occasionally `*.eightfold.ai` for smaller ones), so unlike Workday/Greenhouse/
+// Lever this can't be a URL-pattern match — EIGHTFOLD_HOSTS below is a plain
+// allowlist, extended by hand as the AI-discovery routine finds new tenants
+// (same shape as SmartRecruiters' 3000-cap carve-out: a known, documented,
+// manually-maintained exception, not a hidden one).
+//
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
 // independent-verification rule). Each was validated on 2026-08-30 against live
@@ -57,6 +76,16 @@
 // Fail-open everywhere: an unparseable url, an unknown host, a truncated body
 // or an unexpected API shape yields NO verdict, and the row stays active.
 
+// Eightfold tenants confirmed to expose `/careers/sitemap.xml` (see the header
+// comment above). Add a host here once a new tenant's sitemap is confirmed
+// live and unpaginated — do NOT add one on the strength of the URL alone.
+const EIGHTFOLD_HOSTS = new Set(["jobs.ericsson.com", "jobs.vodafone.com"]);
+
+/** Eightfold job id from a `/careers/job/{id}-{slug}` url, or null. */
+function eightfoldJobId(pathname) {
+  return (pathname.match(/\/careers\/job\/(\d+)/) || [])[1] ?? null;
+}
+
 /** Hosts whose posting-death question is answered by the platform's own API.
  *  Returns a SWEEP_PROBE_OVERRIDES descriptor, or null to ask the row's own url. */
 export function aiScrapedProbe(row) {
@@ -65,6 +94,13 @@ export function aiScrapedProbe(row) {
   const host = u.hostname.replace(/^www\./, "");
   const path = u.pathname;
   let m;
+
+  // Eightfold — no per-job status field anywhere (job API, apply-redirect
+  // target), so the probe is redirected to the tenant's own sitemap instead;
+  // aiScrapedIsDead below checks the row's job id for presence in it.
+  if (EIGHTFOLD_HOSTS.has(host) && eightfoldJobId(path)) {
+    return { url: `https://${host}/careers/sitemap.xml` };
+  }
 
   // Greenhouse — job-boards.greenhouse.io/{board}/jobs/{id}. The EU board host
   // (job-boards.eu.greenhouse.io) is served by the US API host; there is no
@@ -172,8 +208,14 @@ export function aiScrapedIsDead(row, body, res) {
   // it — a job description that happens to quote one of the DEAD_PHRASES, or a
   // finalUrl that is simply the API url, would otherwise read as a death.
   // Greenhouse / Lever / Workday are decided by status code alone (404, plus
-  // Workday's opted-in 403); SmartRecruiters is the one that needs its body.
+  // Workday's opted-in 403); SmartRecruiters and Eightfold are the ones that
+  // need their body.
   if (aiScrapedProbe(row)) {
+    if (EIGHTFOLD_HOSTS.has(host)) {
+      const id = eightfoldJobId(u.pathname);
+      // Truncated/unparseable sitemap body -> no verdict, not a death.
+      return !!id && typeof body === "string" && body.includes("<urlset") && !body.includes(id);
+    }
     if (host !== "jobs.smartrecruiters.com") return false;
     let j;
     try { j = JSON.parse(body); } catch { return false; } // truncated/HTML -> no verdict
