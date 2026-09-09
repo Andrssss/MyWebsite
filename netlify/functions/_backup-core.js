@@ -1,10 +1,10 @@
 import { getStore } from "@netlify/blobs";
-import { readReviewsWithEtag } from "./_subject_reviews_store.js";
+import { readReviewsWithEtag } from "./_subject_reviews_store.mjs";
 
 const STORE_NAME = "weekly-backups";
 
 // subject_reviews moved to the "subject-reviews" Blob 2026-09-08 (see
-// _subject_reviews_store.js) — this snapshot now protects against an
+// _subject_reviews_store.mjs) — this snapshot now protects against an
 // accidental bad write/deploy to THAT blob, not against Postgres going away.
 // A live blob being "always current" doesn't remove the need for a
 // point-in-time copy; it just changes what the copy is a copy of.

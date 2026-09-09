@@ -1,7 +1,7 @@
 // netlify/functions/reviews.mjs
 //
 // subject_reviews lives in the "subject-reviews" Netlify Blob now, not
-// Postgres (2026-09-08) — see _subject_reviews_store.js for the concurrency-
+// Postgres (2026-09-08) — see _subject_reviews_store.mjs for the concurrency-
 // safe read-modify-write helpers this file is built on, and CLAUDE.md's
 // "Where data lives" for why (not derived data, not low-concurrency, unlike
 // the earlier job-stats/ats-state blob migrations).
@@ -25,7 +25,7 @@ import {
   updateReview,
   deleteReview,
   toggleLike,
-} from "./_subject_reviews_store.js";
+} from "./_subject_reviews_store.mjs";
 
 function jsonResponse(statusCode, body) {
   return new Response(JSON.stringify(body), {

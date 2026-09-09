@@ -1,4 +1,4 @@
-// netlify/functions/_subject_reviews_store.js
+// netlify/functions/_subject_reviews_store.mjs
 //
 // subject_reviews moved from Postgres to Netlify Blobs (2026-09-08, user
 // decision) — see CLAUDE.md "Where data lives" for the full rationale. Unlike
@@ -15,9 +15,16 @@
 // in between. This gives the same "no lost update" guarantee a Postgres row
 // UPDATE would, without needing a database.
 //
-// CommonJS on purpose (not .mjs), same reasoning as _db_audit.js: both
-// require() (reviews.js) and import (the .mjs migration/backup callers) work
-// without ESM/CJS interop risk.
+// ESM (.mjs) on purpose — this used to be CommonJS (_subject_reviews_store.js,
+// "so both require() and import work"), but reviews.mjs importing it pulled
+// in a NESTED `require("@netlify/blobs")` (this file, CJS) from inside an
+// ESM entry point. esbuild bundles that as a synthetic `__require` shim
+// that Netlify's Lambda runtime cannot resolve at runtime — confirmed live:
+// "Cannot find module '@netlify/blobs'" thrown from exactly that require,
+// even though every direct ESM `import { getStore } from "@netlify/blobs"`
+// in this repo's other .mjs store modules works fine. Only ESM importers are
+// left now (reviews.mjs, _backup-core.js), so there is no interop reason to
+// stay CommonJS, and every reason not to.
 //
 // Store: "subject-reviews", single key "reviews.json":
 //   { nextId, reviews: [{ id, name, user, difficulty, usefulness, general,
@@ -27,10 +34,10 @@
 // derived `likeCount` + `likedByMe` (see toPublicRow below), so one visitor's
 // browser id can't be read off another visitor's like list.
 
-const { getStore } = require("@netlify/blobs");
+import { getStore } from "@netlify/blobs";
 
-const STORE_NAME = "subject-reviews";
-const BLOB_KEY = "reviews.json";
+export const STORE_NAME = "subject-reviews";
+export const BLOB_KEY = "reviews.json";
 const GENERAL_INFO_NAME = "általános információ";
 
 function store() {
@@ -41,7 +48,7 @@ function normalizeForCompare(name) {
   return String(name ?? "").trim().toLowerCase();
 }
 
-async function readReviewsWithEtag() {
+export async function readReviewsWithEtag() {
   const { data, etag } = await store().getWithMetadata(BLOB_KEY, { type: "json" });
   if (!data || !Array.isArray(data.reviews)) {
     return { data: { nextId: 1, reviews: [] }, etag: null };
@@ -62,7 +69,7 @@ async function readReviewsWithEtag() {
 // spreads retries out in time so they stop lock-stepping into the same
 // collision, and 20 retries covers a much larger burst than this site will
 // ever see in practice.
-async function mutateReviews(mutateFn, { maxRetries = 20 } = {}) {
+export async function mutateReviews(mutateFn, { maxRetries = 20 } = {}) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const { data, etag } = await readReviewsWithEtag();
     const next = mutateFn(data);
@@ -77,7 +84,7 @@ async function mutateReviews(mutateFn, { maxRetries = 20 } = {}) {
   throw new Error("Nem sikerült írni a subject-reviews blobba (túl sok ütközés).");
 }
 
-function toPublicRow(review, viewerId) {
+export function toPublicRow(review, viewerId) {
   const { likes, ...rest } = review;
   const likeList = Array.isArray(likes) ? likes : [];
   return {
@@ -132,7 +139,7 @@ function sortRows(reviews) {
 }
 
 // `limit` = distinct subject names (not rows) — see the old SQL's comment.
-function queryReviews(reviews, { limit } = {}) {
+export function queryReviews(reviews, { limit } = {}) {
   if (!limit) return sortRows(reviews);
 
   const orderedNames = selectSubjectNamesOrdered(reviews).slice(0, limit).map((g) => g.name);
@@ -140,19 +147,19 @@ function queryReviews(reviews, { limit } = {}) {
   return sortRows(reviews.filter((r) => nameSet.has(r.name)));
 }
 
-async function getReviewById(id) {
+export async function getReviewById(id) {
   const { data } = await readReviewsWithEtag();
   return data.reviews.find((r) => r.id === id) || null;
 }
 
-async function listReviews({ limit } = {}) {
+export async function listReviews({ limit } = {}) {
   const { data } = await readReviewsWithEtag();
   return queryReviews(data.reviews, { limit });
 }
 
 // ── mutations ───────────────────────────────────────────────────────────
 
-async function createReview(fields) {
+export async function createReview(fields) {
   let created;
   await mutateReviews((data) => {
     const id = data.nextId;
@@ -162,7 +169,7 @@ async function createReview(fields) {
   return created;
 }
 
-async function updateReview(id, patch) {
+export async function updateReview(id, patch) {
   let updated = null;
   await mutateReviews((data) => {
     const idx = data.reviews.findIndex((r) => r.id === id);
@@ -175,7 +182,7 @@ async function updateReview(id, patch) {
   return updated;
 }
 
-async function deleteReview(id) {
+export async function deleteReview(id) {
   let deleted = false;
   await mutateReviews((data) => {
     const next = data.reviews.filter((r) => r.id !== id);
@@ -190,7 +197,7 @@ async function deleteReview(id) {
 // most one entry for `userId` in `likes`, regardless of how many times this
 // races against itself — the retry loop in mutateReviews re-reads the fresh
 // state each attempt, so a double-click just flips the state twice.
-async function toggleLike(id, userId) {
+export async function toggleLike(id, userId) {
   let result = null;
   await mutateReviews((data) => {
     const idx = data.reviews.findIndex((r) => r.id === id);
@@ -206,18 +213,3 @@ async function toggleLike(id, userId) {
   });
   return result; // null if the review doesn't exist
 }
-
-module.exports = {
-  STORE_NAME,
-  BLOB_KEY,
-  readReviewsWithEtag,
-  mutateReviews,
-  toPublicRow,
-  queryReviews,
-  getReviewById,
-  listReviews,
-  createReview,
-  updateReview,
-  deleteReview,
-  toggleLike,
-};
