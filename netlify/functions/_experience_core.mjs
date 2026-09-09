@@ -44,8 +44,17 @@ function normalizeText(s) {
 // already sits next to "intern" — "traineeship" fails the boundary test for
 // bare "trainee" (continues with "ship", a letter). Live example: "global
 // traineeship gbds - hungary".
+// "gyakornok" carries a `~` STEM prefix (see hasKeyword below): Hungarian
+// inflects it productively ("gyakornokként", "gyakornokot", "gyakornoki"),
+// and a strict word-boundary match (needed elsewhere to keep "intern" from
+// firing inside "internal"/"international") silently stopped matching any of
+// those forms — confirmed live 2026-09-09 backfill on "GYAKORNOKKÉNT",
+// "GYAKORNOKOT", "gyakornoki program" titles whose only signal was this word.
+// English "intern"/"trainee" stay strict (their few derived forms are already
+// listed explicitly as "internship"/"traineeship"); a right-open stem on a
+// short English root would resurrect the "internal" problem.
 export const INTERNSHIP_KEYWORDS = [
-  "gyakornok", "intern", "internship", "trainee", "traineeship",
+  "~gyakornok", "intern", "internship", "trainee", "traineeship",
   "diákmunka", "diakmunka", "tehetsegprogram", "tehetségprogram",
   "student", "students",
 ];
@@ -76,7 +85,18 @@ export const MID_KEYWORDS = [
 
 // Word-boundary match so e.g. "intern" doesn't fire on "internal"/"international"
 // and "mid" (from "mid-level") doesn't fire on "midtown" etc.
+//
+// A `~`-prefixed keyword is a STEM: only the LEFT edge needs a boundary, the
+// right side is open (matches src/lib/categorize.mjs's STEM_PREFIX, same
+// reasoning) — for Hungarian words that inflect productively (case endings,
+// adjectival "-i"), where a strict right boundary would silently stop
+// matching most real-world forms of the word.
+const STEM_PREFIX = "~";
 function hasKeyword(text, keyword) {
+  if (keyword.startsWith(STEM_PREFIX)) {
+    const escaped = keyword.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escaped}`, "i").test(text);
+  }
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(text);
 }

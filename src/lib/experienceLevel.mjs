@@ -28,6 +28,19 @@ export const INTERN_KEYWORDS = [
   "intern", "internship", "gyakornok", "trainee", "traineeship", "diák", "diákmunka",
 ];
 
+// "gyakornok"/"diák" need a right-OPEN boundary (a "stem"): Hungarian inflects
+// them productively (gyakornokKÉNT, gyakornokOT, gyakornokI, diákKÉNT), and
+// the strict two-sided boundary that the English words above need (to keep
+// "intern" from firing inside "internal"/"international") silently stopped
+// matching almost every real-world form of these two — confirmed live
+// 2026-09-09 backfill on "GYAKORNOKKÉNT"/"GYAKORNOKOT"/"gyakornoki program"
+// titles that lost their only signal. Left boundary alone is still required,
+// so "médiák" (media, plural) does NOT false-positive on "diák" — the match
+// would have to start mid-word, which the left boundary forbids regardless of
+// how open the right side is.
+const INTERN_STEM_KEYWORDS = ["gyakornok", "diák"];
+const INTERN_STRICT_KEYWORDS = INTERN_KEYWORDS.filter((k) => !INTERN_STEM_KEYWORDS.includes(k));
+
 /** Diákszövetkezeti források: definíció szerint gyakornoki, sosem junior/medior. */
 export const INTERN_ONLY_SOURCES = [
   "minddiak",
@@ -64,9 +77,13 @@ const SENIOR_TOKENS = wordRe("senior|szenior|lead");
 // 2026-09-09 on "IT internal audit analyst", "Internal Tools Developer" and
 // "Manual Tester (Internal Systems & Customer Journey)" — none of them
 // internships, all silently forced into the intern bucket. Same fix shape as
-// the "talent" bug (see INTERN_KEYWORDS comment above), one boundary check
-// this time instead of a keyword removal.
-const INTERN_KEYWORD_TOKENS = wordRe(INTERN_KEYWORDS.join("|"));
+// the "talent" bug (see INTERN_KEYWORDS comment above). Strict keywords need
+// both a left AND right boundary; INTERN_STEM_KEYWORDS need only the left one
+// (see that const's comment) — combined into one regex via alternation.
+const INTERN_KEYWORD_TOKENS = new RegExp(
+  `(?<![\\p{L}\\p{N}])(?:(?:${INTERN_STRICT_KEYWORDS.join("|")})(?![\\p{L}\\p{N}])|(?:${INTERN_STEM_KEYWORDS.join("|")}))`,
+  "u"
+);
 const hasInternKeyword = (text) => INTERN_KEYWORD_TOKENS.test(norm(text));
 
 const hasJuniorToken = (e) => JUNIOR_TOKENS.test(e);

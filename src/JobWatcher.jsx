@@ -323,13 +323,22 @@ const INTERN_KEYWORDS = [
 ];
 const JUNIOR_KEYWORD = "junior";
 
+// "gyakornok"/"diák" need a right-OPEN boundary (a "stem"): Hungarian
+// inflects them productively (gyakornokKÉNT/-OT/-I, diákKÉNT), and a strict
+// two-sided boundary silently stopped matching almost every real-world form
+// of these two — confirmed live 2026-09-09 backfill on "GYAKORNOKKÉNT"/
+// "GYAKORNOKOT"/"gyakornoki program" titles. Left boundary alone is still
+// required, so "médiák" doesn't false-positive on "diák" (the match would
+// have to start mid-word). Mirrors experienceLevel.mjs's INTERN_KEYWORD_TOKENS.
+const INTERN_STEM_KEYWORDS = ["gyakornok", "diák"];
+const INTERN_STRICT_KEYWORDS = INTERN_KEYWORDS.filter((k) => !INTERN_STEM_KEYWORDS.includes(k));
+
 // Word-boundary version — a plain `.includes()` substring check also matches
 // "intern" inside "internal"/"international": confirmed live 2026-09-09 on
 // "IT internal audit analyst", "Internal Tools Developer" and "Manual Tester
-// (Internal Systems & Customer Journey)", none of them internships. Same
-// accent-safe boundary shape as experienceLevel.mjs's INTERN_KEYWORD_TOKENS.
+// (Internal Systems & Customer Journey)", none of them internships.
 const INTERN_KEYWORDS_RE = new RegExp(
-  `(?<![\\p{L}\\p{N}])(?:${INTERN_KEYWORDS.join("|")})(?![\\p{L}\\p{N}])`,
+  `(?<![\\p{L}\\p{N}])(?:(?:${INTERN_STRICT_KEYWORDS.join("|")})(?![\\p{L}\\p{N}])|(?:${INTERN_STEM_KEYWORDS.join("|")}))`,
   "u"
 );
 const hasInternKeyword = (text) => INTERN_KEYWORDS_RE.test((text || "").toLowerCase());
