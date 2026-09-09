@@ -101,8 +101,22 @@
   új url cég+title párja egy INAKTÍV saját sorral egyezik, azt a sort
   mozgatjuk az új url-re (url+active csak, tartalom változatlan — insert-only
   elv, mint migrateVolatileUrl-nél), NEM új sort szúrunk be. Csak alllocaljobs
-  önmagával szemben fut — cross-source törlést/migrációt a user kifejezetten
-  NEM kért (lásd a retroaktív takarító SQL-t is: csak same-source DELETE).
+  önmagával szemben fut.
+
+  ⚠️ 2026-09-09 (user-döntés — a fenti "cross-source törlést a user NEM kért"
+  már NEM áll): élőben előfordult, hogy egy MÁR aktív alllocaljobs sor utólag
+  vált duplikátummá — az ats-crawl megfelelő sora akkor még inaktív volt,
+  amikor ez a scraper a sajátját beszúrta (a beszúrás-előtti
+  skippedDuplicateElsewhere ilyenkor nem tud beavatkozni, mert akkor még
+  nem volt élő külső egyezés), majd órákkal később valaki/valami újra
+  aktiválta az ats-crawl sort — a végeredmény két aktív sor ugyanarra az
+  állásra. A `scrapeAlllocaljobs` végén ÚJ retroaktív takarító lépés fut
+  minden körben: a már meglévő `otherActiveKeys` halmazt (amit ez a run
+  amúgy is felépít) ráengedjük a SAJÁT jelenleg aktív sorainkra is, nem csak
+  az újonnan scrapelt kártyákra — ami egyezik, azt töröljük. Ugyanaz az elv,
+  mint a beszúrás-előtti szűrőnél: alllocaljobs mindig enged a másik
+  forrásnak, sosem fordítva. Ez minden napi futással magától helyrehozza az
+  ilyen, időzítésből adódó átfedést, nem csak beszúráskor.
 */
 
 import { Pool } from "pg";
@@ -653,6 +667,32 @@ async function scrapeAlllocaljobs(client) {
     confirmDead,
   });
   console.log(`[alllocaljobs] active reconcile — complete=${allComplete}, ${JSON.stringify(rc)}`);
+
+  // Retroactive cross-source dupe cleanup (2026-09-09, user-döntés). The
+  // skippedDuplicateElsewhere gate above only fires for a NEW url at insert
+  // time — an ALREADY-active alllocaljobs row can still end up duplicating
+  // another source's row later, if that other row was inactive (or not yet
+  // scraped) at the moment this run inserted its own copy, and only becomes
+  // active afterwards (confirmed live 2026-09-09: an ats-crawl row was
+  // wrongly inactive when alllocaljobs's run found the same job and inserted
+  // its own row; the ats-crawl row was reactivated hours later, leaving both
+  // active). otherActiveKeys already covers every other source's CURRENT
+  // active rows, so re-running the same check against alllocaljobs's own
+  // existing active rows — not just this run's new items — closes that gap
+  // every run, going forward, with no manual re-audit needed. Same rule as
+  // the insert-time gate: alllocaljobs always yields, so its own row is the
+  // one deleted, never the other source's.
+  const { rows: ownActiveForRetroCheck } = await client.query(
+    `SELECT id, url, company, title FROM job_posts
+     WHERE source = 'alllocaljobs' AND active = true AND company IS NOT NULL`
+  );
+  const retroDupeIds = ownActiveForRetroCheck
+    .filter((r) => otherActiveKeys.has(dedupeKey(r.company, r.title)))
+    .map((r) => r.id);
+  if (retroDupeIds.length > 0) {
+    await client.query(`DELETE FROM job_posts WHERE id = ANY($1::int[])`, [retroDupeIds]);
+    console.log(`[alllocaljobs] retroactive cross-source dupe cleanup: deleted ${retroDupeIds.length} row(s)`);
+  }
 }
 
 /* ── handler ─────────────────────────────────────────────────── */
