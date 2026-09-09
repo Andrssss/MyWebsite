@@ -31,11 +31,11 @@ export default async (req) => {
   const client = await pool.connect();
   try {
     const byReqId = await client.query(
-      `SELECT id, source, title, url, experience, active, company, first_seen, last_seen
+      `SELECT id, source, title, url, experience, active, company, first_seen
        FROM job_posts WHERE url LIKE '%1434343033%'`
     );
     const byTitle = await client.query(
-      `SELECT id, source, title, url, experience, active, company, first_seen, last_seen
+      `SELECT id, source, title, url, experience, active, company, first_seen
        FROM job_posts WHERE title ILIKE '%tesztautomatiz%' ORDER BY first_seen DESC LIMIT 30`
     );
 
