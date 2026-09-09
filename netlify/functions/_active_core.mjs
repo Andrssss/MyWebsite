@@ -1108,6 +1108,14 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
 // re-fetch EVERY row the sweep ever killed, every day, forever — a cost that only
 // grows. A posting that first appeared over a month ago and is dead is not coming
 // back; the false-kill window we actually care about is days, not months.
+//
+// EXEMPT: SWEEP_SOLE_DEACTIVATOR_SOURCES (see below) ignore this bound entirely —
+// confirmed necessary 2026-09-09, when a full cross-source liveness audit found 3
+// genuinely-still-live `talent` rows stuck inactive at 66-164 days old, invisible
+// to every automatic path for the same reason as the 2026-07-14 profession-intern
+// case this constant's sibling comment already documents. The "not coming back"
+// assumption above is a guess based on staleness; for these sources it doesn't
+// need to be a guess, because an authoritative per-url rule can just ask.
 export const REVIVE_MAX_AGE_DAYS = 45;
 
 // Sources whose reconcileActive is hardcoded reactivate-only (`complete:false`),
@@ -1119,10 +1127,17 @@ export const REVIVE_MAX_AGE_DAYS = 45;
 // long since aged out of the listing that would have reactivated it (2026-07-14: 7 live
 // profession-intern rows sat off exactly like this, invisible to every automatic path).
 //
-// Safe only because each of these four has an authoritative per-url death rule
-// (profession-intern → REDIRECT_DEAD_SOURCES; talent/nofluffjobs/bluebird →
+// Safe only because each of these five has an authoritative per-url death rule
+// (profession-intern → REDIRECT_DEAD_SOURCES; talent/nofluffjobs/bluebird/startupjobs →
 // BANNER_DEAD_SOURCES), so "no death signal on its own page" really does mean alive,
 // and because their reconcile cannot re-deactivate what this revives (no flip-flop).
+//
+// 2026-09-09: membership here ALSO exempts a source from REVIVE_MAX_AGE_DAYS (see
+// that constant's comment) — every inactive row gets re-asked, however old. Cheap
+// and safe for exactly this set (a few hundred rows total across all five), and
+// the same authoritative-rule property that rules out flip-flop above is exactly
+// what makes an unbounded daily re-ask harmless — which is why membership below
+// is deliberately narrow, not a default.
 //
 // ⚠️ Do NOT add a source here whose rows can be deactivated on PURPOSE (policy), e.g.
 // out-of-scope-location rows: they are ALIVE at their url, so this would resurrect them
@@ -1173,6 +1188,9 @@ export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
  * HTTP 200–399 from the posting's own page (see _isAliveResult) — a 403/429/5xx
  * is "we could not ask", never "it's back".
  *
+ * `maxAgeDays`/REVIVE_MAX_AGE_DAYS does not apply to SWEEP_SOLE_DEACTIVATOR_SOURCES —
+ * see that set's comment for why an unbounded daily re-ask is safe there.
+ *
  * @param {import("pg").PoolClient} client
  * @param {(url: string, opts?: {wantBody?: boolean}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
  * @param {object} [opts]
@@ -1191,7 +1209,7 @@ export async function reviveSweepDead(client, checkFinal, opts = {}) {
       WHERE active = false
         AND (sweep_dead = true OR source = ANY($3::text[]))
         AND NOT (source = ANY($1::text[]))
-        AND first_seen >= NOW() - make_interval(days => $2::int)`,
+        AND (source = ANY($3::text[]) OR first_seen >= NOW() - make_interval(days => $2::int))`,
     [[...SWEEP_EXCLUDED_SOURCES], maxAgeDays, [...SWEEP_SOLE_DEACTIVATOR_SOURCES]]
   );
   if (rows.length === 0) return { checked: 0, revived: 0 };
