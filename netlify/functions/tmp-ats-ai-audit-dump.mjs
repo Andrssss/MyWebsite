@@ -21,7 +21,7 @@ export default async (req) => {
   try {
     const target = await client.query(
       `SELECT id, source, url, title, company, technologies, active, sweep_dead,
-              first_seen, last_seen
+              first_seen
          FROM job_posts
         WHERE source IN ('AI-scraped', 'ats-crawl')
         ORDER BY id`
