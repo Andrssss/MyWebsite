@@ -80,6 +80,13 @@ const SubjectInfo = () => {
   const [allLoaded, setAllLoaded] = useState(false);
   const loadingAllRef = useRef(false);
 
+  // Like-gomb spam-védelem: reviewId -> az utolsó elfogadott kattintás ideje.
+  // Az első kattintás mindig azonnal elmegy; egy adott vélemény szívecskéjére
+  // ismételt pörgetés a hűtési ablakon belül némán eldobódik (nincs se API-
+  // hívás, se optimista UI-váltás), a szerverre nem jut el spam.
+  const likeCooldownRef = useRef({});
+  const LIKE_COOLDOWN_MS = 1000;
+
   const cycleKepzesMode = () => {
     setKepzesMode((prev) => {
       switch (prev) {
@@ -409,6 +416,11 @@ const handleDelete = async (id) => {
 };
 
 const handleToggleLike = async (id) => {
+  const now = Date.now();
+  const lastClick = likeCooldownRef.current[id] || 0;
+  if (now - lastClick < LIKE_COOLDOWN_MS) return; // spam-kattintás, eldobva
+  likeCooldownRef.current[id] = now;
+
   // Optimista update, hiba esetén visszaállítjuk.
   setSubjects((prev) =>
     prev.map((s) =>
