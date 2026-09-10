@@ -40,13 +40,13 @@ export default async (request) => {
         GROUP BY source
       `);
       const mbhLinux = await client.query(`
-        SELECT COUNT(*)::int AS cnt FROM job_posts
+        SELECT id, title, url, technologies FROM job_posts
         WHERE active = true AND source = 'mbh' AND technologies LIKE '%Node.js%'
       `);
       return new Response(JSON.stringify({
         elkAndEltStillTogether: rows,
         otpKukaStillHaveSAP: sap.rows,
-        mbhStillHasNodeJs: mbhLinux.rows[0],
+        mbhStillHasNodeJs: mbhLinux.rows,
       }, null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
     } finally {
       client.release();
