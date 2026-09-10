@@ -5,6 +5,8 @@
 // titles for any source whose top technology looks suspiciously dominant.
 // No writes. Delete after use.
 import { Pool } from "pg";
+import { load as cheerioLoad } from "cheerio";
+import { fetchText, extractTechnologies } from "./_experience_core.mjs";
 
 const TOKEN = "9f2c7b6a1e8d4f05c3a9b7e2d61f804c5a3e9b7d10f6";
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -38,6 +40,42 @@ export default async (request) => {
       return new Response(JSON.stringify({ stats: rows[0], recentRows: recent.rows }, null, 2), {
         headers: { "content-type": "application/json; charset=utf-8" },
       });
+    }
+
+    if (url.searchParams.get("check") === "elk-source") {
+      const target = url.searchParams.get("url");
+      const html = await fetchText(target);
+      const extracted = extractTechnologies(html);
+
+      const $ = cheerioLoad(html);
+      $("script, style, noscript").remove();
+      $("li, p, div, br, h1, h2, h3, h4, h5, h6, td, th, tr").each((_, el) => {
+        $(el).prepend(" ").append(" ");
+      });
+      const scoped = $('.description, .job-description, #job-details, .show-more-less-html__markup, [class*="jobDescriptionColumn"], .ContentColumn').first().text().replace(/\s+/g, " ").trim();
+      const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+
+      const boundaryRe = (kw) => new RegExp(`(^|[^\\p{L}\\p{N}])${kw}([^\\p{L}\\p{N}]|$|\\d)`, "giu");
+      const findHits = (text, kw) => {
+        const hits = [];
+        const re = boundaryRe(kw);
+        let m;
+        while ((m = re.exec(text)) && hits.length < 10) {
+          const start = Math.max(0, m.index - 40);
+          hits.push(text.slice(start, m.index + m[0].length + 40));
+          re.lastIndex = m.index + 1;
+        }
+        return hits;
+      };
+
+      return new Response(JSON.stringify({
+        extracted,
+        scopedTextLength: scoped.length,
+        scopedTextSample: scoped.slice(0, 300),
+        bodyTextLength: bodyText.length,
+        elkHitsInBody: findHits(bodyText, "elk"),
+        eltHitsInBody: findHits(bodyText, "elt"),
+      }, null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
     const counts = await client.query(`
