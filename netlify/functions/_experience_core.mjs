@@ -456,6 +456,39 @@ export function extractTechnologies(html) {
     $(el).prepend(" ").append(" ");
   });
 
+  // Precise, single-purpose containers, tried FIRST and in this exact
+  // priority order (not merged into the combined selector below, which picks
+  // by DOM POSITION across all its selectors, not list priority — see why
+  // that matters right here). Found+confirmed live 2026-09-10 via an
+  // independent audit (fetching the actual affected postings, not re-running
+  // this file's own output):
+  // - profession.hu (#adv): the real Feladatok/Elvárások/Előnyt-jelent/Amit-
+  //   kínálunk block sits AFTER the page's own hidden decoy heading
+  //   (#job-details, ~16 chars, "Állás részletei" — the exact collision the
+  //   MIN_TRUSTED_LENGTH fallback further below was built for) in DOM order,
+  //   so the combined selector always resolved to the decoy and fell through
+  //   to a full-body scan on EVERY profession.hu/profession-intern posting
+  //   (333 active as of this writing) — confirmed picking up nav/newsletter-
+  //   widget UI text ("Elküldöm", "Elfelejtetted a jelszavadat",
+  //   "Eltávolítottuk") as if it were job content.
+  // - SAP SuccessFactors career sites (.jobdescription, no hyphen — distinct
+  //   from .job-description below), e.g. otp/kuka: match none of the
+  //   selectors below at all, so they always fell to full body too, which
+  //   always includes the site-wide cookie-consent banner ("SAP as service
+  //   provider", "Google Analytics" show up as if they were required tech).
+  // - the "Datacenter" ATS platform (.jobAdvertisement__content), e.g. mbh:
+  //   same full-body fallback, picking up its "Hasonló pozíciók" (similar
+  //   positions) sidebar widget's OTHER postings' titles instead ("Linux
+  //   rendszergazda", "Node.js fejlesztő" bleeding into unrelated rows).
+  let text = "";
+  for (const sel of ["#adv", ".jobdescription", ".jobAdvertisement__content"]) {
+    const t = normalizeWhitespace($(sel).first().text());
+    if (t) {
+      text = t;
+      break;
+    }
+  }
+
   // LinkedIn: same container used by extractLinkedInExperience.
   // talent.com (current markup): [class*="jobDescriptionColumn"] (CSS-modules
   // hash suffix, hence substring match) — neither JSON-LD nor __NEXT_DATA__
@@ -464,9 +497,11 @@ export function extractTechnologies(html) {
   // feladatok/elvárások block and stops before the "Alapadatok" sidebar
   // (helyszín/bérezés/stb.) — no related-postings widget on the page to
   // pollute (verified live 2026-09-08, issue #4).
-  let text = normalizeWhitespace(
-    $('.description, .job-description, #job-details, .show-more-less-html__markup, [class*="jobDescriptionColumn"], .ContentColumn').first().text()
-  );
+  if (!text) {
+    text = normalizeWhitespace(
+      $('.description, .job-description, #job-details, .show-more-less-html__markup, [class*="jobDescriptionColumn"], .ContentColumn').first().text()
+    );
+  }
 
   if (!text) {
     // zyntern (Vue SPA): the visible body is only navbar/footer — the posting
