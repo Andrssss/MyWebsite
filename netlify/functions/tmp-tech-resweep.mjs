@@ -24,6 +24,35 @@ export default async (request) => {
   if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
 
   const url = new URL(request.url);
+
+  if (url.searchParams.get("check") === "elk-remaining") {
+    const client = await pool.connect();
+    try {
+      const { rows } = await client.query(`
+        SELECT source, COUNT(*)::int AS cnt
+        FROM job_posts
+        WHERE active = true AND technologies LIKE '%ELK Stack%' AND technologies LIKE '%ELT%'
+        GROUP BY source ORDER BY cnt DESC
+      `);
+      const sap = await client.query(`
+        SELECT source, COUNT(*)::int AS cnt FROM job_posts
+        WHERE active = true AND source IN ('otp','kuka') AND technologies LIKE '%SAP%'
+        GROUP BY source
+      `);
+      const mbhLinux = await client.query(`
+        SELECT COUNT(*)::int AS cnt FROM job_posts
+        WHERE active = true AND source = 'mbh' AND technologies LIKE '%Node.js%'
+      `);
+      return new Response(JSON.stringify({
+        elkAndEltStillTogether: rows,
+        otpKukaStillHaveSAP: sap.rows,
+        mbhStillHasNodeJs: mbhLinux.rows[0],
+      }, null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
+    } finally {
+      client.release();
+    }
+  }
+
   const source = url.searchParams.get("source");
   const afterId = parseInt(url.searchParams.get("afterId") || "0", 10);
   if (!source) return new Response(JSON.stringify({ error: "source required" }), { status: 400 });
