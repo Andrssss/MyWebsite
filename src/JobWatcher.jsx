@@ -565,7 +565,7 @@ function ActiveFilterSummary({ items }) {
 
 const JobWatcher = () => {
   const navigate = useNavigate();
-  const debugMode = new URLSearchParams(window.location.search).has("debug");
+  const debugMode = true;
   const [sources, setSources] = useState([]);
   const [jobs, setJobs] = useState([]);
   // Both admin tiers come from JobAccessGate, which already asked the server
@@ -1077,34 +1077,7 @@ const JobWatcher = () => {
     saveClickedKey(localKey);
   };
 
-  const [lastUpdates, setLastUpdates] = useState([]);
   const [showEmail, setShowEmail] = useState(false);
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    fetch("/.netlify/functions/last-deploy")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!Array.isArray(data?.updates)) return;
-        setLastUpdates(
-          data.updates
-            .filter((u) => u?.date)
-            .map((u) => ({ date: new Date(u.date) }))
-        );
-      })
-      .catch(() => {});
-  }, [isAdmin]);
-
-  useEffect(() => {
-    fetch("/.netlify/functions/job-events")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!Array.isArray(data?.events)) return;
-        setUpcomingEvents(data.events);
-      })
-      .catch(() => {});
-  }, []);
 
   /* =======================
      FETCH
@@ -2073,51 +2046,6 @@ const JobWatcher = () => {
   <div className="job-watcher">
     <div className="job-watcher-header">
       <div className="job-watcher-header__main">
-          {!isRestricted && (
-            <>
-              <h1>Automata scraper</h1>
-              <p>Minden nap UTC szerint 5-22 között óránként frissül. Kivéve az AI agentek, azok reggel futnak, ha van még tokenem.</p>
-              <div className="job-linkedin-notice">
-                <span className="job-linkedin-notice__title">⚠️ Figyelem — LinkedIn</span>
-                <p>
-                  A LinkedIn állások <strong>~50%-át</strong> tudjuk csak
-                  megjeleníteni, mert a publikus API-k erősen korlátozottak.
-                </p>
-              </div>
-
-              {upcomingEvents.length > 0 && (
-                <div className="job-events-notice">
-                  <span className="job-events-notice__title">📅 Közelgő állásbörzék</span>
-                  <ul className="job-events-notice__list">
-                    {upcomingEvents.slice(0, 5).map((ev) => (
-                      <li key={ev.url}>
-                        <a href={ev.url} target="_blank" rel="noopener noreferrer">
-                          {ev.title}
-                        </a>
-                        {" — "}
-                        {new Date(ev.date).toLocaleDateString("hu-HU")}
-                        {ev.endDate ? `–${new Date(ev.endDate).toLocaleDateString("hu-HU")}` : ""}
-                        {ev.location ? ` · ${ev.location}` : ""}
-                        {ev.registrationDeadline
-                          ? ` · Jelentkezési határidő: ${new Date(ev.registrationDeadline).toLocaleDateString("hu-HU")}`
-                          : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="job-last-deploy">
-                {lastUpdates.length > 0 ? (
-                  <span>
-                    {`Last git commit: ${lastUpdates[0].date.toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}`}
-                  </span>
-                ) : (
-                  <span>Nincs elérhető frissítési dátum.</span>
-                )}
-              </div>
-            </>
-          )}
-
           {isRestricted && (
             <header className="job-reroute-hero">
               <span className="job-reroute-hero__arrow" aria-hidden="true">➡️</span>
