@@ -58,6 +58,28 @@ export default async (request) => {
 
   const params = new URL(request.url).searchParams;
 
+  if (params.get("deleteprodiak")) {
+    const urls = [
+      "https://www.prodiak.hu/allas/programozo-oktato-diakmunka/273585",
+      "https://www.prodiak.hu/allas/szamitogepes-oktato/274001",
+      "https://www.prodiak.hu/allas/delivery-management-gyakornok/273893",
+      "https://www.prodiak.hu/allas/programozo-oktato/273587",
+      "https://www.prodiak.hu/allas/programozo-oktato/273589",
+    ];
+    const client = await pool2.connect();
+    try {
+      const res = await client.query(
+        `DELETE FROM job_posts WHERE source = 'prodiak' AND url = ANY($1::text[]) RETURNING id, url`,
+        [urls]
+      );
+      return new Response(JSON.stringify({ deleted: res.rows }, null, 2), {
+        headers: { "content-type": "application/json" },
+      });
+    } finally {
+      client.release();
+    }
+  }
+
   if (params.get("dbcheck")) {
     const client = await pool2.connect();
     try {
