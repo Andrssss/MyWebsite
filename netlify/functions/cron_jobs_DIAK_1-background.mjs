@@ -1709,11 +1709,21 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         //   3. `itSkill`    — az "AI Requirements Analyst gyakornok" címében nincs
         //                     kategória-keyword, a skill-címkéjében viszont ott az IT.
         //
-        // A description-t szándékosan NEM etetjük a matchesKeywords-be: a 800 karakteres
+        // 2026-09-10 (GitHub issue #12): a 2. jel korábban `matchesKeywords(title, "")`
+        // volt, ami valójában csak `!shouldSkipTitleFilter(title, _filters)` — vagyis
+        // "a cím nincs a denylisten", NEM "a cím IT-kulcsszót tartalmaz". Mivel a lenti
+        // sor ÚGYIS lefuttatja ugyanezt a denylist-ellenőrzést, ez a jel a gyakorlatban
+        // semmit nem tett hozzá — a dokumentált 3 jelből ténylegesen csak 2 élt, ezért
+        // maradhatott ki két valódi IT-cím (Hálózatmérnök, Tesztmenedzsment) is a
+        // job_filters bare-word hibája MELLETT. Valódi cím-alapú IT-jelre cserélve
+        // (`hasStrongItTitle`, ugyanaz, amit a muisz-ág használ a saját kategóriája
+        // helyett).
+        //
+        // A description-t szándékosan NEM etetjük ebbe a jelbe: a 800 karakteres
         // leírásokban a banki/marketinges szövegek is emlegetnek Excelt/SQL-t, ez pontosan
         // a 2026-07-29-i description-pollution csapda.
         matchedList = merged
-          .filter((c) => c.inItField || matchesKeywords(c.title, "") || c.itSkill)
+          .filter((c) => c.inItField || hasStrongItTitle(c.title) || c.itSkill)
           .filter((c) => {
             const hit = getBlockingFilterWord(c.title, _filters);
             if (hit) console.log(`[zyntern] SKIP "${c.title}"  ← blacklist hit: "${hit}"`);

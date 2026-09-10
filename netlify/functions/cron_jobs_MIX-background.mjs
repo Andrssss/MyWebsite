@@ -88,7 +88,23 @@ const DREAMJOBS_NON_IT_CATEGORY_IDS = new Set([
   76376, // hospitality-tourism — Vendéglátás és Turizmus
   80399, // skilled-manual-labor — Szakmunka & Fizikai munka
   80400, // engineering-manufacturing — Mérnök & Gyártás (élőben: operátor/termelés, nem IT)
+  // 2026-09-10 (GitHub issue #12 audit fallout): három ÚJ kategória bukkant fel a
+  // taxonómiában, mindegyik élő tartalommal ellenőrizve — egyik sem IT:
+  80397, // construction-real-estate — "Ingatlanértékesítő", "Épületvillamossági Projektvezető"
+  80398, // retail-trade — "Kiskereskedelmi ügyintéző"
+  50510, // healthcare-medical — "Terápiás / szociális munkatárs"
 ]);
+
+// 2026-09-10 (GitHub issue #12): "customer-service-10" (99610) egy ÚJ, VEGYES
+// kategória — a taxonómia-drift, amit az audit talált. Élő tartalma zöme nem IT
+// (karosszéria-ügyintéző, telefonos biztosítási specialista, ügyfélkapcsolati
+// munkatárs), DE közéjük keveredett egy valódi "Technical Support Specialist"
+// (Formlabs) is, amit a korábbi bare id/slug allow-list emiatt némán kihagyott.
+// Sem a teljes befogadás, sem a teljes kizárás nem helyes — ez az egyetlen
+// kategória kap cím-alapú másodlagos szűrést a bare id-check helyett.
+const DREAMJOBS_AMBIGUOUS_CATEGORY_IDS = new Set([99610]); // customer-service-10
+const DREAMJOBS_SUPPORT_TITLE_HINT =
+  /technical support|it support|helpdesk|help desk|support specialist|support engineer|support analyst|rendszergazda/i;
 
 // 2026-08-20: MEGSZŰNT az API-oldali `job-categories=` szűrő.
 // Előzmény: 2026-07-14-én a 63-as kategóriát azért vettük ki a listából, mert
@@ -353,10 +369,16 @@ function extractDreamJobs(payload) {
 }
 
 function isDreamJobsItCategory(job) {
-  return (
+  if (
     DREAMJOBS_IT_CATEGORY_IDS.has(job.categoryId) ||
     DREAMJOBS_IT_CATEGORY_SLUGS.has(job.categorySlug)
-  );
+  ) {
+    return true;
+  }
+  if (DREAMJOBS_AMBIGUOUS_CATEGORY_IDS.has(job.categoryId)) {
+    return DREAMJOBS_SUPPORT_TITLE_HINT.test(job.title || "");
+  }
+  return false;
 }
 
 // Returns { jobs, complete }. `complete` is false when a paging loop ran all the
@@ -397,7 +419,11 @@ async function fetchAllDreamJobs() {
         seen.add(key);
         allUrls.push(key);
 
-        if (!isDreamJobsItCategory(job) && !DREAMJOBS_NON_IT_CATEGORY_IDS.has(job.categoryId)) {
+        if (
+          !isDreamJobsItCategory(job) &&
+          !DREAMJOBS_NON_IT_CATEGORY_IDS.has(job.categoryId) &&
+          !DREAMJOBS_AMBIGUOUS_CATEGORY_IDS.has(job.categoryId)
+        ) {
           unknownCategories.set(job.categoryId, job.categorySlug);
         }
         // `scope[]=isNotBlue` kliens-oldali megfelelője.

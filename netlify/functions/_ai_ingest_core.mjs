@@ -134,10 +134,18 @@ export function isItJob(title, categories) {
    kategórián KÍVÜLI beengedés kapuja, az `isItJob` a kategória nélküli
    forrásoké.
 
+   2026-09-10 (GitHub issue #12): a muisz "IT Intern" → Irodai kategória-hiba
+   mellé egy MÁSIK forma is előkerült — "Service Desk" és "Technical Support" /
+   "Support Analyst" című, valódi IT-support hirdetések ugyanígy nem-IT
+   kategóriában ülnek, és a régi regex ezt a szókincset egyáltalán nem
+   ismerte. A help-/service-desk és hálózat-mérnöki szavak — a fenti tiltott
+   szavakkal ellentétben — önmagukban is egyértelműen IT-szagúak (nincs
+   plauzibilis nem-IT olvasatuk), ezért idekerülnek.
+
    Egy közös példány, mert két scraper használja (melodiak, muisz) — külön
    másolatban garantáltan szétcsúsznának. */
 export const STRONG_IT_TITLE =
-  /(adattudós|adatelemző|adatmérnök|data\s+(scientist|analyst|engineer)|szoftver|software|programozó|fejlesztőmérnök|webfejlesztő|developer|devops|rendszergazda|informatikus|\bIT\b)/i;
+  /(adattudós|adatelemző|adatmérnök|data\s+(scientist|analyst|engineer)|szoftver|software|programozó|fejlesztőmérnök|webfejlesztő|developer|devops|rendszergazda|informatikus|\bIT\b|help\s*desk|service\s*desk|technical\s+support|support\s+(analyst|engineer|specialist)|hálózatmérnök|network\s+engineer)/i;
 
 export function hasStrongItTitle(title) {
   return STRONG_IT_TITLE.test(String(title || ""));
