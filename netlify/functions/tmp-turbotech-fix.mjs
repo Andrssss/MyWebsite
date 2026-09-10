@@ -30,7 +30,10 @@ export default async (request) => {
       `SELECT id, url, source, title, company, active, experience, technologies, first_seen FROM job_posts WHERE id = $1`,
       [ID]
     );
-    return new Response(JSON.stringify(rows, null, 2), { headers: { "content-type": "application/json" } });
+    const cat = await client.query(
+      `SELECT name, keywords FROM job_categories WHERE name = 'Fejlesztő' OR name = 'Hardware' OR name = 'Mérnöki / Gyártás'`
+    );
+    return new Response(JSON.stringify({ row: rows, categories: cat.rows }, null, 2), { headers: { "content-type": "application/json" } });
   } finally {
     client.release();
   }
