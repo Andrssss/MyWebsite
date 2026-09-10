@@ -5,7 +5,9 @@
 import { Pool } from "pg";
 import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
-import { shouldSkipTitleFilter } from "./_seniority_policy.mjs";
+import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
+import { extractTechnologies } from "./_experience_core.mjs";
+import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 const TOKEN = "f3c9a812e6d045b7180ce2f976a8d5b1e04c73a92f6081d3";
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -67,6 +69,38 @@ export default async (request) => {
     return new Response(JSON.stringify({ filterCount: filters.length, results }, null, 2), {
       headers: { "content-type": "application/json" },
     });
+  }
+
+  const prodiakTest = params.get("prodiaktest"); // "title|url|description"
+  if (prodiakTest) {
+    const [title, url, description] = prodiakTest.split("|");
+    const diag = { title, url, description };
+    try {
+      const experience = seniorAwareExperience(title, null) ?? "-";
+      diag.experience = experience;
+      const technologies = extractTechnologies(`<div class="description">${description || ""}</div>`);
+      diag.technologies = technologies;
+      const level = computeLevel({ title, experience, source: "prodiak" });
+      diag.level = level;
+      const client2 = await pool.connect();
+      try {
+        const res = await client2.query(
+          `INSERT INTO job_posts (source, title, url, experience, technologies, level, first_seen)
+           VALUES ($1,$2,$3,$4,$5,$6,NOW())
+           ON CONFLICT (source, url) DO NOTHING
+           RETURNING id;`,
+          ["prodiak", title, url, experience, technologies ?? null, level]
+        );
+        diag.insertedId = res.rows[0]?.id ?? null;
+        diag.rowCount = res.rowCount;
+      } finally {
+        client2.release();
+      }
+    } catch (err) {
+      diag.error = err.message;
+      diag.stack = err.stack;
+    }
+    return new Response(JSON.stringify(diag, null, 2), { headers: { "content-type": "application/json" } });
   }
 
   const client = await pool.connect();
