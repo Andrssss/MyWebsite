@@ -15,7 +15,8 @@ const connectionString = process.env.NETLIFY_DATABASE_URL;
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 const BUDGET_MS = 9000;
-const BATCH_LIMIT = 25;
+const BATCH_LIMIT = 60;
+const CONCURRENCY = 6;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default async (request) => {
@@ -40,32 +41,45 @@ export default async (request) => {
     let processed = 0, updated = 0, unchanged = 0, errors = 0;
     const changes = [];
     let lastId = afterId;
+    let idx = 0;
 
-    for (const row of rows) {
+    while (idx < rows.length) {
       if (Date.now() - start > BUDGET_MS) break;
-      lastId = row.id;
-      processed++;
-      try {
-        const html = await fetchText(row.url);
-        const newTech = extractTechnologies(html);
-        const before = row.technologies;
-        const beforeNorm = before ?? null;
-        const afterNorm = newTech ?? null;
-        if (beforeNorm !== afterNorm) {
+      const chunk = rows.slice(idx, idx + CONCURRENCY);
+      idx += chunk.length;
+
+      const results = await Promise.all(
+        chunk.map(async (row) => {
+          try {
+            const html = await fetchText(row.url);
+            return { row, newTech: extractTechnologies(html) };
+          } catch (err) {
+            return { row, error: err.message };
+          }
+        })
+      );
+
+      for (const r of results) {
+        processed++;
+        lastId = r.row.id;
+        if (r.error) {
+          errors++;
+          changes.push({ id: r.row.id, url: r.row.url, error: r.error });
+          continue;
+        }
+        const before = r.row.technologies;
+        if ((before ?? null) !== (r.newTech ?? null)) {
           await client.query(
             `UPDATE job_posts SET technologies = $1 WHERE id = $2 AND technologies IS NOT DISTINCT FROM $3`,
-            [newTech, row.id, before]
+            [r.newTech, r.row.id, before]
           );
           updated++;
-          changes.push({ id: row.id, url: row.url, before, after: newTech });
+          changes.push({ id: r.row.id, url: r.row.url, before, after: r.newTech });
         } else {
           unchanged++;
         }
-      } catch (err) {
-        errors++;
-        changes.push({ id: row.id, url: row.url, error: err.message });
       }
-      await sleep(120);
+      await sleep(150);
     }
 
     const hasMore = rows.length === BATCH_LIMIT || processed < rows.length;
