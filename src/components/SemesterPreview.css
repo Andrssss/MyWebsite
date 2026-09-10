@@ -464,6 +464,18 @@
 
 .file-folder-btn:hover { color: #afd4ff; }
 
+.file-download-count {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #6fcf6f;
+  white-space: nowrap;
+  padding: 1px 6px;
+  background: #1e2d1e;
+  border: 1px solid #3a7a3a;
+  border-radius: 4px;
+}
+
 .file-name-btn {
   background: none;
   border: none;

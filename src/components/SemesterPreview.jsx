@@ -390,10 +390,15 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
             <div key={file.id} className={`file-row${isFolder(file.mimeType) ? ' file-row--folder' : ''}`}>
               <span className="file-icon">{fileIcon(file.mimeType)}</span>
               {isFolder(file.mimeType) ? (
-                <button className="file-name file-folder-btn"
-                  onClick={() => setStack(s => [...s, { id: file.id, name: file.name }])}>
-                  {isRoot ? displayName(file.name) : file.name}
-                </button>
+                <>
+                  <button className="file-name file-folder-btn"
+                    onClick={() => setStack(s => [...s, { id: file.id, name: file.name }])}>
+                    {isRoot ? displayName(file.name) : file.name}
+                  </button>
+                  {isRoot && counts[file.id] > 0 && (
+                    <span className="file-download-count">⬇ {counts[file.id]}</span>
+                  )}
+                </>
               ) : (
                 <button className="file-name file-name-btn"
                   onClick={() => isUrlShortcut(file.name) ? openUrlShortcut(file.id) : setPreviewFile(file)}
