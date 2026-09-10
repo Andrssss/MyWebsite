@@ -16,6 +16,30 @@ export default async (request) => {
 
   const client = await pool.connect();
   try {
+    const url = new URL(request.url);
+    if (url.searchParams.get("check") === "profession-elk") {
+      const { rows } = await client.query(`
+        SELECT
+          COUNT(*)::int AS total_elk_or_elt,
+          COUNT(*) FILTER (WHERE first_seen >= '2026-09-01')::int AS since_fix_date,
+          MIN(first_seen) AS earliest,
+          MAX(first_seen) AS latest
+        FROM job_posts
+        WHERE active = true AND source = 'profession-intern'
+          AND (technologies LIKE '%ELK Stack%' OR technologies LIKE '%ELT%')
+      `);
+      const recent = await client.query(`
+        SELECT title, url, technologies, first_seen FROM job_posts
+        WHERE active = true AND source = 'profession-intern'
+          AND (technologies LIKE '%ELK Stack%' OR technologies LIKE '%ELT%')
+          AND first_seen >= '2026-09-01'
+        ORDER BY first_seen DESC LIMIT 10
+      `);
+      return new Response(JSON.stringify({ stats: rows[0], recentRows: recent.rows }, null, 2), {
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
+
     const counts = await client.query(`
       SELECT source,
         COUNT(*)::int AS active_total,
