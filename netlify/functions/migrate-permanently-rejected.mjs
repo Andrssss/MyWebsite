@@ -10,16 +10,23 @@
 //
 // DELETE THIS FILE after it has been run once successfully in production.
 //
+// Disposable one-off token, hardcoded here rather than gated on an existing
+// env secret (this repo's established pattern for one-time prod writes —
+// see deploy-and-oneoff-writes-workflow notes): AI_INGEST_TOKEN is a
+// write-only Netlify secret and can't be read back to compose the curl call.
+// This token stops mattering the moment the file is deleted.
+//
 //   curl "https://bakan7.netlify.app/.netlify/functions/migrate-permanently-rejected?dryRun=1" \
-//     -H "Authorization: Bearer $AI_INGEST_TOKEN"
+//     -H "Authorization: Bearer 3cf96c2c59f9ebb42cdfd26a61101d1865f876c89bd7bc90"
 //
 //   curl -X POST "https://bakan7.netlify.app/.netlify/functions/migrate-permanently-rejected" \
-//     -H "Authorization: Bearer $AI_INGEST_TOKEN"
+//     -H "Authorization: Bearer 3cf96c2c59f9ebb42cdfd26a61101d1865f876c89bd7bc90"
 
 import { getStore } from "@netlify/blobs";
 
 const STORE_NAME = "ai-scraped-registry";
 const KEY = "registry.json";
+const ONE_OFF_TOKEN = "3cf96c2c59f9ebb42cdfd26a61101d1865f876c89bd7bc90";
 
 function json(status, body) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -29,10 +36,8 @@ function json(status, body) {
 }
 
 function authorized(request) {
-  const expected = process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET;
-  if (!expected) return false;
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  return token === expected;
+  return token === ONE_OFF_TOKEN;
 }
 
 function toSlug(s) {
