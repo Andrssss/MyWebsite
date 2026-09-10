@@ -4,6 +4,8 @@
 // evidence-based row-flip as the (deleted) tmp-revive-issue13.mjs. Delete after use.
 import { Pool } from "pg";
 import { getStore } from "@netlify/blobs";
+import { loadFilters } from "./load_filters.mjs";
+import { shouldSkipTitleFilter } from "./_seniority_policy.mjs";
 
 const TOKEN = "f3c9a812e6d045b7180ce2f976a8d5b1e04c73a92f6081d3";
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -56,6 +58,16 @@ export default async (request) => {
   const params = new URL(request.url).searchParams;
   const source = params.get("source");
   const revive = params.get("revive"); // comma-separated urls
+  const titleCheck = params.get("titlecheck"); // pipe-separated titles
+
+  if (titleCheck) {
+    const filters = await loadFilters();
+    const titles = titleCheck.split("|").map((t) => t.trim()).filter(Boolean);
+    const results = titles.map((t) => ({ title: t, skippedAsSenior: shouldSkipTitleFilter(t, filters) }));
+    return new Response(JSON.stringify({ filterCount: filters.length, results }, null, 2), {
+      headers: { "content-type": "application/json" },
+    });
+  }
 
   const client = await pool.connect();
   try {
