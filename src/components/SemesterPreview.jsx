@@ -41,6 +41,30 @@ async function openUrlShortcut(fileId) {
 
 const displayName = (name) => name.replace(/^\d+_/, '');
 
+// Downloads are counted per folder, not per file: the subject's own root
+// folder gets a counter, each of its immediate (first-level) subfolders gets
+// its own, and anything nested deeper rolls up into its first-level
+// ancestor's count instead of getting a counter of its own (user decision).
+const countKeyForStack = (stack) => (stack[1] || stack[0]).id;
+
+async function bumpDownloadCount(folderId, setCounts) {
+  setCounts(c => ({ ...c, [folderId]: (c[folderId] || 0) + 1 }));
+  try {
+    const res = await fetch('/.netlify/functions/download-count', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId }),
+      keepalive: true,
+    });
+    if (res.ok) {
+      const { count } = await res.json();
+      setCounts(c => ({ ...c, [folderId]: count }));
+    }
+  } catch {
+    // best-effort — the optimistic local bump above already reflects the click
+  }
+}
+
 const sortFiles = (files) => [...files].sort((a, b) => {
   const aIsFolder = isFolder(a.mimeType) ? 0 : 1;
   const bIsFolder = isFolder(b.mimeType) ? 0 : 1;
@@ -72,7 +96,7 @@ const VideoGroup = ({ name, items }) => {
   );
 };
 
-const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
+const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext, downloadCount, onDownload }) => {
   const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -147,8 +171,9 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
           <span className="preview-modal-title">{file.name}</span>
           <div className="preview-modal-actions">
             <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
-              target="_blank" rel="noopener noreferrer" className="preview-modal-download">
-              ⬇ Letöltés
+              target="_blank" rel="noopener noreferrer" className="preview-modal-download"
+              onClick={onDownload}>
+              ⬇ Letöltés{downloadCount > 0 ? ` (${downloadCount})` : ''}
             </a>
             <button className="preview-modal-close" onClick={requestClose}>✕</button>
           </div>
@@ -182,7 +207,7 @@ const PreviewModal = ({ file, onClose, onPrev, onNext, hasPrev, hasNext }) => {
   );
 };
 
-async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
+async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal, onSuccess) {
   const check = () => { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); };
   try {
     setStatus('Fájlok listázása...');
@@ -229,6 +254,7 @@ async function downloadFolder(folderId, name, fallbackUrl, setStatus, signal) {
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
     setStatus(null);
+    onSuccess?.();
   } catch (e) {
     if (e.name === 'AbortError') { setStatus(null); return; }
     alert(`Hiba: ${e.message}\n\nMegnyitjuk Drive-ban.`);
@@ -243,11 +269,23 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
   const [loadingId, setLoadingId] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [counts, setCounts] = useState({});
   const abortRef = React.useRef(null);
 
   const currentFolder = stack[stack.length - 1];
   const isRoot = stack.length === 1;
   const files = cache[currentFolder.id];
+  const countKey = countKeyForStack(stack);
+  const downloadCount = counts[countKey] || 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/.netlify/functions/download-count')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!cancelled && data?.counts) setCounts(data.counts); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   React.useEffect(() => {
     if (cache[currentFolder.id] !== undefined) return;
@@ -305,11 +343,12 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
                   displayName(currentFolder.name),
                   `https://drive.google.com/drive/folders/${currentFolder.id}`,
                   setDownloading,
-                  ctrl.signal
+                  ctrl.signal,
+                  () => bumpDownloadCount(countKey, setCounts)
                 );
               }}
             >
-              ⬇ Letöltés
+              ⬇ Letöltés{downloadCount > 0 ? ` (${downloadCount})` : ''}
             </button>
           )}
           {ytLinks.length === 1 && (
@@ -366,7 +405,8 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
                 <div className="file-actions">
                   <a href={`https://drive.google.com/uc?export=download&id=${file.id}`}
                     target="_blank" rel="noopener noreferrer"
-                    className="file-btn file-btn-download" title="Letöltés">⬇</a>
+                    className="file-btn file-btn-download" title="Letöltés"
+                    onClick={() => bumpDownloadCount(countKey, setCounts)}>⬇</a>
                 </div>
               )}
             </div>
@@ -385,6 +425,8 @@ const FileBrowser = ({ rootId, rootName, subjectVideos, moodleUrl, onRootError, 
             hasNext={previewIdx < previewableFiles.length - 1}
             onPrev={() => setPreviewFile(previewableFiles[previewIdx - 1])}
             onNext={() => setPreviewFile(previewableFiles[previewIdx + 1])}
+            downloadCount={downloadCount}
+            onDownload={() => bumpDownloadCount(countKey, setCounts)}
           />
         );
       })()}
