@@ -1,33 +1,47 @@
 // netlify/functions/cron_job_events-background.mjs
 //
-// Heti cron (2026-09-11 óta — napi volt előtte, user-döntés: az esemény-lista
-// lassan változik, napi futás felesleges terhelés/költség volt): beolvassa az
-// `event_sources` regiszterben (event-sources.js-en keresztül karbantartott)
-// listing oldalakat, AI-val (_ai_events_extract_core) kinyeri a rajtuk
-// hirdetett közelgő állásbörzéket/eventeket, és beolvasztja a "job-events"
-// Blobba (_job_events_store.mjs) — az a blob a jövőbeli eseményeket tárolja,
-// a lejárt (mai nap előtti) sorokat minden futás eldobja, forrás nélkül is
-// (ld. mergeAndPurgeEvents). Heti ütemezés mellett is helyes marad: a purge
-// dátum-alapú, csak ritkábban fut, egy lejárt sor legfeljebb ~6 napig
+// 2 naponta futó cron (2026-09-11 óta — előtte heti, előtte napi; user-döntés
+// mindkétszer: az esemény-lista lassan változik, ritkább futás is elég):
+// beolvassa az `event_sources` regiszterben (event-sources.js-en keresztül
+// karbantartott) listing oldalakat, és beolvasztja a "job-events" Blobba
+// (_job_events_store.mjs) — az a blob a jövőbeli eseményeket tárolja, a
+// lejárt (mai nap előtti) sorokat minden futás eldobja, forrás nélkül is
+// (ld. mergeAndPurgeEvents). Ritkább ütemezés mellett is helyes marad: a
+// purge dátum-alapú, csak ritkábban fut, egy lejárt sor legfeljebb ~1 napig
 // maradhat bent a törlés előtt ahelyett, hogy még aznap eltűnne.
 //
-// `registrationDeadline` (2026-09-08 kibővítve): a listázó oldal HTML-je
-// gyakran nem közli a jelentkezési határidőt, csak az esemény saját
-// aloldala — ezért minden olyan eseményre, aminek a listázó-extrakcióból
-// null jött, egy külön (olcsó, haiku-modelles) follow-up lekéri és
-// átvizsgálja a saját `url`-jét (ld. enrichDeadline). Ezt csak EGYSZER teszi
-// meg eseményenként: a tárolt sor `deadlineChecked` mezője jelzi, hogy már
-// megnéztük, így egy örökre határidő nélküli esemény nem fizet rá minden
-// futásra újra a lekérésre/AI-hívásra.
+// **Két kinyerési mód, forrásonként `event_sources.mode` dönt (2026-09-11,
+// user request: "csak amit egyszerű vagy van rá API, AI nélkül"):**
+//   - `jsonld` — determinisztikus, AI nélkül (_events_jsonld_core.mjs):
+//     a listázó oldal saját schema.org/Event JSON-LD-jét parse-olja
+//     (cheerio + JSON.parse, nulla LLM-hívás). Csak azokra a forrásokra
+//     használható, amik tényleg közlik ezt (kibernaptar.hu igen — WordPress
+//     events-calendar plugin; ivsz.hu/mvisz.hu ELLENŐRIZVE és NEM, ezért
+//     azok ki is kerültek a regiszterből, nem próbálunk rájuk törékeny
+//     HTML-mintaillesztést építeni).
+//   - `llm-read` — a régi AI-s út (_ai_events_extract_core.mjs), meghagyva
+//     epam/progmasters-nek (2 kicsi, egy-eseményes céges oldal, nincs
+//     strukturált adatuk, de a költség is elhanyagolható).
+//
+// `registrationDeadline` (2026-09-08 kibővítve, csak az `llm-read` módnál):
+// a listázó oldal HTML-je gyakran nem közli a jelentkezési határidőt, csak
+// az esemény saját aloldala — ezért minden olyan eseményre, aminek a
+// listázó-extrakcióból null jött, egy külön (olcsó, haiku-modelles)
+// follow-up lekéri és átvizsgálja a saját `url`-jét (ld. enrichDeadline).
+// Ezt csak EGYSZER teszi meg eseményenként: a tárolt sor `deadlineChecked`
+// mezője jelzi, hogy már megnéztük. A `jsonld` módú források ezt sosem
+// kapják meg — nincs rá strukturált mező, és ez maga is egy AI-hívás volna,
+// pont amit a "no AI" kérés elkerülni akar; ott `registrationDeadline`
+// mindig null marad.
 //
 // Direkt ütemezve `config.schedule`-lel, mint a cron_daily_stats.mjs — nem a
-// cron_scheduler dispatcheren keresztül, mert ez alacsony gyakoriságú (heti)
-// és nem kell staggerelni. Netlify saját ütemezett hívása nem küld
-// CRON_SECRET bearer-t, ezért — pont úgy, mint cron_daily_stats.mjs-nél —
-// nincs itt bejövő auth-ellenőrzés.
+// cron_scheduler dispatcheren keresztül, mert ez alacsony gyakoriságú és nem
+// kell staggerelni. Netlify saját ütemezett hívása nem küld CRON_SECRET
+// bearer-t, ezért — pont úgy, mint cron_daily_stats.mjs-nél — nincs itt
+// bejövő auth-ellenőrzés.
 
 export const config = {
-  schedule: "30 5 * * 1", // minden hétfőn 05:30 UTC
+  schedule: "30 5 */2 * *", // 2 naponta (páratlan naptári napokon) 05:30 UTC
 };
 
 import { Pool } from "pg";
@@ -38,6 +52,7 @@ import {
   estimateCost,
   fetchListingPage,
 } from "./_ai_events_extract_core.mjs";
+import { extractEventsJsonLd } from "./_events_jsonld_core.mjs";
 import { readEvents, mergeAndPurgeEvents } from "./_job_events_store.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -119,7 +134,29 @@ async function enrichDeadline(event, known, budget) {
   }
 }
 
-async function runSite(client, site, knownByUrl) {
+async function runSiteJsonLd(client, site) {
+  let html;
+  try {
+    html = await fetchListingPage(site.list_url);
+  } catch (err) {
+    await client.query(`UPDATE event_sources SET fail_streak = fail_streak + 1 WHERE site = $1`, [site.site]);
+    console.error(`[job-events] ${site.site}: fetch failed — ${err.message}`);
+    return [];
+  }
+
+  try {
+    const events = extractEventsJsonLd(html, { baseUrl: site.list_url });
+    await client.query(`UPDATE event_sources SET last_ok = NOW(), fail_streak = 0 WHERE site = $1`, [site.site]);
+    console.log(`[job-events] ${site.site}: found=${events.length} (jsonld, no AI)`);
+    return events.map((e) => ({ ...e, source: site.site }));
+  } catch (err) {
+    await client.query(`UPDATE event_sources SET fail_streak = fail_streak + 1 WHERE site = $1`, [site.site]);
+    console.error(`[job-events] ${site.site}: jsonld extraction failed — ${err.message}`);
+    return [];
+  }
+}
+
+async function runSiteLLM(client, site, knownByUrl) {
   let html;
   try {
     html = await fetchListingPage(site.list_url);
@@ -150,13 +187,17 @@ async function runSite(client, site, knownByUrl) {
   }
 }
 
+function runSite(client, site, knownByUrl) {
+  return site.mode === "jsonld" ? runSiteJsonLd(client, site) : runSiteLLM(client, site, knownByUrl);
+}
+
 export default withTimeout("cron_job_events-background", async () => {
   const client = await pool.connect();
   let sites = [];
   try {
     await ensureTable(client);
     ({ rows: sites } = await client.query(
-      `SELECT site, list_url FROM event_sources WHERE mode <> 'disabled' ORDER BY site`
+      `SELECT site, list_url, mode FROM event_sources WHERE mode <> 'disabled' ORDER BY site`
     ));
 
     const { events: storedEvents } = await readEvents();

@@ -21,7 +21,12 @@ const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
 
-const MODES = new Set(["llm-read", "disabled"]);
+// "jsonld" (2026-09-11): deterministic schema.org/Event JSON-LD extraction,
+// no AI — see cron_job_events-background.mjs / _events_jsonld_core.mjs. Only
+// valid for a source that actually embeds it (kibernaptar.hu does; verify
+// before switching a source to this mode, the cron just silently finds 0
+// events on a page without it, no error).
+const MODES = new Set(["llm-read", "jsonld", "disabled"]);
 
 function authorized(event) {
   const expected = (process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET || "").trim();
