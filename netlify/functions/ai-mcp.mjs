@@ -125,8 +125,20 @@ const TOOLS = [
         },
         rejected: {
           type: "array",
-          description: "Company names to add to the permanently-rejected list.",
-          items: { type: "string" },
+          description:
+            "Companies to permanently reject, as structured records — not free text. 'slug' must " +
+            "exactly match the slug used in sitesChecked/sites for this company when one exists, so " +
+            "future runs can drop it with an exact lookup instead of parsing a string.",
+          items: {
+            type: "object",
+            required: ["slug", "reason"],
+            properties: {
+              slug: { type: "string", description: "Same slug as sites/sitesChecked for this company." },
+              domain: { type: "string", description: "Primary domain, e.g. 'careers.graphisoft.com'. Informational — not the match key." },
+              company: { type: "string" },
+              reason: { type: "string" },
+            },
+          },
         },
       },
       additionalProperties: false,

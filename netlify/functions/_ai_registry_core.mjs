@@ -300,12 +300,31 @@ export async function submitFindings(payload) {
     };
   }
 
-  const rejectedSet = new Set(reg.permanentlyRejected);
-  for (const name of payload?.rejected || []) {
-    const n = String(name || "").trim();
-    if (n) rejectedSet.add(n);
+  // Structured records keyed by slug (same slug space as sites/sitesChecked),
+  // not free text — see AI_SCRAPER_PERMANENTLY_REJECTED_PROPOSAL.md. A raw
+  // string entry from before this migration is left as-is if still present
+  // (readRegistry doesn't reshape it); only new submissions must be objects.
+  const rejectedBySlug = new Map(
+    (reg.permanentlyRejected || [])
+      .filter((r) => r && typeof r === "object" && r.slug)
+      .map((r) => [r.slug, r])
+  );
+  for (const raw of payload?.rejected || []) {
+    if (!raw || typeof raw !== "object") continue;
+    const slug = toSlug(raw.slug || raw.company);
+    if (!slug) continue;
+    const prev = rejectedBySlug.get(slug);
+    rejectedBySlug.set(slug, {
+      slug,
+      domain: String(raw.domain || "").trim().toLowerCase() || prev?.domain || null,
+      company: String(raw.company || "").trim() || prev?.company || null,
+      reason: String(raw.reason || "").trim() || prev?.reason || null,
+    });
   }
-  reg.permanentlyRejected = [...rejectedSet];
+  // Preserve any legacy string entries untouched (no slug to dedupe them by)
+  // ahead of the now-structured ones, so nothing is silently dropped.
+  const legacyStrings = (reg.permanentlyRejected || []).filter((r) => typeof r === "string");
+  reg.permanentlyRejected = [...legacyStrings, ...rejectedBySlug.values()];
 
   await writeRegistry(reg);
 

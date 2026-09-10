@@ -34,7 +34,8 @@
 //     -d '{"findings":[{"slug":"example","title":"Junior Dev","url":"https://example.hu/allas/1",
 //          "company":"ACME","experience":"junior","technologies":"Java"}],
 //          "sitesChecked":{"example":{"url":"https://example.hu/karrier","status":"has_junior_opening"}},
-//          "rejected":["SomeCorp"]}'
+//          "rejected":[{"slug":"somecorp","domain":"somecorp.hu","company":"SomeCorp",
+//                        "reason":"JS-rendered, no job text without JS"}]}'
 //
 // See ai-mcp.mjs for the MCP transport of the same two operations — added so
 // the routine's orchestrator can fetch/submit without ever composing a raw
