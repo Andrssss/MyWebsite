@@ -1,11 +1,15 @@
 // netlify/functions/cron_job_events-background.mjs
 //
-// Napi cron: beolvassa az `event_sources` regiszterben (event-sources.js-en
-// keresztül karbantartott) listing oldalakat, AI-val (_ai_events_extract_core)
-// kinyeri a rajtuk hirdetett közelgő állásbörzéket/eventeket, és beolvasztja
-// a "job-events" Blobba (_job_events_store.mjs) — az a blob a jövőbeli
-// eseményeket tárolja, a lejárt (mai nap előtti) sorokat minden futás
-// eldobja, forrás nélkül is (ld. mergeAndPurgeEvents).
+// Heti cron (2026-09-11 óta — napi volt előtte, user-döntés: az esemény-lista
+// lassan változik, napi futás felesleges terhelés/költség volt): beolvassa az
+// `event_sources` regiszterben (event-sources.js-en keresztül karbantartott)
+// listing oldalakat, AI-val (_ai_events_extract_core) kinyeri a rajtuk
+// hirdetett közelgő állásbörzéket/eventeket, és beolvasztja a "job-events"
+// Blobba (_job_events_store.mjs) — az a blob a jövőbeli eseményeket tárolja,
+// a lejárt (mai nap előtti) sorokat minden futás eldobja, forrás nélkül is
+// (ld. mergeAndPurgeEvents). Heti ütemezés mellett is helyes marad: a purge
+// dátum-alapú, csak ritkábban fut, egy lejárt sor legfeljebb ~6 napig
+// maradhat bent a törlés előtt ahelyett, hogy még aznap eltűnne.
 //
 // `registrationDeadline` (2026-09-08 kibővítve): a listázó oldal HTML-je
 // gyakran nem közli a jelentkezési határidőt, csak az esemény saját
@@ -14,16 +18,16 @@
 // átvizsgálja a saját `url`-jét (ld. enrichDeadline). Ezt csak EGYSZER teszi
 // meg eseményenként: a tárolt sor `deadlineChecked` mezője jelzi, hogy már
 // megnéztük, így egy örökre határidő nélküli esemény nem fizet rá minden
-// napra újra a lekérésre/AI-hívásra.
+// futásra újra a lekérésre/AI-hívásra.
 //
 // Direkt ütemezve `config.schedule`-lel, mint a cron_daily_stats.mjs — nem a
-// cron_scheduler dispatcheren keresztül, mert ez alacsony gyakoriságú (napi)
+// cron_scheduler dispatcheren keresztül, mert ez alacsony gyakoriságú (heti)
 // és nem kell staggerelni. Netlify saját ütemezett hívása nem küld
 // CRON_SECRET bearer-t, ezért — pont úgy, mint cron_daily_stats.mjs-nél —
 // nincs itt bejövő auth-ellenőrzés.
 
 export const config = {
-  schedule: "30 5 * * *", // minden nap 05:30 UTC
+  schedule: "30 5 * * 1", // minden hétfőn 05:30 UTC
 };
 
 import { Pool } from "pg";
