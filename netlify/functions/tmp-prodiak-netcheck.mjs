@@ -4,6 +4,9 @@
 // Netlify's outbound IPs than for a dev machine (same class of issue as
 // startup.jobs' Cloudflare block). Delete after use.
 import https from "https";
+import { Pool } from "pg";
+
+const pool2 = new Pool({ connectionString: process.env.NETLIFY_DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 const TOKEN = "b7e2c904f6a183d5e07c9b4a1f6d8032e5c7a91b4f083d6e";
 const BASE = "https://www.prodiak.hu";
@@ -54,6 +57,26 @@ export default async (request) => {
   if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
 
   const params = new URL(request.url).searchParams;
+
+  if (params.get("dbcheck")) {
+    const client = await pool2.connect();
+    try {
+      const { rows } = await client.query(
+        `SELECT count(*)::int AS n, max(first_seen) AS newest, max(id) AS max_id
+           FROM job_posts WHERE source = 'prodiak'`
+      );
+      const { rows: recent } = await client.query(
+        `SELECT id, url, first_seen FROM job_posts WHERE source = 'prodiak'
+          ORDER BY first_seen DESC LIMIT 8`
+      );
+      return new Response(JSON.stringify({ stats: rows[0], recent }, null, 2), {
+        headers: { "content-type": "application/json" },
+      });
+    } finally {
+      client.release();
+    }
+  }
+
   const pages = Number(params.get("pages") || 1);
 
   const results = [];
