@@ -29,8 +29,15 @@
     fetch-then-UPDATE nincs.
   • Helyszín: a szigorított, FAIL-CLOSED kapu (_ats_location.mjs) — user-döntés
     2026-08-26, üres helyszín itt ELDOBÁS, a rendszer többi részével ellentétben.
-  • Senior: NEM dobjuk el (2026-08-25-i szabály) — az ingestJobs
-    seniorAwareExperience-e címkézi, a frontend rejti.
+  • Senior: ELDOBJUK insert előtt, mint minden más forrásnál (STORE_SENIOR_JOBS
+    = false, 2026-09-04-i kill switch, ld. _seniority_policy.mjs) — a 2026-08-25-i
+    "tagged+hidden" szabály (seniorAwareExperience címkézi, a frontend rejti)
+    csak akkor élne újra, ha a kapcsoló visszakerül true-ra. Élő példa: egy
+    greenhouse/tulip hirdetés ("DevX Engineer") a testből kinyert "5+ years"
+    miatt itt is csendben kiesik insert előtt, holott a lista- és detail-hívás,
+    a helyszín-kapu és a technológia-kinyerés mind hibátlanul lefutott rajta —
+    ne tessék ezt "a crawler nem talál semmit" hibaként azonosítani, ez a
+    globális senior-szabály, nem egy ats-specifikus hiba.
 
   2026-09-02: a board nem-IT sorai (amiket az ingestJobs isItJob-kapuja amúgy
   is eldob) NEM vesznek el — ha a cím a marketing_scraper testvérprojekt
