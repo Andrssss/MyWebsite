@@ -93,7 +93,7 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-const _runJob = withTimeout("tmp-nfj-polish-backfill", async () => {
+const _runJob = withTimeout("tmp-nfj-polish-backfill-background", async () => {
   const store = getStore("tmp-nfj-polish-backfill-result");
   const client = await pool.connect();
   let rows;
