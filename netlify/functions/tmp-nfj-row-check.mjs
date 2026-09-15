@@ -14,7 +14,7 @@ export default async (request) => {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(
-      `SELECT id, url, active, technologies, last_seen FROM job_posts WHERE url ILIKE $1`,
+      `SELECT id, url, active, technologies, first_seen FROM job_posts WHERE url ILIKE $1`,
       ["%data-science-consultant-quantumblack%"]
     );
     return new Response(JSON.stringify(rows, null, 2), {
