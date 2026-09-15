@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "2,5,6,7,9,10,11,13,14,17,18,19,21,22,23,25,26 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,13,14,15,17,18,19,21,22,23,25,26 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -73,6 +73,11 @@ const GRID = {
   // Futásonként max 20 tenant (ATS_CRAWL_BATCH) → 16 óra × 20 = 320
   // board-lekérés/nap a plafon, akkor is, ha a felderítő több száz tenantot hoz be.
   14: [{ name: "cron_jobs_ATSCRAWL-background" }],   // ats-crawl (19 tenant)
+  // cvonline (2026-09-15, élő ROI-vizsgálat után bekötve): teljes, determi-
+  // nisztikus lapozott lista (nem forgó aggregátor, mint a talent), ezért
+  // sima reconcile-t kap (nem reactivate-only). Host-ütközés nincs a
+  // szomszédos :14 (ashby/greenhouse/lever) vagy :16 (LinkedIn L_5) slottal.
+  15: [{ name: "cron_jobs_CVONLINE-background" }],   // cvonline IT-informatika (~150 HU sor)
   // Workable országos feed (2026-08-30, WEB_CRAWLER_PLAN.md F5). NEM tenant-
   // alapú: egyetlen lapozott kereső-hívás adja az ÖSSZES magyarországi
   // Workable-hirdetést (08-30-i mérés: 396 hirdetés / 76 cég / 20 lap), a

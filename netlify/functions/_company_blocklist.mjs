@@ -89,6 +89,10 @@ const LISTS_BY_SOURCE = {
   // display-formában ("Magyar Telekom Nyrt.") — ugyanaz az alak, mint a
   // talent/alllocaljobs ágon, tehát a közös lista illeszkedik rá.
   workable: COMPANY_BLOCKLIST,
+  // cvonline (2026-09-15): a cégnév display-formában jön a lista-kártyáról
+  // (gyakran a posztoló HR-ügynökség neve, nem a végső munkáltatóé) —
+  // ugyanaz az alak, mint a talent/alllocaljobs ágon.
+  cvonline: COMPANY_BLOCKLIST,
 };
 
 function normalizeText(s) {

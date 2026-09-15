@@ -127,6 +127,15 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   // scraper wiring needed for workable/workly themselves.
   "workable",
   "workly",
+  // 2026-09-15: added when the new cvonline scraper's ROI check found 31/150
+  // Hungary-relevant cvonline postings were re-posts already carried by these
+  // three direct sources (13 minddiak, 10 trenkwalder, 8 muisz) — a bigger
+  // overlap than several already-whitelisted sources' own thresholds (nix's 7
+  // pairs, workable's 6). Widens every existing caller's comparison too, not
+  // just cvonline's — that's the point of one shared list (see header).
+  "minddiak",
+  "muisz",
+  "trenkwalder",
 ];
 
 function splitTechList(technologies) {
