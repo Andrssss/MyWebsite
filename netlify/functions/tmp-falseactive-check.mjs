@@ -29,7 +29,7 @@ export default async (request) => {
     results = [];
     for (const [company, title] of TARGETS) {
       const { rows } = await client.query(
-        `SELECT id, source, url, active, sweep_dead, first_seen, last_seen, title, company
+        `SELECT id, source, url, active, sweep_dead, first_seen, title, company
          FROM job_posts
          WHERE company ILIKE $1 AND title ILIKE $2
          ORDER BY id`,
