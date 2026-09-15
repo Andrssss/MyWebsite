@@ -204,6 +204,55 @@ const TECH_KEYWORDS = [
   ["langgraph", "LangGraph"], ["hugging face", "Hugging Face"], ["vertex ai", "Vertex AI"],
   ["scikit-learn", "scikit-learn"], ["sklearn", "scikit-learn"], ["pydantic", "Pydantic"],
 
+  /* ── 2026-09-15 bővítés — miért nem volt eddig Gemini/Claude/stb. a
+     technológiák között: ezek egyszerűen sosem voltak a kulcsszólistán, a
+     kinyerő logika nem hibás. Módszer (élő minta, nem a DB-ből, ld. CLAUDE.md
+     "validálj más csatornán"): egy egyszeri tmp-ai-tech-audit-background.mjs
+     endpoint az elmúlt 14 nap job_posts-ának MINDEN forrásából (28 forrás,
+     214 hirdetés, 181 sikeres fetch) lekérte az élő oldalt és jelölt
+     AI-kulcsszavakra kereste. Küszöb ugyanaz, mint 09-01-én: konkrét
+     hirdetésben látott, egyértelmű jelentés.
+
+     Elfogadva (mind valódi, hirdetés-tartalomból, nem oldalsablon-szövegből):
+     gemini (4 találat, pl. "GPT, Claude, Gemini, Llama vagy hasonló" és egy
+     "Gemini PRO subscription" mint juttatás), claude (21 találat — a meglévő
+     "claude code" mellett a puszta "Claude"/"ChatGPT/Claude" forma is
+     gyakori), mistral + llama (Deutsche Telekom nofluffjobs-hirdetések:
+     "DeepSeek Coder, Qwen/Qwen-Coder, CodeGeeX, StarCoder, Code Llama,
+     Mistral" — konkrét modellcsalád-felsorolás), deepseek (ugyanonnan),
+     azure openai + azure ai foundry (ENELIS AI Engineer hirdetés: "Azure AI
+     Foundry vagy Azure OpenAI tapasztalat"), crewai + autogen + semantic
+     kernel (egy Deutsche Telekom "Agentic SDLC" hirdetés agent-keretrendszer
+     felsorolásából: "LangGraph, AutoGen, CrewAI, ..., Semantic Kernel").
+
+     ELUTASÍTVA, bizonyított fals pozitívval (ugyanaz a hibaosztály, mint a
+     09-01-es workday/vps/cursor lista — nem a hirdetés szövege, hanem az
+     oldal sablonja/harmadik fél widgetje illesztett):
+     `palm` (Google PaLM) — a mintában 7/7 találat egy WordPress
+     preset-szín-változó volt (`--wp--preset--color--palm-leaf`) egy
+     AI-scraped forrású (Swicon) oldal <style>-jében, semmi köze a
+     hirdetéshez; a PaLM ráadásul már leváltott Google-modell is.
+     `zapier` — a 2/2 találat egy hírlevél-plugin JS-be ágyazott
+     integrációs-lista tömbje volt (bluebird.hu sablon minden hirdetésén),
+     nem az adott állás elvárása.
+     Egy első, szűkebb (88 hirdetés/11 forrás, csak ats-crawl+AI-scraped)
+     mintában a `llama` is fals pozitívnak tűnt (BambooHR nyilvános
+     /careers/<id> oldal SPA-bootstrap JS-ében "EASY_LLAMA_INTEGRATION_MVP"
+     feature-flag) — de ez az audit-szkript saját hibája volt: a valós
+     kinyerés (`cron_jobs_ATSCRAWL-background.mjs`) a `/detail` JSON
+     végpontot olvassa, nem a publikus SPA-oldalt, és az élőben ellenőrizve
+     a `/detail` payload NEM tartalmazza ezt a stringet — a `llama`
+     kulcsszó ettől függetlenül fent marad.
+     Nulla találat (nincs bizonyíték, egyelőre NEM felvéve): anthropic, grok,
+     cohere, perplexity, ollama, bedrock, watsonx, ibm watson, stable
+     diffusion, midjourney, dall-e, n8n, pinecone, weaviate, qdrant, milvus,
+     faiss, whisper, gpt-4, gpt-5, langsmith, amazon q, notebooklm, replit,
+     azure ai studio, google bard. */
+  ["gemini", "Gemini"], ["claude", "Claude"], ["mistral", "Mistral"],
+  ["llama", "Llama"], ["deepseek", "DeepSeek"], ["azure openai", "Azure OpenAI"],
+  ["azure ai foundry", "Azure AI Foundry"], ["crewai", "CrewAI"],
+  ["autogen", "AutoGen"], ["semantic kernel", "Semantic Kernel"],
+
   // enterprise platforms
   ["salesforce", "Salesforce"], ["sfdc", "Salesforce"], ["servicenow", "ServiceNow"],
   ["hubspot", "HubSpot"], ["zendesk", "Zendesk"], ["shopify", "Shopify"],
