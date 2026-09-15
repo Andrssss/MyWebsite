@@ -12,10 +12,11 @@ export const config = { background: true };
 
 const TOKEN = "f3a9c2e7b6d1508f4a2c7e9b1d6f0a3c8e5b2d9f7a1c4e6b";
 
-const PER_SOURCE_LIMIT = 8;
-const TOTAL_CAP = 260;
-const CONCURRENCY = 10;
+const PER_SOURCE_LIMIT = 20;
+const TOTAL_CAP = 500;
+const CONCURRENCY = 14;
 const FETCH_TIMEOUT_MS = 9000;
+const WINDOW_DAYS = 14;
 
 // [key, label, note] — note flags candidates with known ambiguity risk so
 // the review step can weigh hits against real snippet context.
@@ -109,17 +110,21 @@ export default async (request) => {
   try {
     const client = await pool.connect();
     let rows;
+    let sourceTotals;
     try {
       const { rows: sourceRows } = await client.query(
-        `SELECT DISTINCT source FROM job_posts WHERE first_seen >= now() - interval '7 days'`
+        `SELECT source, COUNT(*)::int AS total FROM job_posts
+         WHERE first_seen >= now() - interval '${WINDOW_DAYS} days'
+         GROUP BY source ORDER BY source`
       );
+      sourceTotals = Object.fromEntries(sourceRows.map(r => [r.source, r.total]));
       const sources = sourceRows.map(r => r.source);
 
       rows = [];
       for (const source of sources) {
         const { rows: sample } = await client.query(
           `SELECT id, source, title, company, url FROM job_posts
-           WHERE source = $1 AND first_seen >= now() - interval '7 days'
+           WHERE source = $1 AND first_seen >= now() - interval '${WINDOW_DAYS} days'
            ORDER BY random() LIMIT $2`,
           [source, PER_SOURCE_LIMIT]
         );
@@ -157,7 +162,7 @@ export default async (request) => {
         if (m) {
           const bucket = perCandidate[label];
           bucket.count++;
-          if (bucket.examples.length < 4) {
+          if (bucket.examples.length < 6) {
             bucket.examples.push({
               source: row.source,
               title: row.title,
@@ -177,6 +182,8 @@ export default async (request) => {
     await store.setJSON("result", {
       status: "done",
       finishedAt: new Date().toISOString(),
+      windowDays: WINDOW_DAYS,
+      sourceTotals,
       totalRows: rows.length,
       fetchedOk,
       fetchFailed,
