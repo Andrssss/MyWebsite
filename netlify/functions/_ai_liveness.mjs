@@ -87,6 +87,32 @@
 // EXPIRED TLS cert whose content was confirmed live anyway — none of these are
 // new rule candidates, they're the same fail-open-on-purpose list as before.
 //
+// 2026-09-15, later same day: a user-reported batch of 8 false-active rows
+// (found by hand, not by any sweep) surfaced three more real gaps, each
+// cross-checked against a live control before being added, same rule as
+// every entry above:
+// - naih.hu: postings are bare PDF files (no status of their own — a closed
+//   one keeps answering 200 forever, per the PDF caveat in the 2026-09-15
+//   entry below). The site's own /allaspalyazat listing page links every
+//   CURRENTLY open posting's PDF by filename; the reported closed posting's
+//   filename is confirmed absent from it while the listing's one live PDF is
+//   confirmed present, so this is a listing-membership check, same shape as
+//   the Eightfold sitemap / telekom.hu API checks above.
+// - lechnerkozpont.hu: a removed posting's own page answers 403 where a live
+//   one answers 200 — confirmed on 3 reported-dead vs 4 currently-listed-live
+//   postings, stable across 3 repeated rounds each (ruling out a rate-limit
+//   fluke). Opted into deadStatuses, same narrow shape as Workday's CXS 403.
+// - trskarrier.hu: every posting's page embeds a client-side JS countdown to
+//   its OWN deadline as a literal Date string; the "jelentkezési határidő
+//   lejárt" text the countdown swaps in on expiry is baked into every
+//   posting's script regardless of actual state (same i18n-template trap
+//   DEAD_PHRASES' script-stripping already guards against), so the *date* is
+//   parsed out and compared to now instead of matching that string.
+// The other 5 of the 8 reported rows (Qube/Greenhouse, 2×NISZ) were already
+// correctly classified dead by the existing Greenhouse-API and plain-404
+// rules — they just hadn't been swept yet — so no rule change was needed for
+// those; the scoped re-sweep after this deploy is what actually clears them.
+//
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
 // independent-verification rule). Each was validated on 2026-08-30 against live
@@ -167,6 +193,30 @@ export function aiScrapedProbe(row) {
   // shape as the Eightfold sitemap check above). Confirmed live 2026-09-15.
   if (host === "telekom.hu" && path === "/karrier/jobs" && u.searchParams.get("jobId")) {
     return { url: "https://www.telekom.hu/karrier/api/jobs", headers: { Accept: "application/json" } };
+  }
+
+  // naih.hu (2026-09-15): postings are plain PDF files with no status of
+  // their own — a closed one keeps answering 200 forever (a government site,
+  // old announcement PDFs are simply left in place). The site's own
+  // /allaspalyazat listing page links every CURRENTLY open posting's PDF by
+  // filename; confirmed live that a user-reported closed posting (deadline
+  // 2026-07-31) is entirely absent from it while the one PDF the listing
+  // currently does link is present verbatim (aiScrapedIsDead below checks
+  // the row's own filename for membership, same shape as the telekom.hu id
+  // check above).
+  if (host === "naih.hu" && /^\/files\/[^/]+\.pdf$/i.test(path)) {
+    return { url: "https://www.naih.hu/allaspalyazat" };
+  }
+
+  // lechnerkozpont.hu (2026-09-15): a removed posting's own page answers 403
+  // where a live one answers 200 — confirmed live on 3 user-reported-closed
+  // postings vs the 4 postings currently listed on the tenant's own
+  // /oldal/karrier page, stable across 3 repeated rounds each (not a
+  // rate-limit/bot-block fluke, unlike the general 403-is-a-non-verdict
+  // assumption elsewhere in the sweep). Same narrow opt-in shape as Workday's
+  // CXS 403 above.
+  if (host === "lechnerkozpont.hu" && /^\/karrier\/\d+-/.test(path)) {
+    return { url: row.url, deadStatuses: [403] };
   }
 
   return null;
@@ -258,6 +308,19 @@ export function aiScrapedIsDead(row, body, res) {
       // Missing/unparseable list -> no verdict, not a death (fail open).
       return !!jobId && !!list && !list.some((job) => job && job.id === jobId);
     }
+    if (host === "naih.hu") {
+      const filename = (u.pathname.match(/\/files\/([^/]+\.pdf)$/i) || [])[1];
+      // Missing filename or an unparseable/truncated listing page -> no
+      // verdict, not a death (fail open) — same shape as the other
+      // membership checks above.
+      if (!filename || typeof body !== "string") return false;
+      return !body.includes(filename);
+    }
+    // lechnerkozpont.hu's death question is answered entirely by its
+    // deadStatuses opt-in above (403 on the row's own page) — this branch is
+    // only reached on a non-403 response, i.e. a live posting, so no body
+    // rule belongs here.
+    if (host === "lechnerkozpont.hu") return false;
     if (host !== "jobs.smartrecruiters.com") return false;
     let j;
     try { j = JSON.parse(body); } catch { return false; } // truncated/HTML -> no verdict
@@ -293,6 +356,23 @@ export function aiScrapedIsDead(row, body, res) {
   if (host === "cigpannonia.hu" && typeof body === "string") {
     const title = (body.match(/<title[^>]*>([\s\S]{0,200}?)<\/title>/i) || [])[1] || "";
     if (title.trim().startsWith("404")) return true;
+  }
+
+  // --- trskarrier.hu (2026-09-15): every posting embeds a client-side
+  // countdown to its OWN deadline as a raw JS Date literal
+  // (`var countDownDate = new Date("Dec 31, 2025 22:00:00")`), and the same
+  // script's "A jelentkezési határidő lejárt!" string sits in the page
+  // source of EVERY posting regardless of whether it's actually expired (the
+  // countdown only swaps the DOM text client-side once distance<0) — the
+  // exact i18n-template trap DEAD_PHRASES' script-stripping already guards
+  // against, so that string can't be matched directly. The date itself is
+  // real per-posting content, though: parse it and compare to now.
+  if (host === "trskarrier.hu" && typeof body === "string") {
+    const m = body.match(/var\s+countDownDate\s*=\s*new Date\("([^"]+)"\)/);
+    if (m) {
+      const deadline = Date.parse(m[1]);
+      if (!Number.isNaN(deadline) && deadline < Date.now()) return true;
+    }
   }
 
   // --- redirect-to-careers-root landings
