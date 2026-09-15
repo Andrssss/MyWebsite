@@ -1,6 +1,20 @@
 /*
   cvonline.hu – "IT / Informatika" kategória scraper
 
+  ⚠️ NINCS ÜTEMEZVE (2026-09-15). Élő smoke-teszt (tmp-cvonline-fetch-debug)
+  kiderítette, hogy a cvonline.hu a Netlify Lambda egress IP-ket egy saját
+  JS-es kihívó oldalra (`/botchallenge.html?token=...`) irányítja át — sima
+  szerveroldali `fetch()`-csel megválaszolhatatlan (böngésző-JS futtatás
+  kellene hozzá, gomb-kattintás-szimulációval). Otthoni gépről / WebFetch-ből
+  indítva a kategória-oldal tökéletesen normális, szerveroldalon renderelt
+  HTML-t ad (ezért nézett ki élesben is scrapelhetőnek a ROI-vizsgálat
+  során) — a blokk KIFEJEZETTEN a datacenter/felhő-IP-kre szól, ugyanaz a
+  hibaosztály, mint `allasportal`-nál (ld. CRON_SCHEDULE.md, "ELENGEDVE").
+  A kód a lenti leírás szerint működne, HA a fetch átjutna a kihívón — a
+  fájl a repóban marad, de a cron_scheduler.mjs GRID-jéből ki van hagyva.
+  Újra bekötni csak akkor érdemes, ha kerül elé egy proxy/headless-browser
+  megoldás (ugyanaz a nyitott kérdés, mint allasportalnál).
+
   Statikus, szerveroldalon renderelt HTML (Drupal), lapozható lista:
     https://www.cvonline.hu/hu/allashirdetesek/it-informatika-0?page=N  (0-indexelt)
 
