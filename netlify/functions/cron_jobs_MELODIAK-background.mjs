@@ -162,6 +162,7 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
   let totalFetched = 0;
   let fetchFailed = 0;
   let detailFetchFailed = 0;
+  let skippedIncomplete = 0;
 
   try {
     await ensureTechnologiesColumn(client);
@@ -227,6 +228,19 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
           }
         }
 
+        // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor detail-
+        // fetchje technológiát sem adott, véglegesen csonka maradna (az
+        // experience itt mindig "diákmunka", nem jelez hibát). Ehelyett
+        // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a
+        // foundUrls-be itt is bekerül, a `known`-ban viszont nincs benne, a
+        // következő futás újnak látja és újrapróbálja.
+        if (!knownUrls.has(jobUrl) && !technologies) {
+          skippedIncomplete++;
+          foundUrls.push(jobUrl);
+          console.log(`[melodiak] SKIP incomplete detail fetch (no technologies) — retry later: ${jobUrl}`);
+          continue;
+        }
+
         const wasNew = await upsertJob(client, "melodiak", {
           title,
           url: jobUrl,
@@ -247,7 +261,7 @@ export default withTimeout("cron_jobs_MELODIAK-background", async () => {
 
     console.log(
       `[melodiak] DONE — fetched=${totalFetched}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}, detail_fetch_failed=${detailFetchFailed}`
+      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}, detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
     );
 
     const complete = fetchFailed === 0;

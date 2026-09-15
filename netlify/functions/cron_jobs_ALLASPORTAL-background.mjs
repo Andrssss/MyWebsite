@@ -303,6 +303,7 @@ async function scrapeAllasportal(client) {
   let alreadyExisted = 0;
   let skippedSenior = 0;
   let skippedCompany = 0;
+  let skippedIncomplete = 0;
 
   // Detail-fetch KIZÁRÓLAG genuinely új url-eknél fut — egy már ismert sor
   // insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos UPDATE)
@@ -355,6 +356,16 @@ async function scrapeAllasportal(client) {
       }
     }
 
+    // Insert-only forrás (nincs utólagos UPDATE) — ha sem technológia, sem
+    // tapasztalat nem jött át, a sor véglegesen csonka maradna. Ehelyett
+    // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a url nincs
+    // `known`-ban, a következő futás újnak látja és újrapróbálja.
+    if (!item.technologies && item.experience === "-") {
+      skippedIncomplete++;
+      console.log(`[allasportal] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${item.url}`);
+      continue;
+    }
+
     if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
       skippedSenior++;
       continue;
@@ -371,7 +382,8 @@ async function scrapeAllasportal(client) {
 
   console.log(
     `[allasportal] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-    `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, unique=${foundUrls.length} ` +
+    `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
+    `skipped_incomplete=${skippedIncomplete}, unique=${foundUrls.length} ` +
     `(raw=${allItems.length}, slices_complete=${allComplete})`
   );
 

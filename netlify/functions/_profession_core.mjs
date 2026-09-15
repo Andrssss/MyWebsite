@@ -797,6 +797,17 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
       }
       delete item.detailHtml;
 
+      // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor
+      // detail-fetchje (időkeret/hálózati hiba/hibás oldal miatt) sem
+      // technológiát, sem tapasztalatot nem adott, véglegesen csonka maradna.
+      // Ehelyett kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a
+      // url nincs `known`-ban, a következő futás újnak látja és
+      // újrapróbálja.
+      if (known && !known.has(item.url) && !item.technologies && (!item.experience || item.experience === "-")) {
+        console.log(`[${source}] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${item.url}`);
+        continue;
+      }
+
       if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
         console.log(`[${source}] SKIP senior-experience [${item.experience}] "${item.title}" → ${item.url}`);
         continue;

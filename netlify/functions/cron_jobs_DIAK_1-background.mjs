@@ -1853,6 +1853,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
                 }
               }
             }
+            // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor
+            // technológia-fetchje (időkeret/hálózati hiba/hibás oldal miatt)
+            // semmit sem adott, véglegesen csonka maradna (az experience itt
+            // mindig "diákmunka", nem jelez hibát). Ehelyett kihagyjuk
+            // (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a `known`-ban
+            // nincs benne, a következő futás újnak látja és újrapróbálja.
+            if (TECH_DETAIL_SOURCES.includes(source) && !knownUrls.has(item.url) && !item.technologies) {
+              console.log(`[${source}] SKIP incomplete detail fetch (no technologies) — retry later: ${item.url}`);
+              continue;
+            }
             // zyntern/minddiak: neither has a stable URL-pattern (each "repost"
             // gets a fresh site-side id, no separable stable component like
             // talent — see migrateByTitleCompany's doc), so migrateVolatileUrl

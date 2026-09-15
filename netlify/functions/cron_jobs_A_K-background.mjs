@@ -284,6 +284,14 @@ const SOURCES = [
             console.warn(`[karrierhungaria] detail fetch failed: ${it.url} — ${err.message}`);
           }
         }
+        // Insert-only forrás (nincs utólagos UPDATE) — ha sem technológia, sem
+        // tapasztalat nem jött át, a sor véglegesen csonka maradna. Ehelyett
+        // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a url nincs
+        // `known`-ban, a következő futás újnak látja és újrapróbálja.
+        if (!it.technologies && it.experience === "-") {
+          console.log(`[karrierhungaria] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${it.url}`);
+          continue;
+        }
         if (shouldSkipSeniorExperience(isSeniorExperience(it.experience))) {
           console.log(`SKIP senior exp="${it.experience}" "${it.title}"`);
           continue;

@@ -11,7 +11,8 @@ import zlib from "zlib";
 import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
+import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany, sweepActive404, reviveSweepDead } from "./_active_core.mjs";
+import { fetchFinal } from "./cron_404sweep-background.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
@@ -407,6 +408,14 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
         } catch (err) {
           console.warn(`[talent] detail fetch failed: ${job.url} — ${err.message}`);
         }
+        // Insert-only forrás (nincs utólagos UPDATE) — ha sem technológia, sem
+        // tapasztalat nem jött át, a sor véglegesen csonka maradna. Ehelyett
+        // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a job.url
+        // nincs `known`-ban, a következő futás újnak látja és újrapróbálja.
+        if (!job.technologies && job.experience === "-") {
+          console.log(`[talent] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${job.url}`);
+          continue;
+        }
         // title+company+technologies dedup needs job.technologies, so this
         // check must run AFTER the detail fetch above (2026-09-04).
         if (await migrateByTitleCompany(client, "talent", job.url, job.title, job.company, job.technologies, allUrls)) {
@@ -435,6 +444,23 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     // reactivation can't resurrect a closed-but-still-listed job either.
     const rc = await reconcileActive(client, "talent", allUrls, { complete: false });
     console.log(`[talent] active reconcile (reactivate-only) — ${JSON.stringify(rc)}`);
+
+    // 2026-09-15: talent's own detail-page check (system_status, see
+    // BANNER_DEAD_SOURCES/SOFT_404_ALIVE_SOURCES in _active_core.mjs) is the
+    // ONLY authoritative liveness signal for this source — the reconcile above
+    // can never use it (rotating/nondeterministic listing). That check used to
+    // run only once/day via cron_404sweep-background (14:00 UTC), so a
+    // posting that died and came back within a day could sit wrongly
+    // "Expired" for up to ~24h (user-reported case, 2026-09-15: a genuinely
+    // live posting expired hours after insert). Folded the SAME
+    // sweepActive404/reviveSweepDead pair into this run instead of a separate
+    // cron on its own schedule — talent already updates hourly (4-19 UTC), so
+    // this tracks its real cadence (~1h worst case) instead of adding a
+    // disjoint schedule that would also fire during hours nothing changes.
+    const sweepRc = await sweepActive404(client, fetchFinal, { sources: ["talent"] });
+    console.log(`[talent] hourly liveness sweep — ${JSON.stringify(sweepRc)}`);
+    const reviveRc = await reviveSweepDead(client, fetchFinal, { sources: ["talent"] });
+    console.log(`[talent] hourly sweep-dead revive — ${JSON.stringify(reviveRc)}`);
   } finally {
     client.release();
   }

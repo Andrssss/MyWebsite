@@ -212,6 +212,7 @@ export default withTimeout(JOB_NAME, async (request) => {
   let newlyInserted = 0;
   let alreadyExisted = 0;
   let skippedSenior = 0;
+  let skippedIncomplete = 0;
   const foundUrls = [];
   let crawlError = false;
 
@@ -278,6 +279,18 @@ export default withTimeout(JOB_NAME, async (request) => {
         }
 
         const finalExperience = seniorAwareExperience(entry.title, experience);
+
+        // Insert-only forrás (nincs utólagos UPDATE) — ha sem technológia, sem
+        // tapasztalat nem jött át, a sor véglegesen csonka maradna. Ehelyett
+        // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a
+        // foundUrls-be már bekerült feljebb, a `known`-ban viszont nincs benne,
+        // úgyhogy a következő futás újnak látja és újrapróbálja.
+        if (!knownUrls.has(entry.url) && !technologies && finalExperience === "-") {
+          skippedIncomplete++;
+          console.log(`[workly] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${entry.url}`);
+          continue;
+        }
+
         const res = await client.query(
           `INSERT INTO job_posts (source, title, url, experience, company, technologies, level, first_seen)
            VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
@@ -297,7 +310,7 @@ export default withTimeout(JOB_NAME, async (request) => {
       pagesProcessed++;
     }
 
-    console.log(`[workly] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}`);
+    console.log(`[workly] DONE — new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, skipped_incomplete=${skippedIncomplete}`);
 
     // Reconcile active flag only on a full, error-free crawl from page 1 — a
     // partial/limited run would wrongly deactivate jobs on the unseen pages.

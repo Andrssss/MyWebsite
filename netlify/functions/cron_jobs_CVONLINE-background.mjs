@@ -222,6 +222,7 @@ const _runJob = withTimeout("cron_jobs_CVONLINE-background", async () => {
   let skippedBlockedCompany = 0;
   let skippedCrossSourceDupe = 0;
   let detailFetchFailed = 0;
+  let skippedIncomplete = 0;
 
   try {
     await ensureTechnologiesColumn(client);
@@ -285,6 +286,16 @@ const _runJob = withTimeout("cron_jobs_CVONLINE-background", async () => {
         experience = experience || "-";
       }
 
+      // Insert-only forrás (nincs utólagos UPDATE) — ha sem technológia, sem
+      // tapasztalat nem jött át, a sor véglegesen csonka maradna. Ehelyett
+      // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a job.url
+      // nincs `known`-ban, a következő futás újnak látja és újrapróbálja.
+      if (!technologies && experience === "-") {
+        skippedIncomplete++;
+        console.log(`[cvonline] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${job.url}`);
+        continue;
+      }
+
       await upsertJob(client, { ...job, experience, technologies });
       newlyInserted++;
       console.log(`[cvonline] NEW "${job.title}" @ ${job.company ?? "-"} exp=${experience} tech=[${technologies ?? "-"}] → ${job.url}`);
@@ -294,7 +305,7 @@ const _runJob = withTimeout("cron_jobs_CVONLINE-background", async () => {
       `[cvonline] DONE — new=${newlyInserted}, known=${alreadyKnown}, ` +
       `skipped_filter=${skippedFilter}, skipped_foreign=${skippedForeign}, ` +
       `skipped_blocked_company=${skippedBlockedCompany}, skipped_cross_dupe=${skippedCrossSourceDupe}, ` +
-      `detail_fetch_failed=${detailFetchFailed}, complete=${complete}`
+      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}, complete=${complete}`
     );
 
     const rc = await reconcileActive(client, SOURCE, foundUrls, { complete });

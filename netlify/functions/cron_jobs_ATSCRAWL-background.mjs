@@ -364,13 +364,27 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
       console.log(`[atscrawl] ${label} skip no-url: "${job.title}"`);
       continue;
     }
+    const experience = (html ? extractBodyExperience(html) : null) || "-";
+    const technologies = html ? extractTechnologies(html) : null;
+    // Insert-only forrás (nincs utólagos UPDATE) — ha egy detailRef-es sornál
+    // (külön detail-hívást igényelt) a hívás elhasalt/hibás oldalt adott
+    // vissza, és emiatt sem technológia, sem tapasztalat nem jött át, a sor
+    // véglegesen csonka maradna. Ehelyett kihagyjuk (LinkedIn-minta,
+    // 2026-09-04/09-15 user-jelzés) — a reconcile a `boardJobs`-ból épülő,
+    // ettől független listát használ, tehát ez biztonságos. Csak
+    // detailRef-es sorokra vonatkozik: egy listából már meglévő leírású
+    // (SAFE-B) sor genuinely-üres eredménye nem hiba, azt nem szűrjük.
+    if (job.detailRef && !technologies && experience === "-") {
+      console.log(`[atscrawl] ${label} SKIP incomplete detail fetch (no tech, no experience) — retry later: "${job.title}"`);
+      continue;
+    }
     built.push({
       title: job.title,
       url: normalizeUrl(url) || url,
       company: job.company || tenant.company || null,
       location: job.location,
-      experience: (html ? extractBodyExperience(html) : null) || "-",
-      technologies: html ? extractTechnologies(html) : null,
+      experience,
+      technologies,
     });
   }
 

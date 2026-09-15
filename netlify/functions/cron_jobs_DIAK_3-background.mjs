@@ -929,6 +929,18 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             item.technologies = technologies;
             await sleep(400);
           }
+          // Insert-only forrás (nincs utólagos UPDATE) — ha az otp (897-899)
+          // vagy wherewework (905-908) detail-fetchje sem technológiát, sem
+          // tapasztalatot nem adott, az ÚJ sor véglegesen csonka maradna.
+          // Ehelyett kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés):
+          // a `known`-ban nincs benne, a következő futás újnak látja és
+          // újrapróbálja. A cím-alapú gyorsítóágakat (otp junior/medior/
+          // gyakornok, DIAKMUNKA_SOURCES fix "diákmunka") ez nem érinti, mert
+          // azoknál item.experience már valós érték.
+          if (!knownUrls.has(item.url) && !item.technologies && (!item.experience || item.experience === "-")) {
+            console.log(`${tag}   SKIP incomplete detail fetch (no tech, no experience) — retry later: ${item.url}`);
+            continue;
+          }
           // wherewework (2026-09-04): unlike otp, the numeric id itself is not
           // stable — a repost gets a brand-new slug AND id, so no url-pattern
           // migration is possible. Same fix as talent's 2026-09-03 case: merge

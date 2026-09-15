@@ -231,6 +231,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
     let skippedSenior = 0;
     let skippedNoTitle = 0;
     let skippedNonIt = 0;
+    let skippedIncomplete = 0;
     let detailFetchFailed = 0;
 
     for (const job of jobs) {
@@ -293,6 +294,19 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
           continue;
         }
 
+        // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor
+        // detail-fetchje sem technológiát, sem tapasztalatot nem adott,
+        // véglegesen csonka maradna. A foundUrls-be lentebb mindenképp
+        // bekerül (a lista igazolja a létezést), csak az insertet hagyjuk ki
+        // — a következő futás újnak látja és újrapróbálja (LinkedIn-minta,
+        // 2026-09-04/09-15 user-jelzés).
+        if (!knownUrls.has(job.url) && !technologies && experience === "-") {
+          skippedIncomplete++;
+          foundUrls.push(job.url);
+          console.log(`[unicredit] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${job.url}`);
+          continue;
+        }
+
         const wasNew = await upsertJob(client, source, {
           title: job.title,
           url: job.url,
@@ -314,7 +328,7 @@ export default withTimeout("cron_jobs_UNICREDIT-background", async () => {
 
     console.log(
       `[unicredit] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, skipped_non_it=${skippedNonIt}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}`
+      `skipped_senior=${skippedSenior}, skipped_non_it=${skippedNonIt}, skipped_no_title=${skippedNoTitle}, fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
     );
 
     // complete=false when pagination broke mid-way (listFetchFailed) — a

@@ -156,6 +156,7 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
   let skippedSenior = 0;
   let skippedNonBudapest = 0;
   let detailFetchFailed = 0;
+  let skippedIncomplete = 0;
   const foundUrls = [];
 
   try {
@@ -201,6 +202,19 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
         }
       }
 
+      // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor detail-
+      // fetchje technológiát sem adott, véglegesen csonka maradna (az
+      // experience itt mindig "diákmunka", nem jelez hibát). Ehelyett
+      // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a
+      // foundUrls-be itt is bekerül, a `known`-ban viszont nincs benne, a
+      // következő futás újnak látja és újrapróbálja.
+      if (!knownUrls.has(jobUrl) && !technologies) {
+        skippedIncomplete++;
+        foundUrls.push(jobUrl);
+        console.log(`[atlasz] SKIP incomplete detail fetch (no technologies) — retry later: ${jobUrl}`);
+        continue;
+      }
+
       const wasNew = await upsertJob(client, "atlasz", {
         title,
         url: jobUrl,
@@ -221,7 +235,7 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
     console.log(
       `[atlasz] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}, ` +
-      `detail_fetch_failed=${detailFetchFailed}`
+      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
     );
 
     // Single API response = full current listing.

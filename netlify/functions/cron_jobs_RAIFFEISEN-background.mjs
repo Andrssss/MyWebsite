@@ -273,6 +273,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
+    let skippedIncomplete = 0;
     let notBudapest = 0;
     let detailFetchFailed = 0;
 
@@ -370,6 +371,21 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
           const idPattern = idOnlyPattern(url);
           if (idPattern) migrated = await migrateVolatileUrl(client, source, url, idPattern, currentUrls);
         }
+
+        // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor
+        // detail-fetchje sem technológiát, sem tapasztalatot nem adott,
+        // véglegesen csonka maradna. A foundUrls-t itt is feltöltjük (a lista
+        // igazolja a létezést, egy meglévő aktív sort ne deaktiváljon
+        // tévesen a reconcile), csak az insertet hagyjuk ki — a következő
+        // futás újnak látja és újrapróbálja (LinkedIn-minta, 2026-09-04/09-15
+        // user-jelzés).
+        if (!technologies && experience === "-") {
+          skippedIncomplete++;
+          foundUrls.push(url);
+          console.log(`[raiffeisen] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${url}`);
+          continue;
+        }
+
         const wasNew = await upsertJob(client, source, { title, url, experience, technologies });
         foundUrls.push(url);
         if (migrated) {
@@ -390,7 +406,7 @@ export default withTimeout("cron_jobs_RAIFFEISEN-background", async () => {
     console.log(
       `[raiffeisen] DONE — total=${dedup.length}, new=${newlyInserted}, migrated=${migratedUrls}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}, ` +
-      `fetch_failed=${detailFetchFailed}`
+      `fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
     );
 
     // Detail-fetch failures don't threaten completeness: every listed job is in

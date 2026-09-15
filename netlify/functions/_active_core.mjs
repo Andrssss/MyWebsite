@@ -1225,21 +1225,28 @@ export const SWEEP_SOLE_DEACTIVATOR_SOURCES = new Set([
  * @param {object} [opts]
  * @param {number} [opts.concurrency=12]
  * @param {number} [opts.maxAgeDays=REVIVE_MAX_AGE_DAYS]
+ * @param {string[]} [opts.sources]  opt-in scope for an ad-hoc/more-frequent run
+ *   against just some sources (mirrors sweepActive404's opts.sources) — omitted
+ *   ⇒ unchanged behaviour (every eligible source), what the daily cron uses.
  * @returns {Promise<{checked:number, revived:number}>}
  */
 export async function reviveSweepDead(client, checkFinal, opts = {}) {
   const concurrency = Math.max(1, opts.concurrency ?? 12);
   const maxAgeDays = opts.maxAgeDays ?? REVIVE_MAX_AGE_DAYS;
+  const sources = Array.isArray(opts.sources) && opts.sources.length ? opts.sources : null;
 
   await ensureActiveSchema(client);
 
+  const params = [[...SWEEP_EXCLUDED_SOURCES], maxAgeDays, [...SWEEP_SOLE_DEACTIVATOR_SOURCES]];
+  if (sources) params.push(sources);
   const { rows } = await client.query(
     `SELECT url, source FROM job_posts
       WHERE active = false
         AND (sweep_dead = true OR source = ANY($3::text[]))
         AND NOT (source = ANY($1::text[]))
-        AND (source = ANY($3::text[]) OR first_seen >= NOW() - make_interval(days => $2::int))`,
-    [[...SWEEP_EXCLUDED_SOURCES], maxAgeDays, [...SWEEP_SOLE_DEACTIVATOR_SOURCES]]
+        AND (source = ANY($3::text[]) OR first_seen >= NOW() - make_interval(days => $2::int))
+        ${sources ? "AND source = ANY($4::text[])" : ""}`,
+    params
   );
   if (rows.length === 0) return { checked: 0, revived: 0 };
 

@@ -179,12 +179,13 @@ const MAX_LIST_PAGES = 15;
 // 07-11 tanulság: a cap-kimerülés guard nélkül ölt 15 élő sort).
 const BROWSE_MAX_PAGES = 250;
 
-// A detail-fetch (szint + technológiák) csak új url-eknél fut, és ha az
-// időkeret közben lejár, az adott sor véglegesen '-'/technologies nélkül megy
-// be — insert-only szabály miatt (LinkedInen kívül sehol nincs utólagos
-// UPDATE) nincs későbbi gyógyulás. Ezért időkeret-túllépéskor a detail-fetch-et
-// elhagyjuk, NEM a futást szakítjuk meg — a completeness (és így a reconcile)
-// érintetlen.
+// A detail-fetch (szint + technológiák) csak új url-eknél fut. Ha az időkeret
+// közben lejár VAGY a fetch elhasal, az érintett ÚJ sort NEM szúrjuk be
+// csonkán (lásd lentebb az incomplete-guardot) — insert-only szabály miatt
+// (LinkedInen kívül sehol nincs utólagos UPDATE) egy ilyen sor sosem
+// gyógyulna meg. Ehelyett kihagyjuk: a url nincs `known`-ban, a következő
+// futás újnak látja és újrapróbálja (LinkedIn-minta, 2026-09-04/09-15
+// user-jelzés). A completeness (és így a reconcile) ettől érintetlen marad.
 // A withTimeout kerete háttérfüggvényre 14 perc; 10 percnél elzárjuk a csapot,
 // hogy az upsertek + reconcile biztosan beférjenek.
 const DETAIL_DEADLINE_MS = 10 * 60 * 1000;
@@ -475,6 +476,7 @@ async function scrapeAlllocaljobs(client) {
   let skippedCompany = 0;
   let skippedNonIt = 0;
   let skippedDetailBudget = 0;
+  let skippedIncomplete = 0;
   let skippedDeadOnArrival = 0;
   let skippedDuplicateElsewhere = 0;
   let skippedDuplicateRepost = 0;
@@ -575,8 +577,8 @@ async function scrapeAlllocaljobs(client) {
       : "-";
 
     if (!known.has(item.url) && Date.now() >= detailDeadline) {
-      // Időkeret elfogyott — '-'-szal / technologies nélkül megy be. A
-      // completeness szándékosan NEM romlik ettől (lásd DETAIL_DEADLINE_MS).
+      // Időkeret elfogyott — a lenti incomplete-guard emiatt nem engedi
+      // beszúrni technológiák/tapasztalat nélkül (lásd DETAIL_DEADLINE_MS).
       skippedDetailBudget++;
     } else if (!known.has(item.url)) {
       try {
@@ -599,6 +601,17 @@ async function scrapeAlllocaljobs(client) {
       } catch (err) {
         console.warn(`[alllocaljobs] detail fetch failed: ${item.url} — ${err.message}`);
       }
+    }
+
+    // Insert-only forrás (nincs utólagos UPDATE) — ha sem technológia, sem
+    // tapasztalat nem jött át (időkeret/hálózati hiba/hibás oldal miatt), a
+    // sor véglegesen csonka maradna. Ehelyett kihagyjuk (LinkedIn-minta,
+    // 2026-09-04/09-15 user-jelzés): a url nincs `known`-ban, a következő
+    // futás újnak látja és újrapróbálja.
+    if (!item.technologies && item.experience === "-") {
+      skippedIncomplete++;
+      console.log(`[alllocaljobs] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${item.url}`);
+      continue;
     }
 
     if (shouldSkipSeniorExperience(isSeniorExperience(item.experience))) {
@@ -639,6 +652,7 @@ async function scrapeAlllocaljobs(client) {
     `migrated_repost=${migratedRepost}, ` +
     `skipped_senior=${skippedSenior}, skipped_company=${skippedCompany}, ` +
     `skipped_nonit=${skippedNonIt}, skipped_detail_budget=${skippedDetailBudget}, ` +
+    `skipped_incomplete=${skippedIncomplete}, ` +
     `skipped_dead_on_arrival=${skippedDeadOnArrival}, ` +
     `skipped_duplicate_elsewhere=${skippedDuplicateElsewhere}, ` +
     `skipped_duplicate_repost=${skippedDuplicateRepost}, ` +

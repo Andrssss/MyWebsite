@@ -33,7 +33,6 @@ const ROUTINES = new Set(["coverage", "activation"]);
 const INDEX_CAP = 26; // ~half a year of weekly reports kept per routine
 
 const ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app";
-const GITHUB_REPO = "Andrssss/MyWebsite";
 
 // Strong consistency: index is a read-modify-write and the admin page must see a
 // report the moment a routine finishes posting it.
@@ -90,53 +89,7 @@ function renderFinding(f, i) {
 }
 
 async function fileGithubIssue(report) {
-  const token = process.env.GITHUB_ISSUE_TOKEN;
-  if (!token) return { created: false, reason: "GITHUB_ISSUE_TOKEN not set" };
-
-  const findings = Array.isArray(report.findings) ? report.findings : [];
-  if (findings.length === 0) return { created: false, reason: "no findings" };
-
-  const label = report.routine === "coverage" ? "Coverage audit" : "Activation audit";
-  const date = String(report.generatedAt || report.storedAt || "").slice(0, 10);
-  const sources = [...new Set(findings.map((f) => f.source).filter(Boolean))];
-  const sourceList = sources.slice(0, 5).join(", ") + (sources.length > 5 ? ", …" : "");
-  const title = `⚡ ${label} ${date}: ${findings.length} finding${findings.length === 1 ? "" : "s"}${sourceList ? ` (${sourceList})` : ""}`.slice(0, 250);
-
-  const body = [
-    report.summary ? `**Summary:** ${report.summary}` : null,
-    ...findings.map(renderFinding),
-    "---",
-    "_Filed automatically by the weekly Állásfigyelő audit routine (see `audit-report.mjs`)._",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
-  let res;
-  try {
-    res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({
-        title,
-        body,
-        labels: [report.routine === "coverage" ? "coverage-audit" : "activation-audit"],
-      }),
-    });
-  } catch (e) {
-    return { created: false, reason: `fetch failed: ${e.message}` };
-  }
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    return { created: false, reason: `GitHub API ${res.status}: ${text.slice(0, 300)}` };
-  }
-  const issue = await res.json();
-  return { created: true, number: issue.number, url: issue.html_url };
+   // TODO ..... Delete this
 }
 
 async function handlePost(request) {

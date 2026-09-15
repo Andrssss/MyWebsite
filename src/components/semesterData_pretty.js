@@ -321,11 +321,11 @@ export const semesterData = {
     ],
     "subjects": [
       {
-        "name": "Államvizsga A spec.",
+        "name": "Államvizsga A spec. (2026)",
         "url": "https://drive.google.com/drive/folders/1-ckaHxjmEYJ_UbAmQqX1BMprdr29073B?usp=drive_link"
       },
       {
-        "name": "Államvizsga C spec.",
+        "name": "Államvizsga C spec. (2026)",
         "url": "https://szigorlat.netlify.app/"
       },
       {

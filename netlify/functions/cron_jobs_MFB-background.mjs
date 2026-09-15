@@ -215,6 +215,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
+    let skippedIncomplete = 0;
     let notBudapest = 0;
     let detailFetchFailed = 0;
     // A row whose parse throws never reaches foundUrls, but the reconcile below
@@ -288,6 +289,19 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           }
         }
 
+        // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor
+        // detail-fetchje sem technológiát, sem tapasztalatot nem adott,
+        // véglegesen csonka maradna. A foundUrls-be itt is bekerül, a
+        // `known`-ban viszont nincs benne, úgyhogy a következő futás újnak
+        // látja és újrapróbálja (LinkedIn-minta, 2026-09-04/09-15
+        // user-jelzés).
+        if (!knownUrls.has(url) && !technologies && experience === "-") {
+          skippedIncomplete++;
+          foundUrls.push(url);
+          console.log(`[mfb] SKIP incomplete detail fetch (no tech, no experience) — retry later: ${url}`);
+          continue;
+        }
+
         const pattern = volatileUrlPattern(url);
         const migrated = pattern
           ? await migrateVolatileUrl(client, source, url, pattern, currentUrls)
@@ -313,7 +327,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
     console.log(
       `[mfb] DONE — total=${rows.length}, new=${newlyInserted}, migrated=${migratedUrls}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}, ` +
-      `detail_fetch_failed=${detailFetchFailed}`
+      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
     );
 
     // Single API response = full current listing, so the crawl is complete —

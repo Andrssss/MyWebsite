@@ -175,6 +175,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
   let skippedSenior = 0;
   let fetchFailed = 0;
   let detailFetchFailed = 0;
+  let skippedIncomplete = 0;
   const seen = new Set();
 
   try {
@@ -231,6 +232,19 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
           }
         }
 
+        // Insert-only forrás (nincs utólagos UPDATE) — ha egy ÚJ sor detail-
+        // fetchje technológiát sem adott, véglegesen csonka maradna (az
+        // experience itt mindig "diákmunka", nem jelez hibát). Ehelyett
+        // kihagyjuk (LinkedIn-minta, 2026-09-04/09-15 user-jelzés): a
+        // foundUrls-be itt is bekerül, a `known`-ban viszont nincs benne, a
+        // következő futás újnak látja és újrapróbálja.
+        if (!knownUrls.has(job.url) && !job.technologies) {
+          skippedIncomplete++;
+          foundUrls.push(job.url);
+          console.log(`[pannondiak] SKIP incomplete detail fetch (no technologies) — retry later: ${job.url}`);
+          continue;
+        }
+
         const wasNew = await upsertJob(client, "pannondiak", job);
         foundUrls.push(job.url);
         if (wasNew) {
@@ -245,7 +259,7 @@ export default withTimeout("cron_jobs_PANNONDIAK-background", async () => {
 
     console.log(
       `[pannondiak] DONE — new=${newlyInserted}, existed=${alreadyExisted}, ` +
-      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}, detail_fetch_failed=${detailFetchFailed}`
+      `skipped_senior=${skippedSenior}, fetch_failed=${fetchFailed}, detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
     );
 
     const complete = fetchFailed === 0;
