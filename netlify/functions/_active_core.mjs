@@ -1067,14 +1067,21 @@ async function _probeAll(rows, checkFinal, concurrency) {
 
 export async function sweepActive404(client, checkFinal, opts = {}) {
   const concurrency = Math.max(1, opts.concurrency ?? 12);
+  // Opt-in scope for ad-hoc/manual runs (e.g. "just re-check ai-scraped + ats-crawl
+  // right now") without waiting for the scheduled all-sources pass. Omitted ⇒
+  // unchanged behaviour (every eligible source), exactly what the daily cron uses.
+  const sources = Array.isArray(opts.sources) && opts.sources.length ? opts.sources : null;
 
   await ensureActiveSchema(client);
 
   const { rows } = await client.query(
-    `SELECT url, source FROM job_posts WHERE active = true AND NOT (source = ANY($1::text[]))`,
-    [[...SWEEP_EXCLUDED_SOURCES]]
+    `SELECT url, source FROM job_posts
+      WHERE active = true
+        AND NOT (source = ANY($1::text[]))
+        ${sources ? "AND source = ANY($2::text[])" : ""}`,
+    sources ? [[...SWEEP_EXCLUDED_SOURCES], sources] : [[...SWEEP_EXCLUDED_SOURCES]]
   );
-  if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0 };
+  if (rows.length === 0) return { checked: 0, suspects: 0, deactivated: 0, deactivatedUrls: [] };
 
   const results = await _probeAll(rows, checkFinal, concurrency);
 
@@ -1101,7 +1108,7 @@ export async function sweepActive404(client, checkFinal, opts = {}) {
     deactivated = res.rowCount ?? 0;
   }
 
-  return { checked: rows.length, suspects: suspects.length, deactivated };
+  return { checked: rows.length, suspects: suspects.length, deactivated, deactivatedUrls: confirmed };
 }
 
 // How far back reviveSweepDead looks (by first_seen). Without a bound it would
