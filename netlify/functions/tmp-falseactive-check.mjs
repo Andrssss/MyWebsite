@@ -37,6 +37,17 @@ export default async (request) => {
       );
       results.push({ company, title, rows });
     }
+    // NAIH fallback: broaden past the abbreviation in case company is the
+    // spelled-out official name, and past exact title wording.
+    const { rows: naihRows } = await client.query(
+      `SELECT id, source, url, active, sweep_dead, first_seen, title, company
+       FROM job_posts
+       WHERE (title ILIKE '%rendszer%zemeltet%' AND company ILIKE '%adatv%d%')
+          OR company ILIKE '%naih%'
+          OR company ILIKE '%Nemzeti Adatv%delmi%'
+       ORDER BY id`
+    );
+    results.push({ company: "NAIH (fallback)", title: "*", rows: naihRows });
   } finally {
     client.release();
   }
