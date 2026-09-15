@@ -400,7 +400,23 @@ export async function ingestJobs(client, {
     if (shouldSkipTitleFilter(job.title, filters)) { skippedSenior++; continue; }
     if (rejectLocation(job.location)) { skippedLocation++; continue; }
     const resolvedExperience = seniorAwareExperience(job.title, resolveExperience(job));
-    if (shouldSkipSeniorExperience(isSeniorExperience(resolvedExperience))) { skippedSenior++; continue; }
+    if (shouldSkipSeniorExperience(isSeniorExperience(resolvedExperience))) {
+      // Only blocks a NEW row. A row that's already in the DB (typically
+      // inserted earlier with experience="-"/no technologies because THAT
+      // run's detail-fetch/extraction came up empty) must still go through
+      // upsertJob below, or it freezes forever: every later crawl re-derives
+      // the same correct "senior" verdict and hits this `continue` again
+      // before upsertJob ever runs, so the anti-clobber ON CONFLICT backfill
+      // (the self-healing this whole architecture relies on) never gets a
+      // chance to fire. Confirmed live 2026-09-15 on ats-crawl/tulip "DevX
+      // Engineer": tenant recrawled repeatedly with lastError=null, yet the
+      // row stayed stuck at experience="-", technologies=null indefinitely.
+      const { rows: existing } = await client.query(
+        `SELECT 1 FROM job_posts WHERE source = $1 AND url = $2`,
+        [source, job.url]
+      );
+      if (existing.length === 0) { skippedSenior++; continue; }
+    }
     if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
     await upsertJob(client, source, job, resolvedExperience);
     insertedUrls.push(job.url);
