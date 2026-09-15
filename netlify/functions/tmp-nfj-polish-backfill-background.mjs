@@ -78,7 +78,7 @@ function recomputeTechnologies(html) {
   return found.size ? [...found].join(", ") : null;
 }
 
-const CONCURRENCY = 8;
+const CONCURRENCY = 4;
 
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
@@ -114,13 +114,25 @@ const _runJob = withTimeout("tmp-nfj-polish-backfill-background", async () => {
   await mapLimit(rows, CONCURRENCY, async (row) => {
     let html;
     try {
-      const res = await fetch(row.url, {
-        headers: {
-          "User-Agent": "JobWatcher/1.0",
-          Accept: "text/html,application/xhtml+xml",
-          "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
-        },
-      });
+      // Plain fetch() has no default timeout - the first two runs of this
+      // job (2026-09-15) each burned their whole budget (29s, then 14min)
+      // without finishing 43 rows, almost certainly a handful of hung
+      // connections wedging the worker pool. Explicit abort fixes that.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      let res;
+      try {
+        res = await fetch(row.url, {
+          headers: {
+            "User-Agent": "JobWatcher/1.0",
+            Accept: "text/html,application/xhtml+xml",
+            "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       html = await res.text();
     } catch (err) {
