@@ -309,12 +309,19 @@ const TECH_KEYWORDS = [
      collapse. A later pass on the pestidev.hu side is expected to split
      these out of `technologies` into their own filterable/colored facet —
      this list only makes sure the raw signal gets captured at scrape time.
-     `polish` deliberately omitted: case-insensitive match collides with the
-     common verb ("polish your CV/skills") — same false-positive class as
-     the removed `solid` keyword above, so left out rather than risk noise;
-     the Hungarian form doesn't have a case-collision but keeping only one
-     direction would just be inconsistent, so it's left out entirely. */
+     `polish` (the English word) still deliberately omitted: case-insensitive
+     match collides with the common verb ("polish your CV/skills") — same
+     false-positive class as the removed `solid` keyword above. 2026-09-15:
+     `lengyel` (the Hungarian adjective) WAS also left out to start, purely
+     for symmetry with the English side — but it has no collision risk of
+     its own (no common Hungarian word/phrase contains it the way "polish"
+     collides with the verb), so it's back in on its own merits; a posting
+     phrasing the requirement in Hungarian is now caught everywhere, only
+     an English-phrased "Polish" still needs a source-specific structured
+     field the way nofluffjobs' requirements.languages ISO codes provide
+     (see NFJ_LANGUAGE_LABELS in cron_jobs_NOFLUFFJOBS-background.mjs). */
   ["hungarian", "Hungarian"], ["magyar", "Hungarian"],
+  ["lengyel", "Polish"],
   ["english", "English"], ["angol", "English"],
   ["german", "German"], ["német", "German"],
   ["french", "French"], ["francia", "French"],
