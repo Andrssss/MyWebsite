@@ -48,6 +48,16 @@ export default async (request) => {
        ORDER BY id`
     );
     results.push({ company: "NAIH (fallback)", title: "*", rows: naihRows });
+
+    // All naih.hu host rows, to find a live control PDF posting to validate
+    // a listing-page-diff rule against.
+    const { rows: naihHostRows } = await client.query(
+      `SELECT id, source, url, active, sweep_dead, first_seen, title, company
+       FROM job_posts
+       WHERE url ILIKE '%naih.hu%'
+       ORDER BY id`
+    );
+    results.push({ company: "naih.hu (all host rows)", title: "*", rows: naihHostRows });
   } finally {
     client.release();
   }
