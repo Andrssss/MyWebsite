@@ -66,6 +66,27 @@
 // (same shape as SmartRecruiters' 3000-cap carve-out: a known, documented,
 // manually-maintained exception, not a hidden one).
 //
+// 2026-09-15: user pushed back on a manual sweep finding only 2 dead out of 522
+// active ai-scraped+ats-crawl rows ("lehetetlen" — too few). A review pass
+// scoped to hosts NOT covered by any rule below (title-word-hit fraction
+// against the fetched body, same method as 08-30/09-02) turned up two real
+// gaps, both now fixed: (1) karrier.fundamenta.hu and karrier.kh.hu redirect a
+// closed posting to `/lejart-allashirdetes`, the exact same white-label ATS
+// signature as the karrierportal.hu/posta/alfa tenants above — generalized to
+// a host-agnostic path check (LEJART_ALLASHIRDETES_PATH) instead of enumerating
+// a 4th and 5th tenant one at a time; (2) telekom.hu's `/karrier/api/jobs`
+// board-listing check (documented as a working method back on 08-30 but never
+// actually wired into these functions) is now a real SWEEP_PROBE_OVERRIDES
+// entry. Everything else the review pass flagged (36 of 57 candidates) turned
+// out to be non-verdicts on re-check from a different vantage point — timeouts/
+// connection resets/403s that resolved fine from elsewhere (proves the sweep's
+// own "never trust a negative status" rule earns its keep), PDF postings and
+// client-rendered SPA shells (bamboohr, eightfold tenants outside
+// EIGHTFOLD_HOSTS, hrmaster.hu, indivizo, netopgraf) where 0% title-hit is
+// expected on a live page too, and one site (be-novative.com) with a merely
+// EXPIRED TLS cert whose content was confirmed live anyway — none of these are
+// new rule candidates, they're the same fail-open-on-purpose list as before.
+//
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
 // independent-verification rule). Each was validated on 2026-08-30 against live
@@ -140,6 +161,14 @@ export function aiScrapedProbe(row) {
     };
   }
 
+  // telekom.hu — /karrier/jobs?jobId=… is a client-rendered SPA with no
+  // per-job status of its own; the tenant's own board API lists every
+  // currently open job by id (aiScrapedIsDead below checks membership, same
+  // shape as the Eightfold sitemap check above). Confirmed live 2026-09-15.
+  if (host === "telekom.hu" && path === "/karrier/jobs" && u.searchParams.get("jobId")) {
+    return { url: "https://www.telekom.hu/karrier/api/jobs", headers: { Accept: "application/json" } };
+  }
+
   return null;
 }
 
@@ -148,15 +177,20 @@ export function aiScrapedProbe(row) {
  *  legitimate url migration elsewhere in the bucket can't match: AI-scraped rows
  *  routinely redirect and stay alive (test-it.com gains a /hu/ prefix,
  *  sprinteins gains a -full-or-part-time suffix, keler PDFs move to a CDN). */
+// Shared white-label ATS vendor signature: whatever the tenant's own vanity
+// host is, a closed posting on this product 30x's to exactly this path
+// ("lejárt álláshirdetés" = "expired job posting"). Confirmed independently on
+// FIVE unrelated tenants now — karrierportal.hu (multi-tenant: bkk/groupama/
+// uniqa/mvm/giro), karrier.posta.hu, karrier.alfa.hu (2026-09-08), and
+// karrier.fundamenta.hu / karrier.kh.hu (2026-09-15, found via a title-word-hit
+// review pass after these two sat active past closing with 0% title match on
+// this exact landing page). The path string is distinctive enough that
+// host-scoping buys no real safety, only the enumerate-every-new-tenant staleness
+// this repo has hit before (see hardcoded-taxonomy-id-lists-go-stale) — so unlike
+// every other entry in DEAD_LANDINGS below, this one is checked for ANY host.
+const LEJART_ALLASHIRDETES_PATH = /^\/lejart-allashirdetes\/?$/i;
+
 const DEAD_LANDINGS = [
-  // karrierportal.hu tenants: bkk/groupama/uniqa/mvm/giro on *.karrierportal.hu,
-  // and Magyar Posta on its own vanity host, same product.
-  { host: /(^|\.)karrierportal\.hu$/, path: /^\/lejart-allashirdetes\/?$/i },
-  { host: /^karrier\.posta\.hu$/, path: /^\/lejart-allashirdetes\/?$/i },
-  // alfa.hu (2026-09-08): same product/path as the karrierportal.hu tenants
-  // above, just on its own vanity host — confirmed live (karrier.alfa.hu
-  // redirects a closed posting to this exact path).
-  { host: /^karrier\.alfa\.hu$/, path: /^\/lejart-allashirdetes\/?$/i },
   { host: /(^|\.)kuka\.com$/, path: /\/company\/careers\/vacancies\/?$/i },
   { host: /(^|\.)accenture\.com$/, path: /\/careers\/jobsearch\/?$/i },
   { host: /(^|\.)bamboohr\.com$/, path: /^\/careers\/?$/i },
@@ -216,6 +250,14 @@ export function aiScrapedIsDead(row, body, res) {
       // Truncated/unparseable sitemap body -> no verdict, not a death.
       return !!id && typeof body === "string" && body.includes("<urlset") && !body.includes(id);
     }
+    if (host === "telekom.hu") {
+      const jobId = u.searchParams.get("jobId");
+      let j;
+      try { j = JSON.parse(body); } catch { return false; } // truncated/HTML -> no verdict
+      const list = Array.isArray(j?.jobList) ? j.jobList : null;
+      // Missing/unparseable list -> no verdict, not a death (fail open).
+      return !!jobId && !!list && !list.some((job) => job && job.id === jobId);
+    }
     if (host !== "jobs.smartrecruiters.com") return false;
     let j;
     try { j = JSON.parse(body); } catch { return false; } // truncated/HTML -> no verdict
@@ -260,6 +302,7 @@ export function aiScrapedIsDead(row, body, res) {
     let finalHost = null;
     try { finalHost = new URL(res.finalUrl).hostname.replace(/^www\./, ""); } catch { finalHost = null; }
     if (from !== null && to !== null && from !== to && finalHost) {
+      if (LEJART_ALLASHIRDETES_PATH.test(to)) return true;
       for (const rule of DEAD_LANDINGS) {
         if (rule.host.test(finalHost) && rule.path.test(to)) return true;
       }
