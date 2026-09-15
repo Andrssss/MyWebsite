@@ -319,9 +319,28 @@ const NGSTATE_UNESCAPE = { "&a;": "&", "&q;": '"', "&s;": "'", "&l;": "<", "&g;"
  * Management Tools)" ajánlásból —, plusz Oracle/SQL/Windows a láblécből.
  * Ezért csak a hirdetés SAJÁT szövegét adjuk az extractornak.
  *
- * A requirements.languages (Angol/Magyar chipek) szándékosan kimarad: az nyelv,
- * nem technológia.
+ * A requirements.languages (Angol/Magyar chipek) 2026-09-01-ig szándékosan
+ * kimaradt ("az nyelv, nem technológia") — ez a döntés a 2026-09-08-i
+ * _tech_keywords.js változás óta ELAVULT, mert azóta a nyelvi elvárások is
+ * szándékosan a `technologies` mezőbe kerülnek (l. ott a "spoken/written
+ * language requirements" blokkot). 2026-09-15: élő hiba — a QuantumBlack/
+ * McKinsey budapesti hirdetésen a lengyel nyelvkövetelmény sosem jelent meg
+ * a DB-ben, mert (a) ez a mező eddig el sem jutott a kulcsszó-keresőig, és
+ * (b) a "polish" szó ÚGYIS szándékosan hiányzik a generic TECH_KEYWORDS
+ * listából (a "polish your CV/skills" ige-ütközés miatt). Itt viszont a
+ * mező tiszta ISO 639-1 kód ({type, code}), nem szabad szöveg, tehát a
+ * szöveges ütközés nem áll fenn — kód→címke lookuppal biztonságosan
+ * felvehető, beleértve a "Polish"-t is.
  */
+const NFJ_LANGUAGE_LABELS = {
+  hu: "Hungarian", en: "English", de: "German", fr: "French", it: "Italian",
+  es: "Spanish", nl: "Dutch", ru: "Russian", ro: "Romanian", sk: "Slovak",
+  cs: "Czech", sr: "Serbian", hr: "Croatian", sl: "Slovenian", bg: "Bulgarian",
+  uk: "Ukrainian", pt: "Portuguese", sv: "Swedish", no: "Norwegian", da: "Danish",
+  fi: "Finnish", el: "Greek", tr: "Turkish", ar: "Arabic", zh: "Chinese",
+  ja: "Japanese", ko: "Korean", he: "Hebrew", pl: "Polish",
+};
+
 function extractPostingState(html) {
   try {
     const $ = cheerioLoad(html);
@@ -355,11 +374,22 @@ function extractNofluffTechnologies(html) {
       if (typeof task === "string" && task) parts.push(`<li>${task}</li>`);
     }
   }
-  if (!parts.length) return null;
+  const found = new Set();
+  if (parts.length) {
+    // A .description wrapper azért kell, hogy extractTechnologies a scoped
+    // ágán fusson, ne a „rövid szöveg → teljes body" fallbackján.
+    const text = extractTechnologies(`<div class="description">${parts.join(" ")}</div>`);
+    if (text) for (const label of text.split(", ")) found.add(label);
+  }
 
-  // A .description wrapper azért kell, hogy extractTechnologies a scoped ágán
-  // fusson, ne a „rövid szöveg → teljes body" fallbackján.
-  return extractTechnologies(`<div class="description">${parts.join(" ")}</div>`);
+  if (Array.isArray(req.languages)) {
+    for (const entry of req.languages) {
+      const label = NFJ_LANGUAGE_LABELS[entry?.code];
+      if (label) found.add(label);
+    }
+  }
+
+  return found.size ? [...found].join(", ") : null;
 }
 
 async function fetchNofluffDetail(url) {
