@@ -93,7 +93,10 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-const _runJob = withTimeout("tmp-nfj-polish-backfill-background", async () => {
+export default withTimeout("tmp-nfj-polish-backfill-background", async (request) => {
+  const auth = (request.headers.get("authorization") || "").trim();
+  if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
+
   const store = getStore("tmp-nfj-polish-backfill-result");
   const client = await pool.connect();
   let rows;
@@ -188,11 +191,5 @@ const _runJob = withTimeout("tmp-nfj-polish-backfill-background", async () => {
     errors,
   };
   await store.setJSON("latest.json", report);
+  return new Response("done", { status: 200 });
 });
-
-export default async (request) => {
-  const auth = (request.headers.get("authorization") || "").trim();
-  if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
-  _runJob();
-  return new Response("started", { status: 202 });
-};
