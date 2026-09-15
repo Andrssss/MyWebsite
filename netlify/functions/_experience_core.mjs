@@ -426,6 +426,45 @@ export function matchTechKeywords(text) {
   return found;
 }
 
+// Detects whether a posting's OWN body text is written in English — distinct
+// from the "english"/"angol" TECH_KEYWORDS entries above, which only catch a
+// posting that explicitly STATES a language requirement ("English:
+// advanced"). An international-company ad that is simply written in English
+// throughout, with no such requirements line, was never tagged before this.
+//
+// Word list + threshold measured 2026-09-15 against live postings (not
+// invented): 49 confirmed-English ad bodies (30 greenhouse.io job-board
+// descriptions across 10 companies + 19 English-language profession.hu ads,
+// the latter identified by their own "Responsibilities" section heading
+// rendering in English even though the surrounding site chrome is
+// Hungarian) and 29 confirmed-Hungarian profession.hu ads ("Feladatok"
+// heading, Hungarian body). Every English sample matched 10-13 of these 13
+// words; every true-Hungarian sample matched 0-2 (a lone "and"/"the" inside
+// an otherwise-Hungarian tech-stack mention isn't unusual, but never several
+// at once). 3 more "Feladatok"-headed samples matched 10/13 — inspected
+// individually, their ad BODY text is itself plain English (only the site's
+// own section label is Hungarian), so scoring them as English is correct,
+// not a false positive. Single-word matching alone is not used: a lone hit
+// is too easily an embedded English phrase or quoted stack list, so the
+// check requires a majority of the list, chosen well below the English
+// corpus's observed floor (10) and well above the Hungarian corpus's
+// observed ceiling among genuinely Hungarian ads (2).
+const ENGLISH_SIGNAL_WORDS = [
+  "and", "with", "for", "the", "to", "of", "in", "on", "or",
+  "experience", "you", "your", "as",
+];
+const ENGLISH_SIGNAL_MIN_HITS = 6;
+
+export function looksLikeEnglishAd(text) {
+  if (!text) return false;
+  let hits = 0;
+  for (const w of ENGLISH_SIGNAL_WORDS) {
+    if (techBoundaryRegex(w).test(text)) hits++;
+    if (hits >= ENGLISH_SIGNAL_MIN_HITS) return true;
+  }
+  return false;
+}
+
 // Normalizes a free-text, LLM-written technologies list down to ONLY
 // recognized TECH_KEYWORDS labels — the ai-scraped pipeline's technologies
 // field is raw LLM output with no other filtering (unlike every hand
@@ -574,6 +613,7 @@ export function extractTechnologies(html) {
     }
   }
 
+  let scanText = text;
   let found = matchTechKeywords(text);
 
   // Scoped selectors are a substring/generic-id match (e.g. #job-details),
@@ -597,8 +637,17 @@ export function extractTechnologies(html) {
   const MIN_TRUSTED_LENGTH = 200;
   if (!found.size && text.length < MIN_TRUSTED_LENGTH) {
     const bodyText = normalizeWhitespace($("body").text());
-    if (bodyText !== text) found = matchTechKeywords(bodyText);
+    if (bodyText !== text) {
+      found = matchTechKeywords(bodyText);
+      scanText = bodyText;
+    }
   }
+
+  // Ad-language detection runs on whichever text was actually scanned above
+  // (scoped description, or the full-body fallback) — independent of
+  // whether any TECH_KEYWORDS hit, since a real English ad can legitimately
+  // mention none of them (e.g. a non-technical role).
+  if (looksLikeEnglishAd(scanText)) found.add("English");
 
   return found.size ? [...found].join(", ") : null;
 }
