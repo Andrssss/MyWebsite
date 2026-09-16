@@ -40,8 +40,16 @@ function store() {
   return getStore({ name: STORE_NAME, consistency: "strong" });
 }
 
+// Lowercased on purpose (2026-09-16, issue #17 follow-up): SmartRecruiters'
+// own `company.identifier` casing (sr-global-search) doesn't always match
+// the casing a guessed/backfilled slug ends up with for the same real
+// company (confirmed live: "boschgroup" vs "BoschGroup", "hiflylabs" vs
+// "Hiflylabs" — two tenant rows, double crawl load, both counted separately
+// in the HU-posting leaderboard). Only the dedup KEY is normalized; the
+// `slug` field stored on the tenant record (used for the actual HTTP calls
+// in _ats_providers.mjs) keeps whatever casing it was first added with.
 export function tenantKey(provider, slug) {
-  return `${provider}:${slug}`;
+  return `${provider}:${String(slug).toLowerCase()}`;
 }
 
 /* ── tenants ──────────────────────────────────────────────────────────────
