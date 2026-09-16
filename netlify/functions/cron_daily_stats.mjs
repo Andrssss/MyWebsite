@@ -34,15 +34,16 @@ export default withTimeout("cron_daily_stats", async function handler() {
     const today = new Date().toISOString().slice(0, 10);
 
     // A mai nap összes új munkája (title + source + experience kell a
-    // senior-kizáráshoz és a diák/intern felismeréshez)
+    // senior-kizáráshoz és a diák/intern felismeréshez, technologies a
+    // nyelv/technológia bontáshoz)
     const { rows: todayRows } = await client.query(
-      `SELECT title, source, experience
+      `SELECT title, source, experience, technologies
        FROM job_posts
        WHERE (first_seen AT TIME ZONE 'UTC')::date = $1`,
       [today]
     );
 
-    const { totalJobs, internJobs, categories, internCategories } =
+    const { totalJobs, internJobs, categories, internCategories, languages, technologies } =
       computeDayStats(todayRows, JOB_CATEGORIES);
 
     const { skipped } = await appendDayIfMissing(today, {
@@ -50,9 +51,11 @@ export default withTimeout("cron_daily_stats", async function handler() {
       internJobs,
       categories,
       internCategories,
+      languages,
+      technologies,
     });
 
-    console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}, intern_categories=${internCategories.length}${skipped ? " (already present, skipped)" : ""}`);
+    console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}, intern_categories=${internCategories.length}, languages=${languages.length}, technologies=${technologies.length}${skipped ? " (already present, skipped)" : ""}`);
   } catch (err) {
     console.error("[daily_stats] Error:", err);
   } finally {

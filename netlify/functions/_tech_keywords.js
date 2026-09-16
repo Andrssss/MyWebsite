@@ -351,4 +351,21 @@ const TECH_KEYWORDS = [
   ["hebrew", "Hebrew"], ["héber", "Hebrew"],
 ];
 
-module.exports = { TECH_KEYWORDS };
+// Canonical labels (a subset of TECH_KEYWORDS' second column, see the
+// "spoken/written language requirements" block above) that denote a spoken/
+// written language requirement rather than an actual technology. Added
+// 2026-09-16 so the daily stats pipeline (_stats_core.mjs) can split the
+// `job_posts.technologies` field into two separate facets for the pestidev.hu
+// stats page — the same split the 2026-09-08 comment above already flagged as
+// expected, just landing in the stats aggregation rather than the raw
+// extraction (extractTechnologies() keeps writing both into one field; only
+// the day-stats reader tells them apart).
+const LANGUAGE_LABELS = new Set([
+  "Hungarian", "Polish", "English", "German", "French", "Italian", "Spanish",
+  "Dutch", "Russian", "Romanian", "Slovak", "Czech", "Serbian", "Croatian",
+  "Slovenian", "Bulgarian", "Ukrainian", "Portuguese", "Swedish", "Norwegian",
+  "Danish", "Finnish", "Greek", "Turkish", "Arabic", "Chinese", "Japanese",
+  "Korean", "Hebrew",
+]);
+
+module.exports = { TECH_KEYWORDS, LANGUAGE_LABELS };

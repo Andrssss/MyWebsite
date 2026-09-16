@@ -16,6 +16,11 @@
 // Amikor a board kategóriái változnak (átnevezés, új/törölt kategória, más
 // kulcsszavak a job_categories táblában), a régi sorok elavulnak — a nyers
 // hirdetésekből viszont a MAI szabályokkal bármikor újraszámolhatók.
+//
+// 2026-09-16: ugyanez a séma vonatkozik a dailyLanguages/dailyTechnologies
+// bontásra is (ld. _stats_core.mjs technologyBreakdown()) — a `technologies`
+// mezőt is a nyers job_posts/archívum sorokból számoljuk újra, nem a régi
+// mentett bontást patch-eljük.
 
 import { getStore } from "@netlify/blobs";
 import { computeDayStats } from "./_stats_core.mjs";
@@ -73,6 +78,7 @@ export function mergeRows(liveRows, archiveRows) {
       title: row.title,
       source: row.source,
       experience: row.experience,
+      technologies: row.technologies,
       day,
       live: isLive,
     };
@@ -121,7 +127,7 @@ export async function fetchLiveRows(client, { from, to } = {}) {
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const { rows } = await client.query(
-    `SELECT title, source, experience, url,
+    `SELECT title, source, experience, technologies, url,
             TO_CHAR((first_seen AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day
        FROM job_posts
        ${where}`,
@@ -139,9 +145,11 @@ export async function writeDays(byDay, jobCategories, { from, to }) {
   const perDay = [];
   const statRows = [];
   const catRows = [];
+  const langRows = [];
+  const techRows = [];
 
   for (const day of days) {
-    const { totalJobs, internJobs, categories, internCategories } =
+    const { totalJobs, internJobs, categories, internCategories, languages, technologies } =
       computeDayStats(byDay.get(day), jobCategories);
 
     // A 0 találatos napokat nem tároljuk (a régi backfill is így tett).
@@ -154,6 +162,8 @@ export async function writeDays(byDay, jobCategories, { from, to }) {
     for (const { category, count } of categories) catRows.push({ date: day, category, count });
     for (const { category, count } of internCategories)
       catRows.push({ date: day, category: `intern:${category}`, count });
+    for (const { label, count } of languages) langRows.push({ date: day, language: label, count });
+    for (const { label, count } of technologies) techRows.push({ date: day, technology: label, count });
 
     perDay.push({
       date: day,
@@ -161,14 +171,18 @@ export async function writeDays(byDay, jobCategories, { from, to }) {
       intern_jobs: internJobs,
       categories: categories.length,
       intern_categories: internCategories.length,
+      languages: languages.length,
+      technologies: technologies.length,
     });
   }
 
-  await replaceDays(statRows, catRows, { from, to });
+  await replaceDays(statRows, catRows, langRows, techRows, { from, to });
 
   return {
     insertedStats: statRows.length,
     insertedCategories: catRows.length,
+    insertedLanguages: langRows.length,
+    insertedTechnologies: techRows.length,
     perDay,
   };
 }
@@ -200,12 +214,15 @@ export async function rebuildStats(client, jobCategories, { from, to, dryRun = f
   if (dryRun) {
     const preview = [];
     for (const day of days) {
-      const { totalJobs, internJobs, categories } = computeDayStats(byDay.get(day), jobCategories);
+      const { totalJobs, internJobs, categories, languages, technologies } =
+        computeDayStats(byDay.get(day), jobCategories);
       preview.push({
         date: day,
         total_jobs: totalJobs,
         intern_jobs: internJobs,
         categories: categories.length,
+        languages: languages.length,
+        technologies: technologies.length,
       });
     }
     return { ...summary, ms: Date.now() - startedAt, perDay: preview };

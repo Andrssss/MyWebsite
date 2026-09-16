@@ -31,6 +31,7 @@
 
 import { categorize, UNCATEGORIZED } from "../../src/lib/categorize.mjs";
 import { isInternLike, isSenior } from "../../src/lib/experienceLevel.mjs";
+import { LANGUAGE_LABELS } from "./_tech_keywords.js";
 
 export { categorize, UNCATEGORIZED } from "../../src/lib/categorize.mjs";
 export { isInternLike, isSenior } from "../../src/lib/experienceLevel.mjs";
@@ -53,6 +54,35 @@ export function categorizeJobs(rows, jobCategories) {
 }
 
 /**
+ * Sorok → nyelvek/technológiák bontása. A `job_posts.technologies` mező
+ * vesszővel elválasztott, extractTechnologies() kanonikus címkéiből áll (ld.
+ * _tech_keywords.js) — EGY hirdetés több technológiát/nyelvet is felsorolhat,
+ * ezért ez NEM egy-egy besorolás (mint categorizeJobs), hanem gyakoriság-
+ * számlálás minden előforduló címkére, a LANGUAGE_LABELS halmaz alapján két
+ * külön vödörbe szétosztva.
+ */
+export function technologyBreakdown(rows) {
+  const langCounts = {};
+  const techCounts = {};
+
+  for (const row of rows) {
+    if (!row.technologies) continue;
+    const labels = row.technologies.split(",").map((t) => t.trim()).filter(Boolean);
+    for (const label of labels) {
+      const bucket = LANGUAGE_LABELS.has(label) ? langCounts : techCounts;
+      bucket[label] = (bucket[label] || 0) + 1;
+    }
+  }
+
+  const toSorted = (counts) =>
+    Object.entries(counts)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+
+  return { languages: toSorted(langCounts), technologies: toSorted(techCounts) };
+}
+
+/**
  * Egy nap összesítése.
  *
  * A senior hirdetéseket kihagyjuk, mert a board is elrejti őket alapból
@@ -62,11 +92,14 @@ export function categorizeJobs(rows, jobCategories) {
 export function computeDayStats(rows, jobCategories) {
   const jobs = rows.filter((row) => !isSenior(row.experience));
   const internJobs = jobs.filter(isInternLike);
+  const { languages, technologies } = technologyBreakdown(jobs);
 
   return {
     totalJobs: jobs.length,
     internJobs: internJobs.length,
     categories: categorizeJobs(jobs, jobCategories),
     internCategories: categorizeJobs(internJobs, jobCategories),
+    languages,
+    technologies,
   };
 }
