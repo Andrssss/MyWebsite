@@ -339,6 +339,14 @@ export async function ingestJobs(client, {
   rejectLocation = isNonBudapestLocation, scopePrefix = null, handoffAtsUrls = false,
   skipCrossSourceDupes = false, extraFoundUrls = [],
 }) {
+  // Canonicalize any case-variant of the flat AI source (found 2026-09-16: a
+  // stray "ai-scraped" row predating this module didn't match FIXED's
+  // case-sensitive "AI-scraped" key in jobs.js's /jobs/sources GROUP BY, so it
+  // rendered as its own 1-row source bucket). Every current caller already
+  // passes the AI_SOURCE constant, but this closes the gate for good at the
+  // one place every write path funnels through, instead of trusting callers.
+  if (source && source.toLowerCase() === AI_SOURCE.toLowerCase()) source = AI_SOURCE;
+
   await ensureTechnologiesColumn(client);
   await ensureLevelColumn(client);
   const ok = jobs.length > 0;
