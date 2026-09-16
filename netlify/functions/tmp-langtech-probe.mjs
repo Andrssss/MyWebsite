@@ -34,8 +34,31 @@ export default async (request) => {
   const store = getStore("job-posts-archive");
   const { blobs } = await store.list();
 
+  const statsStore = getStore("job-stats");
+  const stats = await statsStore.get("latest.json", { type: "json" });
+  const dailyLanguages = stats?.dailyLanguages || [];
+  const dailyTechnologies = stats?.dailyTechnologies || [];
+  const statsSummary = {
+    generatedAt: stats?.generatedAt,
+    dailyStatsCount: (stats?.dailyStats || []).length,
+    dailyLanguagesCount: dailyLanguages.length,
+    dailyTechnologiesCount: dailyTechnologies.length,
+    dailyLanguagesDateRange: dailyLanguages.length
+      ? [dailyLanguages[0].date, dailyLanguages[dailyLanguages.length - 1].date]
+      : null,
+    dailyTechnologiesDateRange: dailyTechnologies.length
+      ? [dailyTechnologies[0].date, dailyTechnologies[dailyTechnologies.length - 1].date]
+      : null,
+    earliestLanguageSample: dailyLanguages.slice(0, 5),
+    earliestTechnologySample: dailyTechnologies.slice(0, 5),
+  };
+
   return new Response(
-    JSON.stringify({ dbInfo, archiveBlobCount: blobs.length, archiveBlobKeys: blobs.map((b) => b.key) }, null, 2),
+    JSON.stringify(
+      { dbInfo, archiveBlobCount: blobs.length, archiveBlobKeys: blobs.map((b) => b.key), statsSummary },
+      null,
+      2
+    ),
     { headers: { "content-type": "application/json; charset=utf-8" } }
   );
 };
