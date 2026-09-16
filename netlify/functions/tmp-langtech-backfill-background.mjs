@@ -20,13 +20,17 @@ const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
-const _runJob = withTimeout("tmp-langtech-backfill-background", async () => {
+export default withTimeout("tmp-langtech-backfill-background", async (request) => {
+  const auth = (request.headers.get("authorization") || "").trim();
+  if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
+
   const store = getStore("tmp-langtech-backfill-result");
   const client = await pool.connect();
   try {
     const jobCategories = await loadCategories();
     const result = await rebuildStats(client, jobCategories, {});
     await store.setJSON("latest.json", { finishedAt: new Date().toISOString(), ...result });
+    return new Response("done", { status: 200 });
   } catch (err) {
     await store.setJSON("latest.json", {
       finishedAt: new Date().toISOString(),
@@ -37,10 +41,3 @@ const _runJob = withTimeout("tmp-langtech-backfill-background", async () => {
     client.release();
   }
 });
-
-export default async (request) => {
-  const auth = (request.headers.get("authorization") || "").trim();
-  if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
-  _runJob();
-  return new Response("started", { status: 202 });
-};
