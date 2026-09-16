@@ -1,8 +1,9 @@
 // Shared session-aware fetch machinery for hu.alllocaljobs.com, used by both
 // cron_jobs_ALLLOCALJOBS-background.mjs (hourly scrape) and
-// cron_alllocaljobs_deepsweep-background.mjs (daily full dead-check) — kept
-// in one place so a fix to either (the latin1/utf8 Location bug, cookie
-// handling) can't drift between two copies.
+// cron_alllocaljobs_deepsweep-background.mjs (full dead-check, also hourly
+// since 2026-09-16 — see that file's header) — kept in one place so a fix to
+// either (the latin1/utf8 Location bug, cookie handling) can't drift between
+// two copies.
 //
 // Detail pages (/állás-<token>) only render for a client carrying a session
 // cookie: cookie-less, they 200-redirect to /állások?requested_vacancy_not_found=1

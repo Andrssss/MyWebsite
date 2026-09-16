@@ -62,12 +62,17 @@
   éri el. Első nekifutásra egy soronkénti véletlen-mintás kiegészítést kapott ez
   a fájl (`reconcileActive`'s `confirmDeadExtraLimit`) — user-döntés alapján ez
   KIDOBVA (részleges/valószínűségi lefedés, nem garantált). A tényleges fix:
-  külön napi teljes-lefedettségű sweep, lásd `cron_alllocaljobs_deepsweep-
+  külön teljes-lefedettségű sweep, lásd `cron_alllocaljobs_deepsweep-
   background.mjs` — MINDEN aktív alllocaljobs sort végigellenőriz session-nel,
-  naponta egyszer (cron_dispatcher_daily triggereli, 14:00 UTC), nem csak egy
-  random részhalmazt óránként. A session-fetch gépezet (makeJar/fetchWithSession/
+  nem csak egy random részhalmazt. A session-fetch gépezet (makeJar/fetchWithSession/
   fixLocationEncoding) `_alllocaljobs_core.mjs`-be lett kiemelve, hogy a két
   fájl (ez + a deepsweep) ne két külön, idővel szétdriftelő másolatot tartson.
+  (2026-09-16, issue #15: a deepsweep eredetileg naponta egyszer futott
+  cron_dispatcher_daily-n át, 14:00 UTC — ez akár ~24 órás rést hagyott egy
+  frissen kihalt sor és a következő ellenőrzés között. Azóta a
+  cron_scheduler.mjs GRID-jén fut, óránként, a `:09`-es scrape után 3 perccel
+  (`:12`) — a max. késleltetés ~1 órára csökkent, lásd a deepsweep fájl saját
+  fejlécét.)
 
   ⚠️ 2026-08-18 (user-döntés, élő cég+title átfedés-vizsgálat után: 215 aktív
   sorból csak 23%-nak volt pontos cég+title egyezése talent/profession/

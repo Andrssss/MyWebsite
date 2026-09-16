@@ -1,5 +1,5 @@
-// Daily FULL dead-check for alllocaljobs — every currently active row, once
-// a day, checked at its own detail url via a real session.
+// FULL dead-check for alllocaljobs — every currently active row, checked at
+// its own detail url via a real session.
 //
 // Why this exists (2026-07-30, user-jelzés + élő 294-soros ellenőrzés): the
 // hourly cron_jobs_ALLLOCALJOBS-background.mjs already has a confirmDead gate
@@ -13,13 +13,28 @@
 // randomized partial sample onto the hourly gate (reconcileActive's
 // confirmDeadExtraLimit) — rejected (user: partial/probabilistic coverage
 // isn't good enough) in favor of this: a dedicated job that checks EVERY
-// active row, once a day, full stop.
+// active row, full stop.
 //
 // Session-fetch machinery (makeJar/fetchWithSession/fixLocationEncoding) is
 // shared with the hourly scraper via _alllocaljobs_core.mjs — a fix to either
 // (the latin1/utf8 Location bug, cookie handling) can't drift between two
-// copies. Triggered by cron_dispatcher_daily (14:00 UTC), same slot as the
-// other once-a-day sources / cron_404sweep-background.
+// copies.
+//
+// Cadence (2026-09-16, issue #15): originally triggered once/day at 14:00 UTC
+// via cron_dispatcher_daily, same slot as cron_404sweep-background. That left
+// a gap — a posting that died shortly after the daily run could sit wrongly
+// "active" for up to ~24h before the next day's sweep caught it (the same
+// structural shape as the talent hourly-sweep fix from 2026-09-15, just
+// mirrored: that bug produced wrongly-inactive rows, this one wrongly-active).
+// Moved to cron_scheduler.mjs's GRID instead (minute :12, hours 4-19 UTC, 3
+// min after the alllocaljobs scrape's own :09 slot) — now runs every active
+// hour, tracking the scraper's own real cadence instead of a disjoint daily
+// schedule, cutting worst-case lag from ~24h to ~1h. This is a ~16x increase
+// in session-based requests/day against alllocaljobs.hu (1x/day → hourly
+// across the 16-hour 4-19 UTC window) — a deliberate trade-off, not an
+// oversight; see the GRID entry's comment in cron_scheduler.mjs for why this
+// stayed a separate function/invocation rather than being inlined into the
+// scraper itself (time-budget + generic-sweep-machinery reasons).
 
 import { Pool } from "pg";
 import { withTimeout, logRecovery } from "./_error-logger.mjs";
@@ -41,7 +56,7 @@ function sleep(ms) {
 // Fail-safe time budget: the background function gets 14 min total. At ~294
 // active rows and ~700ms/row (350ms sleep + request), a full pass takes
 // ~3-4 min today, but the active count will grow — if it ever gets close to
-// the limit, stop checking (unconfirmed rows stay active, tomorrow's run
+// the limit, stop checking (unconfirmed rows stay active, next hour's run
 // picks up where this one left off) rather than risk a timeout mid-UPDATE.
 const CHECK_DEADLINE_MS = 12 * 60 * 1000;
 
@@ -75,7 +90,7 @@ const _runJob = withTimeout("cron_alllocaljobs_deepsweep-background", async () =
         if (finalUrl.includes("requested_vacancy_not_found")) dead.push(url);
       } catch (err) {
         // network hiccup / timeout — fail-safe: unconfirmed stays active,
-        // tomorrow's run tries again.
+        // next hour's run tries again.
       }
       checked++;
     }

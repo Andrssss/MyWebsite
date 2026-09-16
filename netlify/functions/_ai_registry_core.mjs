@@ -20,7 +20,7 @@ import { Pool } from "pg";
 import { getStore } from "@netlify/blobs";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE, isItJob, isSeniorLike } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobsVerbose, toSlug, AI_SOURCE, isItJob, isSeniorLike } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 import { normTitle, normCompany, findCrossSourceDuplicates } from "./_ai_dupe_guard.mjs";
 
@@ -59,12 +59,25 @@ async function writeRegistry(reg) {
   await store().setJSON(KEY, { ...reg, updatedAt: new Date().toISOString() });
 }
 
-function groupBySlug(findings) {
+// `invalidOut`, when passed, gets one { url, title, slug, reason } entry per
+// dropped raw finding — lets submitFindings report per-finding diagnostics
+// for drops that happen before sanitizeJobsVerbose ever sees the row.
+function groupBySlug(findings, invalidOut) {
   const groups = new Map();
   for (const f of findings || []) {
-    if (!f || !f.title || !f.url) continue;
+    if (!f || typeof f !== "object") {
+      invalidOut?.push({ url: null, title: null, slug: null, reason: "invalid_entry" });
+      continue;
+    }
+    if (!f.title || !f.url) {
+      invalidOut?.push({ url: f.url || null, title: f.title || null, slug: f.slug || null, reason: !f.title ? "missing_title" : "missing_url" });
+      continue;
+    }
     const slug = toSlug(f.slug);
-    if (!slug) continue;
+    if (!slug) {
+      invalidOut?.push({ url: f.url, title: f.title, slug: f.slug || null, reason: "missing_slug" });
+      continue;
+    }
     if (!groups.has(slug)) groups.set(slug, []);
     groups.get(slug).push(f);
   }
@@ -223,22 +236,35 @@ export async function submitFindings(payload) {
   // rather than losing them silently.
   const throttled = Math.max(0, submitted.length - budget.remaining);
   const accepted = submitted.slice(0, budget.remaining);
+  const throttledFindings = submitted.slice(budget.remaining);
 
   const reg = await readRegistry();
   const now = new Date().toISOString();
-  const results = {};
+  const ingestedBySource = {};
   let totalWritten = 0;
 
+  // Per-finding diagnostics across the WHOLE submitted batch — a finding
+  // dropped for a missing slug/title/url or a duplicate url ACROSS companies
+  // in the same batch is just as much "what happened to my submission" as a
+  // content-gate skip further down (2026-09-16: the routine had no way to
+  // tell those apart from a silent drop before this).
+  const invalidFindings = [];
   const slugByUrl = new Map();
   const allJobs = [];
-  for (const [slug, rawJobs] of groupBySlug(accepted)) {
-    for (const j of sanitizeJobs(rawJobs)) {
-      if (slugByUrl.has(j.url)) continue;
+  for (const [slug, rawJobs] of groupBySlug(accepted, invalidFindings)) {
+    const { jobs, invalid } = sanitizeJobsVerbose(rawJobs);
+    for (const v of invalid) invalidFindings.push({ ...v, slug });
+    for (const j of jobs) {
+      if (slugByUrl.has(j.url)) {
+        invalidFindings.push({ url: j.url, title: j.title, slug, reason: "duplicate_in_batch" });
+        continue;
+      }
       slugByUrl.set(j.url, slug);
       allJobs.push(j);
     }
   }
 
+  let jobResults = [];
   if (allJobs.length > 0) {
     const client = await pool.connect();
     try {
@@ -255,7 +281,13 @@ export async function submitFindings(payload) {
         // Amit már egy másik forrás behozott, azt nem duplázzuk (_ai_dupe_guard.mjs).
         skipCrossSourceDupes: true,
       });
-      results[AI_SOURCE] = stats;
+      // `jobResults` is pulled off `stats` (not left nested) so it isn't
+      // duplicated wholesale between `ingested` and the flat `results` list
+      // below — this endpoint's caller is an LLM reading its own tool output,
+      // so a needlessly doubled array is wasted context, not just bytes.
+      const { jobResults: rawJobResults, ...statsRest } = stats;
+      ingestedBySource[AI_SOURCE] = statsRest;
+      jobResults = rawJobResults.map((r) => ({ ...r, slug: slugByUrl.get(r.url) || null }));
       totalWritten = stats.insertedUrls.length;
       console.log(
         `[ai-registry-core] ${AI_SOURCE}: rows=${stats.rows} inserted=${stats.inserted} ` +
@@ -330,9 +362,18 @@ export async function submitFindings(payload) {
 
   await consume(totalWritten);
 
+  // Per-finding report covering EVERY submitted finding, not just the ones
+  // that reached ingestJobs — see the invalidFindings comment above.
+  const results = [
+    ...invalidFindings.map((v) => ({ url: v.url, title: v.title, slug: v.slug, status: "invalid", reason: v.reason })),
+    ...throttledFindings.map((f) => ({ url: f?.url || null, title: f?.title || null, slug: f?.slug || null, status: "throttled", reason: "rate_limited" })),
+    ...jobResults,
+  ];
+
   return {
     ok: true,
-    ingested: results,
+    ingested: ingestedBySource,
+    results,
     rateLimit: {
       limit: budget.limit,
       writtenThisRequest: totalWritten,

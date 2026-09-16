@@ -97,7 +97,12 @@ const TOOLS = [
       "bookkeeping (lastChecked/status/listingUrls) to merge into memory, and any " +
       "companies to permanently reject. Findings past the remaining upload budget are " +
       "silently throttled (report rateLimit.throttled honestly) and will be re-found " +
-      "next run rather than lost.",
+      "next run rather than lost. The response's `results` array has one entry per " +
+      "submitted finding (matched by url) with a `status` — 'inserted', 'handed_to_ats', " +
+      "'duplicate', 'skipped_non_it', 'skipped_senior_title', 'skipped_senior_experience', " +
+      "'skipped_location', 'skipped_company', 'invalid', or 'throttled' — plus a `reason` " +
+      "where relevant. Check it for any finding that doesn't show up on the board later; " +
+      "don't resubmit a finding whose status was anything other than 'throttled'.",
     inputSchema: {
       type: "object",
       properties: {

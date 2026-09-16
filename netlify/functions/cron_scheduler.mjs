@@ -2,7 +2,7 @@ export const config = {
   // Fires ONLY at the minutes present in GRID below (hours 4–19 UTC).
   // Keep this minute list exactly in sync with the GRID keys — a minute that
   // isn't in GRID does nothing, a GRID key that isn't listed here never fires.
-  schedule: "2,5,6,7,9,10,11,13,14,17,18,19,21,22,23,25,26 4-19 * * *",
+  schedule: "2,5,6,7,9,10,11,12,13,14,17,18,19,21,22,23,25,26 4-19 * * *",
 };
 
 import { withTimeout } from "./_error-logger.mjs";
@@ -41,6 +41,24 @@ const GRID = {
   6: [{ name: "cron_jobs_RAIFFEISEN-background" }],   // raiffeisen (~10)
   7: [{ name: "cron_jobs_KH-background" }],           // kh (~9)
   9: [{ name: "cron_jobs_ALLLOCALJOBS-background" }], // alllocaljobs (~221) — 4 min after profession
+  // Full session-aware dead-check across EVERY active alllocaljobs row — moved
+  // here from a once/day slot 2026-09-16 (issue #15): alllocaljobs' own search
+  // index lags behind individual postings closing, so a dead job can keep
+  // showing as a card in the listing indefinitely and never reach the hourly
+  // scraper's own confirmDead gate (which only fires on listing-ABSENT rows).
+  // Once/day left an up-to-~24h window where a freshly-dead row still showed
+  // active. Kept as its OWN function/invocation (not inlined into the :09
+  // scraper above) because it needs its own multi-minute time budget on top of
+  // an already time-tight scrape+detail-fetch run, and reuses the exact same
+  // session machinery (_alllocaljobs_core.mjs) — see that file's header for
+  // why alllocaljobs can't use the generic sweepActive404 machinery instead
+  // (a cookieless fetch of a LIVE job redirects too, so the generic
+  // redirect-dead rule would false-kill live rows). 3 min after the scraper's
+  // own :09 run so most runs don't overlap, though occasional overlap (two
+  // independent sessions/jars hitting the same host) is tolerated — it already
+  // happened, rarely, under the old daily 14:00 UTC slot landing inside the
+  // hourly 14:09 scrape.
+  12: [{ name: "cron_alllocaljobs_deepsweep-background" }],
   10: [{ name: "cron_jobs_ERSTE-background" }],        // erste (~7)
   11: [{ name: "cron_jobs_VALOREBASIS-background" }],  // valorebasis (~2)
   13: [{ name: "cron_jobs_MIX-background" }],          // kuka/zyntern/dreamjobs (~35)

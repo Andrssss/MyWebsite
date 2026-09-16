@@ -27,7 +27,7 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobs, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobsVerbose, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 import { withDbAuditFlush } from "./_db_audit.js";
 
@@ -74,8 +74,10 @@ export default withDbAuditFlush("ai-ingest", async (request) => {
   const budget = await checkBudget();
   if (payload.jobs.length > 0 && budget.remaining === 0) return tooManyRequests(budget);
 
-  const throttled = Math.max(0, payload.jobs.length - budget.remaining);
-  const jobs = sanitizeJobs(payload.jobs).slice(0, budget.remaining);
+  const { jobs: sanitized, invalid } = sanitizeJobsVerbose(payload.jobs);
+  const throttled = Math.max(0, sanitized.length - budget.remaining);
+  const jobs = sanitized.slice(0, budget.remaining);
+  const throttledJobs = sanitized.slice(budget.remaining);
   // Flat single source for all ai-scraped rows (slug kept only for logging).
   const source = AI_SOURCE;
 
@@ -99,10 +101,22 @@ export default withDbAuditFlush("ai-ingest", async (request) => {
     });
     await consume(stats.insertedUrls.length);
     console.log(`[ai-ingest ${source}] received=${payload.jobs.length} clean=${jobs.length} throttled=${throttled} handedToAts=${stats.handedToAts} atsTenantsAdded=${stats.atsTenantsAdded.length} dupeSkipped=${stats.skippedDuplicate} ${JSON.stringify(stats)}`);
+    // Per-job report covering EVERY job in the request, not just the ones that
+    // reached ingestJobs — a job dropped for bad input (invalid) or rate limit
+    // (throttled) is just as much "what happened to my batch" as one dropped
+    // by a content gate. `jobResults` is pulled out of `stats` (not just
+    // spread) so it isn't duplicated wholesale into this flat `results` list.
+    const { jobResults, ...statsRest } = stats;
+    const results = [
+      ...invalid.map((v) => ({ url: v.url, title: v.title, status: "invalid", reason: v.reason })),
+      ...throttledJobs.map((j) => ({ url: j.url, title: j.title, status: "throttled", reason: "rate_limited" })),
+      ...jobResults,
+    ];
     return json(200, {
       source,
       received: payload.jobs.length,
-      ...stats,
+      ...statsRest,
+      results,
       rateLimit: { limit: budget.limit, throttled, resetInSeconds: budget.resetInSeconds },
     });
   } catch (err) {

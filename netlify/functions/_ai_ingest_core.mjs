@@ -69,16 +69,44 @@ function trimField(v, max) {
 // Normalize + dedupe caller-supplied rows. No HTML hallucination guard here —
 // these callers are trusted via bearer token; that guard lives in
 // _ai_extract_core.mjs, which is the one path handling raw LLM output.
-export function sanitizeJobs(rawJobs) {
+//
+// Verbose form: also reports WHY a raw entry was dropped, per entry, so a
+// caller can tell the submitting agent exactly what was wrong with which job
+// instead of a single opaque row-count drop (2026-09-16 — the batch upload
+// path gave no per-job feedback at all, so a submitting agent had no way to
+// tell a malformed job from a fine one just sitting further back in the
+// batch). `sanitizeJobs` stays the plain-array form for callers that don't
+// need per-item diagnostics.
+export function sanitizeJobsVerbose(rawJobs) {
   const seen = new Set();
-  const out = [];
+  const jobs = [];
+  const invalid = [];
   for (const j of rawJobs || []) {
-    if (!j || typeof j.title !== "string" || typeof j.url !== "string") continue;
-    const title = j.title.replace(/\s+/g, " ").trim();
-    const url = normalizeUrl(j.url.trim());
-    if (title.length < 3 || !url || seen.has(url)) continue;
+    if (!j || typeof j !== "object") {
+      invalid.push({ url: null, title: null, reason: "invalid_entry" });
+      continue;
+    }
+    const title = typeof j.title === "string" ? j.title.replace(/\s+/g, " ").trim() : "";
+    const rawUrl = typeof j.url === "string" ? j.url.trim() : "";
+    if (title.length < 3) {
+      invalid.push({ url: rawUrl || null, title: title || null, reason: "missing_title" });
+      continue;
+    }
+    if (!rawUrl) {
+      invalid.push({ url: null, title, reason: "missing_url" });
+      continue;
+    }
+    const url = normalizeUrl(rawUrl);
+    if (!url) {
+      invalid.push({ url: rawUrl, title, reason: "invalid_url" });
+      continue;
+    }
+    if (seen.has(url)) {
+      invalid.push({ url, title, reason: "duplicate_in_batch" });
+      continue;
+    }
     seen.add(url);
-    out.push({
+    jobs.push({
       title: title.slice(0, 300),
       url,
       company: trimField(j.company, 200),
@@ -92,7 +120,11 @@ export function sanitizeJobs(rawJobs) {
       technologies: normalizeTechnologyList(j.technologies),
     });
   }
-  return out;
+  return { jobs, invalid };
+}
+
+export function sanitizeJobs(rawJobs) {
+  return sanitizeJobsVerbose(rawJobs).jobs;
 }
 
 /* ── IT-only gate (user rule 2026-07-16: ai-scraped accepts ONLY IT jobs) ──
@@ -358,6 +390,10 @@ export async function ingestJobs(client, {
   const foundUrls = [...extraFoundUrls];
   const insertedUrls = []; // Only rows that passed every gate — callers use this to record what
                            // actually reached the DB, rather than what they hoped to write.
+  // Per-job outcome, one entry per row in `jobs` — lets a batch-submitting
+  // caller (the AI discovery routine, ai-ingest.mjs curl callers) see WHICH
+  // of its submitted jobs did what, instead of only aggregate counts below.
+  const jobResults = [];
   let skippedSenior = 0;
   let skippedCompany = 0;
   let skippedNonIt = 0;
@@ -392,6 +428,7 @@ export async function ingestJobs(client, {
         if (!atsTenants.has(key)) {
           atsTenants.set(key, { provider: handoff.provider, slug: handoff.slug, company: job.company || null });
         }
+        jobResults.push({ url: job.url, title: job.title, status: "handed_to_ats", reason: handoff.provider });
         continue;
       }
     }
@@ -402,11 +439,24 @@ export async function ingestJobs(client, {
     if (dupe) {
       skippedDuplicateUrls.push(job.url);
       duplicateOf.push({ url: job.url, title: job.title, existingSource: dupe.source, existingUrl: dupe.url });
+      jobResults.push({ url: job.url, title: job.title, status: "duplicate", reason: `already_active_as_${dupe.source}`, existingUrl: dupe.url });
       continue;
     }
-    if (!isItJob(job.title, categories)) { skippedNonIt++; continue; }
-    if (shouldSkipTitleFilter(job.title, filters)) { skippedSenior++; continue; }
-    if (rejectLocation(job.location)) { skippedLocation++; continue; }
+    if (!isItJob(job.title, categories)) {
+      skippedNonIt++;
+      jobResults.push({ url: job.url, title: job.title, status: "skipped_non_it" });
+      continue;
+    }
+    if (shouldSkipTitleFilter(job.title, filters)) {
+      skippedSenior++;
+      jobResults.push({ url: job.url, title: job.title, status: "skipped_senior_title" });
+      continue;
+    }
+    if (rejectLocation(job.location)) {
+      skippedLocation++;
+      jobResults.push({ url: job.url, title: job.title, status: "skipped_location", reason: job.location || null });
+      continue;
+    }
     const resolvedExperience = seniorAwareExperience(job.title, resolveExperience(job));
     if (shouldSkipSeniorExperience(isSeniorExperience(resolvedExperience))) {
       // Only blocks a NEW row. A row that's already in the DB (typically
@@ -423,11 +473,20 @@ export async function ingestJobs(client, {
         `SELECT 1 FROM job_posts WHERE source = $1 AND url = $2`,
         [source, job.url]
       );
-      if (existing.length === 0) { skippedSenior++; continue; }
+      if (existing.length === 0) {
+        skippedSenior++;
+        jobResults.push({ url: job.url, title: job.title, status: "skipped_senior_experience", reason: resolvedExperience });
+        continue;
+      }
     }
-    if (isBlockedCompany(job.company, source)) { skippedCompany++; continue; }
+    if (isBlockedCompany(job.company, source)) {
+      skippedCompany++;
+      jobResults.push({ url: job.url, title: job.title, status: "skipped_company", reason: job.company || null });
+      continue;
+    }
     await upsertJob(client, source, job, resolvedExperience);
     insertedUrls.push(job.url);
+    jobResults.push({ url: job.url, title: job.title, status: "inserted" });
   }
 
   // Tenant-felvétel a ciklus UTÁN, csoportosítva: egy boardról tíz hirdetés is
@@ -458,5 +517,6 @@ export async function ingestJobs(client, {
     handedToAts: handedToAtsUrls.length, handedToAtsUrls,
     atsTenantsAdded,
     skippedDuplicate: skippedDuplicateUrls.length, skippedDuplicateUrls, duplicateOf,
+    jobResults,
   };
 }
