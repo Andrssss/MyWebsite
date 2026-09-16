@@ -11,7 +11,7 @@ import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_polic
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -486,6 +486,11 @@ async function scrapeNofluffjobs(client) {
     console.log(`[nofluffjobs]   after filters: ${merged.length}`);
 
     for (const item of merged) {
+      if (isCrossSourceUrlDupe(crossDupeIndex, item.url)) {
+        console.log(`[nofluffjobs]   SKIP exact-url dupe (already on another source) → ${item.url}`);
+        continue;
+      }
+
       if (isCrossSourceDupe(crossDupeIndex, item.company, item.title)) {
         console.log(`[nofluffjobs]   SKIP cross-source dupe "${item.title}" @ ${item.company || "-"} → ${item.url}`);
         continue;

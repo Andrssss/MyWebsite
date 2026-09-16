@@ -13,7 +13,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompany, sweepActive404, reviveSweepDead } from "./_active_core.mjs";
 import { fetchFinal } from "./cron_404sweep-background.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { extractTalentExperience, extractTechnologies, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -387,13 +387,18 @@ const _runJob = withTimeout("cron_jobs_T-background", async (request) => {
     // _cross_source_dupe.mjs. Checked before the detail-page fetch so a
     // confirmed dupe never costs a request.
     const crossDupeIndex = await loadCrossSourceDupeIndex(client, "talent", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
-    console.log(`[talent] cross-source dupe index: ${crossDupeIndex.size} keys`);
+    console.log(`[talent] cross-source dupe index: ${crossDupeIndex.keySet.size} keys / ${crossDupeIndex.urlSet.size} urls`);
 
     let contentMerged = 0;
     let contentSkippedActive = 0;
     let skippedCrossSourceDupe = 0;
     for (const job of talentJobs) {
       if (!known.has(job.url)) {
+        if (isCrossSourceUrlDupe(crossDupeIndex, job.url)) {
+          skippedCrossSourceDupe += 1;
+          console.log(`[talent] SKIP exact-url dupe (already on another source) → ${job.url}`);
+          continue;
+        }
         if (isCrossSourceDupe(crossDupeIndex, job.company, job.title)) {
           skippedCrossSourceDupe += 1;
           console.log(`[talent] SKIP cross-source dupe "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);

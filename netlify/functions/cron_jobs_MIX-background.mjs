@@ -13,7 +13,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 import {
   extractBodyExperience,
@@ -725,7 +725,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       // CROSS_SOURCE_DUPE_SOURCES list — see _cross_source_dupe.mjs. Checked
       // before enrichIfNew so a confirmed dupe never costs a detail-page fetch.
       const dreamCrossDupeIndex = await loadCrossSourceDupeIndex(client, "dreamjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
-      console.log(`[dreamjobs] cross-source dupe index: ${dreamCrossDupeIndex.size} keys`);
+      console.log(`[dreamjobs] cross-source dupe index: ${dreamCrossDupeIndex.keySet.size} keys / ${dreamCrossDupeIndex.urlSet.size} urls`);
 
       // Same-source duplicate guard (2026-09-04, same pattern as nofluffjobs/
       // startupjobs/LinkedIn/profession-intern): the trailing repost counter
@@ -741,6 +741,12 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         if (pattern) {
           const migrated = await migrateVolatileUrl(client, "dreamjobs", job.url, pattern, currentUrls);
           if (migrated) console.log(`[dreamjobs] MIGRATED url → ${job.url}`);
+        }
+
+        if (isCrossSourceUrlDupe(dreamCrossDupeIndex, job.url)) {
+          skippedCrossSourceDupe++;
+          console.log(`[dreamjobs] SKIP exact-url dupe (already on another source) → ${job.url}`);
+          continue;
         }
 
         if (isCrossSourceDupe(dreamCrossDupeIndex, job.company, job.title)) {

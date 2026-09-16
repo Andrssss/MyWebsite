@@ -50,6 +50,7 @@ import { rejectNonBudapest } from "./_ats_location.mjs";
 import {
   loadCrossSourceDupeIndex,
   isCrossSourceDupe,
+  isCrossSourceUrlDupe,
   CROSS_SOURCE_DUPE_SOURCES,
 } from "./_cross_source_dupe.mjs";
 import { ingestJobs, normalizeUrl } from "./_ai_ingest_core.mjs";
@@ -209,10 +210,15 @@ const _runJob = withTimeout("cron_jobs_WORKABLE-background", async () => {
        2026-09-02: a megosztott CROSS_SOURCE_DUPE_SOURCES listára szűkítve (nem
        a teljes tábla) — ld. _cross_source_dupe.mjs. */
     const dupeIndex = await loadCrossSourceDupeIndex(client, WORKABLE_SOURCE, { onlySources: CROSS_SOURCE_DUPE_SOURCES });
-    console.log(`[workable] cross-source dupe index: ${dupeIndex.size} keys`);
+    console.log(`[workable] cross-source dupe index: ${dupeIndex.keySet.size} keys / ${dupeIndex.urlSet.size} urls`);
     let skippedDupe = 0;
     const deduped = rows.filter((r) => {
       if (!budapestUrlSet.has(r.url)) return true; // nem-budapesti váz: a reconcile-halmazt tölti
+      if (isCrossSourceUrlDupe(dupeIndex, r.url)) {
+        skippedDupe += 1;
+        console.log(`[workable] SKIP exact-url dupe (already on another source) → ${r.url}`);
+        return false;
+      }
       if (!isCrossSourceDupe(dupeIndex, r.company, r.title)) return true;
       skippedDupe += 1;
       console.log(`[workable] SKIP cross-source dupe "${r.title}" @ ${r.company}`);

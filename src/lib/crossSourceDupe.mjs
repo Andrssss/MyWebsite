@@ -136,6 +136,41 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   "minddiak",
   "muisz",
   "trenkwalder",
+  // 2026-09-16: added after the site owner supplied an external fuzzy
+  // title+company-similarity pairing run against a live DB export
+  // (pestidev_teljes_parositas_2026-09-16.csv, 487 pairs) that this repo's
+  // own exact-dupeKey audits had never surfaced, because none of these
+  // sources — every one a single-employer/bank scraper never wired into
+  // loadCrossSourceDupeIndex at all — were ever in scope for one. Counted by
+  // how often each appeared on one (unprotected) side of a pair: mbh 104,
+  // otp 72, cg-jobstream 24, kuka 19, raiffeisen 19, kh 15, karrierhungaria
+  // 13, qdiak 12, mfb 7, zyntern/schonherz 4 each, erste 4, unicredit/atlasz
+  // 1 each. IMPORTANT caveat found while checking this in: re-running this
+  // repo's own dupeKey() (exact-match on normalized company+title) against
+  // that same CSV's pairs matched only 2 of the 236 — the external tool
+  // scores continuous title/company SIMILARITY (title_sim/company_sim), which
+  // catches near-misses (missing company field, reworded titles, Hungarian
+  // vs. English phrasing) this repo's exact key never will. So this addition
+  // is correct and costs nothing, but it will NOT retroactively clean the
+  // existing backlog and will keep missing most future near-duplicates from
+  // these sources too — the real gap is the exact-match strategy itself, not
+  // just this whitelist (see cross-source-dupe-coverage memory on why a fuzzy
+  // threshold was rejected here before; worth revisiting given this external
+  // tool's evident precision).
+  "mbh",
+  "otp",
+  "cg-jobstream",
+  "kuka",
+  "raiffeisen",
+  "kh",
+  "karrierhungaria",
+  "qdiak",
+  "mfb",
+  "zyntern",
+  "schonherz",
+  "erste",
+  "unicredit",
+  "atlasz",
 ];
 
 function splitTechList(technologies) {

@@ -63,6 +63,7 @@ import { ingestJobs, normalizeUrl, isItJob } from "./_ai_ingest_core.mjs";
 import {
   loadCrossSourceDupeIndex,
   isCrossSourceDupe,
+  isCrossSourceUrlDupe,
   CROSS_SOURCE_DUPE_SOURCES,
 } from "./_cross_source_dupe.mjs";
 import { isInScopeTitle } from "./_marketing_match.mjs";
@@ -331,6 +332,10 @@ async function crawlTenant(client, tenant, { filters, categories, dupeIndex, ten
     dedupedHuJobs = [];
     for (const job of huJobs) {
       const company = job.company || tenant.company || null;
+      if (isCrossSourceUrlDupe(dupeIndex, job.url)) {
+        console.log(`[atscrawl] ${label} SKIP exact-url dupe (already on another source) → ${job.url}`);
+        continue;
+      }
       if (isCrossSourceDupe(dupeIndex, company, job.title)) {
         console.log(`[atscrawl] ${label} SKIP cross-source dupe "${job.title}" @ ${company}`);
         continue;
@@ -504,7 +509,7 @@ const _runJob = withTimeout("cron_jobs_ATSCRAWL-background", async () => {
 
   try {
     const dupeIndex = await loadCrossSourceDupeIndex(client, ATS_SOURCE, { onlySources: CROSS_SOURCE_DUPE_SOURCES });
-    console.log(`[atscrawl] cross-source dupe index: ${dupeIndex.size} keys`);
+    console.log(`[atscrawl] cross-source dupe index: ${dupeIndex.keySet.size} keys / ${dupeIndex.urlSet.size} urls`);
 
     for (const tenant of dueList) {
       const r = await crawlTenant(client, tenant, { filters, categories, dupeIndex, tenants });
