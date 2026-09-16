@@ -5,8 +5,12 @@
 // directly, same as _ats_state.mjs's own callers. Delete after use.
 import { readTenants, readCandidateState, tenantKey } from "./_ats_state.mjs";
 
-// Same narrow-scope token as ats-tenants.mjs — no separate secret to manage.
-const EXPECTED_TOKEN = process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET;
+// Dedicated one-off env var (not AI_INGEST_TOKEN/CRON_SECRET) — those are
+// Sensitive/write-only in Netlify and can't be read back to invoke this from
+// outside the dashboard. TMP_ATS_AUDIT_TOKEN is set (non-sensitive, so it
+// can be read back) just for this endpoint's lifetime and removed from
+// Netlify along with this file once the numbers are pulled.
+const EXPECTED_TOKEN = process.env.TMP_ATS_AUDIT_TOKEN;
 
 const RECHECK_NO_HU_DAYS = 3;
 
