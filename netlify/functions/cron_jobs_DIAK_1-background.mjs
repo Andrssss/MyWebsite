@@ -25,6 +25,7 @@ import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from
 import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
 import { hasStrongItTitle } from "./_ai_ingest_core.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -1793,6 +1794,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
         const knownUrls = TECH_DETAIL_SOURCES.includes(source)
           ? new Set((await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url))
           : null;
+        // Cross-source duplicate guard (2026-09-16, GH issue #18 follow-up):
+        // minddiak/muisz/zyntern have been in CROSS_SOURCE_DUPE_SOURCES since
+        // 2026-09-15 but never actually called the guard at insert time (the
+        // whitelist alone only drives the read-side "Átfedés" badge) — found
+        // live via zyntern re-listing an MBH internship after MBH's own copy
+        // had already expired. schonherz/tudasdiak are NOT in the whitelist,
+        // so this is a no-op for them (loadCrossSourceDupeIndex not even called).
+        const crossDupeIndex = CROSS_SOURCE_DUPE_SOURCES.includes(source)
+          ? await loadCrossSourceDupeIndex(client, source, { onlySources: CROSS_SOURCE_DUPE_SOURCES })
+          : null;
         for (const item of matchedList) {
           item.experience = "diákmunka";
           try {
@@ -1878,6 +1889,17 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
                 console.log(`[${source}] SKIP active title+company+tech duplicate: "${item.title}" → ${item.url}`);
                 continue;
               }
+            }
+            // Scoped to genuinely NEW urls only, same as every other caller of
+            // this guard — an already-existing row must never be excluded from
+            // reconcileActive's foundUrls just because another source also has it.
+            if (
+              crossDupeIndex &&
+              !knownUrls.has(item.url) &&
+              isCrossSourceDupe(crossDupeIndex, item.company, item.title)
+            ) {
+              console.log(`[${source}] SKIP cross-source dupe "${item.title}" → ${item.url}`);
+              continue;
             }
             await upsertJob(client, source, item);
             if (source === "minddiak") console.log(`[minddiak] SAVED: "${item.title}"  url=${item.url}`);

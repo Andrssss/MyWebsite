@@ -25,6 +25,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -211,7 +212,34 @@ function extractJsonLdLocation(html) {
   return parts.filter(Boolean).join(" | ");
 }
 
-// Returns { title, experience } or null if not Budapest
+// 2026-09-16 (GH issue #18 follow-up): eudiakok is a diákmunka *intermediary*
+// — its own JSON-LD hiringOrganization is the agency ("euDiákok
+// Iskolaszövetkezet"), never the real employer, which only ever appears in
+// free text (title + "Céginformáció" blurb). A general company extractor
+// isn't attempted here (too fragile against free text) — this only detects
+// the bank/1-company sources this repo already scrapes directly, so a
+// re-post of one of THEIR postings can be caught by the cross-source dupe
+// guard below. Found live: an MBH internship listed here stayed "active"
+// after MBH's own copy had already expired. Anything else keeps
+// company = null, unchanged from before.
+const KNOWN_COMPANY_PATTERNS = [
+  [/\bmbh\b/i, "MBH Bank"],
+  [/\berste\b/i, "Erste Bank"],
+  [/\bmfb\b/i, "MFB Bank"],
+  [/\braiffeisen\b/i, "Raiffeisen Bank"],
+  [/\bunicredit\b/i, "UniCredit Bank"],
+  [/k\s?&\s?h/i, "K&H Bank"],
+  [/\bcapgemini\b/i, "Capgemini"],
+];
+
+function detectKnownCompany(text) {
+  for (const [re, name] of KNOWN_COMPANY_PATTERNS) {
+    if (re.test(text)) return name;
+  }
+  return null;
+}
+
+// Returns { title, experience, company } or null if not Budapest
 function parseDetailPage(html) {
   const $ = cheerioLoad(html);
 
@@ -252,8 +280,9 @@ function parseDetailPage(html) {
     ? "diákmunka"
     : extractBodyExperience(html);
   const technologies = extractTechnologies(html);
+  const company = detectKnownCompany(`${title} ${normalizeWhitespace($("body").text())}`);
 
-  return { title, experience, technologies };
+  return { title, experience, technologies, company };
 }
 
 /* ── db ──────────────────────────────────────────────────────── */
@@ -261,11 +290,11 @@ function parseDetailPage(html) {
 async function upsertJob(client, source, item) {
   const experience = seniorAwareExperience(item.title, item.experience) ?? "-";
   const res = await client.query(
-    `INSERT INTO job_posts (source, title, url, experience, technologies, level, first_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW())
+    `INSERT INTO job_posts (source, title, url, experience, technologies, level, company, first_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
+    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source }), item.company ?? null]
   );
   return res.rowCount > 0;
 }
@@ -289,6 +318,15 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
 
   const jobLinks = extractJobLinks(listHtml, BASE);
   console.log(`[eudiakok] list: ${jobLinks.length} links`);
+
+  // Cross-source duplicate guard (2026-09-16, GH issue #18 follow-up) — see
+  // detectKnownCompany's header for why company is only ever detected for
+  // the known bank/1-company sources. Scoped to genuinely NEW urls only, same
+  // as every other caller of this guard.
+  const crossDupeIndex = await loadCrossSourceDupeIndex(client, "eudiakok", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+  const { rows: knownRows } = await client.query(`SELECT url FROM job_posts WHERE source = 'eudiakok'`);
+  const known = new Set(knownRows.map((r) => r.url));
+  let skippedCrossSourceDupe = 0;
 
   let newlyInserted = 0;
   let alreadyExisted = 0;
@@ -323,11 +361,18 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
           continue;
         }
 
+        if (!known.has(detailUrl) && isCrossSourceDupe(crossDupeIndex, parsed.company, parsed.title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[eudiakok] SKIP cross-source dupe "${parsed.title}" (${parsed.company}) → ${detailUrl}`);
+          continue;
+        }
+
         const wasNew = await upsertJob(client, "eudiakok", {
           title: parsed.title,
           url: detailUrl,
           experience: parsed.experience,
           technologies: parsed.technologies,
+          company: parsed.company,
         });
         foundUrls.push(detailUrl);
 
@@ -355,7 +400,8 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
     console.log(
       `[eudiakok] DONE — total=${jobLinks.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, ` +
-      `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
+      `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}, ` +
+      `skipped_cross_source_dupe=${skippedCrossSourceDupe}`
     );
 
     // List fetch succeeded (we returned early otherwise), so the crawl is

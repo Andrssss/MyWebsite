@@ -83,6 +83,22 @@ export function dupeKey(company, title) {
   return `${c}|${t}`;
 }
 
+// 2026-09-16 (GH issue #18): the bank / single-company career-site sources —
+// each posts its own IT roles directly, with real (if small) risk of the same
+// posting also showing up on a big aggregator (LinkedIn, ats-crawl, ...).
+// Kept as its own named list, spread into CROSS_SOURCE_DUPE_SOURCES below, so
+// _dupe_snapshot.mjs can route just these into a separate low-volume Blob
+// instead of the big sources' daily snapshot — see the comment down there.
+export const SMALL_COMPANY_DUPE_SOURCES = [
+  "mbh",
+  "erste",
+  "mfb",
+  "raiffeisen",
+  "unicredit",
+  "kh",
+  "cg-jobstream",
+];
+
 // The sources that measurably re-list postings other scrapers already carry
 // (2026-08-28 startup.jobs analysis: 45/56 rows already present under one of
 // these; 2026-08-30 workable analysis: 40/186 Budapest rows, same pattern).
@@ -136,6 +152,19 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   "minddiak",
   "muisz",
   "trenkwalder",
+  // 2026-09-16: bank / single-company career-site sources (GH issue #18) —
+  // ats-crawl's SEED_TENANTS doesn't cover any of them (bespoke in-house HR
+  // APIs, not a SaaS ATS platform it has an adapter for), but a live sample
+  // still showed real risk of the SAME posting being re-listed by a big
+  // aggregator source (LinkedIn, ats-crawl, ...), so they belong in the
+  // shared whitelist like everything else here. Split into their own
+  // sub-list (below) purely for the *storage* side: each of these posts a
+  // handful of jobs a day at most, so the once-a-day snapshot Blob's
+  // performance rationale (skip a full job_posts scan on every high-volume
+  // scraper run) doesn't apply — they get their own small "dupe-snapshot-small"
+  // Blob instead of being folded into the big sources' "dupe-snapshot" one.
+  // See SMALL_COMPANY_DUPE_SOURCES + netlify/functions/_dupe_snapshot.mjs.
+  ...SMALL_COMPANY_DUPE_SOURCES,
 ];
 
 function splitTechList(technologies) {

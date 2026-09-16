@@ -16,7 +16,7 @@ export const config = {
 import pkg from "pg";
 const { Pool } = pkg;
 import { withTimeout } from "./_error-logger.mjs";
-import { writeDupeSnapshot } from "./_dupe_snapshot.mjs";
+import { writeDupeSnapshot, writeSmallDupeSnapshot } from "./_dupe_snapshot.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -31,6 +31,8 @@ export default withTimeout("cron_dupe_snapshot", async function handler() {
   try {
     const result = await writeDupeSnapshot(client);
     console.log(`[dupe-snapshot] wrote ${result.rowCount} rows, generatedAt=${result.generatedAt}`);
+    const smallResult = await writeSmallDupeSnapshot(client);
+    console.log(`[dupe-snapshot-small] wrote ${smallResult.rowCount} rows, generatedAt=${smallResult.generatedAt}`);
   } finally {
     client.release();
   }

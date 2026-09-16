@@ -19,17 +19,33 @@
 // CROSS_SOURCE_DUPE_SOURCES when it was written), falls back to the original
 // full-scan query — this is a resource optimization, never allowed to
 // silently reduce dedup coverage.
+//
+// 2026-09-16 (GH issue #18): the bank/single-company sources
+// (SMALL_COMPANY_DUPE_SOURCES) post a handful of jobs a day at most, so the
+// snapshot's whole rationale — skip a full-table scan on a HIGH-volume
+// scraper's run — doesn't apply to them. Rather than fold their rows into the
+// same Blob the big sources use, they get their own "dupe-snapshot-small"
+// Blob, written/read in parallel with the big one and merged transparently in
+// readDupeSnapshot() so loadCrossSourceDupeIndex/loadSameSourceDupeIndex don't
+// need to know there are two underlying stores.
 import { getStore } from "@netlify/blobs";
-import { CROSS_SOURCE_DUPE_SOURCES } from "../../src/lib/crossSourceDupe.mjs";
+import { CROSS_SOURCE_DUPE_SOURCES, SMALL_COMPANY_DUPE_SOURCES } from "../../src/lib/crossSourceDupe.mjs";
 
-const STORE_NAME = "dupe-snapshot";
+const BIG_STORE_NAME = "dupe-snapshot";
+const SMALL_STORE_NAME = "dupe-snapshot-small";
 const SNAPSHOT_KEY = "latest.json";
 
-function store() {
-  return getStore({ name: STORE_NAME, consistency: "strong" });
+// CROSS_SOURCE_DUPE_SOURCES already has the small sources spread into it (see
+// crossSourceDupe.mjs) so every existing caller's `onlySources:
+// CROSS_SOURCE_DUPE_SOURCES` keeps covering them — only the storage side
+// needs to know which sources are "big" vs "small".
+const BIG_SOURCES = CROSS_SOURCE_DUPE_SOURCES.filter((s) => !SMALL_COMPANY_DUPE_SOURCES.includes(s));
+
+function store(name) {
+  return getStore({ name, consistency: "strong" });
 }
 
-export async function writeDupeSnapshot(client) {
+async function writeSnapshot(storeName, sources, client) {
   const generatedAt = new Date().toISOString();
   const { rows } = await client.query(
     `SELECT source, url, company, title, technologies, active
@@ -37,20 +53,45 @@ export async function writeDupeSnapshot(client) {
       WHERE source = ANY($1::text[])
         AND company IS NOT NULL AND company <> ''
         AND title IS NOT NULL AND title <> ''`,
-    [CROSS_SOURCE_DUPE_SOURCES]
+    [sources]
   );
-  await store().setJSON(SNAPSHOT_KEY, { generatedAt, sources: CROSS_SOURCE_DUPE_SOURCES, rows });
+  await store(storeName).setJSON(SNAPSHOT_KEY, { generatedAt, sources, rows });
   return { generatedAt, rowCount: rows.length };
 }
 
-export async function readDupeSnapshot() {
+export function writeDupeSnapshot(client) {
+  return writeSnapshot(BIG_STORE_NAME, BIG_SOURCES, client);
+}
+
+export function writeSmallDupeSnapshot(client) {
+  return writeSnapshot(SMALL_STORE_NAME, SMALL_COMPANY_DUPE_SOURCES, client);
+}
+
+async function readSnapshot(storeName) {
   try {
-    const raw = await store().get(SNAPSHOT_KEY, { type: "json" });
+    const raw = await store(storeName).get(SNAPSHOT_KEY, { type: "json" });
     if (!raw || !Array.isArray(raw.rows) || !Array.isArray(raw.sources) || !raw.generatedAt) return null;
     return raw;
   } catch {
     return null;
   }
+}
+
+// Merges the big + small snapshots into the one shape callers already expect.
+// If either half is missing/corrupt (e.g. the small store's first write
+// hasn't happened yet), its sources are simply absent from the merged
+// `sources` list, so snapshotCovers() correctly reports "not covered" for
+// just that half and callers fall back to a live DB query for it — same
+// fail-soft guarantee the single-store version had.
+export async function readDupeSnapshot() {
+  const [big, small] = await Promise.all([readSnapshot(BIG_STORE_NAME), readSnapshot(SMALL_STORE_NAME)]);
+  const parts = [big, small].filter(Boolean);
+  if (!parts.length) return null;
+  return {
+    generatedAt: parts.reduce((min, p) => (p.generatedAt < min ? p.generatedAt : min), parts[0].generatedAt),
+    sources: parts.flatMap((p) => p.sources),
+    rows: parts.flatMap((p) => p.rows),
+  };
 }
 
 // True only when every source the caller needs was actually captured in the
