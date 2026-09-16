@@ -9,7 +9,15 @@ export default async (request) => {
   const auth = (request.headers.get("authorization") || "").trim();
   if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
   const store = getStore("tmp-langtech-backfill-result");
-  const data = await store.get("latest.json", { type: "json" });
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key") || "latest.json";
+  if (url.searchParams.get("list") === "1") {
+    const { blobs } = await store.list();
+    return new Response(JSON.stringify(blobs.map((b) => b.key), null, 2), {
+      headers: { "content-type": "application/json; charset=utf-8" },
+    });
+  }
+  const data = await store.get(key, { type: "json" });
   return new Response(JSON.stringify(data ?? { status: "not finished yet" }, null, 2), {
     headers: { "content-type": "application/json; charset=utf-8" },
   });

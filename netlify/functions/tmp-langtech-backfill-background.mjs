@@ -24,15 +24,20 @@ export default withTimeout("tmp-langtech-backfill-background", async (request) =
   const auth = (request.headers.get("authorization") || "").trim();
   if (auth !== `Bearer ${TOKEN}`) return new Response("unauthorized", { status: 401 });
 
+  const url = new URL(request.url);
+  const from = url.searchParams.get("from") || undefined;
+  const to = url.searchParams.get("to") || undefined;
+  const resultKey = from || to ? `latest-${from || "start"}_${to || "end"}.json` : "latest.json";
+
   const store = getStore("tmp-langtech-backfill-result");
   const client = await pool.connect();
   try {
     const jobCategories = await loadCategories();
-    const result = await rebuildStats(client, jobCategories, {});
-    await store.setJSON("latest.json", { finishedAt: new Date().toISOString(), ...result });
+    const result = await rebuildStats(client, jobCategories, { from, to });
+    await store.setJSON(resultKey, { finishedAt: new Date().toISOString(), ...result });
     return new Response("done", { status: 200 });
   } catch (err) {
-    await store.setJSON("latest.json", {
+    await store.setJSON(resultKey, {
       finishedAt: new Date().toISOString(),
       error: String(err?.message || err),
     });
