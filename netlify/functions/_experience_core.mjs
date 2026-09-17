@@ -465,6 +465,48 @@ export function looksLikeEnglishAd(text) {
   return false;
 }
 
+// Same idea, other direction (2026-09-17): the site's own majority-Hungarian
+// postings never got an analogous "Hungarian" tag from body text alone —
+// only the "hungarian"/"magyar" TECH_KEYWORDS entries fired, and those only
+// catch a posting that explicitly STATES a language requirement, same gap
+// looksLikeEnglishAd closed for English. Since almost every source on this
+// site is Hungarian-language by default, this now fires on most postings —
+// that's the intended symmetry, not a bug: the pestidev.hu spoken-language
+// breakdown this feeds (see LANGUAGE_LABELS below) was silently
+// undercounting Hungarian for exactly that reason.
+//
+// Word list: common Hungarian function words with no plausible standalone
+// occurrence in English/German/Polish tech-ad text (accented forms —
+// "és", "hogy", "amely" — carry zero collision risk by construction; the
+// unaccented ones — "van", "de", "ha", "aki" — were checked against
+// TECH_KEYWORDS and common tech/company terms for embedded-substring
+// collisions, e.g. "advantage"/"Evans" contain "van" but fail
+// techBoundaryRegex's boundary check since it's not a standalone token).
+// Threshold verified 2026-09-17 against representative synthetic ad text
+// (a live DB corpus like looksLikeEnglishAd's 2026-09-15 tuning wasn't
+// reachable from this session — no production DB credentials on hand):
+// realistic multi-sentence Hungarian ad bodies scored 5-9 hits, realistic
+// English/mixed-language ad bodies (including one with a single Hungarian
+// CTA line) scored 0-1. MIN_HITS=4 sits with margin on both sides. Same
+// known limitation as the English side: a short, bullet-only posting with
+// few full sentences can score 0-1 on either list and go untagged — that's
+// an accepted gap in the underlying technique, not specific to Hungarian.
+const HUNGARIAN_SIGNAL_WORDS = [
+  "és", "vagy", "hogy", "nem", "van", "kell", "mint",
+  "aki", "amely", "ha", "de", "tapasztalat", "csapat",
+];
+const HUNGARIAN_SIGNAL_MIN_HITS = 4;
+
+export function looksLikeHungarianAd(text) {
+  if (!text) return false;
+  let hits = 0;
+  for (const w of HUNGARIAN_SIGNAL_WORDS) {
+    if (techBoundaryRegex(w).test(text)) hits++;
+    if (hits >= HUNGARIAN_SIGNAL_MIN_HITS) return true;
+  }
+  return false;
+}
+
 // Normalizes a free-text, LLM-written technologies list down to ONLY
 // recognized TECH_KEYWORDS labels — the ai-scraped pipeline's technologies
 // field is raw LLM output with no other filtering (unlike every hand
@@ -646,8 +688,11 @@ export function extractTechnologies(html) {
   // Ad-language detection runs on whichever text was actually scanned above
   // (scoped description, or the full-body fallback) — independent of
   // whether any TECH_KEYWORDS hit, since a real English ad can legitimately
-  // mention none of them (e.g. a non-technical role).
+  // mention none of them (e.g. a non-technical role). Hungarian gets the
+  // same treatment (2026-09-17) — see looksLikeHungarianAd above for why
+  // this now fires on most Hungarian-language postings.
   if (looksLikeEnglishAd(scanText)) found.add("English");
+  if (looksLikeHungarianAd(scanText)) found.add("Hungarian");
 
   return found.size ? [...found].join(", ") : null;
 }
