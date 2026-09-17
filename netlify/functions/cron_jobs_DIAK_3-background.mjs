@@ -881,6 +881,12 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             if (migrated) console.log(`${tag}   MIGRATED url → ${item.url}`);
           }
           if (source === "otp") {
+            // GH issue #24: single-employer portal, so the company is a
+            // constant — same pattern as the bank scrapers fixed for #18
+            // (cron_jobs_MBH/ERSTE/... COMPANY_NAME). Needed for cross-source
+            // dupeKey matching (src/lib/crossSourceDupe.mjs), which treats a
+            // missing company as "cannot compare" and silently skips the row.
+            item.company = "OTP Bank";
             // OTP itt már nem csak diákmunkát ad vissza: az IT / üzletfejlesztés
             // kategóriák minden szintet tartalmaznak. Ezért — ahogy a professionnél —
             // a névből döntünk, és ha a név nem árulkodik, letöltjük a hirdetést:

@@ -97,6 +97,11 @@ export const SMALL_COMPANY_DUPE_SOURCES = [
   "unicredit",
   "kh",
   "cg-jobstream",
+  // 2026-09-17 (GH issue #24): otp was named in the original #18 sweep too but
+  // missed the 09-16 batch — cron_jobs_DIAK_3-background.mjs never wrote a
+  // company literal for it, so it stayed invisible to dupeKey the same way the
+  // other banks were before that fix.
+  "otp",
 ];
 
 // The sources that measurably re-list postings other scrapers already carry
