@@ -7,7 +7,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { INTERNSHIP_KEYWORDS, INTERN_SOURCES, isInternshipTitle, isJuniorTitle, isMidLevelTitle, extractProfessionExperience, extractTechnologies, isSeniorExperience } from "./_experience_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -770,6 +770,11 @@ async function processOneSource(client, p, jobName, { startPage = 1, maxPages = 
       // a confirmed dupe never costs a request (same pattern as talent/
       // ats-crawl/startupjobs). Only for a genuinely new url — an already-known
       // row is already on the board either way.
+      if (crossDupeIndex && known && !known.has(item.url) && isCrossSourceUrlDupe(crossDupeIndex, item.url)) {
+        console.log(`[${source}] SKIP exact-url dupe (already on another source) → ${item.url}`);
+        continue;
+      }
+
       if (crossDupeIndex && known && !known.has(item.url) && isCrossSourceDupe(crossDupeIndex, item.company, item.title)) {
         console.log(`[${source}] SKIP cross-source dupe "${item.title}" @ ${item.company || "-"} → ${item.url}`);
         continue;

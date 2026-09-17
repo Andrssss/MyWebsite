@@ -28,7 +28,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -898,6 +898,15 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [source])).rows.map((r) => r.url)
         );
         for (const item of matchedList) {
+          if (
+            source === "wherewework" &&
+            !knownUrls.has(item.url) &&
+            whereweworkCrossDupeIndex &&
+            isCrossSourceUrlDupe(whereweworkCrossDupeIndex, item.url)
+          ) {
+            console.log(`${tag}   SKIP exact-url dupe (already on another source) → ${item.url}`);
+            continue;
+          }
           if (
             source === "wherewework" &&
             !knownUrls.has(item.url) &&

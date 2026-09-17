@@ -13,7 +13,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
 import {
   extractBodyExperience,
@@ -731,7 +731,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       // CROSS_SOURCE_DUPE_SOURCES list — see _cross_source_dupe.mjs. Checked
       // before enrichIfNew so a confirmed dupe never costs a detail-page fetch.
       const dreamCrossDupeIndex = await loadCrossSourceDupeIndex(client, "dreamjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
-      console.log(`[dreamjobs] cross-source dupe index: ${dreamCrossDupeIndex.size} keys`);
+      console.log(`[dreamjobs] cross-source dupe index: ${dreamCrossDupeIndex.keySet.size} keys / ${dreamCrossDupeIndex.urlSet.size} urls`);
 
       // Same-source duplicate guard (2026-09-04, same pattern as nofluffjobs/
       // startupjobs/LinkedIn/profession-intern): the trailing repost counter
@@ -747,6 +747,12 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         if (pattern) {
           const migrated = await migrateVolatileUrl(client, "dreamjobs", job.url, pattern, currentUrls);
           if (migrated) console.log(`[dreamjobs] MIGRATED url → ${job.url}`);
+        }
+
+        if (isCrossSourceUrlDupe(dreamCrossDupeIndex, job.url)) {
+          skippedCrossSourceDupe++;
+          console.log(`[dreamjobs] SKIP exact-url dupe (already on another source) → ${job.url}`);
+          continue;
         }
 
         if (isCrossSourceDupe(dreamCrossDupeIndex, job.company, job.title)) {
@@ -812,10 +818,31 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
       const kukaJobs = allKukaJobs.filter((job) => !shouldSkipTitleFilter(job.title, _filters));
       console.log(`kuka: ${kukaJobs.length} jobs found (of ${allKukaJobs.length} listed)`);
 
+      // Cross-source duplicate guard (2026-09-17, GH issue #18/#24 follow-up):
+      // kuka was already in CROSS_SOURCE_DUPE_SOURCES so every OTHER caller
+      // checks against its rows, but kuka's own ingest never checked back —
+      // the exact "on the whitelist but never calls the guard" gap already
+      // documented for eudiakok/DIAK_1 (see cross-source-dupe-coverage memory).
+      const kukaCrossDupeIndex = await loadCrossSourceDupeIndex(client, "kuka", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+      console.log(`[kuka] cross-source dupe index: ${kukaCrossDupeIndex.keySet.size} keys / ${kukaCrossDupeIndex.urlSet.size} urls`);
+
       // A TELJES élő lista (szűrés előtt) a migrálás "él még" halmaza — egy még
       // listázott url-t soha nem nevezhetünk át alóla.
       const kukaCurrentUrls = allKukaJobs.map((j) => j.url);
+      let kukaSkippedCrossSourceDupe = 0;
       for (const job of kukaJobs) {
+        if (!known.get("kuka").has(job.url)) {
+          if (isCrossSourceUrlDupe(kukaCrossDupeIndex, job.url)) {
+            kukaSkippedCrossSourceDupe++;
+            console.log(`[kuka] SKIP exact-url dupe (already on another source) → ${job.url}`);
+            continue;
+          }
+          if (isCrossSourceDupe(kukaCrossDupeIndex, job.company, job.title)) {
+            kukaSkippedCrossSourceDupe++;
+            console.log(`[kuka] SKIP cross-source dupe "${job.title}" @ ${job.company ?? "-"} → ${job.url}`);
+            continue;
+          }
+        }
         if (!(await enrichIfNew(job, known.get("kuka"), extractKukaExperience, "cron_jobs_MIX"))) continue;
         if (shouldSkipSeniorExperience(isSeniorExperience(job.experience))) continue;
         const idPattern = kukaIdOnlyPattern(job.url);
@@ -825,7 +852,7 @@ const _runJob = withTimeout("cron_jobs_MIX-background", async (request) => {
         }
         await upsertJob(client, "kuka", job);
       }
-      console.log(`kuka: ${kukaJobs.length} jobs processed`);
+      console.log(`kuka: ${kukaJobs.length} jobs processed (cross-source skipped=${kukaSkippedCrossSourceDupe})`);
       // Reconcile against the FULL listing (incl. senior) so a still-listed job is
       // never wrongly deactivated just because it now matches the senior filter.
       const rc = await reconcileActive(client, "kuka", allKukaJobs.map((j) => j.url), { complete: kukaComplete });

@@ -25,7 +25,7 @@ import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from
 import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
 import { hasStrongItTitle } from "./_ai_ingest_core.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -1893,6 +1893,14 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             // Scoped to genuinely NEW urls only, same as every other caller of
             // this guard — an already-existing row must never be excluded from
             // reconcileActive's foundUrls just because another source also has it.
+            if (
+              crossDupeIndex &&
+              !knownUrls.has(item.url) &&
+              isCrossSourceUrlDupe(crossDupeIndex, item.url)
+            ) {
+              console.log(`[${source}] SKIP exact-url dupe (already on another source) → ${item.url}`);
+              continue;
+            }
             if (
               crossDupeIndex &&
               !knownUrls.has(item.url) &&

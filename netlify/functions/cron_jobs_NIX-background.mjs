@@ -42,7 +42,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import {
   isInternshipTitle,
   isJuniorTitle,
@@ -311,6 +311,12 @@ const _runJob = withTimeout("cron_jobs_NIX-background", async () => {
         if (shouldSkipTitleFilter(title, _filters)) {
           skippedSenior++;
           console.log(`[nix] SKIP title-denylist "${title}" → ${url}`);
+          continue;
+        }
+
+        if (!known.has(url) && isCrossSourceUrlDupe(crossDupeIndex, url)) {
+          skippedCrossSourceDupe++;
+          console.log(`[nix] SKIP exact-url dupe (already on another source) → ${url}`);
           continue;
         }
 

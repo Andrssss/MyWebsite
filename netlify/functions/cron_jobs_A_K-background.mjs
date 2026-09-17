@@ -15,6 +15,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, INTERNSHIP_KEYWORDS, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -174,6 +175,13 @@ async function fetchKarrierJobs(categoryUrl, inertiaVersion) {
       // duplicate. Key the url on the stable id so one job = one url.
       url: `${KARRIERHUNGARIA_BASE}/allasajanlat/${p.id ?? p.href}`,
       description: p.content_company || null,
+      // 2026-09-17 (GH issue #18 follow-up): content_company IS the employer
+      // name — kept separately from `description` above (which feeds the
+      // unrelated levelNotBlacklisted title/body check) so dupeKey() has a
+      // real company to match on; without it every karrierhungaria row was
+      // silently uncomparable ("cannot compare", never a false negative, but
+      // never a real check either).
+      company: p.content_company || null,
     }));
     allJobs.push(...jobs);
     nextUrl = positions?.next_page_url ?? null;
@@ -248,6 +256,14 @@ const SOURCES = [
     );
     const known = new Set(knownRows.map((r) => r.url));
 
+    // Cross-source duplicate guard (2026-09-17, GH issue #18 follow-up) —
+    // karrierhungaria was never wired into loadCrossSourceDupeIndex despite
+    // being a real overlap source (see src/lib/crossSourceDupe.mjs). Checked
+    // before the detail-page fetch so a confirmed dupe never costs a request.
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "karrierhungaria", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[karrierhungaria] cross-source dupe index: ${crossDupeIndex.keySet.size} keys / ${crossDupeIndex.urlSet.size} urls`);
+    let skippedCrossSourceDupe = 0;
+
     /* --- Karrierhungaria (Inertia API) --- */
     for (const url of SOURCES) {
       let jobs;
@@ -274,6 +290,16 @@ const SOURCES = [
         // KIZÁRÓLAG a detail-oldalról jön, ezért a fetch új állásnál mindig
         // lefut — az experience-t csak akkor írjuk felül, ha a cím még "-".
         it.experience = isInternshipTitle(it.title) ? "diákmunka" : "-";
+        if (!known.has(it.url) && isCrossSourceUrlDupe(crossDupeIndex, it.url)) {
+          skippedCrossSourceDupe++;
+          console.log(`[karrierhungaria] SKIP exact-url dupe (already on another source) → ${it.url}`);
+          continue;
+        }
+        if (!known.has(it.url) && isCrossSourceDupe(crossDupeIndex, it.company, it.title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[karrierhungaria] SKIP cross-source dupe "${it.title}" @ ${it.company || "-"} → ${it.url}`);
+          continue;
+        }
         if (!known.has(it.url)) {
           try {
             await sleep(500);
@@ -307,6 +333,7 @@ const SOURCES = [
       console.log(`karrierhungaria (${url.split("/")[4]}): ${items.length} items processed.`);
     }
 
+    console.log(`karrierhungaria: cross-source skipped=${skippedCrossSourceDupe}`);
     const rc = await reconcileActive(client, "karrierhungaria", foundUrls, { complete: !crawlError });
     console.log(`[karrierhungaria] active reconcile — complete=${!crawlError}, ${JSON.stringify(rc)}`);
   } finally {

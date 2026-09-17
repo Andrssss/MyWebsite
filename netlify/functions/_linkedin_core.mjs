@@ -13,7 +13,7 @@ import {
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
 import { dupeKey } from "../../src/lib/crossSourceDupe.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
 let _filters = [];
@@ -454,6 +454,10 @@ export async function processLinkedInSources(sources, jobName) {
 
         // Checked before the detail-page fetch so a confirmed cross-source
         // dupe never costs a request (same pattern as talent/profession-intern).
+        if (!knownCanonicalUrls.has(canonical) && isCrossSourceUrlDupe(crossDupeIndex, it.url)) {
+          console.log(`[LinkedIn] SKIP exact-url dupe (already on another source) → ${it.url}`);
+          continue;
+        }
         if (!knownCanonicalUrls.has(canonical) && isCrossSourceDupe(crossDupeIndex, it.company, it.title)) {
           console.log(`[LinkedIn] SKIP cross-source dupe "${it.title}" @ ${it.company || "-"} → ${it.url}`);
           continue;

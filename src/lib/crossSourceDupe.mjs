@@ -174,6 +174,29 @@ export const CROSS_SOURCE_DUPE_SOURCES = [
   // Blob instead of being folded into the big sources' "dupe-snapshot" one.
   // See SMALL_COMPANY_DUPE_SOURCES + netlify/functions/_dupe_snapshot.mjs.
   ...SMALL_COMPANY_DUPE_SOURCES,
+  // 2026-09-16/17: recovered from an unmerged branch (origin/claude/database-
+  // duplication-q79v16, commit 7cd0c1e) whose whitelist widening never made it
+  // to main — a separate same-day commit (cebd6b7) added the bank sources
+  // above via its own SMALL_COMPANY_DUPE_SOURCES but didn't carry these 5. The
+  // branch's own source: an external fuzzy title/company-similarity pairing
+  // run against a live DB export (pestidev_teljes_parositas_2026-09-16.csv,
+  // 487 pairs) found each of these — every one its own single-employer/
+  // aggregator scraper never wired into loadCrossSourceDupeIndex at all — on
+  // one side of 236 unprotected pairs (karrierhungaria 13, qdiak 12, zyntern
+  // 4, schonherz 4). IMPORTANT caveat carried over from that commit: re-running
+  // this repo's own dupeKey() (exact-match) against that same CSV matched only
+  // 2 of the 236 — the external tool scores continuous similarity, which
+  // catches near-misses (missing company, reworded titles, HU vs EN phrasing)
+  // this repo's exact key never will. So this addition is correct and costs
+  // nothing going forward, but it will NOT retroactively clean the existing
+  // backlog and will keep missing most future near-duplicates from these
+  // sources too — the real gap is the exact-match strategy itself, not just
+  // this whitelist (see cross-source-dupe-coverage memory).
+  "karrierhungaria",
+  "qdiak",
+  "zyntern",
+  "schonherz",
+  "atlasz",
 ];
 
 function splitTechList(technologies) {

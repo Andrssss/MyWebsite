@@ -21,6 +21,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText } from "./_experience_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -172,6 +173,16 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
       (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["atlasz"])).rows.map((r) => r.url)
     );
 
+    // Cross-source duplicate guard (2026-09-17, GH issue #18 follow-up) —
+    // atlasz was never wired in. The jobsearch.php API carries no employer
+    // field at all (see this file's header), so only the exact-url check
+    // (isCrossSourceUrlDupe) is meaningful here — the fuzzy title+company key
+    // can never match with company always null (dupeKey treats that as
+    // "cannot compare", not a false negative).
+    let skippedCrossSourceDupe = 0;
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "atlasz", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[atlasz] cross-source dupe index: ${crossDupeIndex.keySet.size} keys / ${crossDupeIndex.urlSet.size} urls`);
+
     for (const job of jobs) {
       const title = normalizeWhitespace(job.position);
       if (!title) continue;
@@ -189,6 +200,12 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
       }
 
       const jobUrl = normalizeUrl(new URL(job.url, BASE).toString());
+
+      if (!knownUrls.has(jobUrl) && isCrossSourceUrlDupe(crossDupeIndex, jobUrl)) {
+        skippedCrossSourceDupe++;
+        console.log(`[atlasz] SKIP exact-url dupe (already on another source) → ${jobUrl}`);
+        continue;
+      }
 
       // A teljes sor a beszúrás ELŐTT áll össze (nincs fetch-then-UPDATE).
       let technologies = null;
@@ -235,7 +252,8 @@ export default withTimeout("cron_jobs_ATLASZ-background", async () => {
     console.log(
       `[atlasz] DONE — total=${jobs.length}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_non_budapest=${skippedNonBudapest}, ` +
-      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
+      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}, ` +
+      `skipped_cross_source_dupe=${skippedCrossSourceDupe}`
     );
 
     // Single API response = full current listing.

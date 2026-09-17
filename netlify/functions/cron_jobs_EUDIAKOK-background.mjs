@@ -25,7 +25,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
-import { loadCrossSourceDupeIndex, isCrossSourceDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
 
@@ -358,6 +358,12 @@ export default withTimeout("cron_jobs_EUDIAKOK-background", async () => {
         if (shouldSkipTitleFilter(parsed.title, _filters) || shouldSkipSeniorExperience(isSeniorExperience(parsed.experience))) {
           skippedSenior++;
           console.log(`[eudiakok] SKIP senior "${parsed.title}" → ${detailUrl}`);
+          continue;
+        }
+
+        if (!known.has(detailUrl) && isCrossSourceUrlDupe(crossDupeIndex, detailUrl)) {
+          skippedCrossSourceDupe++;
+          console.log(`[eudiakok] SKIP exact-url dupe (already on another source) → ${detailUrl}`);
           continue;
         }
 

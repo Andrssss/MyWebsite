@@ -46,6 +46,7 @@ import { reconcileActive, loadSameSourceDupeIndex, findSameSourceDuplicate } fro
 import {
   loadCrossSourceDupeIndex,
   isCrossSourceDupe,
+  isCrossSourceUrlDupe,
   CROSS_SOURCE_DUPE_SOURCES,
   dupeKey,
 } from "./_cross_source_dupe.mjs";
@@ -217,7 +218,7 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
     // Scoped to the shared CROSS_SOURCE_DUPE_SOURCES list (2026-09-02) instead
     // of the whole table — see _cross_source_dupe.mjs.
     const dupeIndex = await loadCrossSourceDupeIndex(client, "startupjobs", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
-    console.log(`[startupjobs] cross-source dupe index: ${dupeIndex.size} keys`);
+    console.log(`[startupjobs] cross-source dupe index: ${dupeIndex.keySet.size} keys / ${dupeIndex.urlSet.size} urls`);
 
     // Same-source duplicate guard (2026-09-04): startup.jobs re-lists a
     // re-posted ad under a brand-new listing id (confirmed live: LTG
@@ -274,6 +275,12 @@ const _runJob = withTimeout("cron_jobs_STARTUPJOBS-background", async () => {
           const experience = titleExperience(title) ?? extractBodyExperience(descriptionHtml) ?? "-";
           const technologies = extractTechnologies(descriptionHtml);
           const company = normalizeWhitespace(job?.company?.name) || null;
+
+          if (isCrossSourceUrlDupe(dupeIndex, url)) {
+            skippedCrossSourceDupe++;
+            console.log(`[startupjobs] SKIP exact-url dupe (already on another source) → ${url}`);
+            continue;
+          }
 
           if (isCrossSourceDupe(dupeIndex, company, title)) {
             skippedCrossSourceDupe++;

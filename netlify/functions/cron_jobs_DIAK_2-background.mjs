@@ -14,6 +14,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { seniorAwareExperience } from "./_seniority_policy.mjs";
 import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -279,11 +280,27 @@ const _runJob = withTimeout("cron_jobs_DIAK_2-background", async (request) => {
     console.log(`[ydiak] active reconcile — complete=${ydiak.complete}, ${JSON.stringify(rcY)}`);
 
     /* Q Diák */
+    // Cross-source duplicate guard (2026-09-17, GH issue #18 follow-up) —
+    // qdiak was never wired in. The toborzas API carries no employer field at
+    // all, so only the exact-url check (isCrossSourceUrlDupe) is meaningful
+    // here — the fuzzy title+company key can never match with company always
+    // absent (dupeKey treats that as "cannot compare", not a false negative).
+    const qdiakCrossDupeIndex = await loadCrossSourceDupeIndex(client, "qdiak", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[qdiak] cross-source dupe index: ${qdiakCrossDupeIndex.keySet.size} keys / ${qdiakCrossDupeIndex.urlSet.size} urls`);
+    const knownQdiakUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = 'qdiak'`)).rows.map((r) => r.url)
+    );
     const qdiakJobs = await fetchAllQdiakJobs();
+    let qdiakSkippedCrossSourceDupe = 0;
     for (const job of qdiakJobs) {
+      if (!knownQdiakUrls.has(job.url) && isCrossSourceUrlDupe(qdiakCrossDupeIndex, job.url)) {
+        qdiakSkippedCrossSourceDupe++;
+        console.log(`[qdiak] SKIP exact-url dupe (already on another source) → ${job.url}`);
+        continue;
+      }
       await upsertJob(client, "qdiak", job);
     }
-    console.log(`qdiak: ${qdiakJobs.length} jobs processed`);
+    console.log(`qdiak: ${qdiakJobs.length} jobs processed (cross-source skipped=${qdiakSkippedCrossSourceDupe})`);
     // The API returns the full active IT (category 12) set — exactly the subset we
     // store — under stable numeric-id URLs, so the bucket is complete. On a fetch
     // error fetchAllQdiakJobs returns [], which reconcileActive treats as an empty
