@@ -31,7 +31,9 @@ export default async (request) => {
         });
       }
       const { rowCount } = await client.query(
-        `UPDATE job_posts SET technologies = NULL WHERE source = 'wherewework' AND technologies IS NOT NULL`
+        `UPDATE job_posts SET technologies = NULL
+           WHERE source = 'wherewework' AND technologies IS NOT NULL
+             AND company ~* 'Employers in Hungary$'`
       );
       return new Response(JSON.stringify({ cleared: rowCount }), {
         headers: { "content-type": "application/json; charset=utf-8" },
@@ -39,14 +41,23 @@ export default async (request) => {
     }
 
     const { rows: countRows } = await client.query(
-      `SELECT active, count(*)::int AS n FROM job_posts WHERE source = 'wherewework' AND technologies IS NOT NULL GROUP BY active`
+      `SELECT active, (company ~* 'Employers in Hungary$') AS is_aggregator, count(*)::int AS n
+         FROM job_posts WHERE source = 'wherewework' AND technologies IS NOT NULL
+         GROUP BY active, is_aggregator ORDER BY is_aggregator, active`
     );
-    const { rows: sample } = await client.query(
+    const { rows: aggregatorSample } = await client.query(
       `SELECT id, url, title, company, technologies, active, first_seen
          FROM job_posts WHERE source = 'wherewework' AND technologies IS NOT NULL
-         ORDER BY first_seen DESC LIMIT 15`
+           AND company ~* 'Employers in Hungary$'
+         ORDER BY first_seen DESC LIMIT 20`
     );
-    return new Response(JSON.stringify({ byActive: countRows, sample }, null, 2), {
+    const { rows: realSample } = await client.query(
+      `SELECT id, url, title, company, technologies, active, first_seen
+         FROM job_posts WHERE source = 'wherewework' AND technologies IS NOT NULL
+           AND company !~* 'Employers in Hungary$'
+         ORDER BY first_seen DESC LIMIT 10`
+    );
+    return new Response(JSON.stringify({ byActiveAndAggregator: countRows, aggregatorSample, realSample }, null, 2), {
       headers: { "content-type": "application/json; charset=utf-8" },
     });
   } finally {

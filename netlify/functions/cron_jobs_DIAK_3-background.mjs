@@ -538,19 +538,26 @@ async function upsertJob(client, source, item) {
 // Let\u00f6lti a hirdet\u00e9s-oldalt \u00e9s kiolvassa, h\u00e1ny \u00e9vet v\u00e1rnak el a t\u00f6rzssz\u00f6vegb\u0151l.
 // (wherewework + otp "egy\u00e9b" \u00e1gon haszn\u00e1ljuk.)
 //
-// skipTechnologies (GH issue #23): wherewework's detail page carries NO real
-// per-posting body at all \u2014 confirmed live 2026-09-17, its whole "Job
-// description" section is a generic marketing blurb templated per job TITLE
+// skipTechnologies (GH issue #23): wherewework hosts TWO distinct posting
+// types \u2014 confirmed live 2026-09-17 by diffing an aggregator-type page
+// against a real-employer one (Bosch): a real posting's own "Job description"
+// has genuine "Company Description:"/"Job Description:"/"Qualifications:"
+// sections and an external ATS apply link, and extracting technologies from
+// it is correct (e.g. "MSSQL, Power BI, Selenium, Excel, English" matched the
+// page's own listed requirements exactly). But wherewework ALSO generates
+// pseudo-employer "industry landing page" listings \u2014 company is a category
+// label like "Technology & Software Employers in Hungary" or "Electronics &
+// Battery Employers in Hungary", never a real employer \u2014 whose entire "Job
+// description" is a generic marketing blurb templated per job TITLE
 // ("Interested in Data Engineer jobs in Hungary? You're in the right place...
-// University pipelines in data science feed a healthy talent market..."),
-// identical across every posting sharing that title, never the employer's own
-// requirements. extractTechnologies's full-body fallback (triggered because
-// none of its scoped selectors match this markup) was therefore stamping
-// EVERY wherewework posting under a title with a coincidental keyword hit
-// (216 rows got the literal "data science" tag in one batch) \u2014 real-looking
-// but entirely fake data. Since there's no legitimate technologies signal to
-// extract here at all, wherewework skips the call outright rather than
-// storing a misleading value.
+// upload your CV to wherewework..."), identical across every posting sharing
+// that title. extractTechnologies's full-body fallback (none of its scoped
+// selectors match this markup) was stamping every one of THESE with a
+// coincidental keyword hit (216 rows got the literal "data science" tag in
+// one batch) \u2014 real-looking but entirely fake. See isWhereweworkAggregator
+// below for the caller-side gate (keyed off item.company, already known
+// before this fetch) that skips technologies ONLY for that pseudo-employer
+// type, not for real postings like the Bosch example above.
 async function fetchDetailExperience(url, { skipTechnologies = false } = {}) {
   try {
     const html = await fetchText(url);
@@ -574,6 +581,17 @@ async function fetchDetailExperience(url, { skipTechnologies = false } = {}) {
 function cleanWhereweworkTitle(rawTitle) {
   if (!rawTitle) return null;
   return normalizeWhitespace(rawTitle).replace(/\s*\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*$/, "").trim();
+}
+
+// GH issue #23: wherewework's generated "industry landing page" postings
+// (see fetchDetailExperience's header) always carry this exact company-name
+// pattern — confirmed live against several category labels ("Technology &
+// Software Employers in Hungary", "Electronics & Battery Employers in
+// Hungary"). item.company already holds this at list-parse time (extractCandidates'
+// /overview- h5 lookup), before any detail-page fetch, so this needs no extra
+// request to decide.
+function isWhereweworkAggregator(company) {
+  return typeof company === "string" && /Employers in Hungary$/i.test(company.trim());
 }
 
 function cleanMisziszListTitle(rawTitle) {
@@ -922,7 +940,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           } else if (DIAKMUNKA_SOURCES.includes(source) || isInternshipTitle(item.title)) {
             item.experience = "diákmunka";
           } else if (source === "wherewework" && !knownUrls.has(item.url)) {
-            const { experience: exp, technologies } = await fetchDetailExperience(item.url, { skipTechnologies: true });
+            const { experience: exp, technologies } = await fetchDetailExperience(item.url, {
+              skipTechnologies: isWhereweworkAggregator(item.company),
+            });
             if (exp) item.experience = exp;
             item.technologies = technologies;
             await sleep(400);
@@ -945,7 +965,9 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           // "HW Analysis Trainee", "Szimulációs gyakornok") are internship
           // titles that hit exactly this gap.
           if (item.technologies === undefined && !knownUrls.has(item.url)) {
-            const { technologies } = await fetchDetailExperience(item.url, { skipTechnologies: source === "wherewework" });
+            const { technologies } = await fetchDetailExperience(item.url, {
+              skipTechnologies: source === "wherewework" && isWhereweworkAggregator(item.company),
+            });
             item.technologies = technologies;
             await sleep(400);
           }
@@ -958,17 +980,16 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
           // gyakornok, DIAKMUNKA_SOURCES fix "diákmunka") ez nem érinti, mert
           // azoknál item.experience már valós érték.
           //
-          // wherewework (GH issue #23) kivétel: a technologies mostantól
-          // SZÁNDÉKOSAN mindig null erre a forrásra (l. fetchDetailExperience
-          // fejléce), és a detail-oldal valós törzsszövege sincs (a "Job
-          // description" is cím-alapú marketingszöveg) — extractBodyExperience
-          // is jellemzően null-t ad rá. A teljesség-ellenőrzés innentől örökre
-          // igazra futna, és a forrás gyakorlatilag SOSEM insertelne új, nem-
-          // gyakornoki című sort. wherewework ezért kimarad ebből a guardból;
-          // hiányzó experience esetén "-" (ismeretlen) kerül be, ahogy sok más
-          // forrásnál is.
+          // wherewework "industry landing page" kivétel (GH issue #23): ezekre
+          // a technologies mostantól SZÁNDÉKOSAN mindig null (l.
+          // fetchDetailExperience fejléce), és a detail-oldal valós
+          // törzsszövege sincs — extractBodyExperience is jellemzően null-t ad
+          // rá. A teljesség-ellenőrzés innentől örökre igazra futna, és ez az
+          // altípus gyakorlatilag SOSEM insertelődne. A VALÓDI munkáltatói
+          // wherewework-posztingokat (pl. Bosch) ez nem érinti — azoknál a
+          // technologies-kinyerés változatlan, a guard is változatlanul fut.
           if (
-            source !== "wherewework" &&
+            !(source === "wherewework" && isWhereweworkAggregator(item.company)) &&
             !knownUrls.has(item.url) &&
             !item.technologies &&
             (!item.experience || item.experience === "-")
