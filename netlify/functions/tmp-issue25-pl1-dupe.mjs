@@ -49,7 +49,7 @@ export default async (request) => {
     }
 
     const { rows } = await client.query(
-      `SELECT id, url, title, company, technologies, active, sweep_dead, first_seen, last_seen
+      `SELECT id, url, title, company, technologies, active, sweep_dead, first_seen
          FROM job_posts WHERE source = 'talent' AND url = ANY($1::text[])`,
       [URLS]
     );
