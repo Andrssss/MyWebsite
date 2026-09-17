@@ -172,6 +172,17 @@ export default withDbAuditFlush("tmp_hungarian_tech_backfill", async (request) =
       const source = url.searchParams.get("source") || null;
       return json(200, { ok: true, ...(await heal(client, afterId, limit, source)) });
     }
+    if (action === "debug") {
+      const target = url.searchParams.get("url");
+      if (!target) return json(400, { error: "missing url param" });
+      try {
+        const html = await withDeadline(fetchText(target), 10000, target);
+        const fresh = extractTechnologies(html);
+        return json(200, { ok: true, htmlLength: html.length, fresh });
+      } catch (err) {
+        return json(200, { ok: false, error: err.message });
+      }
+    }
     if (action === "sample") {
       const source = url.searchParams.get("source") || "";
       const order = url.searchParams.get("order") === "asc" ? "ASC" : "DESC";
