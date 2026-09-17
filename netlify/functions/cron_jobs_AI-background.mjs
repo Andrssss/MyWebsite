@@ -21,8 +21,7 @@ import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { ingestJobs, AI_SOURCE, makeAiScrapedConfirmDead } from "./_ai_ingest_core.mjs";
-import { fetchFinal } from "./cron_404sweep-background.mjs";
+import { ingestJobs, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import {
   extractJobsLLM,
   authorRecipe,
@@ -31,10 +30,6 @@ import {
   fetchListingPage,
   MODEL,
 } from "./_ai_extract_core.mjs";
-
-// Same checker the daily 404 sweep uses — see makeAiScrapedConfirmDead's doc
-// comment in _ai_ingest_core.mjs (GitHub issue #21).
-const confirmDead = makeAiScrapedConfirmDead(fetchFinal);
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
@@ -65,12 +60,6 @@ async function ensureAiExtractorsTable(client) {
   // is a window (paginated / recent-only), so reconcile is reactivate-only and
   // the shared 404 sweep is the sole deactivator (talent/nofluffjobs pattern) —
   // this makes wrongly deactivating page-2+ jobs impossible by default.
-  // Even at true, deactivation is no longer listing-absence alone: every
-  // ai_extractors site shares ONE `source` value, so absence from just this
-  // site's own listing would otherwise read every OTHER site's rows as
-  // vanished too. runSite's confirmDead (makeAiScrapedConfirmDead, GitHub
-  // issue #21) requires a candidate to also fail a dead check at its own url
-  // before reconcileActive may deactivate it.
   await client.query(
     `ALTER TABLE ai_extractors ADD COLUMN IF NOT EXISTS full_listing boolean NOT NULL DEFAULT false`
   );
@@ -162,7 +151,6 @@ async function runSite(client, site) {
     handoffAtsUrls: true,
     // Amit már egy másik forrás behozott, azt nem duplázzuk (_ai_dupe_guard.mjs).
     skipCrossSourceDupes: true,
-    confirmDead,
   });
   const cost = estimateCost(usage);
 

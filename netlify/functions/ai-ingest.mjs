@@ -27,19 +27,14 @@
 import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { loadCategories } from "./load_categories.mjs";
-import { ingestJobs, sanitizeJobsVerbose, toSlug, AI_SOURCE, makeAiScrapedConfirmDead } from "./_ai_ingest_core.mjs";
+import { ingestJobs, sanitizeJobsVerbose, toSlug, AI_SOURCE } from "./_ai_ingest_core.mjs";
 import { checkBudget, consume, tooManyRequests, MAX_ROWS_PER_REQUEST } from "./_ai_rate_limit.mjs";
 import { withDbAuditFlush } from "./_db_audit.js";
-import { fetchFinal } from "./cron_404sweep-background.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
 if (!connectionString) throw new Error("NETLIFY_DATABASE_URL is not set");
 
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
-
-// Same checker the daily 404 sweep uses — see makeAiScrapedConfirmDead's doc
-// comment in _ai_ingest_core.mjs (GitHub issue #21).
-const confirmDead = makeAiScrapedConfirmDead(fetchFinal);
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -103,7 +98,6 @@ export default withDbAuditFlush("ai-ingest", async (request) => {
       // AI-scraped / ats-crawl url duplicates measured on 2026-08-30.
       handoffAtsUrls: true,
       skipCrossSourceDupes: true,
-      confirmDead,
     });
     await consume(stats.insertedUrls.length);
     console.log(`[ai-ingest ${source}] received=${payload.jobs.length} clean=${jobs.length} throttled=${throttled} handedToAts=${stats.handedToAts} atsTenantsAdded=${stats.atsTenantsAdded.length} dupeSkipped=${stats.skippedDuplicate} ${JSON.stringify(stats)}`);
