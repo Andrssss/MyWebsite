@@ -162,6 +162,16 @@ export default withDbAuditFlush("tmp_hungarian_tech_backfill", async (request) =
 
     if (action === "scan") return json(200, { ok: true, ...(await scan(client)) });
     if (action === "heal") return json(200, { ok: true, ...(await heal(client, afterId, limit)) });
+    if (action === "sample") {
+      const source = url.searchParams.get("source") || "";
+      const { rows } = await client.query(
+        `SELECT id, url, technologies FROM job_posts
+          WHERE active AND source = $1 AND (technologies IS NULL OR technologies NOT LIKE '%Hungarian%')
+          ORDER BY id DESC LIMIT 5`,
+        [source]
+      );
+      return json(200, { ok: true, rows });
+    }
     return json(400, { error: `unknown action: ${action}` });
   } catch (err) {
     console.error("[tmp_hungarian_tech_backfill]", err);
