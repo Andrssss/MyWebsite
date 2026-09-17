@@ -12,7 +12,7 @@
 // This module does NOT fetch or call any LLM — HTML/LLM lives in
 // _ai_extract_core.mjs. See AI_SCRAPER_PLAN.md.
 
-import { reconcileActive } from "./_active_core.mjs";
+import { reconcileActive, sweepProbeFor, isDeadResult } from "./_active_core.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn, ensureLevelColumn,
@@ -38,6 +38,37 @@ const TRACKING = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_c
 // one-time collapsed into it via a migration in ai-registry.mjs, removed
 // 2026-08-04 once confirmed none remained.)
 export const AI_SOURCE = "AI-scraped";
+
+// reconcileActive's confirmDead gate for the flat AI-scraped source (GitHub
+// issue #21). Every ai_extractors site shares this ONE `source` value, so
+// when a site opts into fullListing:true, reconcileActive's deactivation
+// candidates are drawn from the whole shared source — every OTHER site's
+// rows too, not just this run's own findings — and absence from one site's
+// listing is never proof that a DIFFERENT host's posting died. Even for the
+// site's own host, a windowed/paginated listing can drop a still-live row
+// (the same failure class alllocaljobs' confirmDead guards). This gate makes
+// listing-absence insufficient on its own: a candidate must ALSO fail every
+// per-platform dead signal at its own url — the exact same rules the daily
+// 404 sweep already applies to this source (aiScrapedProbe/aiScrapedIsDead,
+// wired in via SWEEP_PROBE_OVERRIDES/BANNER_DEAD_SOURCES in _active_core.mjs)
+// — before reconcileActive may deactivate it. Root cause confirmed live:
+// careers.gentherm.com was stuck permanently inactive with no rule ever
+// firing on it (killed by listing-absence, not the sweep, so sweep_dead
+// stayed false and AI-scraped isn't in SWEEP_SOLE_DEACTIVATOR_SOURCES — no
+// path back to active).
+//
+// @param {(url: string, opts?: {wantBody?: boolean, headers?: object}) => Promise<{status:number, finalUrl:string|null, body?:string}>} checkFinal
+//   the sweep's own HTTP checker (fetchFinal, exported from
+//   cron_404sweep-background.mjs) — injected so this module keeps no network
+//   dependency of its own.
+export function makeAiScrapedConfirmDead(checkFinal) {
+  return async function confirmDead(url) {
+    const row = { url, source: AI_SOURCE };
+    const probe = sweepProbeFor(row);
+    const res = await checkFinal(probe.url, { wantBody: true, headers: probe.headers });
+    return isDeadResult(row, res);
+  };
+}
 
 export function toSlug(s) {
   return String(s || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -365,11 +396,14 @@ async function upsertJob(client, source, job, resolvedExperience) {
  *                                    distinction: a row still present anywhere in the raw listing is
  *                                    never treated as dead by reconcile, no matter which of this
  *                                    function's OWN gates (or the caller's pre-filter) reject it.
+ * @param {(url: string) => Promise<boolean>} [args.confirmDead]  passed through to reconcileActive
+ *                                    verbatim — see makeAiScrapedConfirmDead's doc comment above for
+ *                                    why every AI-scraped fullListing:true caller must supply one.
  */
 export async function ingestJobs(client, {
   source, jobs, fullListing = false, filters = [], categories = [],
   rejectLocation = isNonBudapestLocation, scopePrefix = null, handoffAtsUrls = false,
-  skipCrossSourceDupes = false, extraFoundUrls = [],
+  skipCrossSourceDupes = false, extraFoundUrls = [], confirmDead = undefined,
 }) {
   // Canonicalize any case-variant of the flat AI source (found 2026-09-16: a
   // stray "ai-scraped" row predating this module didn't match FIXED's
@@ -508,7 +542,7 @@ export async function ingestJobs(client, {
 
   let reconcile = { skipped: true };
   if (ok) {
-    reconcile = await reconcileActive(client, source, foundUrls, { complete, scopePrefix });
+    reconcile = await reconcileActive(client, source, foundUrls, { complete, scopePrefix, confirmDead });
   }
 
   return {
