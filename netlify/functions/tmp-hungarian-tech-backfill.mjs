@@ -85,13 +85,20 @@ async function scan(client) {
   return { ...total[0], bySource };
 }
 
-async function heal(client, afterId, limit) {
-  const { rows: work } = await client.query(
-    `SELECT id, url, technologies FROM job_posts
-      WHERE active AND id > $1
-      ORDER BY id ASC LIMIT $2`,
-    [afterId, limit]
-  );
+async function heal(client, afterId, limit, source) {
+  const { rows: work } = source
+    ? await client.query(
+        `SELECT id, url, technologies FROM job_posts
+          WHERE active AND source = $1 AND id > $2
+          ORDER BY id ASC LIMIT $3`,
+        [source, afterId, limit]
+      )
+    : await client.query(
+        `SELECT id, url, technologies FROM job_posts
+          WHERE active AND id > $1
+          ORDER BY id ASC LIMIT $2`,
+        [afterId, limit]
+      );
 
   const started = Date.now();
   let processed = 0;
@@ -161,13 +168,17 @@ export default withDbAuditFlush("tmp_hungarian_tech_backfill", async (request) =
     await ensureTechnologiesColumn(client);
 
     if (action === "scan") return json(200, { ok: true, ...(await scan(client)) });
-    if (action === "heal") return json(200, { ok: true, ...(await heal(client, afterId, limit)) });
+    if (action === "heal") {
+      const source = url.searchParams.get("source") || null;
+      return json(200, { ok: true, ...(await heal(client, afterId, limit, source)) });
+    }
     if (action === "sample") {
       const source = url.searchParams.get("source") || "";
+      const order = url.searchParams.get("order") === "asc" ? "ASC" : "DESC";
       const { rows } = await client.query(
         `SELECT id, url, technologies FROM job_posts
           WHERE active AND source = $1 AND (technologies IS NULL OR technologies NOT LIKE '%Hungarian%')
-          ORDER BY id DESC LIMIT 5`,
+          ORDER BY id ${order} LIMIT 5`,
         [source]
       );
       return json(200, { ok: true, rows });
