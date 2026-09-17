@@ -102,6 +102,10 @@ export const SMALL_COMPANY_DUPE_SOURCES = [
   // company literal for it, so it stayed invisible to dupeKey the same way the
   // other banks were before that fix.
   "otp",
+  // 2026-09-17: kuka (cron_jobs_MIX-background.mjs) — also named in #18's
+  // original 9-source list, also missed the 09-16 batch. Same single-employer
+  // shape as the rest of this list.
+  "kuka",
 ];
 
 // The sources that measurably re-list postings other scrapers already carry

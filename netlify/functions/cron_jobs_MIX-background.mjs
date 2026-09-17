@@ -645,6 +645,12 @@ function extractKukaJobs(html) {
       title,
       url,
       experience: inferKukaExperience(title),
+      // GH issue #18/#24: single-employer portal, so the company is a
+      // constant — same pattern as the bank scrapers (COMPANY_NAME) and otp
+      // (cron_jobs_DIAK_3). Needed for cross-source dupeKey matching
+      // (src/lib/crossSourceDupe.mjs), which treats a missing company as
+      // "cannot compare" and silently skips the row.
+      company: "KUKA",
     });
   });
 
