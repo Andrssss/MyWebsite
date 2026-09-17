@@ -89,14 +89,50 @@ const CITY_SLUG_RE = new RegExp(
   "i"
 );
 
+// Profession also serves duplicate job URLs where the company's legal-form
+// suffix is spelled out in full on one crawl and abbreviated on another, e.g.
+// "…-tulip-interfaces-kft-2980540" vs
+// "…-tulip-interfaces-korlatolt-felelossegu-tarsasag-2980540" — same numeric
+// id, same posting (confirmed live 2026-09-17, several clusters incl.
+// "Frameworks/Embedded Software Engineer" @ Tulip Interfaces, "GenAI
+// Engineer" @ Deloitte, "Strategic Data Analyst" @ Tresorit). Unlike the
+// city-slug case, findSameSourceDuplicate/loadSameSourceDupeIndex (which only
+// indexes ACTIVE rows) doesn't reliably catch this either: the two spellings
+// for the same ad tend to surface weeks/months apart, and by the time the
+// second one shows up the first row has usually already aged out to
+// active=false, so it's already gone from the index. The only reliable fix is
+// collapsing both spellings to one canonical URL before either is ever
+// stored, same approach as DUPLICATE_CITY_SLUGS — a curated legal-form list
+// on purpose, not "any trailing word" (see that block's comment for why).
+const LEGAL_FORM_SLUGS = [
+  ["korlatolt-felelossegu-tarsasag", "kft"],
+  ["zartkoru-reszvenytarsasag", "zrt"],
+  ["nyilvanosan-mukodo-reszvenytarsasag", "nyrt"],
+  ["kozkereseti-tarsasag", "kkt"],
+  ["beteti-tarsasag", "bt"],
+  ["egyeni-vallalkozo", "ev"],
+];
+const LEGAL_FORM_SLUG_RES = LEGAL_FORM_SLUGS.map(
+  ([long, short]) => [new RegExp(`-${long}-(\\d{4,})(\\/pro)?\\/?$`, "i"), short]
+);
+
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
 
-    // Normalize duplicate city-slug URLs to a single canonical path so
-    // dedupe/upsert works — see DUPLICATE_CITY_SLUGS above.
     if (/^www\.profession\.hu$/i.test(u.hostname) && /^\/allas\//i.test(u.pathname)) {
+      // Normalize duplicate city-slug URLs to a single canonical path so
+      // dedupe/upsert works — see DUPLICATE_CITY_SLUGS above. Runs first so a
+      // "…-kft-szeged-2947033" style url (legal form THEN city, THEN id) has
+      // its city segment stripped before the legal-form check below looks
+      // for "-{legal form}-{id}" immediately adjacent.
       u.pathname = u.pathname.replace(CITY_SLUG_RE, "-$1$2");
+
+      // Collapse a spelled-out legal form to its abbreviation — see
+      // LEGAL_FORM_SLUGS above.
+      for (const [re, short] of LEGAL_FORM_SLUG_RES) {
+        u.pathname = u.pathname.replace(re, `-${short}-$1$2`);
+      }
     }
 
     u.hash = "";
