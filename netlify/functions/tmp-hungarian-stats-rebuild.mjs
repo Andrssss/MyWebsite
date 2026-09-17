@@ -19,6 +19,7 @@
 
 import pkg from "pg";
 const { Pool } = pkg;
+import { getStore } from "@netlify/blobs";
 import { rebuildStats } from "./_stats_rebuild_core.mjs";
 import { loadCategories } from "./load_categories.mjs";
 
@@ -44,6 +45,14 @@ export default async (request) => {
   if (token !== TOKEN) return json(401, { error: "Unauthorized" });
 
   const dryRun = url.searchParams.get("dryRun") === "1";
+
+  if (url.searchParams.get("action") === "readLangTotals") {
+    const store = getStore("job-stats");
+    const data = await store.get("latest.json", { type: "json" });
+    const totals = {};
+    for (const row of data?.dailyLanguages || []) totals[row.language] = (totals[row.language] || 0) + row.count;
+    return json(200, { ok: true, totals: Object.entries(totals).sort((a, b) => b[1] - a[1]) });
+  }
 
   const client = await pool.connect();
   try {
