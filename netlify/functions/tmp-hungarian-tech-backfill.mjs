@@ -48,8 +48,8 @@ const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 // Concurrent fetches per call, and an overall wall-clock budget so we return
 // well inside Netlify's synchronous-function limit instead of timing out.
-const CONCURRENCY = 6;
-const BUDGET_MS = 8000;
+const CONCURRENCY = 20;
+const BUDGET_MS = 8500;
 const FETCH_TIMEOUT_MS = 6000;
 
 function json(status, body) {
@@ -153,7 +153,7 @@ export default withDbAuditFlush("tmp_hungarian_tech_backfill", async (request) =
   if (token !== TOKEN) return json(401, { error: "Unauthorized" });
 
   const action = url.searchParams.get("action") || "scan";
-  const limit = Math.min(Number(url.searchParams.get("limit")) || 40, 100);
+  const limit = Math.min(Number(url.searchParams.get("limit")) || 40, 300);
   const afterId = Math.max(Number(url.searchParams.get("after_id")) || 0, 0);
 
   const client = await pool.connect();
