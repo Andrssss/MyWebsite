@@ -43,8 +43,16 @@ export default withTimeout("cron_daily_stats", async function handler() {
       [today]
     );
 
-    const { totalJobs, internJobs, categories, internCategories, languages, technologies } =
-      computeDayStats(todayRows, JOB_CATEGORIES);
+    const {
+      totalJobs,
+      internJobs,
+      categories,
+      internCategories,
+      languages,
+      technologies,
+      languagesByCategory,
+      technologiesByCategory,
+    } = computeDayStats(todayRows, JOB_CATEGORIES);
 
     const { skipped } = await appendDayIfMissing(today, {
       totalJobs,
@@ -53,6 +61,8 @@ export default withTimeout("cron_daily_stats", async function handler() {
       internCategories,
       languages,
       technologies,
+      languagesByCategory,
+      technologiesByCategory,
     });
 
     console.log(`[daily_stats] ${today}: total=${totalJobs}, intern=${internJobs}, categories=${categories.length}, intern_categories=${internCategories.length}, languages=${languages.length}, technologies=${technologies.length}${skipped ? " (already present, skipped)" : ""}`);

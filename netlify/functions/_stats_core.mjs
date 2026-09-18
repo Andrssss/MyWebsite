@@ -83,6 +83,33 @@ export function technologyBreakdown(rows) {
 }
 
 /**
+ * Ugyanaz, mint technologyBreakdown(), de kategóriánként külön-külön — a
+ * frontend kategória-választó dropdownja ebből olvassa a "csak ez a
+ * kategória" nézetet (ld. allasfigyelo `app/routes/stats.tsx`). Egy sor
+ * pontosan egy kategóriába esik (categorize() 1-1 leképezés), úgyhogy ez
+ * ugyanazokat a hirdetéseket csoportosítja újra, amiket categorizeJobs() is
+ * lát — nem duplikált besorolási logika, csak más a kimenet alakja.
+ */
+export function technologyBreakdownByCategory(rows, jobCategories) {
+  const byCategory = new Map();
+  for (const row of rows) {
+    const cat = categorize(row.title || "", jobCategories);
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat).push(row);
+  }
+
+  const languagesByCategory = [];
+  const technologiesByCategory = [];
+  for (const [category, catRows] of byCategory) {
+    const { languages, technologies } = technologyBreakdown(catRows);
+    for (const { label, count } of languages) languagesByCategory.push({ category, label, count });
+    for (const { label, count } of technologies) technologiesByCategory.push({ category, label, count });
+  }
+
+  return { languagesByCategory, technologiesByCategory };
+}
+
+/**
  * Egy nap összesítése.
  *
  * A senior hirdetéseket kihagyjuk, mert a board is elrejti őket alapból
@@ -93,6 +120,7 @@ export function computeDayStats(rows, jobCategories) {
   const jobs = rows.filter((row) => !isSenior(row.experience));
   const internJobs = jobs.filter(isInternLike);
   const { languages, technologies } = technologyBreakdown(jobs);
+  const { languagesByCategory, technologiesByCategory } = technologyBreakdownByCategory(jobs, jobCategories);
 
   return {
     totalJobs: jobs.length,
@@ -101,5 +129,7 @@ export function computeDayStats(rows, jobCategories) {
     internCategories: categorizeJobs(internJobs, jobCategories),
     languages,
     technologies,
+    languagesByCategory,
+    technologiesByCategory,
   };
 }

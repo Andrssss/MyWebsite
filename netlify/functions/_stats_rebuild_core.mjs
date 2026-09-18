@@ -21,6 +21,11 @@
 // bontásra is (ld. _stats_core.mjs technologyBreakdown()) — a `technologies`
 // mezőt is a nyers job_posts/archívum sorokból számoljuk újra, nem a régi
 // mentett bontást patch-eljük.
+//
+// 2026-09-18: a kategóriánkénti nyelv/technológia bontás (technologyBreakdown-
+// ByCategory()) is innen épül újra — egy rebuild ugyanabban a menetben írja
+// az aggregált (category mező nélküli) és a kategóriánkénti (category
+// mezővel ellátott) sorokat is a dailyLanguages/dailyTechnologies tömbökbe.
 
 import { getStore } from "@netlify/blobs";
 import { computeDayStats } from "./_stats_core.mjs";
@@ -149,8 +154,16 @@ export async function writeDays(byDay, jobCategories, { from, to }) {
   const techRows = [];
 
   for (const day of days) {
-    const { totalJobs, internJobs, categories, internCategories, languages, technologies } =
-      computeDayStats(byDay.get(day), jobCategories);
+    const {
+      totalJobs,
+      internJobs,
+      categories,
+      internCategories,
+      languages,
+      technologies,
+      languagesByCategory,
+      technologiesByCategory,
+    } = computeDayStats(byDay.get(day), jobCategories);
 
     // A 0 találatos napokat nem tároljuk (a régi backfill is így tett).
     if (totalJobs === 0) {
@@ -163,7 +176,11 @@ export async function writeDays(byDay, jobCategories, { from, to }) {
     for (const { category, count } of internCategories)
       catRows.push({ date: day, category: `intern:${category}`, count });
     for (const { label, count } of languages) langRows.push({ date: day, language: label, count });
+    for (const { category, label, count } of languagesByCategory)
+      langRows.push({ date: day, language: label, count, category });
     for (const { label, count } of technologies) techRows.push({ date: day, technology: label, count });
+    for (const { category, label, count } of technologiesByCategory)
+      techRows.push({ date: day, technology: label, count, category });
 
     perDay.push({
       date: day,

@@ -22,6 +22,20 @@
 // pestidev.hu only shows one aggregate pie each, no month/half-year/intern
 // breakdown, so callers are expected to sum across the whole history rather
 // than filter by date range.
+//
+// 2026-09-18 (user request): a category dimension was added on top of that,
+// for a per-category dropdown on the same two pestidev.hu panels. A row
+// WITHOUT a `category` field is the pre-existing "all categories" aggregate
+// (unchanged — this is what old rows already look like, so nothing needed
+// backfilling for that bucket); a row WITH `category` set is the same
+// label+count, scoped to one job_categories name (categorize()'s 1-1
+// mapping, so a job contributes to exactly one category row per label it
+// carries). Both flavors live in the same dailyLanguages/dailyTechnologies
+// arrays — readers must filter on `category` presence themselves (see
+// allasfigyelo's query.server.ts sumLabels/sumLabelsByCategory) rather than
+// summing the whole array, or the aggregate would double-count. Produced by
+// _stats_core.mjs's technologyBreakdownByCategory(); rows from before this
+// date have no per-category breakdown until a rebuild backfills them.
 
 import { getStore } from "@netlify/blobs";
 
@@ -81,7 +95,16 @@ export async function replaceDays(newStats, newCategories, newLanguages, newTech
 // old `ON CONFLICT (date) DO NOTHING` daily upsert.
 export async function appendDayIfMissing(
   day,
-  { totalJobs, internJobs, categories, internCategories, languages = [], technologies = [] }
+  {
+    totalJobs,
+    internJobs,
+    categories,
+    internCategories,
+    languages = [],
+    technologies = [],
+    languagesByCategory = [],
+    technologiesByCategory = [],
+  }
 ) {
   const current = await readDailyStats();
   if (current.dailyStats.some((r) => r.date === day)) {
@@ -94,9 +117,15 @@ export async function appendDayIfMissing(
     ...internCategories.map(({ category, count }) => ({ date: day, category: `intern:${category}`, count })),
   ];
   const dailyCategories = [...current.dailyCategories, ...newCatRows];
-  const newLangRows = languages.map(({ label, count }) => ({ date: day, language: label, count }));
+  const newLangRows = [
+    ...languages.map(({ label, count }) => ({ date: day, language: label, count })),
+    ...languagesByCategory.map(({ category, label, count }) => ({ date: day, language: label, count, category })),
+  ];
   const dailyLanguages = [...current.dailyLanguages, ...newLangRows];
-  const newTechRows = technologies.map(({ label, count }) => ({ date: day, technology: label, count }));
+  const newTechRows = [
+    ...technologies.map(({ label, count }) => ({ date: day, technology: label, count })),
+    ...technologiesByCategory.map(({ category, label, count }) => ({ date: day, technology: label, count, category })),
+  ];
   const dailyTechnologies = [...current.dailyTechnologies, ...newTechRows];
 
   await writeDailyStats({ dailyStats, dailyCategories, dailyLanguages, dailyTechnologies });
