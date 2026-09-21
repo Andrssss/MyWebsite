@@ -161,23 +161,48 @@ export function sanitizeJobs(rawJobs) {
 /* ── IT-only gate (user rule 2026-07-16: ai-scraped accepts ONLY IT jobs) ──
    Reuses the SAME job_categories keyword lists the rest of the app uses for
    classification (loadCategories(), see cron_daily_stats.mjs / JobWatcher.jsx)
-   — a job counts as "IT" if its title hits ANY category's keywords (plus the
-   two standalone hardcoded triggers those files also special-case: "analyst"/
-   "elemző", and a standalone "AI" token). This is deliberately just the
+   — a job counts as "IT" if its title hits ANY category's keywords (plus a
+   handful of standalone hardcoded triggers those files don't carry: "analyst"/
+   "elemző", a standalone "AI" token, and — 2026-09-21, see below — "rendszer-"
+   compounds/"fejlesztő"/"adatbázis"). This is deliberately just the
    accept/reject test, NOT the single-winner CATEGORY_PRIORITY tie-break those
    files use afterward to pick ONE category — we don't need to pick one here,
-   only to decide IT vs not. */
+   only to decide IT vs not.
+
+   2026-09-21: check_titles (the AI-discovery MCP pre-check, which calls this
+   function directly, unfiltered by any source's own category) rejected
+   "Junior rendszergazda / Rendszerüzemeltető munkatárs" as non_it_title —
+   "rendszergazda" (sysadmin) is unambiguous IT vocabulary and is already
+   trusted as such by STRONG_IT_TITLE just below, but this function had no
+   equivalent fallback and job_categories' live keyword list apparently
+   doesn't carry it either. Fixed as a substring match on the "rendszer-"
+   prefix (not just the literal "rendszergazda") so sibling compounds
+   (rendszerszervező, rendszermérnök, rendszeradminisztrátor, ...) are covered
+   too, same reasoning as STRONG_IT_TITLE's help-desk/hálózatmérnök additions.
+   Also added "fejlesztő" (bare "developer", not just "-mérnök"/"webfejlesztő")
+   and "adatbázis" ("database") — same unambiguous-Hungarian-IT-term bar.
+   Deliberately did NOT add "tesztelő"/"tester"/"QA" or a bare "engineer":
+   the STRONG_IT_TITLE comment below documents "tesztelő" as a known false-
+   positive source ("Robotporszívó-tesztelő" — a vacuum-cleaner tester, not
+   IT), and a bare "engineer" catches plenty of non-IT titles (Sales/Quality/
+   Field Engineer). If those are wanted here too, that's a separate call to
+   make deliberately, not a drive-by fix. */
 
 function kwRegex(kw) {
   const escaped = String(kw).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
 }
 
+const RENDSZER_PREFIX = /(^|[^a-z0-9])rendszer/i;
+const FALLBACK_IT_TITLE_TOKENS = ["fejlesztő", "adatbázis"];
+
 export function isItJob(title, categories) {
   const t = String(title || "").toLowerCase();
   if (!t) return false;
   if (t.includes("analyst") || t.includes("elemző")) return true;
   if (/(^|[^a-z0-9])ai([^a-z0-9]|$)/i.test(title || "")) return true;
+  if (RENDSZER_PREFIX.test(t)) return true;
+  if (FALLBACK_IT_TITLE_TOKENS.some((kw) => kwRegex(kw).test(t))) return true;
   return (categories || []).some(([, kws]) => (kws || []).some((kw) => kwRegex(kw.toLowerCase()).test(t)));
 }
 
