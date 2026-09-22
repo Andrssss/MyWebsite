@@ -103,6 +103,20 @@ async function runExecute(request) {
 export default async (request) => {
   if (!authorized(request)) return json(401, { error: "unauthorized" });
 
+  const url = new URL(request.url);
+  if (url.searchParams.get("action") === "verify-stats-blob") {
+    const jobStats = getStore("job-stats");
+    const latest = await jobStats.get("latest.json", { type: "json" });
+    const leftoverCat = (latest?.dailyCategories || []).filter(
+      (r) => r.category === TARGET || r.category === `intern:${TARGET}`
+    );
+    return json(200, {
+      generatedAt: latest?.generatedAt,
+      dailyCategoriesTotal: (latest?.dailyCategories || []).length,
+      leftoverMatchingTarget: leftoverCat,
+    });
+  }
+
   if (request.method === "POST") {
     let body = {};
     try {
