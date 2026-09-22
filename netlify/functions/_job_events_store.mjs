@@ -7,8 +7,9 @@
 // relációs hozzáférési minta, egyetlen napi cron írja.
 //
 // Store: "job-events", egyetlen kulcs "latest.json":
-//   { generatedAt, events: [{ url, title, date, endDate, location, company,
-//                             type, registrationDeadline, deadlineChecked,
+//   { generatedAt, events: [{ url, title, date, endDate, time, endTime,
+//                             location, company, type, free,
+//                             registrationDeadline, deadlineChecked,
 //                             source, firstSeenAt }] }
 // `url` a sor identitása (mint job_posts-nál). `date` (és opcionális
 // `endDate`) ISO "YYYY-MM-DD". Egy esemény akkor "múltbeli", ha a záró
@@ -16,11 +17,20 @@
 // minden futás kitöröl a blobból, ez a "múltban levőket kitörli" garancia.
 // `type`/`registrationDeadline`/`deadlineChecked` a
 // cron_job_events-background.mjs+_ai_events_extract_core.mjs párosból
-// érkeznek (2026-09-08) — ez a modul mezőagnosztikus, csak áthalad rajtuk,
-// nincs itt külön kezelésük. `deadlineChecked` belső bookkeeping — az
-// allasfigyelo /events oldala (a blob egyetlen olvasója) nem használja,
-// csak azt jelzi ennek a modulnak, hogy a határidő-follow-up már lefutott
-// erre a sorra, ne fizessen rá újra egy örökre üres mezőre.
+// érkeznek (2026-09-08) — ez a modul EGYÉBKÉNT mezőagnosztikus, csak
+// áthalad rajtuk, nincs itt külön kezelésük. `deadlineChecked` belső
+// bookkeeping — az allasfigyelo /events oldala (a blob egyetlen olvasója)
+// nem használja, csak azt jelzi ennek a modulnak, hogy a határidő-follow-up
+// már lefutott erre a sorra, ne fizessen rá újra egy örökre üres mezőre.
+//
+// `free` (2026-09-22, user request: "csak ingyeneseket akarunk") a
+// KIVÉTEL a mezőagnosztikusság alól — a purge-höz hasonlóan ez a modul
+// aktívan kiszűri a `free === false` sorokat minden íráskor (ld.
+// mergeAndPurgeEvents), nem csak áthalad rajtuk. Ez véd a jövőbeli cron-
+// futásoktól (fizetős esemény sosem kerül be) ÉS a régi, e mező előtti
+// sorok egyszeri visszamenőleges tisztításától is (ld. a diszpozábilis
+// tmp-events-*-cleanup endpoint) — mindkettő ugyanezen az egy szűrőn megy
+// át, ha a hívó a teljes újra-osztályozott listát adja át `incoming`-ként.
 
 import { getStore } from "@netlify/blobs";
 
@@ -63,9 +73,11 @@ async function writeEvents(events) {
 
 /**
  * Beolvasztja `incoming` eseményeket a tárolt listába (upsert `url` szerint,
- * megőrizve az eredeti `firstSeenAt`-et), majd eldobja a lejárt sorokat —
- * akkor is, ha `incoming` üres, hogy a takarítás önmagában, forrás nélkül is
- * lefusson minden ütemezett futáskor.
+ * megőrizve az eredeti `firstSeenAt`-et), majd eldobja a lejárt ÉS a
+ * fizetős (`free === false`) sorokat — akkor is, ha `incoming` üres, hogy a
+ * takarítás önmagában, forrás nélkül is lefusson minden ütemezett futáskor.
+ * A `free` szűrő egy meglévő, régebben fizetősre újra-osztályozott sort is
+ * eltávolít, nem csak az újonnan beérkezőket.
  */
 export async function mergeAndPurgeEvents(incoming) {
   const today = todayUTC();
@@ -79,6 +91,6 @@ export async function mergeAndPurgeEvents(incoming) {
     byUrl.set(ev.url, { ...ev, firstSeenAt: existing?.firstSeenAt || now });
   }
 
-  const merged = [...byUrl.values()].filter((e) => !isPast(e, today));
+  const merged = [...byUrl.values()].filter((e) => !isPast(e, today) && e.free !== false);
   return writeEvents(merged);
 }

@@ -36,6 +36,17 @@
 // same enum-or-fallback defensiveness as `type` in validateEvents below —
 // never leave a filterable field null/missing just because the source page
 // didn't say explicitly.
+//
+// `free` + `time`/`endTime` added 2026-09-22 (user request — the board is
+// meant to be a FREE event calendar, and paid conferences/trainings had been
+// slipping in via the widened 2026-09-09 scope; separately, only a date with
+// no time is close to useless for actually adding an event to a calendar).
+// `free` is required like type/format/language — the model must always
+// commit, never leave it ambiguous. The signal to look for is a PAID
+// ticket/admission requirement (price shown, "jegy"/"ticket", "regisztrációs
+// díj"/"registration fee"); free sign-up/registration is still free. `time`/
+// `endTime` are optional (like `endDate`) — most listing pages just don't
+// state one — "HH:MM" 24h, resolved the same way `date` already is.
 
 import {
   MODEL,
@@ -64,7 +75,7 @@ const EVENT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["title", "url", "date", "type", "format", "language"],
+        required: ["title", "url", "date", "type", "format", "language", "free"],
         properties: {
           title: { type: "string" },
           url: { type: "string" },
@@ -72,6 +83,10 @@ const EVENT_SCHEMA = {
           date: { type: "string" },
           // ISO "YYYY-MM-DD", or null for a single-day event.
           endDate: { type: ["string", "null"] },
+          // "HH:MM" 24h start time, or null if the page states no time.
+          time: { type: ["string", "null"] },
+          // "HH:MM" 24h end time, or null.
+          endTime: { type: ["string", "null"] },
           location: { type: ["string", "null"] },
           company: { type: ["string", "null"] },
           // "allasborze" (job fair) | "eloadas" (talk/presentation/webinar) |
@@ -84,6 +99,11 @@ const EVENT_SCHEMA = {
           // "hu" | "en" — the language the event itself is held/announced in
           // (not the page's UI chrome). Judge from the title/description.
           language: { type: "string", enum: EVENT_LANGUAGES },
+          // true if free to attend (free registration/sign-up still counts as
+          // free), false if attending requires purchasing a ticket or paying
+          // any admission fee. Never leave this ambiguous — pick the best
+          // read of the page.
+          free: { type: "boolean" },
           // ISO "YYYY-MM-DD" — the last day one can still register/sign up
           // for the event, or null if the page states no registration or no
           // deadline. High-priority field: extract whenever the page gives it.
@@ -101,7 +121,9 @@ const EXTRACT_SYSTEM =
   "to student- or job-seeker-specific events. A general cybersecurity/dev/tech conference, a " +
   "community meetup, or a free webinar all count, even with no student/career framing at all. " +
   "Skip an event only if it is narrowly paid corporate training aimed at executives/managers " +
-  "(not the general IT audience) or reads as a pure vendor sales pitch with no real content. " +
+  "(not the general IT audience) or reads as a pure vendor sales pitch with no real content — " +
+  "otherwise still return it even if it costs money, and use the `free` field below to say so " +
+  "(this board only wants free events, but that filtering happens after extraction, not here). " +
   "Return every DISTINCT event on the page — not job postings, not news articles. For each: " +
   "`title` is the event name; `url` " +
   "is the link to that event's own detail page and MUST be a link that literally appears as an " +
@@ -109,7 +131,9 @@ const EXTRACT_SYSTEM =
   "guess, or complete a URL. `date` is the event's (first) day as an ISO YYYY-MM-DD date — " +
   "resolve any relative or partial date (e.g. 'szeptember 15.', 'Sept 15') against the given " +
   "reference date, inferring the year if it is omitted. `endDate` is the last day for a " +
-  "multi-day event, or null. `type` classifies the event: \"allasborze\" for a job " +
+  "multi-day event, or null. `time`/`endTime` are the start/end clock time as \"HH:MM\" in " +
+  "24-hour format if the page states one (e.g. '09:30', '9:30 AM', '14:00-16:00'), or null if " +
+  "no time is given — do not guess a time that isn't stated. `type` classifies the event: \"allasborze\" for a job " +
   "fair/career day, \"eloadas\" for a talk/presentation/webinar, \"konferencia\" for a " +
   "conference, \"meetup\" for a meetup, \"egyeb\" if none of those fit. `format` is " +
   "\"online\" if it's virtual-only, \"inperson\" if it's at a physical venue with no online " +
@@ -118,6 +142,11 @@ const EXTRACT_SYSTEM =
   "nothing about an online option. `language` is \"hu\" or \"en\", whichever the event itself " +
   "is conducted in (judge from the title/description, not the site's UI chrome) — default to " +
   "\"hu\" for a Hungarian-language page with no explicit language statement. " +
+  "`free` is HIGH PRIORITY: false if attending requires buying a ticket or paying any " +
+  "admission/participation fee (look for a price, \"jegy\"/\"jegyvásárlás\"/\"ticket\", " +
+  "\"regisztrációs díj\"/\"részvételi díj\"/\"registration fee\", a checkout/payment step); " +
+  "true if it's free to attend, including when free registration/sign-up is required. If the " +
+  "page gives no pricing information at all and nothing suggests payment, default to true. " +
   "`registrationDeadline` is HIGH PRIORITY: if the page states a deadline, cutoff date, or " +
   "\"regisztrálj eddig\" / \"jelentkezési határidő\" / \"register by\" for the event, extract " +
   "it as an ISO YYYY-MM-DD date — resolve relative dates the same way as `date`. Only use null " +
@@ -127,9 +156,14 @@ const EXTRACT_SYSTEM =
   "started yet.";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function cleanDate(v) {
   return typeof v === "string" && DATE_RE.test(v) ? v : null;
+}
+
+function cleanTime(v) {
+  return typeof v === "string" && TIME_RE.test(v) ? v : null;
 }
 
 /**
@@ -168,11 +202,14 @@ function validateEvents(rawEvents, sourceHtml, baseUrl) {
       url,
       date,
       endDate: endDate && endDate >= date ? endDate : null,
+      time: cleanTime(e.time),
+      endTime: cleanTime(e.endTime),
       location: cleanField(e.location),
       company: cleanField(e.company),
       type: EVENT_TYPES.includes(e.type) ? e.type : "egyeb",
       format: EVENT_FORMATS.includes(e.format) ? e.format : "inperson",
       language: EVENT_LANGUAGES.includes(e.language) ? e.language : "hu",
+      free: typeof e.free === "boolean" ? e.free : true,
       registrationDeadline,
     });
   }
@@ -230,6 +267,52 @@ export async function extractRegistrationDeadline(detailHtml, { referenceDate })
   });
   const parsed = parseJson(res);
   return { registrationDeadline: cleanDate(parsed?.registrationDeadline), usage: usageOf(res) };
+}
+
+const PRICING_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["free"],
+  properties: {
+    free: { type: "boolean" },
+  },
+};
+
+const PRICING_SYSTEM =
+  "You are given one event's own detail page (Hungarian or English), titled below. Decide " +
+  "whether attending is FREE or requires paying. Return false if attending requires buying a " +
+  "ticket or paying any admission/participation fee (a price shown, \"jegy\"/\"jegyvásárlás\"/" +
+  "\"ticket\", \"regisztrációs díj\"/\"részvételi díj\"/\"registration fee\", a checkout/payment " +
+  "step). Return true if it's free to attend, including when free registration/sign-up is " +
+  "required, or if the page gives no pricing information at all and nothing suggests payment.";
+
+/**
+ * One-off / backfill helper (2026-09-22): classify free-vs-paid for an
+ * event's OWN detail page, independent of the main per-source listing
+ * extraction above. `extractEventsLLM`'s `free` field is the normal path
+ * going forward — this exists for reclassifying events that were stored
+ * BEFORE that field existed (see the one-time cleanup script), where all we
+ * have is the event's `url`, not the listing HTML it was first found in.
+ * Same cheap model as the deadline follow-up — a single boolean, not a full
+ * extraction.
+ * @returns {Promise<{free: boolean, usage: object}>}
+ */
+export async function classifyEventPricing(detailHtml, { title }) {
+  const stripped = stripHtml(detailHtml);
+  const res = await client().messages.create({
+    model: DEADLINE_MODEL,
+    max_tokens: 200,
+    output_config: { format: { type: "json_schema", schema: PRICING_SCHEMA } },
+    system: [{ type: "text", text: PRICING_SYSTEM }],
+    messages: [
+      {
+        role: "user",
+        content: `Event title: ${title || "(unknown)"}\n\n<html>\n${stripped}\n</html>`,
+      },
+    ],
+  });
+  const parsed = parseJson(res);
+  return { free: typeof parsed?.free === "boolean" ? parsed.free : true, usage: usageOf(res) };
 }
 
 /**

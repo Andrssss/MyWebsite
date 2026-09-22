@@ -39,6 +39,11 @@
 // kell staggerelni. Netlify saját ütemezett hívása nem küld CRON_SECRET
 // bearer-t, ezért — pont úgy, mint cron_daily_stats.mjs-nél — nincs itt
 // bejövő auth-ellenőrzés.
+//
+// `free`/`time`/`endTime` (2026-09-22): mindkét extraktor (jsonld + llm-read)
+// mostantól ezt is visszaadja soronként; a `free === false` sorok kiszűrése
+// magában `_job_events_store.mjs`-ben (mergeAndPurgeEvents) történik, nem
+// itt — lásd annak fejléce.
 
 export const config = {
   schedule: "30 5 */2 * *", // 2 naponta (páratlan naptári napokon) 05:30 UTC
@@ -213,9 +218,10 @@ export default withTimeout("cron_job_events-background", async () => {
       }
     }
 
+    const paidCount = collected.filter((e) => e.free === false).length;
     const { events } = await mergeAndPurgeEvents(collected);
     console.log(
-      `[job-events] sources=${sites.length} collected=${collected.length} stored_after_purge=${events.length}`
+      `[job-events] sources=${sites.length} collected=${collected.length} paid_dropped=${paidCount} stored_after_purge=${events.length}`
     );
   } finally {
     client.release();

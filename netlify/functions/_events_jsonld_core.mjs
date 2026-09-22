@@ -29,6 +29,23 @@
 // per-event detail-page follow-up like the AI path's enrichDeadline does;
 // that one-field lookup was itself an AI call, so dropping it is the actual
 // "no AI" trade this module makes, not an oversight.
+//
+// `time`/`endTime`/`free` added 2026-09-22 (user request — paid conferences/
+// trainings had been slipping onto the board, and the pipeline was throwing
+// away the exact time it already had). kibernaptar's `startDate`/`endDate`
+// ARE full ISO datetimes (unlike `eventAttendanceMode` above, these are
+// live-checked per-event and vary, not a plugin default) — `dateOnly()` used
+// to just truncate them; `timeOnly()` now keeps the clock part, EXCEPT
+// exactly "00:00" is treated as "no time given" (the plugin's own default
+// for an event whose organizer never set a start time, same caveat class as
+// `eventAttendanceMode`). `offers.price` is likewise real per-event data
+// here (spot-checked: 0 HUF on free talks, 150000 HUF / "55.000 - 110.000
+// HUF" on known-paid conferences) — `classifyFree()` reads it, defaulting to
+// NOT free (excluded) when `offers` is missing or its price isn't a plain
+// number, since both real 2026-09-22 examples of that (ITBN CONF-EXPO,
+// "11. Cybersec konferencia" — no `offers` at all) are well-known PAID
+// conferences, not free ones the plugin just forgot to price. The `free`
+// field is what `_job_events_store.mjs`'s `mergeAndPurgeEvents` filters on.
 
 import { load as cheerioLoad } from "cheerio";
 import { normalizeUrl, cleanField } from "./_ai_extract_core.mjs";
@@ -39,9 +56,33 @@ function decodeEntities(str) {
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
+const TIME_RE = /T(\d{2}:\d{2})/;
 
 function dateOnly(iso) {
   return typeof iso === "string" && DATE_RE.test(iso) ? iso.slice(0, 10) : null;
+}
+
+// Exactly "00:00" is the plugin's own default for "no start time set", not a
+// real midnight start — see the file header caveat.
+function timeOnly(iso) {
+  const m = typeof iso === "string" && iso.match(TIME_RE);
+  return m && m[1] !== "00:00" ? m[1] : null;
+}
+
+function offerPrice(offers) {
+  const offer = Array.isArray(offers) ? offers[0] : offers;
+  const price = offer?.price;
+  const num = typeof price === "number" ? price : typeof price === "string" ? Number(price.replace(",", ".")) : NaN;
+  return Number.isFinite(num) ? num : null;
+}
+
+// See the file header: a missing/non-numeric price is treated as PAID, not
+// free — the two real cases found live (ITBN, Cybersec konferencia) were
+// both actually paid conferences with no `offers` block at all.
+function classifyFree(item) {
+  if (typeof item.isAccessibleForFree === "boolean") return item.isAccessibleForFree;
+  const price = offerPrice(item.offers);
+  return price !== null && price === 0;
 }
 
 const TYPE_KEYWORDS = [
@@ -113,11 +154,14 @@ export function extractEventsJsonLd(html, { baseUrl }) {
         url,
         date,
         endDate,
+        time: timeOnly(item.startDate),
+        endTime: timeOnly(item.endDate),
         location: formatLocation(item.location),
         company: cleanField(item.organizer?.name ? decodeEntities(item.organizer.name) : null),
         type: classifyType(title),
         format: classifyFormat(locationName),
         language: "hu",
+        free: classifyFree(item),
         registrationDeadline: null,
         deadlineChecked: true,
       });
