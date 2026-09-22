@@ -113,6 +113,22 @@
 // rules — they just hadn't been swept yet — so no rule change was needed for
 // those; the scoped re-sweep after this deploy is what actually clears them.
 //
+// 2026-09-22: a full active+inactive audit of both sources (514 active + 103
+// revive-eligible inactive rows) found 0 wrong labels under the rules as they
+// stood, plus one real gap via the fallback title-hit review: UserWise
+// Services was stored as userwise-services.workable.com/jobs/{id} (a
+// company-branded subdomain, not apply.workable.com) and its own redirect
+// chain already landed on the documented not_found=true marker — but the
+// Workable rule below required the STORED row's host to literally be
+// apply.workable.com, so it never even asked the question. Widened to any
+// *.workable.com host (see that rule's own comment). Everything else the
+// fallback review flagged (17 candidates total) was the same already-known
+// fail-open-on-purpose shape: PDF postings, client-rendered SPA shells
+// (hrmaster.hu, netopgraf.hu, indivizo, bamboohr — 0% title-hit expected on a
+// live page too), an Eightfold tenant outside EIGHTFOLD_HOSTS, and two
+// low-confidence heuristic hits (personio.de, smartcharging.hu) more likely
+// paraphrased titles than deaths.
+//
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
 // independent-verification rule). Each was validated on 2026-08-30 against live
@@ -345,7 +361,17 @@ export function aiScrapedIsDead(row, body, res) {
   // DEAD_LANDINGS path rule since the signal is a query param, not a path,
   // and the account segment varies. A live redirect (account rename) keeps
   // the /j/{code} suffix instead, so this can't false-positive on that case.
-  if (host === "apply.workable.com" && res && res.finalUrl && /[?&]not_found=true(?:&|$)/.test(res.finalUrl)) {
+  // 2026-09-22: widened from a literal `host === "apply.workable.com"` check —
+  // a full activity-label audit found a row stored under a company-branded
+  // subdomain (userwise-services.workable.com/jobs/{id}, not apply.workable.com)
+  // whose redirect chain landed on the exact same apply.workable.com/{account}/
+  // ?not_found=true marker, but the old host check only matched the STORED
+  // row's own host, never the redirect target, so it silently never fired for
+  // any account-subdomain-stored posting. The verdict lives entirely in
+  // `res.finalUrl` (an unambiguous platform-owned marker), so matching any
+  // *.workable.com origin host is safe — it just widens which stored rows are
+  // even allowed to ask the question, not what counts as an answer.
+  if (/(^|\.)workable\.com$/.test(host) && res && res.finalUrl && /[?&]not_found=true(?:&|$)/.test(res.finalUrl)) {
     return true;
   }
 
