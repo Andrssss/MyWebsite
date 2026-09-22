@@ -31,6 +31,18 @@
 // sorok egyszeri visszamenőleges tisztításától is (ld. a diszpozábilis
 // tmp-events-*-cleanup endpoint) — mindkettő ugyanezen az egy szűrőn megy
 // át, ha a hívó a teljes újra-osztályozott listát adja át `incoming`-ként.
+//
+// Országos relevancia-szűrő (2026-09-22, pestidev.hu issue #56): a korábbi,
+// dokumentálatlan egyszeri feltöltés olyan külföldi fizetős konferenciákat
+// is bevitt a blobba, mint a STARWEST (Anaheim, USA) vagy a Targeting
+// Quality (Ontario, Kanada) — semmi közük Magyarországhoz/Budapesthez, a
+// tábla célja ("Csak Budapest · Csak IT") ezt kizárja. `looksHungaryRelevant`
+// ugyanúgy a purge-höz/free-szűrőhöz csatlakozik: `online`/`hybrid` formátum
+// mindig átmegy (helyfüggetlen, bárhonnan elérhető), `inperson` csak akkor,
+// ha a `location` egy ismert magyar városnevet/"Magyarország"/"Hungary"
+// szót tartalmaz; hiányzó `location` megengedően átmegy (nem büntetjük a
+// hiányzó adatot — l. a #56 másik pontja, ahol pont egy valós budapesti
+// állásbörzének nem volt `location` mezője).
 
 import { getStore } from "@netlify/blobs";
 
@@ -48,6 +60,18 @@ function todayUTC() {
 function isPast(event, today) {
   const cutoff = event.endDate || event.date;
   return !cutoff || cutoff < today;
+}
+
+const HUNGARY_LOCATION_RE =
+  /magyarorsz|hungary|budapest|debrecen|szeged|p[eé]cs|gy[oő]r|miskolc|veszpr[eé]m|sz[eé]kesfeh[eé]rv[aá]r|szombathely|sopron|kecsk[eé]m[eé]t|ny[ií]regyh[aá]za|p[aá]pa|paks|eger|kaposv[aá]r|zalaegerszeg|szolnok|tatab[aá]nya|salg[oó]tarj[aá]n|szekszárd|dunaújváros|erd|budaörs/i;
+
+// online/hybrid: location-agnostic, always relevant (see file header). No
+// `location` at all: permissive pass, missing data isn't itself a signal of
+// being foreign. inperson: only relevant if the venue text names Hungary.
+function looksHungaryRelevant(event) {
+  if (event.format && event.format !== "inperson") return true;
+  if (!event.location) return true;
+  return HUNGARY_LOCATION_RE.test(event.location);
 }
 
 function sortByDate(events) {
@@ -73,11 +97,12 @@ async function writeEvents(events) {
 
 /**
  * Beolvasztja `incoming` eseményeket a tárolt listába (upsert `url` szerint,
- * megőrizve az eredeti `firstSeenAt`-et), majd eldobja a lejárt ÉS a
- * fizetős (`free === false`) sorokat — akkor is, ha `incoming` üres, hogy a
- * takarítás önmagában, forrás nélkül is lefusson minden ütemezett futáskor.
- * A `free` szűrő egy meglévő, régebben fizetősre újra-osztályozott sort is
- * eltávolít, nem csak az újonnan beérkezőket.
+ * megőrizve az eredeti `firstSeenAt`-et), majd eldobja a lejárt, a fizetős
+ * (`free === false`) ÉS a nem magyar-releváns (külföldi inperson) sorokat —
+ * akkor is, ha `incoming` üres, hogy a takarítás önmagában, forrás nélkül is
+ * lefusson minden ütemezett futáskor. Mindhárom szűrő egy meglévő, már
+ * tárolt sort is eltávolít újra-osztályozáskor, nem csak az újonnan
+ * beérkezőket.
  */
 export async function mergeAndPurgeEvents(incoming) {
   const today = todayUTC();
@@ -91,6 +116,8 @@ export async function mergeAndPurgeEvents(incoming) {
     byUrl.set(ev.url, { ...ev, firstSeenAt: existing?.firstSeenAt || now });
   }
 
-  const merged = [...byUrl.values()].filter((e) => !isPast(e, today) && e.free !== false);
+  const merged = [...byUrl.values()].filter(
+    (e) => !isPast(e, today) && e.free !== false && looksHungaryRelevant(e),
+  );
   return writeEvents(merged);
 }
