@@ -69,6 +69,7 @@ export default async (request) => {
   let archiveMatchCount = 0;
   const archiveByBlob = [];
   const archiveReclassifyPreview = {};
+  const archiveMatchedTitles = [];
   for (const blob of blobs) {
     const payload = await store.get(blob.key, { type: "json" });
     const rows = payload?.rows || [];
@@ -79,6 +80,14 @@ export default async (request) => {
       matchCount++;
       const reCat = categorize(row.title || "", categoriesWithoutTarget);
       archiveReclassifyPreview[reCat] = (archiveReclassifyPreview[reCat] || 0) + 1;
+      archiveMatchedTitles.push({
+        blob: blob.key,
+        title: row.title,
+        source: row.source,
+        url: row.url,
+        active: row.active,
+        first_seen: row.first_seen,
+      });
     }
     archiveMatchCount += matchCount;
     archiveByBlob.push({ key: blob.key, count: rows.length, matches: matchCount });
@@ -101,6 +110,7 @@ export default async (request) => {
       matches: archiveMatchCount,
       reclassifyPreview: archiveReclassifyPreview,
       byBlob: archiveByBlob,
+      matchedTitles: archiveMatchedTitles,
     },
   });
 };
