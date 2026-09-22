@@ -1,8 +1,10 @@
 // netlify/functions/ai-mcp.mjs
 //
-// MCP (Model Context Protocol) transport for the same two operations
-// ai-registry.mjs exposes over REST — get the routine's memory/budget, submit
-// this run's findings. Added for one reason: the pestidev discovery routine's
+// MCP (Model Context Protocol) transport for the operations ai-registry.mjs and
+// ats-tenants.mjs expose over REST — get the routine's memory/budget, submit
+// this run's findings, and (2026-09-22) the search-based ATS-tenant discovery
+// pair (get_ats_discovery/submit_ats_tenants — see _ats_tenants_core.mjs).
+// Added for one reason: the pestidev discovery routine's
 // orchestrator has repeatedly had its Step 1 GET refused by Claude Code's
 // auto-mode permission classifier (confirmed 2026-08-20/21/22, across every
 // curl phrasing tried — file-sourcing the token, `bash -c`, a `curl -K` config
@@ -34,16 +36,18 @@
 // generated Mcp-Session-Id that is accepted but not enforced (every tool call
 // is independently idempotent against Netlify Blobs + Postgres, so there is
 // no per-session state to lose track of). Good enough for one orchestrator
-// calling two tools a few times a day; not a general-purpose MCP server.
+// calling a handful of tools a few times a day; not a general-purpose MCP server.
 //
-// The actual GET/POST logic is NOT duplicated here — both this file and
-// ai-registry.mjs call into _ai_registry_core.mjs, so there is exactly one
-// implementation of the budget/filter/upsert tail regardless of which
-// transport a request arrives through.
+// The actual GET/POST logic is NOT duplicated here — this file, ai-registry.mjs
+// and ats-tenants.mjs all call into their respective _*_core.mjs modules
+// (_ai_registry_core.mjs, _ats_tenants_core.mjs), so there is exactly one
+// implementation of each operation regardless of which transport a request
+// arrives through.
 
 import { randomUUID } from "node:crypto";
 import { withDbAuditFlush } from "./_db_audit.js";
 import { getRegistrySnapshot, submitFindings, checkTitles, RegistryRequestError } from "./_ai_registry_core.mjs";
+import { getAtsDiscoverySnapshot, submitAtsTenants } from "./_ats_tenants_core.mjs";
 
 const PROTOCOL_VERSION_FALLBACK = "2025-06-18";
 
@@ -149,6 +153,40 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "get_ats_discovery",
+    description:
+      "Fetch this run's rotating WebSearch queries for finding NEW company ATS boards (Ashby/" +
+      "Greenhouse/Lever/SmartRecruiters/Recruitee/Personio/BambooHR/Teamtailor/Workday) that the " +
+      "daily ats-crawl worker doesn't know about yet — a separate discovery channel from " +
+      "company-discovery's own-career-page search, targeting companies that post through one of " +
+      "these platforms instead. Costs no upload budget and may be called freely, same as " +
+      "company-discovery. Run the returned `suggestedQueries` via WebSearch, pull out URLs on the " +
+      "`supportedProviders` domains (never a company's own career-page URL), skip anything already " +
+      "in `tenants` or `knownMisses`, then call submit_ats_tenants with what's left. Do this once " +
+      "per run alongside the usual work — it does not replace Step 2/3.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "submit_ats_tenants",
+    description:
+      "Submit ATS board URLs found via get_ats_discovery's queries. The server verifies every " +
+      "slug live before accepting it (a misread URL or hallucinated company never gets in), so a " +
+      "provider miss is normal, not an error. This does NOT ingest job postings — the daily " +
+      "ats-crawl worker harvests accepted tenants on its own schedule. Report the response's " +
+      "`added`/`alreadyKnown`/`notFound`/`rejected` counts in the run summary.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        urls: {
+          type: "array",
+          description: "Job-posting URLs on a supported ATS host, e.g. 'https://jobs.ashbyhq.com/<company>/<id>'. Preferred over `tenants` — the slug is read off the URL, not guessed.",
+          items: { type: "string" },
+        },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 function jsonResponse(status, body, extraHeaders) {
@@ -206,6 +244,23 @@ async function callTool(name, args) {
         };
       }
       throw err;
+    }
+  }
+
+  if (name === "get_ats_discovery") {
+    const snapshot = await getAtsDiscoverySnapshot();
+    return { content: [{ type: "text", text: JSON.stringify(snapshot) }] };
+  }
+
+  if (name === "submit_ats_tenants") {
+    try {
+      const result = await submitAtsTenants(args || {});
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: err.message, ...err.details }) }],
+        isError: true,
+      };
     }
   }
 
