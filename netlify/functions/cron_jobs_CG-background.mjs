@@ -15,6 +15,7 @@ import { Pool } from "pg";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -173,7 +174,30 @@ export default withTimeout("cron_jobs_CG-background", async () => {
       if (rows.length < PAGE_SIZE) break;
     }
 
+    // GH issue #24 follow-up (2026-09-22): cg-jobstream was whitelisted in
+    // CROSS_SOURCE_DUPE_SOURCES so every OTHER caller checks against its
+    // rows, but cg-jobstream's own ingest never checked back — same gap
+    // already fixed for kuka (see cross-source-dupe-coverage memory). A live
+    // audit found real pairs this let through (e.g. "Medior Java Developer"
+    // @ Capgemini re-listed on LinkedIn).
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, [SOURCE_KEY])).rows.map((r) => r.url)
+    );
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, SOURCE_KEY, { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[cg-jobstream] cross-source dupe index: ${crossDupeIndex.keySet.size} keys / ${crossDupeIndex.urlSet.size} urls`);
+
+    let skippedCrossSourceDupe = 0;
     for (const item of collected) {
+      if (!knownUrls.has(item.url) && isCrossSourceUrlDupe(crossDupeIndex, item.url)) {
+        skippedCrossSourceDupe += 1;
+        console.log(`[cg-jobstream] SKIP exact-url dupe (already on another source) → ${item.url}`);
+        continue;
+      }
+      if (!knownUrls.has(item.url) && isCrossSourceDupe(crossDupeIndex, COMPANY_NAME, item.title)) {
+        skippedCrossSourceDupe += 1;
+        console.log(`[cg-jobstream] SKIP cross-source dupe "${item.title}" @ ${COMPANY_NAME} → ${item.url}`);
+        continue;
+      }
       const wasNew = await upsertJob(client, SOURCE_KEY, item);
       if (wasNew) {
         newlyInserted += 1;
@@ -185,7 +209,7 @@ export default withTimeout("cron_jobs_CG-background", async () => {
 
     console.log(
       `[cg-jobstream] DONE - fetched=${fetched}, candidates=${collected.length}, ` +
-      `new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, skipped_invalid=${skippedInvalid}`
+      `new=${newlyInserted}, existed=${alreadyExisted}, skipped_senior=${skippedSenior}, skipped_invalid=${skippedInvalid}, skipped_cross_source_dupe=${skippedCrossSourceDupe}`
     );
 
     const complete = !crawlError;

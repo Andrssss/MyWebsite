@@ -641,12 +641,20 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
   const client = write ? await pool.connect() : null;
   if (client) await ensureTechnologiesColumn(client);
   if (client) await ensureLevelColumn(client);
-  // Cross-source guard for wherewework only (the sole SOURCES entry in this
-  // file that's in the shared whitelist) — 2026-09-08, a full-table audit
+  // Cross-source guard for wherewework — 2026-09-08, a full-table audit
   // found 11 wherewework<->AI-scraped and 2 wherewework<->profession-intern
   // collisions never prevented at insert time.
   const whereweworkCrossDupeIndex = client
     ? await loadCrossSourceDupeIndex(client, "wherewework", { onlySources: CROSS_SOURCE_DUPE_SOURCES })
+    : null;
+  // Same guard for otp (GH issue #24 follow-up, 2026-09-22): otp was
+  // whitelisted in CROSS_SOURCE_DUPE_SOURCES so every OTHER caller checks
+  // against its rows, but otp's own ingest never checked back — same gap
+  // already fixed for kuka (see cross-source-dupe-coverage memory). A live
+  // audit found real pairs this let through (e.g. "Tesztautomatizáló
+  // gyakornok" @ OTP Bank re-listed on workly/zyntern).
+  const otpCrossDupeIndex = client
+    ? await loadCrossSourceDupeIndex(client, "otp", { onlySources: CROSS_SOURCE_DUPE_SOURCES })
     : null;
 
   const stats = {
@@ -914,6 +922,24 @@ async function runBatch({ batch, size, write, debug = false, bundleDebug = false
             isCrossSourceDupe(whereweworkCrossDupeIndex, item.company, item.title)
           ) {
             console.log(`${tag}   SKIP cross-source dupe "${item.title}" @ ${item.company || "-"}`);
+            continue;
+          }
+          if (
+            source === "otp" &&
+            !knownUrls.has(item.url) &&
+            otpCrossDupeIndex &&
+            isCrossSourceUrlDupe(otpCrossDupeIndex, item.url)
+          ) {
+            console.log(`${tag}   SKIP exact-url dupe (already on another source) → ${item.url}`);
+            continue;
+          }
+          if (
+            source === "otp" &&
+            !knownUrls.has(item.url) &&
+            otpCrossDupeIndex &&
+            isCrossSourceDupe(otpCrossDupeIndex, "OTP Bank", item.title)
+          ) {
+            console.log(`${tag}   SKIP cross-source dupe "${item.title}" @ OTP Bank`);
             continue;
           }
           const pattern = patternFor ? patternFor(item.url) : null;

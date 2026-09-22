@@ -23,6 +23,7 @@ import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isJuniorTitle, isMidLevelTitle, isSeniorExperience } from "./_experience_core.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
@@ -335,10 +336,23 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
 
     console.log(`[mbh] total unique job links: ${jobSet.size}`);
 
+    // GH issue #24 follow-up (2026-09-22): mbh was whitelisted in
+    // CROSS_SOURCE_DUPE_SOURCES so every OTHER caller checks against its rows,
+    // but mbh's own ingest never checked back — same gap already fixed for
+    // kuka (see cross-source-dupe-coverage memory). A live audit found real
+    // pairs this let through (e.g. several MBH postings re-listed on
+    // profession-intern/zyntern).
+    const knownUrls = new Set(
+      (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["mbh"])).rows.map((r) => r.url)
+    );
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "mbh", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[mbh] cross-source dupe index: ${crossDupeIndex.keySet.size} keys / ${crossDupeIndex.urlSet.size} urls`);
+
     let newlyInserted = 0;
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
+    let skippedCrossSourceDupe = 0;
     let notBudapest = 0;
     let detailFetchFailed = 0;
     const foundUrls = [];
@@ -364,6 +378,17 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
         if (shouldSkipTitleFilter(parsed.title, _filters) || shouldSkipSeniorExperience(isSeniorExperience(parsed.experience))) {
           skippedSenior++;
           console.log(`[mbh] SKIP senior "${parsed.title}" → ${detailUrl}`);
+          continue;
+        }
+
+        if (!knownUrls.has(detailUrl) && isCrossSourceUrlDupe(crossDupeIndex, detailUrl)) {
+          skippedCrossSourceDupe++;
+          console.log(`[mbh] SKIP exact-url dupe (already on another source) → ${detailUrl}`);
+          continue;
+        }
+        if (!knownUrls.has(detailUrl) && isCrossSourceDupe(crossDupeIndex, COMPANY_NAME, parsed.title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[mbh] SKIP cross-source dupe "${parsed.title}" @ ${COMPANY_NAME} → ${detailUrl}`);
           continue;
         }
 
@@ -406,7 +431,7 @@ export default withTimeout("cron_jobs_MBH-background", async () => {
     console.log(
       `[mbh] DONE — total=${jobSet.size}, new=${newlyInserted}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, ` +
-      `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}`
+      `not_budapest=${notBudapest}, fetch_failed=${detailFetchFailed}, skipped_cross_source_dupe=${skippedCrossSourceDupe}`
     );
 
     // Reconcile active flag: detail failures no longer block deactivation (the

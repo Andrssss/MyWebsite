@@ -25,6 +25,7 @@ import { load as cheerioLoad } from "cheerio";
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex } from "./_active_core.mjs";
+import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import {
   isInternshipTitle,
   isSeniorExperience,
@@ -213,12 +214,20 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
       (await client.query(`SELECT url FROM job_posts WHERE source = $1`, ["mfb"])).rows.map((r) => r.url)
     );
 
+    // GH issue #24 follow-up (2026-09-22): mfb was whitelisted in
+    // CROSS_SOURCE_DUPE_SOURCES so every OTHER caller checks against its rows,
+    // but mfb's own ingest never checked back — same gap already fixed for
+    // kuka (see cross-source-dupe-coverage memory).
+    const crossDupeIndex = await loadCrossSourceDupeIndex(client, "mfb", { onlySources: CROSS_SOURCE_DUPE_SOURCES });
+    console.log(`[mfb] cross-source dupe index: ${crossDupeIndex.keySet.size} keys / ${crossDupeIndex.urlSet.size} urls`);
+
     let newlyInserted = 0;
     let migratedUrls = 0;
     let alreadyExisted = 0;
     let skippedSenior = 0;
     let skippedNoTitle = 0;
     let skippedIncomplete = 0;
+    let skippedCrossSourceDupe = 0;
     let notBudapest = 0;
     let detailFetchFailed = 0;
     // A row whose parse throws never reaches foundUrls, but the reconcile below
@@ -279,6 +288,17 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
           continue;
         }
 
+        if (!knownUrls.has(url) && isCrossSourceUrlDupe(crossDupeIndex, url)) {
+          skippedCrossSourceDupe++;
+          console.log(`[mfb] SKIP exact-url dupe (already on another source) → ${url}`);
+          continue;
+        }
+        if (!knownUrls.has(url) && isCrossSourceDupe(crossDupeIndex, COMPANY_NAME, title)) {
+          skippedCrossSourceDupe++;
+          console.log(`[mfb] SKIP cross-source dupe "${title}" @ ${COMPANY_NAME} → ${url}`);
+          continue;
+        }
+
         // A teljes sor a beszúrás ELŐTT áll össze (nincs fetch-then-UPDATE) —
         // lásd az "Experience write policy" szabályt.
         let technologies = null;
@@ -330,7 +350,7 @@ export default withTimeout("cron_jobs_MFB-background", async () => {
     console.log(
       `[mfb] DONE — total=${rows.length}, new=${newlyInserted}, migrated=${migratedUrls}, existed=${alreadyExisted}, ` +
       `skipped_senior=${skippedSenior}, skipped_no_title=${skippedNoTitle}, not_budapest=${notBudapest}, ` +
-      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}`
+      `detail_fetch_failed=${detailFetchFailed}, skipped_incomplete=${skippedIncomplete}, skipped_cross_source_dupe=${skippedCrossSourceDupe}`
     );
 
     // Single API response = full current listing, so the crawl is complete —
