@@ -134,10 +134,22 @@
 // PDF postings (keler.hu/netclass.eu/tarhely.eu — all 7 flagged PDFs are
 // still linked from their own site's current careers-listing page, so
 // genuinely live, just unmatchable by a text heuristic), client-rendered SPA
-// shells with no server-side content (hrmaster.hu, netopgraf.hu, indivizo,
-// bamboohr), and two low-hit-fraction rows (personio.de, smartcharging.hu)
-// whose fetched pages carry a proper job-specific <title> and no closed
-// banner — paraphrased-title false positives of the heuristic, not deaths.
+// shells with no server-side content (netopgraf.hu, indivizo, bamboohr), and
+// two low-hit-fraction rows (personio.de, smartcharging.hu) whose fetched
+// pages carry a proper job-specific <title> and no closed banner —
+// paraphrased-title false positives of the heuristic, not deaths.
+//
+// Same day, follow-up: the user manually confirmed the 2 hrmaster.hu rows
+// above (magicom/segelyszervezet) were genuinely dead, then asked for the
+// "not found" banner itself to be wired in — which meant re-testing the
+// 2026-09-09 "no plain-HTTP signal exists here at all" conclusion, since that
+// banner IS plain HTML. That conclusion turned out to be an artifact of only
+// ever testing already-dead tenants against each other: a fresh check found
+// an independent, genuinely live hrmaster.hu posting (a different company
+// entirely) that renders full server-side job content with zero occurrences
+// of the banner, while multiple independently-found closed postings all
+// render it — real signal, not a universal client-rendered shell. Added to
+// DEAD_PHRASES (see that entry for the HTML-entity-encoding gotcha).
 //
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
@@ -304,6 +316,21 @@ const DEAD_PHRASES = [
   // before JS redirects the visitor to the current listing; confirmed absent
   // on a currently-listed live posting on the same tenant.
   "aktualitását vesztette",
+  // hrmaster.hu (2026-09-22): CORRECTS the 2026-09-09 entry above, which
+  // concluded "no plain-HTTP signal exists here at all" after testing only
+  // magicom/segelyszervezet against real/fake/wrong-slug ids on those SAME
+  // (already-dead) tenants — every id looked byte-identical because all of
+  // them WERE dead, not because the platform can't be read without JS. A
+  // fresh check across independent tenants proves otherwise: a genuinely live
+  // posting (btesz.hrmaster.hu/.../5/gondozoapolo) renders full server-side
+  // job content with zero occurrences of this phrase, while every confirmed-
+  // closed posting checked (magicom/segelyszervezet, both user-confirmed
+  // dead, plus two more tenants found independently closed) renders this
+  // exact banner instead. The platform encodes accented characters as HTML
+  // numeric entities rather than raw UTF-8 (unlike hrfelho.hu above), so the
+  // phrase below is written in that literal encoded form — matching it after
+  // decoding would miss it entirely.
+  "a keresett &#225;ll&#225;shirdet&#233;s nem tal&#225;lhat&#243;",
 ];
 
 function stripScripts(body) {
