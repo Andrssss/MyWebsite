@@ -14,7 +14,6 @@ const CATEGORY_COLOR_MAP = {
   Mobil: "#06b6d4",
   Fejlesztő: "#a855f7",
   "C++": "#0ea5e9",
-  "Menedzser / PM": "#f43f5e",
   "Business / System Analyst": "#8b5cf6",
   "Data Analytics": "#06b6d4",
   "BI (Business Intelligence)": "#0d9488",
