@@ -115,19 +115,29 @@
 //
 // 2026-09-22: a full active+inactive audit of both sources (514 active + 103
 // revive-eligible inactive rows) found 0 wrong labels under the rules as they
-// stood, plus one real gap via the fallback title-hit review: UserWise
-// Services was stored as userwise-services.workable.com/jobs/{id} (a
-// company-branded subdomain, not apply.workable.com) and its own redirect
-// chain already landed on the documented not_found=true marker — but the
-// Workable rule below required the STORED row's host to literally be
-// apply.workable.com, so it never even asked the question. Widened to any
-// *.workable.com host (see that rule's own comment). Everything else the
-// fallback review flagged (17 candidates total) was the same already-known
-// fail-open-on-purpose shape: PDF postings, client-rendered SPA shells
-// (hrmaster.hu, netopgraf.hu, indivizo, bamboohr — 0% title-hit expected on a
-// live page too), an Eightfold tenant outside EIGHTFOLD_HOSTS, and two
-// low-confidence heuristic hits (personio.de, smartcharging.hu) more likely
-// paraphrased titles than deaths.
+// stood at the time, plus 3 real gaps via the fallback title-hit review (17
+// candidates total), each confirmed live before fixing:
+// - UserWise Services was stored as userwise-services.workable.com/jobs/{id}
+//   (a company-branded subdomain, not apply.workable.com) and its own
+//   redirect chain already landed on the documented not_found=true marker —
+//   but the Workable rule below required the STORED row's host to literally
+//   be apply.workable.com, so it never even asked the question. Widened to
+//   any *.workable.com host (see that rule's own comment).
+// - morganstanley.eightfold.ai wasn't in EIGHTFOLD_HOSTS; its sitemap is
+//   confirmed unpaginated and the flagged job id is absent from it. Added.
+// - fizetesipont.hrfelho.hu (OFSZ Zrt.) renders a plain-HTML Hungarian
+//   closed-posting banner ("...aktualitását vesztette...") before a
+//   client-side redirect — confirmed present on the dead posting and absent
+//   on a currently-listed live one on the same tenant. Added to DEAD_PHRASES.
+// The rest of the 17 candidates were the same already-known fail-open-on-
+// purpose shape, each re-confirmed live this pass rather than just assumed:
+// PDF postings (keler.hu/netclass.eu/tarhely.eu — all 7 flagged PDFs are
+// still linked from their own site's current careers-listing page, so
+// genuinely live, just unmatchable by a text heuristic), client-rendered SPA
+// shells with no server-side content (hrmaster.hu, netopgraf.hu, indivizo,
+// bamboohr), and two low-hit-fraction rows (personio.de, smartcharging.hu)
+// whose fetched pages carry a proper job-specific <title> and no closed
+// banner — paraphrased-title false positives of the heuristic, not deaths.
 //
 // EVERY rule below is the posting's own ATS answering about itself, never the
 // scraper's own extraction logic re-run against a fresh fetch (CLAUDE.md's
@@ -142,7 +152,11 @@
 // Eightfold tenants confirmed to expose `/careers/sitemap.xml` (see the header
 // comment above). Add a host here once a new tenant's sitemap is confirmed
 // live and unpaginated — do NOT add one on the strength of the URL alone.
-const EIGHTFOLD_HOSTS = new Set(["jobs.ericsson.com", "jobs.vodafone.com"]);
+// morganstanley.eightfold.ai added 2026-09-22: confirmed live (curl) —
+// /careers/sitemap.xml is a flat <urlset> (no <sitemapindex>) with 1317
+// entries, and the audit's flagged job id (549795197984) is absent from it
+// while the source page itself carried the platform's generic "Jobs" shell.
+const EIGHTFOLD_HOSTS = new Set(["jobs.ericsson.com", "jobs.vodafone.com", "morganstanley.eightfold.ai"]);
 
 /** Eightfold job id from a `/careers/job/{id}-{slug}` url, or null. */
 function eightfoldJobId(pathname) {
@@ -281,6 +295,15 @@ const DEAD_PHRASES = [
   // a swicon.com page bearing this exact banner — the redirect chain already
   // lands us on that final body, so no host-scoping is needed.
   "this job offer is no longer available",
+  // hrfelho.hu (2026-09-22): a white-label HR platform vendor (its own privacy
+  // text names it as the operator behind at least one client's career portal,
+  // fizetesipont.hrfelho.hu/OFSZ Zrt. — same shape as the karrierportal.hu
+  // family, so left host-unscoped for the same staleness reason). A closed
+  // posting's own url renders this exact server-side banner (confirmed
+  // present in the plain HTML, NOT inside the page's <script> redirect timer)
+  // before JS redirects the visitor to the current listing; confirmed absent
+  // on a currently-listed live posting on the same tenant.
+  "aktualitását vesztette",
 ];
 
 function stripScripts(body) {
