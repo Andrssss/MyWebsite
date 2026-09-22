@@ -39,7 +39,6 @@ export const CATEGORY_PRIORITY = [
   "Elemző / Analyst",
   "QA / Tesztelő",
   "Mobil",
-  "Menedzser / PM",
   "UX/UI Design",
   "Webfejlesztés",
   "Hardware",
