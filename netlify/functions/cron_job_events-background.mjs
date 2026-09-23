@@ -44,6 +44,16 @@
 // mostantól ezt is visszaadja soronként; a `free === false` sorok kiszűrése
 // magában `_job_events_store.mjs`-ben (mergeAndPurgeEvents) történik, nem
 // itt — lásd annak fejléce.
+//
+// `ical` mód (2026-09-23): harmadik, AI nélküli kinyerési út
+// (_events_ical_core.mjs) meetup.com csoportokra — a csoport saját
+// `/events/` oldala kliens-oldalon renderel (sem a nyers fetch, sem korábbi
+// WebFetch-ellenőrzések nem látták az eseményeket), DE a
+// `/<slug>/events/ical/` export valódi, statikus VEVENT adatot ad. Ugyanaz
+// a "no AI, csak ami egyszerű vagy van rá API" szabály alá esik, mint a
+// jsonld mód — l. _events_ical_core.mjs fejléce a determinisztikus
+// free/format/language heurisztikákért (nincs strukturált ár/hely mező,
+// mint jsonld `offers.price`-nál, csak szabad szöveg).
 
 export const config = {
   schedule: "30 5 */2 * *", // 2 naponta (páratlan naptári napokon) 05:30 UTC
@@ -58,6 +68,7 @@ import {
   fetchListingPage,
 } from "./_ai_events_extract_core.mjs";
 import { extractEventsJsonLd } from "./_events_jsonld_core.mjs";
+import { extractEventsIcal } from "./_events_ical_core.mjs";
 import { readEvents, mergeAndPurgeEvents } from "./_job_events_store.mjs";
 
 const connectionString = process.env.NETLIFY_DATABASE_URL;
@@ -192,8 +203,32 @@ async function runSiteLLM(client, site, knownByUrl) {
   }
 }
 
+async function runSiteIcal(client, site) {
+  let icalText;
+  try {
+    icalText = await fetchListingPage(site.list_url);
+  } catch (err) {
+    await client.query(`UPDATE event_sources SET fail_streak = fail_streak + 1 WHERE site = $1`, [site.site]);
+    console.error(`[job-events] ${site.site}: fetch failed — ${err.message}`);
+    return [];
+  }
+
+  try {
+    const events = extractEventsIcal(icalText, { defaultLocation: "Budapest" });
+    await client.query(`UPDATE event_sources SET last_ok = NOW(), fail_streak = 0 WHERE site = $1`, [site.site]);
+    console.log(`[job-events] ${site.site}: found=${events.length} (ical, no AI)`);
+    return events.map((e) => ({ ...e, source: site.site }));
+  } catch (err) {
+    await client.query(`UPDATE event_sources SET fail_streak = fail_streak + 1 WHERE site = $1`, [site.site]);
+    console.error(`[job-events] ${site.site}: ical extraction failed — ${err.message}`);
+    return [];
+  }
+}
+
 function runSite(client, site, knownByUrl) {
-  return site.mode === "jsonld" ? runSiteJsonLd(client, site) : runSiteLLM(client, site, knownByUrl);
+  if (site.mode === "jsonld") return runSiteJsonLd(client, site);
+  if (site.mode === "ical") return runSiteIcal(client, site);
+  return runSiteLLM(client, site, knownByUrl);
 }
 
 export default withTimeout("cron_job_events-background", async () => {

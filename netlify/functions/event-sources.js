@@ -26,7 +26,11 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://bakan7.netlify.app
 // valid for a source that actually embeds it (kibernaptar.hu does; verify
 // before switching a source to this mode, the cron just silently finds 0
 // events on a page without it, no error).
-const MODES = new Set(["llm-read", "jsonld", "disabled"]);
+// "ical" (2026-09-23): deterministic meetup.com iCal-export extraction, no
+// AI — see _events_ical_core.mjs. `list_url` must be the group's
+// `https://www.meetup.com/<slug>/events/ical/` export, not its `/events/`
+// page (the latter renders client-side and yields nothing to a plain fetch).
+const MODES = new Set(["llm-read", "jsonld", "ical", "disabled"]);
 
 function authorized(event) {
   const expected = (process.env.AI_INGEST_TOKEN || process.env.CRON_SECRET || "").trim();
