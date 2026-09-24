@@ -21,7 +21,7 @@ const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive, migrateVolatileUrl, escapeRegex, migrateByTitleCompany, hasActiveDuplicateByTitleCompany } from "./_active_core.mjs";
-import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, withTitleTechnologies } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience, getBlockingFilterWord } from "./_seniority_policy.mjs";
 import { hasStrongItTitle } from "./_ai_ingest_core.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -1214,7 +1214,7 @@ async function upsertJob(client, source, item) {
       (source, title, url, experience, company, technologies, level, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [source, item.title, item.url, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
+    [source, item.title, item.url, experience, item.company || null, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source })]
   );
 }
 

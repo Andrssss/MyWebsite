@@ -13,6 +13,7 @@ import {
   extractTechnologies,
   ensureTechnologiesColumn,
   ensureLevelColumn,
+  withTitleTechnologies,
 } from "./_experience_core.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
@@ -296,7 +297,7 @@ export default withTimeout(JOB_NAME, async (request) => {
            VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
            ON CONFLICT (source, url) DO NOTHING
            RETURNING id;`,
-          [SOURCE, entry.title, entry.url, finalExperience, company, technologies, computeLevel({ title: entry.title, experience: finalExperience, source: SOURCE })]
+          [SOURCE, entry.title, entry.url, finalExperience, company, withTitleTechnologies(technologies, entry.title), computeLevel({ title: entry.title, experience: finalExperience, source: SOURCE })]
         );
         if (res.rowCount > 0) {
           newlyInserted++;

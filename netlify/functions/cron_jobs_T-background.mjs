@@ -15,7 +15,7 @@ import { reconcileActive, migrateByTitleCompany, hasActiveDuplicateByTitleCompan
 import { fetchFinal } from "./cron_404sweep-background.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 import { isBlockedCompany } from "./_company_blocklist.mjs";
-import { extractTalentExperience, extractTechnologies, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { extractTalentExperience, extractTechnologies, isInternshipTitle, isSeniorExperience, withTitleTechnologies } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
@@ -182,7 +182,7 @@ async function upsertJob(client, sourceKey, item) {
       (source, title, url, experience, company, technologies, level, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source: sourceKey })]
+    [sourceKey, item.title, item.url, experience, item.company || null, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source: sourceKey })]
   );
 }
 

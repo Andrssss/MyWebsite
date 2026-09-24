@@ -37,7 +37,7 @@ import { isItJob } from "./_ai_ingest_core.mjs";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceDupe, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isSeniorExperience } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, isInternshipTitle, isSeniorExperience, withTitleTechnologies } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 
@@ -164,7 +164,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source }), COMPANY_NAME]
+    [source, item.title, item.url, experience, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source }), COMPANY_NAME]
   );
   return res.rowCount > 0;
 }

@@ -23,7 +23,7 @@ import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
-import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText } from "./_experience_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText, withTitleTechnologies } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -159,7 +159,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, experience, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
+    [source, item.title, item.url, experience, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source })]
   );
   return res.rowCount > 0;
 }

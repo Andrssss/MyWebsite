@@ -32,6 +32,7 @@ import {
   extractTechnologies,
   ensureTechnologiesColumn,
   fetchText,
+  withTitleTechnologies,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -169,7 +170,7 @@ async function upsertJob(client, source, item) {
       item.title,
       item.url,
       experience,
-      item.technologies ?? null,
+      withTitleTechnologies(item.technologies, item.title),
       computeLevel({ title: item.title, experience, source }),
       COMPANY_NAME,
     ]

@@ -520,6 +520,25 @@ export function normalizeTechnologyList(rawText) {
   return found.size ? [...found].join(", ") : null;
 }
 
+// Merges the TECH_KEYWORDS found in a posting's TITLE into its body-derived
+// technologies list (2026-09-24, user request). extractTechnologies() only
+// ever sees the detail page body, and the scoped description containers it
+// prefers usually exclude the <h1> title — so e.g. "AI Text Validation
+// Specialist (Hungarian language)", an English-body ad, never got
+// "Hungarian", and a "Java fejlesztő" whose detail fetch failed got nothing.
+// Called at every scraper's INSERT, so it also covers rows whose detail page
+// was never fetched (technologies null). Body-derived labels keep their
+// order; title-only labels are appended.
+export function withTitleTechnologies(technologies, title) {
+  const labels = technologies
+    ? String(technologies).split(",").map(s => s.trim()).filter(Boolean)
+    : [];
+  for (const label of matchTechKeywords(title || "")) {
+    if (!labels.includes(label)) labels.push(label);
+  }
+  return labels.length ? labels.join(", ") : null;
+}
+
 // Extracts a comma-joined list of recognized technology keywords from an
 // already-fetched job detail page — piggybacks on whatever html a source
 // fetched for extractBodyExperience/etc, no extra network call.

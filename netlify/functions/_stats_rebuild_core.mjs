@@ -26,10 +26,16 @@
 // ByCategory()) is innen épül újra — egy rebuild ugyanabban a menetben írja
 // az aggregált (category mező nélküli) és a kategóriánkénti (category
 // mezővel ellátott) sorokat is a dailyLanguages/dailyTechnologies tömbökbe.
+//
+// 2026-09-24: a `technologies` mezőbe a CÍM kulcsszavai is bekerülnek
+// (withTitleTechnologies, ld. _experience_core.mjs) — az élő sorokat egy
+// egyszeri backfill már javította, az archivált sorokat viszont nem írjuk
+// vissza a blobba, ezért a merge-nél itt olvasáskor pótoljuk.
 
 import { getStore } from "@netlify/blobs";
 import { computeDayStats } from "./_stats_core.mjs";
 import { replaceDays } from "./_daily_stats_store.mjs";
+import { withTitleTechnologies } from "./_experience_core.mjs";
 
 const ARCHIVE_STORE = "job-posts-archive";
 
@@ -83,7 +89,7 @@ export function mergeRows(liveRows, archiveRows) {
       title: row.title,
       source: row.source,
       experience: row.experience,
-      technologies: row.technologies,
+      technologies: withTitleTechnologies(row.technologies, row.title),
       day,
       live: isLive,
     };

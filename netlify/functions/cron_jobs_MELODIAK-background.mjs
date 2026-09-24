@@ -22,7 +22,7 @@ import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { STRONG_IT_TITLE } from "./_ai_ingest_core.mjs";
-import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText } from "./_experience_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText, withTitleTechnologies } from "./_experience_core.mjs";
 
 let _filters = [];
 
@@ -143,7 +143,7 @@ async function upsertJob(client, source, item) {
       item.title,
       item.url,
       experience,
-      item.technologies ?? null,
+      withTitleTechnologies(item.technologies, item.title),
       computeLevel({ title: item.title, experience, source }),
     ]
   );

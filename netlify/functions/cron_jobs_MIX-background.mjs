@@ -21,6 +21,7 @@ import {
   extractTechnologies,
   isInternshipTitle,
   isSeniorExperience,
+  withTitleTechnologies,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, isSeniorTitleFilterMatch, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -264,7 +265,7 @@ async function upsertJob(client, sourceKey, item) {
       (source, title, url, experience, company, technologies, level, first_seen)
      VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING;`,
-    [sourceKey, item.title, item.url, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source: sourceKey })]
+    [sourceKey, item.title, item.url, experience, item.company || null, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source: sourceKey })]
   );
 }
 

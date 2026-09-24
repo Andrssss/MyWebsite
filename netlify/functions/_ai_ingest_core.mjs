@@ -17,6 +17,7 @@ import { isBlockedCompany } from "./_company_blocklist.mjs";
 import {
   isInternshipTitle, isJuniorTitle, isMidLevelTitle, ensureTechnologiesColumn, ensureLevelColumn,
   extractYearsFromText, isSeniorExperience, normalizeTechnologyList,
+  withTitleTechnologies,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -360,7 +361,7 @@ async function upsertJob(client, source, job, resolvedExperience) {
                AND EXCLUDED.experience NOT IN ('-', ''))
            OR (job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL)
            OR (job_posts.company IS NULL AND EXCLUDED.company IS NOT NULL)`,
-    [source, job.title, job.url, resolvedExperience, job.company || null, job.technologies || null, level, startsHidden]
+    [source, job.title, job.url, resolvedExperience, job.company || null, withTitleTechnologies(job.technologies, job.title), level, startsHidden]
   );
 }
 
