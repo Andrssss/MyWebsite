@@ -9,6 +9,7 @@ import {
   INTERNSHIP_KEYWORDS, isInternshipTitle, isJuniorTitle, isMidLevelTitle,
   extractLinkedInExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn,
   isSeniorExperience,
+  withTitleTechnologies,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
@@ -296,7 +297,7 @@ async function upsertJob(client, source, item) {
      ON CONFLICT (source, url)
         DO NOTHING;
         `,
-    [source, item.title, item.url, canonicalUrl, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
+    [source, item.title, item.url, canonicalUrl, experience, item.company || null, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source })]
   );
 }
 

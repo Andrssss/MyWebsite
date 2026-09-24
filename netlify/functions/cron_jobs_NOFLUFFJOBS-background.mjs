@@ -6,7 +6,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { loadFilters } from "./load_filters.mjs";
 import { withTimeout } from "./_error-logger.mjs";
-import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
+import { extractBodyExperience, extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, withTitleTechnologies } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { loadSameSourceDupeIndex, findSameSourceDuplicate } from "./_active_core.mjs";
@@ -426,7 +426,7 @@ async function upsertJob(client, item) {
      ON CONFLICT (source, url) DO UPDATE SET
         technologies = EXCLUDED.technologies
       WHERE job_posts.technologies IS NULL AND EXCLUDED.technologies IS NOT NULL;`,
-    ["nofluffjobs", item.title, item.url, canonicalUrl, experience, item.company || null, item.technologies ?? null, computeLevel({ title: item.title, experience, source: "nofluffjobs" })]
+    ["nofluffjobs", item.title, item.url, canonicalUrl, experience, item.company || null, withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source: "nofluffjobs" })]
   );
 }
 

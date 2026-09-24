@@ -12,7 +12,7 @@ import { load as cheerioLoad } from "cheerio";
 import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { seniorAwareExperience } from "./_seniority_policy.mjs";
-import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn } from "./_experience_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, withTitleTechnologies } from "./_experience_core.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
@@ -159,7 +159,7 @@ async function upsertJob(client, sourceKey, item) {
       item.title,
       item.url,
       experience,
-      item.technologies ?? null,
+      withTitleTechnologies(item.technologies, item.title),
       computeLevel({ title: item.title, experience, source: sourceKey }),
     ]
   );

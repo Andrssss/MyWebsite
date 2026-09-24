@@ -20,7 +20,7 @@ import { withTimeout } from "./_error-logger.mjs";
 import { reconcileActive } from "./_active_core.mjs";
 import { shouldSkipTitleFilter, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
-import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText } from "./_experience_core.mjs";
+import { extractTechnologies, ensureTechnologiesColumn, ensureLevelColumn, fetchText, withTitleTechnologies } from "./_experience_core.mjs";
 import { loadCrossSourceDupeIndex, isCrossSourceUrlDupe, CROSS_SOURCE_DUPE_SOURCES } from "./_cross_source_dupe.mjs";
 
 let _filters = [];
@@ -125,7 +125,7 @@ async function upsertJob(client, source, item) {
       item.title,
       item.url,
       experience,
-      item.technologies ?? null,
+      withTitleTechnologies(item.technologies, item.title),
       computeLevel({ title: item.title, experience, source }),
     ]
   );

@@ -50,6 +50,7 @@ import {
   extractBodyExperience,
   extractTechnologies,
   isSeniorExperience,
+  withTitleTechnologies,
 } from "./_experience_core.mjs";
 import { shouldSkipTitleFilter, shouldSkipSeniorExperience, seniorAwareExperience } from "./_seniority_policy.mjs";
 import { computeLevel } from "../../src/lib/experienceLevel.mjs";
@@ -237,7 +238,7 @@ async function upsertJob(client, source, item) {
      VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
      ON CONFLICT (source, url) DO NOTHING
      RETURNING id;`,
-    [source, item.title, item.url, experience, "NIX", item.technologies ?? null, computeLevel({ title: item.title, experience, source })]
+    [source, item.title, item.url, experience, "NIX", withTitleTechnologies(item.technologies, item.title), computeLevel({ title: item.title, experience, source })]
   );
   return res.rowCount > 0;
 }
